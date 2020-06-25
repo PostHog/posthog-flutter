@@ -1,0 +1,50 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.posthog.flutter_posthog_example">
+
+    <!-- io.flutter.app.FlutterApplication is an android.app.Application that
+         calls FlutterMain.startInitialization(this); in its onCreate method.
+         In most cases you can leave this as-is, but you if you want to provide
+         additional functionality it is fine to subclass or reimplement
+         FlutterApplication and put your custom class here. -->
+    <application
+        android:name="io.flutter.app.FlutterApplication"
+        android:label="flutter_posthog_example"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- This keeps the window background of the activity showing
+                 until Flutter renders its first frame. It can be removed if
+                 there is no splash screen (such as the default splash screen
+                 defined in @style/LaunchTheme). -->
+            <meta-data
+                android:name="io.flutter.app.android.SplashScreenUntilFirstFrame"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <meta-data android:name="flutterEmbedding" android:value="2" />
+
+        <!-- Set your Posthog write key and change the automatic event tracking
+            on if you wish the library to take care of it for you.
+            Remember that the application lifecycle events won't have any
+            special context set for you by the time it is initialized. -->
+        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="<YOUR_API_KEY_GOES_HERE>" />
+        <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="false" />
+        <!--
+            If you want to debug the plugin events. Default is false.
+            <meta-data android:name="com.posthog.posthog.DEBUG" android:value="true" />
+
+            Expected shell output (flutter run) when this flag is enabled:
+                D/Analytics(32684): Ran TrackPayload{event="ButtonClicked"} on integration Posthog.com in 480110 ns.
+                D/Analytics(32684): Ran TrackPayload{event="ButtonClicked"} on integration Posthog.com in 104410 ns.
+        -->
+    </application>
+</manifest>
