@@ -137,36 +137,6 @@ Remember that the application lifecycle events won't have any special context se
 
 For more informations please check: https://posthog.com/docs/integrations/js-integration
 
-## Sending device tokens strings for push notifications
-
-Posthog integrates with 3rd parties that allow sending push notifications.
-In order to do that you will need to provide it with the device token string - which can be obtained using one of the several Flutter libraries.
-
-As soon as you obtain the device token string, you need to add it to Posthog's context by calling `setContext` and then emit a tracking event named `Application Opened` or `Application Installed`. The tracking event is needed because it is the [only moment when Posthog propagates it to 3rd parties](https://posthog.com/docs/connections/destinations/catalog/customer-io/).
-
-Both calls (`setContext` and `track`) can be done sequentially at startup time, given that the token exists.
-Nonetheless, if you don't want to delay the token propagation and don't mind having an extra `Application Opened` event in the middle of your app's events, it can be done right away when the token is acquired.
-
-```dart
-await Posthog.setContext({
-  'device': {
-    'token': yourTokenString
-  },
-});
-
-// the token is only propagated when one of two events are called:
-// - Application Installed
-// - Application Opened
-await Posthog.capture(eventName: 'Application Opened');
-```
-
-A few important points:
-
-- The token is propagated as-is to Posthog through the context field, without any manipulation or intermediate calls to Posthog's libraries. Strucutred data - such as APNs - need to be properly converted to its string representation beforehand
-- On iOS, once the `device.token` is set, calling `setContext({})` will _not_ clean up its value. This occurs due to the existence of another method from posthog's library that sets the device token for Apple Push Notification service (APNs )
-- `setContext` always overrides any previous values that were set in a previous call to `setContext`
-- `setContext` is not persisted after the application is closed
-
 ## Issues
 
 Please file any issues, bugs, or feature requests in the [GitHub repo](https://github.com/posthog/flutter-posthog/issues/new).
