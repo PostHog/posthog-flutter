@@ -70,9 +70,9 @@ class MyApp extends StatelessWidget {
 
 ## Installation
 
-Setup your Android, iOS and/or web sources as described at Posthog.com and generate your write keys.
+Setup your Android, iOS and/or web sources as described at Posthog.com and generate your api keys.
 
-Set your Posthog write key and change the automatic event tracking (only for Android and iOS) on if you wish the library to take care of it for you.
+Set your Posthog api key and change the automatic event tracking (only for Android and iOS) on if you wish the library to take care of it for you.
 Remember that the application lifecycle events won't have any special context set for you by the time it is initialized. If you are using a self hosted instance of Posthog you will need to have the public hostname or ip for your instance as well.
 
 ### Android
