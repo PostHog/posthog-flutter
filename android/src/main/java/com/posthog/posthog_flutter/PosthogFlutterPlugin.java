@@ -59,11 +59,11 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
 
       String writeKey = bundle.getString("com.posthog.posthog.API_KEY");
       String posthogHost = bundle.getString("com.posthog.posthog.POSTHOG_HOST");
-      Boolean trackApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS");
+      Boolean captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS");
       Boolean debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false);
 
       PostHog.Builder analyticsBuilder = new PostHog.Builder(applicationContext, writeKey, posthogHost);
-      if (trackApplicationLifecycleEvents) {
+      if (captureApplicationLifecycleEvents) {
         // Enable this to record certain application events automatically
         analyticsBuilder.captureApplicationLifecycleEvents();
       }
@@ -121,8 +121,8 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   public void onMethodCall(MethodCall call, Result result) {
     if(call.method.equals("identify")) {
       this.identify(call, result);
-    } else if (call.method.equals("track")) {
-      this.track(call, result);
+    } else if (call.method.equals("capture")) {
+      this.capture(call, result);
     } else if (call.method.equals("screen")) {
       this.screen(call, result);
     } else if (call.method.equals("alias")) {
@@ -171,19 +171,19 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
     PostHog.with(this.applicationContext).identify(userId, properties, options);
   }
 
-  private void track(MethodCall call, Result result) {
+  private void capture(MethodCall call, Result result) {
     try {
       String eventName = call.argument("eventName");
       HashMap<String, Object> propertiesData = call.argument("properties");
       HashMap<String, Object> options = call.argument("options");
-      this.callTrack(eventName, propertiesData, options);
+      this.callCapture(eventName, propertiesData, options);
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
-  private void callTrack(
+  private void callCapture(
     String eventName,
     HashMap<String, Object> propertiesData,
     HashMap<String, Object> optionsData

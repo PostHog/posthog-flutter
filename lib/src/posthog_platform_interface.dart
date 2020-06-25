@@ -13,18 +13,18 @@ abstract class PosthogPlatform {
 
   Future<void> identify({
     @required userId,
-    Map<String, dynamic> traits,
+    Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) {
     throw UnimplementedError('identify() has not been implemented.');
   }
 
-  Future<void> track({
+  Future<void> capture({
     @required String eventName,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) {
-    throw UnimplementedError('track() has not been implemented.');
+    throw UnimplementedError('capture() has not been implemented.');
   }
 
   Future<void> screen({
@@ -33,14 +33,6 @@ abstract class PosthogPlatform {
     Map<String, dynamic> options,
   }) {
     throw UnimplementedError('screen() has not been implemented.');
-  }
-
-  Future<void> group({
-    @required String groupId,
-    Map<String, dynamic> traits,
-    Map<String, dynamic> options,
-  }) {
-    throw UnimplementedError('group() has not been implemented.');
   }
 
   Future<void> alias({

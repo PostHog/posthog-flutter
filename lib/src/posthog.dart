@@ -11,22 +11,22 @@ class Posthog {
 
   static Future<void> identify({
     @required userId,
-    Map<String, dynamic> traits,
+    Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) {
     return _posthog.identify(
       userId: userId,
-      traits: traits,
+      properties: properties,
       options: options,
     );
   }
 
-  static Future<void> track({
+  static Future<void> capture({
     @required String eventName,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) {
-    return _posthog.track(
+    return _posthog.capture(
       eventName: eventName,
       properties: properties,
       options: options,
@@ -41,18 +41,6 @@ class Posthog {
     return _posthog.screen(
       screenName: screenName,
       properties: properties,
-      options: options,
-    );
-  }
-
-  static Future<void> group({
-    @required String groupId,
-    Map<String, dynamic> traits,
-    Map<String, dynamic> options,
-  }) {
-    return _posthog.group(
-      groupId: groupId,
-      traits: traits,
       options: options,
     );
   }

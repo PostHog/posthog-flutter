@@ -46,9 +46,9 @@ class MyApp extends StatelessWidget {
             Spacer(),
             Center(
               child: FlatButton(
-                child: Text('TRACK ACTION WITH POSTHOG'),
+                child: Text('CAPTURE ACTION WITH POSTHOG'),
                 onPressed: () {
-                  Posthog.track(
+                  Posthog.capture(
                     eventName: 'ButtonClicked',
                     properties: {
                       'foo': 'bar',
@@ -83,7 +83,7 @@ class MyApp extends StatelessWidget {
                 child: Text('Disable'),
                 onPressed: () async {
                   await Posthog.disable();
-                  Posthog.track(eventName: 'This event will not be logged');
+                  Posthog.capture(eventName: 'This event will not be logged');
                 },
               ),
             ),
@@ -93,7 +93,7 @@ class MyApp extends StatelessWidget {
                 child: Text('Enable'),
                 onPressed: () async {
                   await Posthog.enable();
-                  Posthog.track(eventName: 'Enabled tracking events!');
+                  Posthog.capture(eventName: 'Enabled capturing events!');
                 },
               ),
             ),

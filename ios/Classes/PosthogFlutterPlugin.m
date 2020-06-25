@@ -96,8 +96,8 @@ static NSDictionary *_appendToContextMiddleware;
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
   if ([@"identify" isEqualToString:call.method]) {
     [self identify:call result:result];
-  } else if ([@"track" isEqualToString:call.method]) {
-    [self track:call result:result];
+  } else if ([@"capture" isEqualToString:call.method]) {
+    [self capture:call result:result];
   } else if ([@"screen" isEqualToString:call.method]) {
     [self screen:call result:result];
   } else if ([@"alias" isEqualToString:call.method]) {
@@ -152,7 +152,7 @@ static NSDictionary *_appendToContextMiddleware;
   }
 }
 
-- (void)track:(FlutterMethodCall*)call result:(FlutterResult)result {
+- (void)capture:(FlutterMethodCall*)call result:(FlutterResult)result {
   @try {
     NSString *eventName = call.arguments[@"eventName"];
     NSDictionary *properties = call.arguments[@"properties"];

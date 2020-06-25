@@ -24,7 +24,7 @@ class PosthogWeb {
         ]);
         break;
       case 'capture':
-        analytics.callMethod('track', [
+        analytics.callMethod('capture', [
           call.arguments['eventName'],
           JsObject.jsify(call.arguments['properties']),
         ]);

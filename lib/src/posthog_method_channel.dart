@@ -8,13 +8,13 @@ const MethodChannel _channel = MethodChannel('posthog_flutter');
 class PosthogMethodChannel extends PosthogPlatform {
   Future<void> identify({
     @required userId,
-    Map<String, dynamic> traits,
+    Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) async {
     try {
       await _channel.invokeMethod('identify', {
         'userId': userId,
-        'traits': traits ?? {},
+        'properties': properties ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
       });
     } on PlatformException catch (exception) {
@@ -22,13 +22,13 @@ class PosthogMethodChannel extends PosthogPlatform {
     }
   }
 
-  Future<void> track({
+  Future<void> capture({
     @required String eventName,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) async {
     try {
-      await _channel.invokeMethod('track', {
+      await _channel.invokeMethod('capture', {
         'eventName': eventName,
         'properties': properties ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
@@ -47,22 +47,6 @@ class PosthogMethodChannel extends PosthogPlatform {
       await _channel.invokeMethod('screen', {
         'screenName': screenName,
         'properties': properties ?? {},
-        'options': options ?? PosthogDefaultOptions.instance.options ?? {},
-      });
-    } on PlatformException catch (exception) {
-      print(exception);
-    }
-  }
-
-  Future<void> group({
-    @required String groupId,
-    Map<String, dynamic> traits,
-    Map<String, dynamic> options,
-  }) async {
-    try {
-      await _channel.invokeMethod('group', {
-        'groupId': groupId,
-        'traits': traits ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
       });
     } on PlatformException catch (exception) {
