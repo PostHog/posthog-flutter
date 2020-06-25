@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_posthog/flutter_posthog.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 
 void main() {
   /// Wait until the platform channel is properly initialized so we can call

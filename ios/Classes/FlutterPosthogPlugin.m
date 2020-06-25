@@ -1,10 +1,10 @@
-#import "FlutterPosthogPlugin.h"
+#import "PosthogFlutterPlugin.h"
 #import <PostHog/PHGPostHog.h>
 #import <PostHog/PHGPostHogIntegration.h>
 #import <PostHog/PHGContext.h>
 #import <PostHog/PHGMiddleware.h>
 
-@implementation FlutterPosthogPlugin
+@implementation PosthogFlutterPlugin
 // Contents to be appended to the context
 static NSDictionary *_appendToContextMiddleware;
 
@@ -83,9 +83,9 @@ static NSDictionary *_appendToContextMiddleware;
 
     [PHGPostHog setupWithConfiguration:configuration];
     FlutterMethodChannel* channel = [FlutterMethodChannel
-      methodChannelWithName:@"flutter_posthog"
+      methodChannelWithName:@"posthog_flutter"
       binaryMessenger:[registrar messenger]];
-    FlutterPosthogPlugin* instance = [[FlutterPosthogPlugin alloc] init];
+    PosthogFlutterPlugin* instance = [[PosthogFlutterPlugin alloc] init];
     [registrar addMethodCallDelegate:instance channel:channel];
   }
   @catch (NSException *exception) {
@@ -127,7 +127,7 @@ static NSDictionary *_appendToContextMiddleware;
   }
   @catch (NSException *exception) {
     result([FlutterError
-      errorWithCode:@"FlutterPosthogException"
+      errorWithCode:@"PosthogFlutterException"
       message:[exception reason]
       details: nil]);
   }
@@ -146,7 +146,7 @@ static NSDictionary *_appendToContextMiddleware;
   }
   @catch (NSException *exception) {
     result([FlutterError
-      errorWithCode:@"FlutterPosthogException"
+      errorWithCode:@"PosthogFlutterException"
       message:[exception reason]
       details: nil]);
   }
@@ -162,7 +162,7 @@ static NSDictionary *_appendToContextMiddleware;
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -176,7 +176,7 @@ static NSDictionary *_appendToContextMiddleware;
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -188,7 +188,7 @@ static NSDictionary *_appendToContextMiddleware;
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -198,7 +198,7 @@ static NSDictionary *_appendToContextMiddleware;
     result(anonymousId);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -208,7 +208,7 @@ static NSDictionary *_appendToContextMiddleware;
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -218,7 +218,7 @@ static NSDictionary *_appendToContextMiddleware;
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -228,7 +228,7 @@ static NSDictionary *_appendToContextMiddleware;
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -239,7 +239,7 @@ static NSDictionary *_appendToContextMiddleware;
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
-    result([FlutterError errorWithCode:@"FlutterPosthogException" message:[exception reason] details: nil]);
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -250,7 +250,7 @@ static NSDictionary *_appendToContextMiddleware;
     if (!contained) {
       [result setObject:value forKey:key];
     } else if ([value isKindOfClass:[NSDictionary class]]) {
-      [result setObject:[FlutterPosthogPlugin mergeDictionary:result[key] with:value]
+      [result setObject:[PosthogFlutterPlugin mergeDictionary:result[key] with:value]
         forKey:key];
     }
   }];

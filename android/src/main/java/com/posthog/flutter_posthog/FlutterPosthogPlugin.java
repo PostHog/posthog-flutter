@@ -1,4 +1,4 @@
-package com.posthog.flutter_posthog;
+package com.posthog.posthog_flutter;
 
 import android.app.Activity;
 import android.content.Context;
@@ -29,8 +29,8 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 
-/** FlutterPosthogPlugin */
-public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
+/** PosthogFlutterPlugin */
+public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   private Context applicationContext;
   private MethodChannel methodChannel;
 
@@ -38,7 +38,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
 
   /** Plugin registration. */
   public static void registerWith(PluginRegistry.Registrar registrar) {
-    final FlutterPosthogPlugin instance = new FlutterPosthogPlugin();
+    final PosthogFlutterPlugin instance = new PosthogFlutterPlugin();
     instance.setupChannels(registrar.context(), registrar.messenger());
   }
 
@@ -49,7 +49,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
 
   private void setupChannels(Context applicationContext, BinaryMessenger messenger) {
     try {
-      methodChannel = new MethodChannel(messenger, "flutter_posthog");
+      methodChannel = new MethodChannel(messenger, "posthog_flutter");
       this.applicationContext = applicationContext;
 
       ApplicationInfo ai = applicationContext.getPackageManager()
@@ -91,7 +91,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
 
               chain.proceed(newPayload);
             } catch (Exception e) {
-              Log.e("FlutterPosthog", e.getMessage());
+              Log.e("PosthogFlutter", e.getMessage());
               chain.proceed(chain.payload());
             }
           }
@@ -105,12 +105,12 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       try {
         PostHog.setSingletonInstance(analyticsBuilder.build());
       } catch (IllegalStateException e) {
-        Log.w("FlutterPosthog", e.getMessage());
+        Log.w("PosthogFlutter", e.getMessage());
       }
       // register the channel to receive calls
       methodChannel.setMethodCallHandler(this);
     } catch (Exception e) {
-      Log.e("FlutterPosthog", e.getMessage());
+      Log.e("PosthogFlutter", e.getMessage());
     }
   }
 
@@ -150,7 +150,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       this.callIdentify(userId, traitsData, options);
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -179,7 +179,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       this.callTrack(eventName, propertiesData, options);
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -208,7 +208,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       this.callScreen(screenName, propertiesData, options);
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -237,7 +237,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       PostHog.with(this.applicationContext).alias(alias, options);
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -246,7 +246,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       String anonymousId = PostHog.with(this.applicationContext).getAnonymousId();
       result.success(anonymousId);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -255,7 +255,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       PostHog.with(this.applicationContext).reset();
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -264,7 +264,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       this.appendToContextMiddleware = call.argument("context");
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -275,7 +275,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       PostHog.with(this.applicationContext).optOut(false);
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 
@@ -286,7 +286,7 @@ public class FlutterPosthogPlugin implements MethodCallHandler, FlutterPlugin {
       PostHog.with(this.applicationContext).optOut(true);
       result.success(true);
     } catch (Exception e) {
-      result.error("FlutterPosthogException", e.getLocalizedMessage(), null);
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
   }
 

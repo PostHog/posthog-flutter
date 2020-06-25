@@ -1,4 +1,4 @@
-group 'com.posthog.flutter_posthog'
+group 'com.posthog.posthog_flutter'
 version '1.0-SNAPSHOT'
 
 buildscript {

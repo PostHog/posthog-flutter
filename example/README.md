@@ -1,6 +1,6 @@
-# flutter_posthog_example
+# posthog_flutter_example
 
-Demonstrates how to use the flutter_posthog plugin.
+Demonstrates how to use the posthog_flutter plugin.
 
 ## Getting Started
 

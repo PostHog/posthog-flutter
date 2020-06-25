@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:meta/meta.dart';
-import 'package:flutter_posthog/src/posthog_platform_interface.dart';
+import 'package:posthog_flutter/src/posthog_platform_interface.dart';
 
-export 'package:flutter_posthog/src/posthog_observer.dart';
-export 'package:flutter_posthog/src/posthog_default_options.dart';
+export 'package:posthog_flutter/src/posthog_observer.dart';
+export 'package:posthog_flutter/src/posthog_default_options.dart';
 
 class Posthog {
   static PosthogPlatform get _posthog => PosthogPlatform.instance;

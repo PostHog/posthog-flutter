@@ -1,10 +1,10 @@
-name: flutter_posthog
+name: posthog_flutter
 description: Flutter implementation of Posthog client for iOS, Android and Web
 version: 1.9.0
 homepage: https://www.posthog.com
-repository: https://github.com/posthog/flutter-posthog
-issue_tracker: https://github.com/posthog/flutter-posthog/issues
-documentation: https://github.com/posthog/flutter-posthog#readme
+repository: https://github.com/posthog/posthog-flutter
+issue_tracker: https://github.com/posthog/posthog-flutter/issues
+documentation: https://github.com/posthog/posthog-flutter#readme
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
@@ -25,10 +25,10 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.posthog.flutter_posthog
-        pluginClass: FlutterPosthogPlugin
+        package: com.posthog.posthog_flutter
+        pluginClass: PosthogFlutterPlugin
       ios:
-        pluginClass: FlutterPosthogPlugin
+        pluginClass: PosthogFlutterPlugin
       web:
         pluginClass: PosthogWeb
         fileName: src/posthog_web.dart

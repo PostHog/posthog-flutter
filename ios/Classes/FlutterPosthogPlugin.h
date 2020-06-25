@@ -1,4 +1,4 @@
 #import <Flutter/Flutter.h>
 
-@interface FlutterPosthogPlugin : NSObject <FlutterPlugin>
+@interface PosthogFlutterPlugin : NSObject <FlutterPlugin>
 @end

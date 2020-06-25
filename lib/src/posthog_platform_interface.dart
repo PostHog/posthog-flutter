@@ -1,5 +1,5 @@
 import 'package:meta/meta.dart';
-import 'package:flutter_posthog/src/posthog_method_channel.dart';
+import 'package:posthog_flutter/src/posthog_method_channel.dart';
 
 abstract class PosthogPlatform {
   /// The default instance of [PosthogPlatform] to use

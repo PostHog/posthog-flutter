@@ -6,7 +6,7 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 class PosthogWeb {
   static void registerWith(Registrar registrar) {
     final MethodChannel channel = MethodChannel(
-      'flutter_posthog',
+      'posthog_flutter',
       const StandardMethodCodec(),
       registrar.messenger,
     );

@@ -1,4 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-  package="com.posthog.flutter_posthog">
+  package="com.posthog.posthog_flutter">
     <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>

@@ -4,7 +4,7 @@ PODS:
     - Branch/Core (= 0.33.1)
   - Branch/Core (0.33.1)
   - Flutter (1.0.0)
-  - flutter_posthog (0.0.1):
+  - posthog_flutter (0.0.1):
     - Analytics (= 4.0.1)
     - Flutter
     - Posthog-Branch
@@ -14,7 +14,7 @@ PODS:
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
-  - flutter_posthog (from `.symlinks/plugins/flutter_posthog/ios`)
+  - posthog_flutter (from `.symlinks/plugins/posthog_flutter/ios`)
 
 SPEC REPOS:
   https://github.com/cocoapods/specs.git:
@@ -25,14 +25,14 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
-  flutter_posthog:
-    :path: ".symlinks/plugins/flutter_posthog/ios"
+  posthog_flutter:
+    :path: ".symlinks/plugins/posthog_flutter/ios"
 
 SPEC CHECKSUMS:
   Analytics: ebdc0c3ed93684d10c898f57886e0ce7fbecc240
   Branch: 65d05ffb137ef504777cff6bd4fb6f770f17145a
   Flutter: 0e3d915762c693b495b44d77113d4970485de6ec
-  flutter_posthog: 0357d36d6b066d5d255cda46d2f217b55110af95
+  posthog_flutter: 0357d36d6b066d5d255cda46d2f217b55110af95
   Posthog-Branch: f255ba1354f6aa1bc8654d450b3b933380f2558d
 
 PODFILE CHECKSUM: 3dbe063e9c90a5d7c9e4e76e70a821b9e2c1d271
