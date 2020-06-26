@@ -1,3 +1,7 @@
+## 1.9.2
+
+- Rename entire repo from flutter-posthog to posthog-flutter
+
 ## 1.9.1
 
 - Some renaming for consistency
