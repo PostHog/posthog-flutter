@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.posthog.flutter_posthog_example">
+    package="com.posthog.posthog_flutter_example">
 
     <!-- io.flutter.app.FlutterApplication is an android.app.Application that
          calls FlutterMain.startInitialization(this); in its onCreate method.
@@ -8,7 +8,7 @@
          FlutterApplication and put your custom class here. -->
     <application
         android:name="io.flutter.app.FlutterApplication"
-        android:label="flutter_posthog_example"
+        android:label="posthog_flutter_example"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -37,6 +37,7 @@
             Remember that the application lifecycle events won't have any
             special context set for you by the time it is initialized. -->
         <meta-data android:name="com.posthog.posthog.API_KEY" android:value="<YOUR_API_KEY_GOES_HERE>" />
+        <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://app.posthog.com" />
         <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="false" />
         <!--
             If you want to debug the plugin events. Default is false.

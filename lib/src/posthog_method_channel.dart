@@ -1,20 +1,20 @@
 import 'package:meta/meta.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_posthog/src/posthog_default_options.dart';
-import 'package:flutter_posthog/src/posthog_platform_interface.dart';
+import 'package:posthog_flutter/src/posthog_default_options.dart';
+import 'package:posthog_flutter/src/posthog_platform_interface.dart';
 
-const MethodChannel _channel = MethodChannel('flutter_posthog');
+const MethodChannel _channel = MethodChannel('posthogflutter');
 
 class PosthogMethodChannel extends PosthogPlatform {
   Future<void> identify({
-    @required userId,
-    Map<String, dynamic> traits,
+    @required distinctId,
+    Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) async {
     try {
       await _channel.invokeMethod('identify', {
-        'userId': userId,
-        'traits': traits ?? {},
+        'distinctId': distinctId,
+        'properties': properties ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
       });
     } on PlatformException catch (exception) {
@@ -22,13 +22,13 @@ class PosthogMethodChannel extends PosthogPlatform {
     }
   }
 
-  Future<void> track({
+  Future<void> capture({
     @required String eventName,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) async {
     try {
-      await _channel.invokeMethod('track', {
+      await _channel.invokeMethod('capture', {
         'eventName': eventName,
         'properties': properties ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
@@ -47,22 +47,6 @@ class PosthogMethodChannel extends PosthogPlatform {
       await _channel.invokeMethod('screen', {
         'screenName': screenName,
         'properties': properties ?? {},
-        'options': options ?? PosthogDefaultOptions.instance.options ?? {},
-      });
-    } on PlatformException catch (exception) {
-      print(exception);
-    }
-  }
-
-  Future<void> group({
-    @required String groupId,
-    Map<String, dynamic> traits,
-    Map<String, dynamic> options,
-  }) async {
-    try {
-      await _channel.invokeMethod('group', {
-        'groupId': groupId,
-        'traits': traits ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
       });
     } on PlatformException catch (exception) {
