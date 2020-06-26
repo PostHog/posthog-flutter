@@ -83,7 +83,7 @@ static NSDictionary *_appendToContextMiddleware;
 
     [PHGPostHog setupWithConfiguration:configuration];
     FlutterMethodChannel* channel = [FlutterMethodChannel
-      methodChannelWithName:@"posthog_flutter"
+      methodChannelWithName:@"posthogflutter"
       binaryMessenger:[registrar messenger]];
     PosthogFlutterPlugin* instance = [[PosthogFlutterPlugin alloc] init];
     [registrar addMethodCallDelegate:instance channel:channel];

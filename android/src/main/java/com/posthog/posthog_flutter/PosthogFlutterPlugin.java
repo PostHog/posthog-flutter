@@ -1,5 +1,7 @@
 package com.posthog.posthog_flutter;
 
+import androidx.annotation.NonNull;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -43,13 +45,13 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   }
 
   @Override
-  public void onAttachedToEngine(FlutterPluginBinding binding) {
+  public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
     setupChannels(binding.getApplicationContext(), binding.getBinaryMessenger());
   }
 
   private void setupChannels(Context applicationContext, BinaryMessenger messenger) {
     try {
-      methodChannel = new MethodChannel(messenger, "posthog_flutter");
+      methodChannel = new MethodChannel(messenger, "posthogflutter");
       this.applicationContext = applicationContext;
 
       ApplicationInfo ai = applicationContext.getPackageManager()
@@ -62,19 +64,19 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       Boolean captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS");
       Boolean debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false);
 
-      PostHog.Builder analyticsBuilder = new PostHog.Builder(applicationContext, writeKey, posthogHost);
+      PostHog.Builder posthogBuilder = new PostHog.Builder(applicationContext, writeKey, posthogHost);
       if (captureApplicationLifecycleEvents) {
         // Enable this to record certain application events automatically
-        analyticsBuilder.captureApplicationLifecycleEvents();
+        posthogBuilder.captureApplicationLifecycleEvents();
       }
 
       if (debug) {
-        analyticsBuilder.logLevel(LogLevel.DEBUG);
+        posthogBuilder.logLevel(LogLevel.DEBUG);
       }
 
       // Here we build a middleware that just appends data to the current context
       // using the [deepMerge] strategy.
-      analyticsBuilder.middleware(
+      posthogBuilder.middleware(
         new Middleware() {
           @Override
           public void intercept(Chain chain) {
@@ -103,7 +105,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       // This state may happen after the app is popped (back button until the app closes)
       // and opened again from the TaskManager.
       try {
-        PostHog.setSingletonInstance(analyticsBuilder.build());
+        PostHog.setSingletonInstance(posthogBuilder.build());
       } catch (IllegalStateException e) {
         Log.w("PosthogFlutter", e.getMessage());
       }
@@ -294,7 +296,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
    * Enables / disables / sets custom integration properties so Posthog can properly
    * interact with 3rd parties, such as Amplitude.
    * @see https://posthog.com/docs/connections/sources/catalog/libraries/mobile/android/#selecting-destinations
-   * @see https://github.com/posthogio/analytics-android/blob/master/analytics/src/main/java/com/posthog.android/Options.java
+   * @see https://github.com/posthogio/posthog-android/blob/master/posthog/src/main/java/com/posthog.android/Options.java
    */
   @SuppressWarnings("unchecked")
   private Options buildOptions(HashMap<String, Object> optionsData) {

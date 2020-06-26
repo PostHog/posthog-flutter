@@ -3,17 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/posthog_default_options.dart';
 import 'package:posthog_flutter/src/posthog_platform_interface.dart';
 
-const MethodChannel _channel = MethodChannel('posthog_flutter');
+const MethodChannel _channel = MethodChannel('posthogflutter');
 
 class PosthogMethodChannel extends PosthogPlatform {
   Future<void> identify({
-    @required userId,
+    @required distinctId,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) async {
     try {
       await _channel.invokeMethod('identify', {
-        'userId': userId,
+        'distinctId': distinctId,
         'properties': properties ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
       });
