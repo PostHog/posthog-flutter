@@ -7,13 +7,13 @@ const MethodChannel _channel = MethodChannel('posthogflutter');
 
 class PosthogMethodChannel extends PosthogPlatform {
   Future<void> identify({
-    @required distinctId,
+    @required userId,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) async {
     try {
       await _channel.invokeMethod('identify', {
-        'distinctId': distinctId,
+        'userId': userId,
         'properties': properties ?? {},
         'options': options ?? PosthogDefaultOptions.instance.options ?? {},
       });
