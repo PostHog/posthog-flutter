@@ -9,7 +9,15 @@ export 'package:posthog_flutter/src/posthog_default_options.dart';
 class Posthog {
   static PosthogPlatform get _posthog => PosthogPlatform.instance;
 
-  static Future<void> identify({
+  static final Posthog _instance = Posthog._internal();
+
+  factory Posthog() {
+    return _instance;
+  }
+
+  String currentScreen;
+
+  Future<void> identify({
     @required userId,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
@@ -21,11 +29,12 @@ class Posthog {
     );
   }
 
-  static Future<void> capture({
+  Future<void> capture({
     @required String eventName,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) {
+    properties['\$screen_name'] = this.currentScreen;
     return _posthog.capture(
       eventName: eventName,
       properties: properties,
@@ -33,11 +42,14 @@ class Posthog {
     );
   }
 
-  static Future<void> screen({
+  Future<void> screen({
     @required String screenName,
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) {
+    if (screenName != '/') {
+      this.currentScreen = screenName;
+    }
     return _posthog.screen(
       screenName: screenName,
       properties: properties,
@@ -45,7 +57,7 @@ class Posthog {
     );
   }
 
-  static Future<void> alias({
+  Future<void> alias({
     @required String alias,
     Map<String, dynamic> options,
   }) {
@@ -55,23 +67,23 @@ class Posthog {
     );
   }
 
-  static Future<String> get getAnonymousId {
+  Future<String> get getAnonymousId {
     return _posthog.getAnonymousId;
   }
 
-  static Future<void> reset() {
+  Future<void> reset() {
     return _posthog.reset();
   }
 
-  static Future<void> disable() {
+  Future<void> disable() {
     return _posthog.disable();
   }
 
-  static Future<void> enable() {
+  Future<void> enable() {
     return _posthog.enable();
   }
 
-  static Future<void> debug(bool enabled) {
+  Future<void> debug(bool enabled) {
     if (Platform.isAndroid) {
       throw Exception('Debug flag cannot be dynamically set on Android.\n'
           'Add to AndroidManifest and avoid calling this method when Platform.isAndroid.');
@@ -80,7 +92,9 @@ class Posthog {
     return _posthog.debug(enabled);
   }
 
-  static Future<void> setContext(Map<String, dynamic> context) {
+  Future<void> setContext(Map<String, dynamic> context) {
     return _posthog.setContext(context);
   }
+
+  Posthog._internal();
 }
