@@ -34,7 +34,9 @@ class Posthog {
     Map<String, dynamic> properties,
     Map<String, dynamic> options,
   }) {
-    properties['\$screen_name'] = this.currentScreen;
+    if (!properties.containsKey('\$screen_name')) {
+      properties['\$screen_name'] = this.currentScreen;
+    }
     return _posthog.capture(
       eventName: eventName,
       properties: properties,
