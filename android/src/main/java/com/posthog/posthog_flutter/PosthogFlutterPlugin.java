@@ -13,7 +13,6 @@ import android.util.Log;
 import com.posthog.android.PostHog;
 import com.posthog.android.PostHogContext;
 import com.posthog.android.Properties;
-import com.posthog.android.Traits;
 import com.posthog.android.Options;
 import com.posthog.android.Middleware;
 import com.posthog.android.payloads.BasePayload;
@@ -147,9 +146,9 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   private void identify(MethodCall call, Result result) {
     try {
       String userId = call.argument("userId");
-      HashMap<String, Object> traitsData = call.argument("traits");
+      HashMap<String, Object> propertiesData = call.argument("properties");
       HashMap<String, Object> options = call.argument("options");
-      this.callIdentify(userId, traitsData, options);
+      this.callIdentify(userId, propertiesData, options);
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
