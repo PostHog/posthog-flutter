@@ -36,7 +36,7 @@ void main() => runApp(MyApp());
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    Posthog.screen(
+    Posthog().screen(
       screenName: 'Example Screen',
     );
     return MaterialApp(
@@ -48,7 +48,7 @@ class MyApp extends StatelessWidget {
           child: FlatButton(
             child: Text('TRACK ACTION WITH POSTHOG'),
             onPressed: () {
-              Posthog.capture(
+              Posthog().capture(
                 eventName: 'ButtonClicked',
                 properties: {
                   'foo': 'bar',
