@@ -13,7 +13,7 @@ class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
   void _sendScreenView(PageRoute<dynamic> route) {
     final String screenName = nameExtractor(route.settings);
     if (screenName != null) {
-      Posthog.screen(screenName: screenName);
+      Posthog().screen(screenName: screenName);
     }
   }
 
