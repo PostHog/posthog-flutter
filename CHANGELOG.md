@@ -1,3 +1,7 @@
+## 1.11.0
+
+- Bump the version for Android lib for screen $screen_name consistency
+
 ## 1.10.0
 
 - We will include the last screen that you set in the capture events now.
