@@ -1,6 +1,10 @@
+## 1.11.1
+
+- Bump and pin version for Android lib to 1.1.0
+
 ## 1.11.0
 
-- Bump the version for Android lib for screen $screen_name consistency
+- Bump the version for Android lib for screen \$screen_name consistency
 
 ## 1.10.0
 
