@@ -1,3 +1,7 @@
+## 1.11.2
+
+- Bump and pin version for Android lib to 1.1.1 because of bug
+
 ## 1.11.1
 
 - Bump and pin version for Android lib to 1.1.0
