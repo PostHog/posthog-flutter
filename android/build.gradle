@@ -33,6 +33,6 @@ android {
     }
 
     dependencies {
-        implementation 'com.posthog.android:posthog:1.1.0'
+        implementation 'com.posthog.android:posthog:1.1.1'
     }
 }
