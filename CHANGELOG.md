@@ -1,3 +1,7 @@
+## 2.0.0
+
+- Migrate to flutter 2
+
 ## 1.11.2
 
 - Bump and pin version for Android lib to 1.1.1 because of bug
