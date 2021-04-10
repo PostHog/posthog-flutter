@@ -1,6 +1,4 @@
 import 'dart:io';
-
-import 'package:meta/meta.dart';
 import 'package:posthog_flutter/src/posthog_platform_interface.dart';
 
 export 'package:posthog_flutter/src/posthog_observer.dart';
@@ -15,12 +13,12 @@ class Posthog {
     return _instance;
   }
 
-  String currentScreen;
+  String? currentScreen;
 
   Future<void> identify({
-    @required userId,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required userId,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) {
     return _posthog.identify(
       userId: userId,
@@ -30,9 +28,9 @@ class Posthog {
   }
 
   Future<void> capture({
-    @required String eventName,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required String eventName,
+    required Map<String, dynamic> properties,
+    Map<String, dynamic>? options,
   }) {
     if (!properties.containsKey('\$screen_name')) {
       properties['\$screen_name'] = this.currentScreen;
@@ -45,9 +43,9 @@ class Posthog {
   }
 
   Future<void> screen({
-    @required String screenName,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required String screenName,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) {
     if (screenName != '/') {
       this.currentScreen = screenName;
@@ -60,8 +58,8 @@ class Posthog {
   }
 
   Future<void> alias({
-    @required String alias,
-    Map<String, dynamic> options,
+    required String alias,
+    Map<String, dynamic>? options,
   }) {
     return _posthog.alias(
       alias: alias,
@@ -69,7 +67,7 @@ class Posthog {
     );
   }
 
-  Future<String> get getAnonymousId {
+  Future<String?> get getAnonymousId {
     return _posthog.getAnonymousId;
   }
 

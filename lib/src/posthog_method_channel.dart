@@ -1,4 +1,3 @@
-import 'package:meta/meta.dart';
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/posthog_default_options.dart';
 import 'package:posthog_flutter/src/posthog_platform_interface.dart';
@@ -7,9 +6,9 @@ const MethodChannel _channel = MethodChannel('posthogflutter');
 
 class PosthogMethodChannel extends PosthogPlatform {
   Future<void> identify({
-    @required userId,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required userId,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) async {
     try {
       await _channel.invokeMethod('identify', {
@@ -23,9 +22,9 @@ class PosthogMethodChannel extends PosthogPlatform {
   }
 
   Future<void> capture({
-    @required String eventName,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required String eventName,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) async {
     try {
       await _channel.invokeMethod('capture', {
@@ -39,9 +38,9 @@ class PosthogMethodChannel extends PosthogPlatform {
   }
 
   Future<void> screen({
-    @required String screenName,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required String screenName,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) async {
     try {
       await _channel.invokeMethod('screen', {
@@ -55,8 +54,8 @@ class PosthogMethodChannel extends PosthogPlatform {
   }
 
   Future<void> alias({
-    @required String alias,
-    Map<String, dynamic> options,
+    required String alias,
+    Map<String, dynamic>? options,
   }) async {
     try {
       await _channel.invokeMethod('alias', {
@@ -68,7 +67,7 @@ class PosthogMethodChannel extends PosthogPlatform {
     }
   }
 
-  Future<String> get getAnonymousId async {
+  Future<String?> get getAnonymousId async {
     return await _channel.invokeMethod('getAnonymousId');
   }
 

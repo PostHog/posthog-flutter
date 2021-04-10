@@ -21,7 +21,7 @@ void main() {
   ///
   /// Aside from this special use case, any other context property that needs
   /// to be defined (or re-defined) can be done.
-  Posthog.setContext({
+  Posthog().setContext({
     'device': {
       'token': 'testing',
     }
@@ -33,7 +33,7 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    Posthog.screen(
+    Posthog().screen(
       screenName: 'Example Screen',
     );
     return MaterialApp(
@@ -45,10 +45,10 @@ class MyApp extends StatelessWidget {
           children: <Widget>[
             Spacer(),
             Center(
-              child: FlatButton(
+              child: TextButton(
                 child: Text('CAPTURE ACTION WITH POSTHOG'),
                 onPressed: () {
-                  Posthog.capture(
+                  Posthog().capture(
                     eventName: 'ButtonClicked',
                     properties: {
                       'foo': 'bar',
@@ -61,49 +61,52 @@ class MyApp extends StatelessWidget {
             ),
             Spacer(),
             Center(
-              child: FlatButton(
+              child: TextButton(
                 child: Text('Update Context'),
                 onPressed: () {
-                  Posthog.setContext({'custom': 123});
+                  Posthog().setContext({'custom': 123});
                 },
               ),
             ),
             Spacer(),
             Center(
-              child: FlatButton(
+              child: TextButton(
                 child: Text('Clear Context'),
                 onPressed: () {
-                  Posthog.setContext({});
+                  Posthog().setContext({});
                 },
               ),
             ),
             Spacer(),
             Center(
-              child: FlatButton(
+              child: TextButton(
                 child: Text('Disable'),
                 onPressed: () async {
-                  await Posthog.disable();
-                  Posthog.capture(eventName: 'This event will not be logged');
+                  await Posthog().disable();
+                  Posthog().capture(
+                      eventName: 'This event will not be logged',
+                      properties: {});
                 },
               ),
             ),
             Spacer(),
             Center(
-              child: FlatButton(
+              child: TextButton(
                 child: Text('Enable'),
                 onPressed: () async {
-                  await Posthog.enable();
-                  Posthog.capture(eventName: 'Enabled capturing events!');
+                  await Posthog().enable();
+                  Posthog().capture(
+                      eventName: 'Enabled capturing events!', properties: {});
                 },
               ),
             ),
             Spacer(),
             Platform.isIOS
                 ? Center(
-                    child: FlatButton(
+                    child: TextButton(
                       child: Text('Debug mode'),
                       onPressed: () {
-                        Posthog.debug(true);
+                        Posthog().debug(true);
                       },
                     ),
                   )
