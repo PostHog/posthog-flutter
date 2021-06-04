@@ -29,10 +29,10 @@ class Posthog {
 
   Future<void> capture({
     required String eventName,
-    required Map<String, dynamic> properties,
+    Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) {
-    if (!properties.containsKey('\$screen_name')) {
+    if (properties != null && !properties.containsKey('\$screen_name')) {
       properties['\$screen_name'] = this.currentScreen;
     }
     return _posthog.capture(
