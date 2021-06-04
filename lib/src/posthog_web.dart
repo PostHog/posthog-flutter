@@ -8,7 +8,6 @@ class PosthogWeb {
     final MethodChannel channel = MethodChannel(
       'posthog_flutter',
       const StandardMethodCodec(),
-      registrar.messenger,
     );
     final PosthogWeb instance = PosthogWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
@@ -44,7 +43,6 @@ class PosthogWeb {
         final user = analytics.callMethod('user');
         final anonymousId = user.callMethod('anonymousId');
         return anonymousId;
-        break;
       case 'reset':
         analytics.callMethod('reset');
         break;

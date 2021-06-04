@@ -1,5 +1,5 @@
 class PosthogDefaultOptions {
-  Map<String, dynamic> options;
+  Map<String, dynamic>? options;
 
   /// Singleton of [PosthogDefaultOptions].
   static final PosthogDefaultOptions instance = PosthogDefaultOptions._();

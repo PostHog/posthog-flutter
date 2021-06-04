@@ -1,4 +1,3 @@
-import 'package:meta/meta.dart';
 import 'package:posthog_flutter/src/posthog_method_channel.dart';
 
 abstract class PosthogPlatform {
@@ -12,37 +11,37 @@ abstract class PosthogPlatform {
   static PosthogPlatform instance = PosthogMethodChannel();
 
   Future<void> identify({
-    @required userId,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required userId,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) {
     throw UnimplementedError('identify() has not been implemented.');
   }
 
   Future<void> capture({
-    @required String eventName,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required String eventName,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) {
     throw UnimplementedError('capture() has not been implemented.');
   }
 
   Future<void> screen({
-    @required String screenName,
-    Map<String, dynamic> properties,
-    Map<String, dynamic> options,
+    required String screenName,
+    Map<String, dynamic>? properties,
+    Map<String, dynamic>? options,
   }) {
     throw UnimplementedError('screen() has not been implemented.');
   }
 
   Future<void> alias({
-    @required String alias,
-    Map<String, dynamic> options,
+    required String alias,
+    Map<String, dynamic>? options,
   }) {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
-  Future<String> get getAnonymousId {
+  Future<String?> get getAnonymousId {
     throw UnimplementedError('getAnonymousId() has not been implemented.');
   }
 
