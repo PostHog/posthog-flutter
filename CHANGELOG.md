@@ -1,3 +1,7 @@
+## 2.0.1
+
+- Remove `generated_plugin_registrant.dart` from library
+
 ## 2.0.0
 
 - Migrate to flutter 2
