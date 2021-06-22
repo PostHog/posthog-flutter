@@ -144,6 +144,11 @@ Please file any issues, bugs, or feature requests in the [GitHub repo](https://g
 
 If you wish to contribute a change to this repo, please send a [pull request](https://github.com/posthog/posthog-flutter/pulls).
 
+## Deploying to pub.dev
+
+- [Developing and publishing packages & plugins](https://flutter.dev/docs/development/packages-and-plugins/developing-packages#publish)
+- [Publishing packages](https://dart.dev/tools/pub/publishing)
+
 ## Questions?
 
 ### [Join our Slack community.](https://join.slack.com/t/posthogusers/shared_invite/enQtOTY0MzU5NjAwMDY3LTc2MWQ0OTZlNjhkODk3ZDI3NDVjMDE1YjgxY2I4ZjI4MzJhZmVmNjJkN2NmMGJmMzc2N2U3Yjc3ZjI5NGFlZDQ)
