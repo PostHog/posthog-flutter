@@ -1,7 +1,7 @@
 import 'dart:js';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart' show Registrar;
 
 class PosthogWeb {
   static void registerWith(Registrar registrar) {
