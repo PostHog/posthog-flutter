@@ -1,3 +1,6 @@
+## 2.0.1
+
+- Update examples for PosthogWeb imports
 ## 2.0.0
 
 - Migrate to flutter 2
