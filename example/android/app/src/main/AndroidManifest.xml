@@ -36,7 +36,7 @@
             on if you wish the library to take care of it for you.
             Remember that the application lifecycle events won't have any
             special context set for you by the time it is initialized. -->
-        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="<YOUR_API_KEY_GOES_HERE>" />
+        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="YOUR_API_KEY_GOES_HERE" />
         <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://app.posthog.com" />
         <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="false" />
         <!--

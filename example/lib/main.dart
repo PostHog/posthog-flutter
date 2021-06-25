@@ -101,17 +101,6 @@ class MyApp extends StatelessWidget {
               ),
             ),
             Spacer(),
-            Platform.isIOS
-                ? Center(
-                    child: TextButton(
-                      child: Text('Debug mode'),
-                      onPressed: () {
-                        Posthog().debug(true);
-                      },
-                    ),
-                  )
-                : Container(),
-            Spacer(),
           ],
         ),
       ),

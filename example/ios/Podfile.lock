@@ -1,26 +1,17 @@
 PODS:
-  - Analytics (4.0.1)
-  - Branch (0.33.1):
-    - Branch/Core (= 0.33.1)
-  - Branch/Core (0.33.1)
   - Flutter (1.0.0)
+  - PostHog (1.2.1)
   - posthog_flutter (0.0.1):
-    - Analytics (= 4.0.1)
     - Flutter
-    - Posthog-Branch
-  - Posthog-Branch (0.1.22):
-    - Analytics
-    - Branch (~> 0.33.0)
+    - PostHog (~> 1.0)
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
   - posthog_flutter (from `.symlinks/plugins/posthog_flutter/ios`)
 
 SPEC REPOS:
-  https://github.com/cocoapods/specs.git:
-    - Analytics
-    - Branch
-    - Posthog-Branch
+  trunk:
+    - PostHog
 
 EXTERNAL SOURCES:
   Flutter:
@@ -29,12 +20,10 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/posthog_flutter/ios"
 
 SPEC CHECKSUMS:
-  Analytics: ebdc0c3ed93684d10c898f57886e0ce7fbecc240
-  Branch: 65d05ffb137ef504777cff6bd4fb6f770f17145a
-  Flutter: 0e3d915762c693b495b44d77113d4970485de6ec
-  posthog_flutter: 0357d36d6b066d5d255cda46d2f217b55110af95
-  Posthog-Branch: f255ba1354f6aa1bc8654d450b3b933380f2558d
+  Flutter: 434fef37c0980e73bb6479ef766c45957d4b510c
+  PostHog: 7c7113d36ef50d1de284e89ff329685c8cf8a28b
+  posthog_flutter: e5bed2753b8c124158530724e30232998aaf9137
 
-PODFILE CHECKSUM: 3dbe063e9c90a5d7c9e4e76e70a821b9e2c1d271
+PODFILE CHECKSUM: 8e679eca47255a8ca8067c4c67aab20e64cb974d
 
-COCOAPODS: 1.7.4
+COCOAPODS: 1.10.1

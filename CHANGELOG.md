@@ -1,3 +1,9 @@
+## 2.0.2
+
+- Update to androidX for example android project
+- Fix ios example app and params
+- Fix web library, example, and docs
+
 ## 2.0.1
 
 - Remove `generated_plugin_registrant.dart` from library

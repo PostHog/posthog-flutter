@@ -3,11 +3,13 @@ import 'dart:js';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart' show Registrar;
 
+
 class PosthogWeb {
   static void registerWith(Registrar registrar) {
     final MethodChannel channel = MethodChannel(
-      'posthog_flutter',
+      'posthogflutter',
       const StandardMethodCodec(),
+      registrar.messenger,
     );
     final PosthogWeb instance = PosthogWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
@@ -29,7 +31,7 @@ class PosthogWeb {
         ]);
         break;
       case 'screen':
-        analytics.callMethod('page', [
+        analytics.callMethod('capture', [
           call.arguments['screenName'],
           JsObject.jsify(call.arguments['properties']),
         ]);
