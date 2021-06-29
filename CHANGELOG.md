@@ -1,3 +1,7 @@
+## 2.0.3
+
+- Bugfixes with flutter web and identify call https://github.com/PostHog/posthog-flutter/pull/16
+
 ## 2.0.2
 
 - Update to androidX for example android project
