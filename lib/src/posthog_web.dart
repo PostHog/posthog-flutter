@@ -3,7 +3,6 @@ import 'dart:js';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart' show Registrar;
 
-
 class PosthogWeb {
   static void registerWith(Registrar registrar) {
     final MethodChannel channel = MethodChannel(
@@ -20,7 +19,7 @@ class PosthogWeb {
     switch (call.method) {
       case 'identify':
         analytics.callMethod('identify', [
-          call.arguments['distinctId'],
+          call.arguments['userId'],
           JsObject.jsify(call.arguments['properties']),
         ]);
         break;
@@ -42,8 +41,7 @@ class PosthogWeb {
         ]);
         break;
       case 'getAnonymousId':
-        final user = analytics.callMethod('user');
-        final anonymousId = user.callMethod('anonymousId');
+        final anonymousId = analytics.callMethod('get_distinct_id');
         return anonymousId;
       case 'reset':
         analytics.callMethod('reset');
@@ -56,8 +54,7 @@ class PosthogWeb {
       default:
         throw PlatformException(
           code: 'Unimplemented',
-          details:
-              "The posthog plugin for web doesn't implement the method '${call.method}'",
+          details: "The posthog plugin for web doesn't implement the method '${call.method}'",
         );
     }
   }
