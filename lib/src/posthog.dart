@@ -1,8 +1,9 @@
 import 'dart:io';
+
 import 'package:posthog_flutter/src/posthog_platform_interface.dart';
 
-export 'package:posthog_flutter/src/posthog_observer.dart';
 export 'package:posthog_flutter/src/posthog_default_options.dart';
+export 'package:posthog_flutter/src/posthog_observer.dart';
 
 class Posthog {
   static PosthogPlatform get _posthog => PosthogPlatform.instance;
@@ -32,7 +33,9 @@ class Posthog {
     Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) {
-    if (properties != null && !properties.containsKey('\$screen_name')) {
+    if (properties != null &&
+        !properties.containsKey('\$screen_name') &&
+        this.currentScreen != null) {
       properties['\$screen_name'] = this.currentScreen;
     }
     return _posthog.capture(
