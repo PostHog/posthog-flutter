@@ -15,6 +15,7 @@ static NSDictionary *_appendToContextMiddleware;
     NSString *writeKey = [dict objectForKey: @"com.posthog.posthog.API_KEY"];
     NSString *posthogHost = [dict objectForKey: @"com.posthog.posthog.POSTHOG_HOST"];
     BOOL captureApplicationLifecycleEvents = [[dict objectForKey: @"com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS"] boolValue];
+    BOOL shouldSendDeviceID = [[dict objectForKey: @"com.posthog.posthog.TRACK_DEVICE_ID"] boolValue];
     PHGPostHogConfiguration *configuration = [PHGPostHogConfiguration configurationWithApiKey:writeKey host:posthogHost];
 
     // This middleware is responsible for manipulating only the context part of the request,
@@ -80,6 +81,8 @@ static NSDictionary *_appendToContextMiddleware;
     ];
 
     configuration.captureApplicationLifecycleEvents = captureApplicationLifecycleEvents;
+    // Send device ID only if explicitly requested
+    configuration.shouldSendDeviceID = shouldSendDeviceID;
 
     [PHGPostHog setupWithConfiguration:configuration];
     FlutterMethodChannel* channel = [FlutterMethodChannel

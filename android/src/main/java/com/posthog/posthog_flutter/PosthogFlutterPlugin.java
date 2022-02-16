@@ -15,6 +15,7 @@ import com.posthog.android.PostHogContext;
 import com.posthog.android.Properties;
 import com.posthog.android.Options;
 import com.posthog.android.Middleware;
+import com.posthog.android.ValueMap;
 import com.posthog.android.payloads.BasePayload;
 import static com.posthog.android.PostHog.LogLevel;
 
@@ -60,10 +61,30 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
 
       String writeKey = bundle.getString("com.posthog.posthog.API_KEY");
       String posthogHost = bundle.getString("com.posthog.posthog.POSTHOG_HOST");
-      Boolean captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS");
+      Boolean captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false);
+      Boolean collectDeviceId = bundle.getBoolean("com.posthog.posthog.TRACK_DEVICE_ID", true);
       Boolean debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false);
 
       PostHog.Builder posthogBuilder = new PostHog.Builder(applicationContext, writeKey, posthogHost);
+
+      posthogBuilder.collectDeviceId(collectDeviceId);
+
+      if (!collectDeviceId) {
+        Middleware middleware = new Middleware() {
+          @Override
+          public void intercept(Chain chain) {
+            BasePayload payload = chain.payload();
+            ValueMap properties = payload.getValueMap("properties");
+
+            if (properties != null) properties.remove("$device_id");
+
+            chain.proceed(payload);
+          }
+        };
+
+        posthogBuilder.middleware(middleware);
+      }
+
       if (captureApplicationLifecycleEvents) {
         // Enable this to record certain application events automatically
         posthogBuilder.captureApplicationLifecycleEvents();

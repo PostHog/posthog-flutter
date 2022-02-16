@@ -45,6 +45,8 @@
 	<string>YOUR_API_KEY_GOES_HERE</string>
 	<key>com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS</key>
 	<false/>
+	<key>com.posthog.posthog.TRACK_DEVICE_ID</key>
+	<false/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 </dict>
