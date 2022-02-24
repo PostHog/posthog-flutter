@@ -16,6 +16,7 @@ static NSDictionary *_appendToContextMiddleware;
     NSString *posthogHost = [dict objectForKey: @"com.posthog.posthog.POSTHOG_HOST"];
     BOOL captureApplicationLifecycleEvents = [[dict objectForKey: @"com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS"] boolValue];
     BOOL shouldSendDeviceID = [[dict objectForKey: @"com.posthog.posthog.TRACK_DEVICE_ID"] boolValue];
+    NSArray *trackingBlacklist = [dict objectForKey: @"com.posthog.posthog.TRACK_BLACKLIST"];
     PHGPostHogConfiguration *configuration = [PHGPostHogConfiguration configurationWithApiKey:writeKey host:posthogHost];
 
     // This middleware is responsible for manipulating only the context part of the request,
@@ -76,8 +77,86 @@ static NSDictionary *_appendToContextMiddleware;
       );
     };
 
+    // This middleware is responsible for filtering tracking content by blacklist
+    PHGMiddlewareBlock trackingBlacklistMiddleware = ^(PHGContext *_Nonnull context, PHGMiddlewareNext _Nonnull next) {
+      // Do not execute if there is nothing to append
+      if ([trackingBlacklist count] == 0) {
+        next(context);
+        return;
+      }
+
+      NSPredicate *blacklistPredicate = [NSPredicate predicateWithFormat:@"NOT(self IN %@)", trackingBlacklist];
+
+      // Avoid overriding the context if there is none to override
+      // (see different payload types here: https://github.com/posthogio/analytics-ios/tree/master/PostHog/Classes/Integrations)
+      if (![context.payload isKindOfClass:[PHGCapturePayload class]]
+        && ![context.payload isKindOfClass:[PHGScreenPayload class]]
+        && ![context.payload isKindOfClass:[PHGIdentifyPayload class]]) {
+        next(context);
+        return;
+      }
+
+      next([context
+        modify: ^(id<PHGMutableContext> _Nonnull ctx) {
+          if (_appendToContextMiddleware == nil) {
+            return;
+          }
+
+          // do not touch it if no payload is present
+          if (ctx.payload == nil) {
+            NSLog(@"Cannot update posthog context when the current context payload is empty.");
+            return;
+          }
+
+          @try {
+            // PHGPayload does not offer copyWith* methods, so we have to
+            // manually test and re-create it for each of its type.
+            if ([ctx.payload isKindOfClass:[PHGCapturePayload class]]) {
+              NSDictionary *properties = ((PHGCapturePayload*)ctx.payload).properties;
+
+              NSLog(@"PHGCapturePayload before: %@", properties);
+              properties = [properties dictionaryWithValuesForKeys:[properties.allKeys filteredArrayUsingPredicate:blacklistPredicate]];
+              NSLog(@"PHGCapturePayload after: %@", properties);
+
+              ctx.payload = [[PHGCapturePayload alloc]
+                initWithEvent: ((PHGCapturePayload*)ctx.payload).event
+                properties: properties
+              ];
+            } else if ([ctx.payload isKindOfClass:[PHGScreenPayload class]]) {
+              NSDictionary *properties = ((PHGScreenPayload*)ctx.payload).properties;
+
+              NSLog(@"PHGScreenPayload before: %@", properties);
+              properties = [properties dictionaryWithValuesForKeys:[properties.allKeys filteredArrayUsingPredicate:blacklistPredicate]];
+              NSLog(@"PHGScreenPayload after: %@", properties);
+
+              ctx.payload = [[PHGScreenPayload alloc]
+                initWithName: ((PHGScreenPayload*)ctx.payload).name
+                properties: properties
+              ];
+            } else if ([ctx.payload isKindOfClass:[PHGIdentifyPayload class]]) {
+              NSDictionary *properties = ((PHGIdentifyPayload*)ctx.payload).properties;
+
+              NSLog(@"PHGIdentifyPayload before: %@", properties);
+              properties = [properties dictionaryWithValuesForKeys:[properties.allKeys filteredArrayUsingPredicate:blacklistPredicate]];
+              NSLog(@"PHGIdentifyPayload after: %@", properties);
+
+              ctx.payload = [[PHGIdentifyPayload alloc]
+                initWithDistinctId: ((PHGIdentifyPayload*)ctx.payload).distinctId
+                anonymousId: ((PHGIdentifyPayload*)ctx.payload).anonymousId
+                properties: properties
+              ];
+            }
+          }
+          @catch (NSException *exception) {
+            NSLog(@"Could not update posthog context: %@", [exception reason]);
+          }
+        }]
+      );
+    };
+
     configuration.middlewares = @[
-      [[PHGBlockMiddleware alloc] initWithBlock:contextMiddleware]
+      [[PHGBlockMiddleware alloc] initWithBlock:contextMiddleware],
+      [[PHGBlockMiddleware alloc] initWithBlock:trackingBlacklistMiddleware]
     ];
 
     configuration.captureApplicationLifecycleEvents = captureApplicationLifecycleEvents;
