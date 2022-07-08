@@ -100,7 +100,7 @@ class Posthog {
   }
 
   Future<void> flush() {
-    return _poshog.flush();
+    return _posthog.flush();
   }
 
   Posthog._internal();
