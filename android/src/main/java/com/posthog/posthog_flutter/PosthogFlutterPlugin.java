@@ -159,6 +159,8 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       this.disable(call, result);
     } else if (call.method.equals("enable")) {
       this.enable(call, result);
+    } else if (call.method.equals("enable")) {
+        this.flush(call, result);
     } else {
       result.notImplemented();
     }
@@ -306,6 +308,16 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   private void disable(MethodCall call, Result result) {
     try {
       PostHog.with(this.applicationContext).optOut(true);
+      result.success(true);
+    } catch (Exception e) {
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
+    }
+  }
+
+  // Immediately flush
+  private void flush(MethodCall call, Result result) {
+    try {
+      PostHog.with(this.applicationContext).flush();
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);

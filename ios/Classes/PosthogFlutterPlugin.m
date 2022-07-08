@@ -117,6 +117,8 @@ static NSDictionary *_appendToContextMiddleware;
     [self debug:call result:result];
   } else if ([@"setContext" isEqualToString:call.method]) {
     [self setContext:call result:result];
+  } else if ([@"flush" isEqualToString:call.method]) {
+    [self flush:result];
   } else {
     result(FlutterMethodNotImplemented);
   }
@@ -260,4 +262,13 @@ static NSDictionary *_appendToContextMiddleware;
   return result;
 }
 
+- (void)flush:(FlutterResult)result {
+  @try {
+    [[PHGPostHog sharedPostHog] flush];
+    result([NSNumber numberWithBool:YES]);
+  }
+  @catch (NSException *exception) {
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
+  }
+}
 @end

@@ -114,4 +114,12 @@ class PosthogMethodChannel extends PosthogPlatform {
       print(exception);
     }
   }
+
+  Future<void> flush() async {
+    try {
+      await _channel.invokeMethod('flush');
+    } on PlatformException catch (exception) {
+      print(exception);
+    }
+  }
 }

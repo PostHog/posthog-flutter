@@ -99,5 +99,9 @@ class Posthog {
     return _posthog.setContext(context);
   }
 
+  Future<void> flush() {
+    return _poshog.flush();
+  }
+
   Posthog._internal();
 }

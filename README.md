@@ -22,6 +22,7 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 | `enable`         | X       | X   |     |
 | `debug`          | X\*     | X   | X   |
 | `setContext`     | X       | X   |     |
+| `flush`          | X       | X   |     |
 
 \* Debugging must be set as a configuration parameter in `AndroidManifest.xml` (see below). The official posthog library does not offer the debug method for Android.
 

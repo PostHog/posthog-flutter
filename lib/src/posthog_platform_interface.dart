@@ -64,4 +64,8 @@ abstract class PosthogPlatform {
   Future<void> setContext(Map<String, dynamic> context) {
     throw UnimplementedError('setContext() has not been implemented.');
   }
+
+  Future<void> flush() {
+    throw UnimplementedError('flush() has not been implemented.');
+  }
 }
