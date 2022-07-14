@@ -159,7 +159,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       this.disable(call, result);
     } else if (call.method.equals("enable")) {
       this.enable(call, result);
-    } else if (call.method.equals("enable")) {
+    } else if (call.method.equals("flush")) {
         this.flush(call, result);
     } else {
       result.notImplemented();
