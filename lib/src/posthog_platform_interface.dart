@@ -64,4 +64,12 @@ abstract class PosthogPlatform {
   Future<void> setContext(Map<String, dynamic> context) {
     throw UnimplementedError('setContext() has not been implemented.');
   }
+
+  Future<bool?> isFeatureEnabled(String key) {
+    throw UnimplementedError('isFeatureEnabled() has not been implemented.');
+  }
+
+  Future<void> reloadFeatureFlags() {
+    throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
+  }
 }

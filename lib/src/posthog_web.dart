@@ -51,10 +51,16 @@ class PosthogWeb {
           call.arguments['debug'],
         ]);
         break;
+      case 'isFeatureEnabled':
+        final isFeatureEnabled = analytics.callMethod('getFeatureFlag', [
+          call.arguments['key'],
+        ]);
+        return isFeatureEnabled;
       default:
         throw PlatformException(
           code: 'Unimplemented',
-          details: "The posthog plugin for web doesn't implement the method '${call.method}'",
+          details:
+              "The posthog plugin for web doesn't implement the method '${call.method}'",
         );
     }
   }

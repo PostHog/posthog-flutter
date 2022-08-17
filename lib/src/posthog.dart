@@ -99,5 +99,13 @@ class Posthog {
     return _posthog.setContext(context);
   }
 
+  Future<bool?> isFeatureEnabled(String key) {
+    return _posthog.isFeatureEnabled(key);
+  }
+
+  Future<void> reloadFeatureFlags() {
+    return _posthog.reloadFeatureFlags();
+  }
+
   Posthog._internal();
 }

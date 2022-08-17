@@ -138,6 +138,10 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       this.disable(call, result);
     } else if (call.method.equals("enable")) {
       this.enable(call, result);
+    } else if (call.method.equals("isFeatureEnabled")) {
+      this.isFeatureEnabled(call, result);
+    } else if (call.method.equals("reloadFeatureFlags")) {
+      this.reloadFeatureFlags(call, result);
     } else {
       result.notImplemented();
     }
@@ -291,6 +295,24 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
     }
   }
 
+  private void isFeatureEnabled(MethodCall call, Result result) {
+    try {
+      String key = call.argument("key");
+      boolean isEnabled = PostHog.with(this.applicationContext).isFeatureEnabled(key);
+      result.success(isEnabled);
+    } catch (Exception e) {
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
+    }
+  }
+
+  private void reloadFeatureFlags(MethodCall call, Result result) {
+    try {
+      PostHog.with(this.applicationContext).reloadFeatureFlags();
+      result.success(true);
+    } catch (Exception e) {
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
+    }
+  }
   /**
    * Enables / disables / sets custom integration properties so Posthog can properly
    * interact with 3rd parties, such as Amplitude.
