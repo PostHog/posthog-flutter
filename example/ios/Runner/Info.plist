@@ -47,6 +47,11 @@
 	<false/>
 	<key>com.posthog.posthog.TRACK_DEVICE_ID</key>
 	<false/>
+	<key>com.posthog.posthog.TRACK_BLACKLIST</key>
+	<array>
+		<string>foo</string>
+		<string>bar</string>
+	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 </dict>
