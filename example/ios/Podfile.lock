@@ -1,29 +1,33 @@
 PODS:
   - Flutter (1.0.0)
-  - PostHog (1.4.4)
+  - PostHog (2.0.0)
   - posthog_flutter (0.0.1):
     - Flutter
-    - PostHog (~> 1.4.4)
+    - PostHog (~> 2.0.0)
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
+  - "PostHog (from `git@github.com:SafeNow100/posthog-ios.git`)"
   - posthog_flutter (from `.symlinks/plugins/posthog_flutter/ios`)
-
-SPEC REPOS:
-  trunk:
-    - PostHog
 
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
+  PostHog:
+    :git: "git@github.com:SafeNow100/posthog-ios.git"
   posthog_flutter:
     :path: ".symlinks/plugins/posthog_flutter/ios"
 
+CHECKOUT OPTIONS:
+  PostHog:
+    :commit: 75e22276faf2cf62f268e42e5965439c70e602dd
+    :git: "git@github.com:SafeNow100/posthog-ios.git"
+
 SPEC CHECKSUMS:
   Flutter: 50d75fe2f02b26cc09d224853bb45737f8b3214a
-  PostHog: 4b6321b521569092d4ef3a02238d9435dbaeb99f
-  posthog_flutter: f491e6dfccc47447eacaf561467db6087701b536
+  PostHog: 660ec6c9d80cec17b685e148f17f6785a88b597d
+  posthog_flutter: 26034bf2a278b52bcf4200fa31e45f4b1581d39f
 
-PODFILE CHECKSUM: 8e679eca47255a8ca8067c4c67aab20e64cb974d
+PODFILE CHECKSUM: b5a11171241f2a7577da488229d9741beb6022ed
 
-COCOAPODS: 1.11.2
+COCOAPODS: 1.11.3
