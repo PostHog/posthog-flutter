@@ -64,6 +64,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       Boolean captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false);
       Boolean collectDeviceId = bundle.getBoolean("com.posthog.posthog.TRACK_DEVICE_ID", true);
       Boolean debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false);
+      String[] trackingBlacklist = bundle.getString("com.posthog.posthog.TRACK_BLACKLIST", "").split(", *");
 
       PostHog.Builder posthogBuilder = new PostHog.Builder(applicationContext, writeKey, posthogHost);
 
@@ -97,28 +98,48 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       // Here we build a middleware that just appends data to the current context
       // using the [deepMerge] strategy.
       posthogBuilder.middleware(
-        new Middleware() {
+          new Middleware() {
+            @Override
+            public void intercept(Chain chain) {
+              try {
+                if (appendToContextMiddleware == null) {
+                  chain.proceed(chain.payload());
+                  return;
+                }
+
+                BasePayload payload = chain.payload();
+                BasePayload newPayload = payload.toBuilder()
+                    .context(appendToContextMiddleware)
+                    .build();
+
+                chain.proceed(newPayload);
+              } catch (Exception e) {
+                Log.e("PosthogFlutter", e.getMessage());
+                chain.proceed(chain.payload());
+              }
+            }
+          });
+
+      // Here we build a middleware that removes blacklisted properties (if any).
+      if (trackingBlacklist.length > 0) {
+        Middleware middleware = new Middleware() {
           @Override
           public void intercept(Chain chain) {
-            try {
-              if (appendToContextMiddleware == null) {
-                chain.proceed(chain.payload());
-                return;
+            BasePayload payload = chain.payload();
+            ValueMap properties = payload.getValueMap("properties");
+
+            if (properties != null) {
+              for (String key : trackingBlacklist) {
+                properties.remove(key);
               }
-
-              BasePayload payload = chain.payload();
-              BasePayload newPayload = payload.toBuilder()
-                .context(appendToContextMiddleware)
-                .build();
-
-              chain.proceed(newPayload);
-            } catch (Exception e) {
-              Log.e("PosthogFlutter", e.getMessage());
-              chain.proceed(chain.payload());
             }
+
+            chain.proceed(payload);
           }
-        }
-      );
+        };
+
+        posthogBuilder.middleware(middleware);
+      }
 
       // Set the initialized instance as globally accessible.
       // It may throw an exception if we are trying to re-register a singleton PostHog instance.
