@@ -49,6 +49,15 @@
 	<false/>
 	<key>com.posthog.posthog.TRACK_BLACKLIST</key>
 	<array>
+		<string>$network_carrier</string>
+		<string>$network_bluetooth</string>
+		<string>$screen_density</string>
+		<string>$screen_width</string>
+		<string>$screen_height</string>
+		<string>$device_model</string>
+		<string>$network_wifi</string>
+		<string>$lib_version</string>
+		<string>$locale</string>
 		<string>foo</string>
 		<string>bar</string>
 	</array>

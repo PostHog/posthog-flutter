@@ -20,7 +20,7 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   PostHog:
-    :commit: 75e22276faf2cf62f268e42e5965439c70e602dd
+    :commit: ad41b11430ccc24d5163a069f95bddd5bdaadd5b
     :git: "git@github.com:SafeNow100/posthog-ios.git"
 
 SPEC CHECKSUMS:
@@ -28,6 +28,6 @@ SPEC CHECKSUMS:
   PostHog: 660ec6c9d80cec17b685e148f17f6785a88b597d
   posthog_flutter: 26034bf2a278b52bcf4200fa31e45f4b1581d39f
 
-PODFILE CHECKSUM: b5a11171241f2a7577da488229d9741beb6022ed
+PODFILE CHECKSUM: f577b9c94cec7067241c83cf8dae9f03f47726a9
 
 COCOAPODS: 1.11.3

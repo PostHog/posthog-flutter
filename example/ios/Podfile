@@ -1,10 +1,10 @@
 # Uncomment this line to define a global platform for your project
 # platform :ios, '9.0'
 
-pod 'PostHog', :git => 'git@github.com:SafeNow100/posthog-ios.git'
-
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+pod 'PostHog', :git => 'git@github.com:SafeNow100/posthog-ios.git'
 
 project 'Runner', {
   'Debug' => :debug,

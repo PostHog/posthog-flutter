@@ -36,10 +36,12 @@
             on if you wish the library to take care of it for you.
             Remember that the application lifecycle events won't have any
             special context set for you by the time it is initialized. -->
-        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="YOUR_API_KEY_GOES_HERE" />
+        <meta-data android:name="com.posthog.posthog.API_KEY" android:value="phc_tGKlTdkGmlXoriazJgzQwJJpojGt3udUWU1v2wPD0zk" />
         <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://app.posthog.com" />
         <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="true" />
         <meta-data android:name="com.posthog.posthog.TRACK_DEVICE_ID" android:value="false" />
+        <meta-data android:name="com.posthog.posthog.TRACK_BLACKLIST" 
+          android:value="$network_carrier, $network_bluetooth, $screen_density, $screen_width, $screen_height, $device_model, $network_wifi, $lib_version, $locale, foo, bar" />
 
         <!--
             If you want to debug the plugin events. Default is false.
