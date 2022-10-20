@@ -16,7 +16,7 @@ rootProject.allprojects {
     repositories {
         google()
         jcenter()
-        // maven { url 'https://jitpack.io' }
+        maven { url 'https://jitpack.io' }
     }
 }
 
@@ -35,7 +35,6 @@ android {
 
     dependencies {
         // implementation 'com.posthog.android:posthog:1.1.1'
-        // implementation 'com.github.SafeNow100:posthog-android:master'
-	implementation project (':posthog-android')
+	implementation 'com.github.SafeNow100:posthog-android:master-SNAPSHOT'
     }
 }
