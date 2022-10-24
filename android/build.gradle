@@ -35,6 +35,6 @@ android {
 
     dependencies {
         // implementation 'com.posthog.android:posthog:1.1.1'
-	implementation 'com.github.SafeNow100:posthog-android:master-SNAPSHOT'
+        implementation 'com.github.SafeNow100:posthog-android:master-SNAPSHOT'
     }
 }
