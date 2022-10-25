@@ -52,10 +52,13 @@ class PosthogWeb {
         ]);
         break;
       case 'isFeatureEnabled':
-        final isFeatureEnabled = analytics.callMethod('getFeatureFlag', [
+        final isFeatureEnabled = analytics.callMethod('isFeatureEnabled', [
           call.arguments['key'],
         ]);
         return isFeatureEnabled;
+      case 'reloadFeatureFlags':
+        analytics.callMethod('reloadFeatureFlags');
+        break;
       default:
         throw PlatformException(
           code: 'Unimplemented',

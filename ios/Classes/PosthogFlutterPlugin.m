@@ -114,8 +114,37 @@ static NSDictionary *_appendToContextMiddleware;
     [self debug:call result:result];
   } else if ([@"setContext" isEqualToString:call.method]) {
     [self setContext:call result:result];
+  } else if ([@"isFeatureEnabled" isEqualToString:call.method]) {
+    [self isFeatureEnabled:call result:result];
+  } else if ([@"reloadFeatureFlags" isEqualToString:call.method]) {
+    [self reloadFeatureFlags:call result:result];
   } else {
     result(FlutterMethodNotImplemented);
+  }
+}
+
+- (void)isFeatureEnabled:(FlutterMethodCall*)call result:(FlutterResult)result {
+  @try {
+    NSString *key = call.arguments[@"key"];
+
+    BOOL *isFeatureEnabledResult = [[PHGPostHog sharedPostHog] isFeatureEnabled: key];
+    result([NSNumber numberWithBool:isFeatureEnabledResult]);
+  }
+  @catch (NSException *exception) {
+    result([FlutterError
+      errorWithCode:@"PosthogFlutterException"
+      message:[exception reason]
+      details: nil]);
+  }
+}
+
+- (void)reloadFeatureFlags:(FlutterResult)result {
+  @try {
+    [[PHGPostHog sharedPostHog] reloadFeatureFlags];
+    result([NSNumber numberWithBool:YES]);
+  }
+  @catch (NSException *exception) {
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
