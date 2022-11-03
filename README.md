@@ -18,8 +18,8 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 | `alias`          | X       | X   | X   |
 | `getAnonymousId` | X       | X   | X   |
 | `reset`          | X       | X   | X   |
-| `disable`        | X       | X   |     |
-| `enable`         | X       | X   |     |
+| `disable`        | X       | X   | X   |
+| `enable`         | X       | X   | X   |
 | `debug`          | X\*     | X   | X   |
 | `setContext`     | X       | X   |     |
 
