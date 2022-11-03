@@ -51,6 +51,12 @@ class PosthogWeb {
           call.arguments['debug'],
         ]);
         break;
+      case 'enable':
+        analytics.callMethod('opt_in_capturing');
+        break;
+      case 'disable':
+        analytics.callMethod('opt_out_capturing');
+        break;
       default:
         throw PlatformException(
           code: 'Unimplemented',
