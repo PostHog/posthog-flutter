@@ -58,6 +58,11 @@ class PosthogWeb {
         return isFeatureEnabled;
       case 'reloadFeatureFlags':
         analytics.callMethod('reloadFeatureFlags');
+      case 'enable':
+        analytics.callMethod('opt_in_capturing');
+        break;
+      case 'disable':
+        analytics.callMethod('opt_out_capturing');
         break;
       default:
         throw PlatformException(
