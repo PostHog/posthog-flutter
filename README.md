@@ -10,18 +10,20 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 
 ### Supported methods
 
-| Method           | Android | iOS | Web |
-| ---------------- | ------- | --- | --- |
-| `identify`       | X       | X   | X   |
-| `capture`        | X       | X   | X   |
-| `screen`         | X       | X   | X   |
-| `alias`          | X       | X   | X   |
-| `getAnonymousId` | X       | X   | X   |
-| `reset`          | X       | X   | X   |
-| `disable`        | X       | X   | X   |
-| `enable`         | X       | X   | X   |
-| `debug`          | X\*     | X   | X   |
-| `setContext`     | X       | X   |     |
+| Method              | Android | iOS | Web |
+| ------------------  | ------- | --- | --- |
+| `identify`          | X       | X   | X   |
+| `capture`           | X       | X   | X   |
+| `screen`            | X       | X   | X   |
+| `alias`             | X       | X   | X   |
+| `getAnonymousId`    | X       | X   | X   |
+| `reset`             | X       | X   | X   |
+| `disable`           | X       | X   |     |
+| `enable`            | X       | X   |     |
+| `debug`             | X\*     | X   | X   |
+| `setContext`        | X       | X   |     |
+| `isFeatureEnabled`  | X       | X   | X   |
+| `reloadFeatureFlags`| X       | X   | X   |
 
 \* Debugging must be set as a configuration parameter in `AndroidManifest.xml` (see below). The official posthog library does not offer the debug method for Android.
 
