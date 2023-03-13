@@ -58,6 +58,7 @@ class PosthogWeb {
         return isFeatureEnabled;
       case 'reloadFeatureFlags':
         analytics.callMethod('reloadFeatureFlags');
+        break;
       case 'enable':
         analytics.callMethod('opt_in_capturing');
         break;
