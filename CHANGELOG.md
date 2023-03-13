@@ -1,3 +1,7 @@
+## 3.0.0
+
+- Adds basic feature flags support with `isFeatureEnabled` and `reloadFeatureFlags`
+
 ## 2.0.3
 
 - Bugfixes with flutter web and identify call https://github.com/PostHog/posthog-flutter/pull/16
