@@ -1,3 +1,7 @@
+## 3.0.4
+
+- Adds CI/CD for deploying to pub.dev
+
 ## 3.0.0
 
 - Adds basic feature flags support with `isFeatureEnabled` and `reloadFeatureFlags`
