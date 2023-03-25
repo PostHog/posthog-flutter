@@ -8,7 +8,7 @@ class PosthogWeb {
     final MethodChannel channel = MethodChannel(
       'posthogflutter',
       const StandardMethodCodec(),
-      registrar.messenger,
+      registrar,
     );
     final PosthogWeb instance = PosthogWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
