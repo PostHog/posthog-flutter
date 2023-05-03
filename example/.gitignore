@@ -588,3 +588,7 @@ healthchecksdb
 MigrationBackup/
 
 # End of https://www.gitignore.io/api/git,dart,flutter,intellij,webstorm,visualstudio
+
+
+# Web related
+lib/generated_plugin_registrant.dart
