@@ -138,7 +138,7 @@ static NSDictionary *_appendToContextMiddleware;
   }
 }
 
-- (void)reloadFeatureFlags:(FlutterResult)result {
+- (void)reloadFeatureFlags:(FlutterMethodCall*)call result:(FlutterResult)result {
   @try {
     [[PHGPostHog sharedPostHog] reloadFeatureFlags];
     result([NSNumber numberWithBool:YES]);
