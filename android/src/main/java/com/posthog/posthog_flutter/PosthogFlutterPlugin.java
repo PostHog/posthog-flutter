@@ -293,7 +293,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       HashMap<String, Object> propertiesData = call.argument("groupProperties");
       Properties properties = this.hashMapToProperties(propertiesData);
 
-      PostHog.with(this.applicationContext).group(groupType, groupKey, properties);
+      PostHog.with(this.applicationContext).group(groupType, groupKey, properties, null);
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
