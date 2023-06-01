@@ -56,6 +56,13 @@ class PosthogWeb {
           call.arguments['key'],
         ]);
         return isFeatureEnabled;
+      case 'group':
+        analytics.callMethod('group', [
+          call.arguments['groupType'],
+          call.arguments['groupKey'],
+          JsObject.jsify(call.arguments['groupProperties']),
+        ]);
+        break;
       case 'reloadFeatureFlags':
         analytics.callMethod('reloadFeatureFlags');
         break;

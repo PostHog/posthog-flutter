@@ -142,96 +142,68 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
       this.isFeatureEnabled(call, result);
     } else if (call.method.equals("reloadFeatureFlags")) {
       this.reloadFeatureFlags(call, result);
+    } else if (call.method.equals("group")) {
+      this.reloadFeatureFlags(call, result);
     } else {
       result.notImplemented();
     }
+  }
+
+  private Properties hashMapToProperties(HashMap<String, Object> propertiesData) {
+    Properties properties = new Properties();
+
+    for(Map.Entry<String, Object> property : propertiesData.entrySet()) {
+      String key = property.getKey();
+      Object value = property.getValue();
+      properties.putValue(key, value);
+    }
+
+    return properties;
   }
 
   private void identify(MethodCall call, Result result) {
     try {
       String userId = call.argument("userId");
       HashMap<String, Object> propertiesData = call.argument("properties");
-      HashMap<String, Object> options = call.argument("options");
-      this.callIdentify(userId, propertiesData, options);
+      HashMap<String, Object> optionsData = call.argument("options");
+      Properties properties = this.hashMapToProperties(propertiesData);
+      Options options = this.buildOptions(optionsData);
+      PostHog.with(this.applicationContext).identify(userId, properties, options);
+
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
-  }
-
-  private void callIdentify(
-    String userId,
-    HashMap<String, Object> propertiesData,
-    HashMap<String, Object> optionsData
-  ) {
-    Properties properties = new Properties();
-    Options options = this.buildOptions(optionsData);
-
-    for(Map.Entry<String, Object> property : propertiesData.entrySet()) {
-      String key = property.getKey();
-      Object value = property.getValue();
-      properties.putValue(key, value);
-    }
-
-    PostHog.with(this.applicationContext).identify(userId, properties, options);
   }
 
   private void capture(MethodCall call, Result result) {
     try {
       String eventName = call.argument("eventName");
       HashMap<String, Object> propertiesData = call.argument("properties");
-      HashMap<String, Object> options = call.argument("options");
-      this.callCapture(eventName, propertiesData, options);
+      HashMap<String, Object> optionsData = call.argument("options");
+      Properties properties = this.hashMapToProperties(propertiesData);
+      Options options = this.buildOptions(optionsData);
+
+      PostHog.with(this.applicationContext).capture(eventName, properties, options);
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
-  }
-
-  private void callCapture(
-    String eventName,
-    HashMap<String, Object> propertiesData,
-    HashMap<String, Object> optionsData
-  ) {
-    Properties properties = new Properties();
-    Options options = this.buildOptions(optionsData);
-
-    for(Map.Entry<String, Object> property : propertiesData.entrySet()) {
-      String key = property.getKey();
-      Object value = property.getValue();
-      properties.putValue(key, value);
-    }
-
-    PostHog.with(this.applicationContext).capture(eventName, properties, options);
   }
 
   private void screen(MethodCall call, Result result) {
     try {
       String screenName = call.argument("screenName");
       HashMap<String, Object> propertiesData = call.argument("properties");
-      HashMap<String, Object> options = call.argument("options");
-      this.callScreen(screenName, propertiesData, options);
+      HashMap<String, Object> optionsData = call.argument("options");
+      Properties properties = this.hashMapToProperties(propertiesData);
+      Options options = this.buildOptions(optionsData);
+
+      PostHog.with(this.applicationContext).screen(screenName, properties, options);
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
     }
-  }
-
-  private void callScreen(
-    String screenName,
-    HashMap<String, Object> propertiesData,
-    HashMap<String, Object> optionsData
-  ) {
-    Properties properties = new Properties();
-    Options options = this.buildOptions(optionsData);
-
-    for(Map.Entry<String, Object> property : propertiesData.entrySet()) {
-      String key = property.getKey();
-      Object value = property.getValue();
-      properties.putValue(key, value);
-    }
-
-    PostHog.with(this.applicationContext).screen(screenName, properties, options);
   }
 
   private void alias(MethodCall call, Result result) {
@@ -308,6 +280,20 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   private void reloadFeatureFlags(MethodCall call, Result result) {
     try {
       PostHog.with(this.applicationContext).reloadFeatureFlags();
+      result.success(true);
+    } catch (Exception e) {
+      result.error("PosthogFlutterException", e.getLocalizedMessage(), null);
+    }
+  }
+
+  private void group(MethodCall call, Result result) {
+    try {
+      String groupType = call.argument("groupType");
+      String groupKey = call.argument("groupKey");
+      HashMap<String, Object> propertiesData = call.argument("groupProperties");
+      Properties properties = this.hashMapToProperties(propertiesData);
+
+      PostHog.with(this.applicationContext).group(groupType, groupKey, properties);
       result.success(true);
     } catch (Exception e) {
       result.error("PosthogFlutterException", e.getLocalizedMessage(), null);

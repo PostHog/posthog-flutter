@@ -6,7 +6,7 @@ const MethodChannel _channel = MethodChannel('posthogflutter');
 
 class PosthogMethodChannel extends PosthogPlatform {
   Future<void> identify({
-    required userId,
+    required String userId,
     Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) async {
@@ -130,6 +130,22 @@ class PosthogMethodChannel extends PosthogPlatform {
   Future<void> reloadFeatureFlags() async {
     try {
       await _channel.invokeMethod('reloadFeatureFlags');
+    } on PlatformException catch (exception) {
+      print(exception);
+    }
+  }
+
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    Map<String, dynamic>? groupProperties,
+  }) async {
+    try {
+      await _channel.invokeMethod('group', {
+        'groupType': groupType,
+        'groupKey': groupKey,
+        'groupProperties': groupProperties ?? {},
+      });
     } on PlatformException catch (exception) {
       print(exception);
     }

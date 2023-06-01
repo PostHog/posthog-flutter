@@ -118,7 +118,9 @@ static NSDictionary *_appendToContextMiddleware;
     [self isFeatureEnabled:call result:result];
   } else if ([@"reloadFeatureFlags" isEqualToString:call.method]) {
     [self reloadFeatureFlags:call result:result];
-  } else {
+  } else if ([@"group" isEqualToString:call.method]) {
+    [self group:call result:result];
+  }  else {
     result(FlutterMethodNotImplemented);
   }
 }
@@ -160,7 +162,26 @@ static NSDictionary *_appendToContextMiddleware;
       message:[exception reason]
       details: nil]);
   }
+}
 
+
+- (void)group:(FlutterMethodCall*)call result:(FlutterResult)result {
+  @try {
+    NSString *groupType = call.arguments[@"groupType"];
+    NSString *groupKey = call.arguments[@"groupKey"];
+    NSDictionary *groupProperties = call.arguments[@"groupProperties"];
+    [[PHGPostHog sharedPostHog] saveGroup: groupType groupKey: groupKey]
+    [[PHGPostHog sharedPostHog] group: groupType 
+                                groupKey: groupKey 
+                                groupProperties: groupProperties];
+    result([NSNumber numberWithBool:YES]);
+  }
+  @catch (NSException *exception) {
+    result([FlutterError
+      errorWithCode:@"PosthogFlutterException"
+      message:[exception reason]
+      details: nil]);
+  }
 }
 
 - (void)identify:(FlutterMethodCall*)call result:(FlutterResult)result {
