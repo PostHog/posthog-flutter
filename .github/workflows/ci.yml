@@ -16,6 +16,11 @@ jobs:
         with:
           channel: 'stable'
       - name: Install dependencies
+        working-directory: ./example
         run: flutter pub get
-      - name: Test
+      - name: Build iOS
+        working-directory: ./example
         run: flutter flutter build ios
+      - name: Build Android
+        working-directory: ./example
+        run: flutter flutter build apk
