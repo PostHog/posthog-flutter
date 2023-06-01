@@ -170,10 +170,9 @@ static NSDictionary *_appendToContextMiddleware;
     NSString *groupType = call.arguments[@"groupType"];
     NSString *groupKey = call.arguments[@"groupKey"];
     NSDictionary *groupProperties = call.arguments[@"groupProperties"];
-    [[PHGPostHog sharedPostHog] saveGroup: groupType groupKey: groupKey]
     [[PHGPostHog sharedPostHog] group: groupType 
                                 groupKey: groupKey 
-                                groupProperties: groupProperties];
+                                properties: groupProperties];
     result([NSNumber numberWithBool:YES]);
   }
   @catch (NSException *exception) {
