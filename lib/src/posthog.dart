@@ -17,7 +17,7 @@ class Posthog {
   String? currentScreen;
 
   Future<void> identify({
-    required userId,
+    required String userId,
     Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) {
