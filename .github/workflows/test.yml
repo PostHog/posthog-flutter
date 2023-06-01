@@ -1,0 +1,21 @@
+name: Tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+# Publish using custom workflow
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Test
+        run: flutter test
