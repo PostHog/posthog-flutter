@@ -20,7 +20,7 @@ jobs:
         run: flutter pub get
       - name: Build iOS
         working-directory: ./example
-        run: flutter flutter build ios
+        run: flutter build ios
       - name: Build Android
         working-directory: ./example
-        run: flutter flutter build apk
+        run: flutter build apk
