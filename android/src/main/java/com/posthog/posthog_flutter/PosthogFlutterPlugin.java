@@ -153,9 +153,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
     Properties properties = new Properties();
 
     for(Map.Entry<String, Object> property : propertiesData.entrySet()) {
-      String key = property.getKey();
-      Object value = property.getValue();
-      properties.putValue(key, value);
+      properties.putValue(property.getKey(), property.getValue());
     }
 
     return properties;
