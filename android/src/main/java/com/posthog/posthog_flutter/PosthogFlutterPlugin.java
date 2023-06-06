@@ -143,7 +143,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
     } else if (call.method.equals("reloadFeatureFlags")) {
       this.reloadFeatureFlags(call, result);
     } else if (call.method.equals("group")) {
-      this.reloadFeatureFlags(call, result);
+      this.group(call, result);
     } else {
       result.notImplemented();
     }
