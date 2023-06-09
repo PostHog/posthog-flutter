@@ -1,3 +1,12 @@
+## 3.1.0
+
+- Adds support for `groups`
+- Fixes a type issue with identify so that the userId is now always a String
+
+## 3.0.5
+
+- Fixes a bug with the iOS implementation for feature flags that stopped the SDK from building
+
 ## 3.0.4
 
 - Adds CI/CD for deploying to pub.dev
