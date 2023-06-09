@@ -17,7 +17,7 @@ class Posthog {
   String? currentScreen;
 
   Future<void> identify({
-    required userId,
+    required String userId,
     Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) {
@@ -105,6 +105,18 @@ class Posthog {
 
   Future<void> reloadFeatureFlags() {
     return _posthog.reloadFeatureFlags();
+  }
+  
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    required Map<String, dynamic> groupProperties,
+  }) {
+    return _posthog.group(
+      groupType: groupType,
+      groupKey: groupKey,
+      groupProperties: groupProperties
+    );
   }
 
   Posthog._internal();

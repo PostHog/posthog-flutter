@@ -11,7 +11,7 @@ abstract class PosthogPlatform {
   static PosthogPlatform instance = PosthogMethodChannel();
 
   Future<void> identify({
-    required userId,
+    required String userId,
     Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) {
@@ -71,5 +71,13 @@ abstract class PosthogPlatform {
 
   Future<void> reloadFeatureFlags() {
     throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
+  }
+
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    Map<String, dynamic>? groupProperties
+  }) {
+    throw UnimplementedError('group() has not been implemented.');
   }
 }
