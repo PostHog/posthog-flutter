@@ -15,7 +15,13 @@ import com.posthog.android.PostHogContext;
 import com.posthog.android.Properties;
 import com.posthog.android.Options;
 import com.posthog.android.Middleware;
+import com.posthog.android.payloads.AliasPayload;
 import com.posthog.android.payloads.BasePayload;
+import com.posthog.android.payloads.CapturePayload;
+import com.posthog.android.payloads.GroupPayload;
+import com.posthog.android.payloads.IdentifyPayload;
+import com.posthog.android.payloads.ScreenPayload;
+
 import static com.posthog.android.PostHog.LogLevel;
 
 import java.util.LinkedHashMap;
@@ -38,6 +44,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   static HashMap<String, Object> appendToContextMiddleware;
 
   /** Plugin registration. */
+  @SuppressWarnings("deprecation")
   public static void registerWith(PluginRegistry.Registrar registrar) {
     final PosthogFlutterPlugin instance = new PosthogFlutterPlugin();
     instance.setupChannels(registrar.context(), registrar.messenger());
@@ -86,9 +93,22 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
               }
 
               BasePayload payload = chain.payload();
-              BasePayload newPayload = payload.toBuilder()
-                .context(appendToContextMiddleware)
-                .build();
+//              BasePayload newPayload = payload.toBuilder()
+//                .context(appendToContextMiddleware)
+//                .build();
+              BasePayload newPayload = null;
+              // great opportunity to use Sealed Classes and ensure a comprehensive check
+              if (payload instanceof AliasPayload) {
+                newPayload = ((AliasPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
+              } else if (payload instanceof CapturePayload) {
+                newPayload = ((CapturePayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
+              } else if (payload instanceof GroupPayload) {
+                newPayload = ((GroupPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
+              } else if (payload instanceof IdentifyPayload) {
+                newPayload = ((IdentifyPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
+              } else if (payload instanceof ScreenPayload) {
+                newPayload = ((ScreenPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
+              }
 
               chain.proceed(newPayload);
             } catch (Exception e) {
@@ -309,6 +329,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
     return options;
   }
 
+  /*
   // Merges [newMap] into [original], *not* preserving [original]
   // keys (deep) in case of conflicts.
   private static Map deepMerge(Map original, Map newMap) {
@@ -323,4 +344,6 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
     }
     return original;
   }
+   */
+
 }
