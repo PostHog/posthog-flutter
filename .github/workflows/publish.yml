@@ -14,8 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     # use dart-lang/setup-dart/.github/workflows/publish.yml@v1 when https://github.com/dart-lang/setup-dart/issues/68 is fixed
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
       - name: Install dependencies
         run: flutter pub get
       - name: Publish
