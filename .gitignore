@@ -597,3 +597,5 @@ lib/example/generated_plugin_registrant.dart
 
 # FVM
 .fvm/
+
+posthog_flutter.iml
