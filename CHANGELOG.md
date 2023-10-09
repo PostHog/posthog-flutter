@@ -1,5 +1,7 @@
 ## Next
 
+## 3.2.0
+
 - Add support to Dart v3.0.0 (#52)[https://github.com/PostHog/posthog-flutter/pull/52]
 
 ## 3.1.0
