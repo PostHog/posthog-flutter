@@ -591,4 +591,6 @@ MigrationBackup/
 
 
 # Web related
-lib/generated_plugin_registrant.dart
+
+android/.project
+android/.settings
