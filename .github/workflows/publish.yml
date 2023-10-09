@@ -1,24 +1,12 @@
-# .github/workflows/publish.yml
 name: Publish to pub.dev
 
 on:
   push:
     tags:
-    - 'v[0-9]+.[0-9]+.[0-9]+*' # tag pattern on pub.dev: 'v'
+      - '[0-9]+.[0-9]+.[0-9]+*'
 
-# Publish using custom workflow
 jobs:
   publish:
-    permissions:
-      id-token: write # This is required for authentication using OIDC
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dart-lang/setup-dart@v1
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Publish
-        run: flutter pub publish --force
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    # with:
+    #   working-directory: path/to/package/within/repository
