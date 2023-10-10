@@ -1,40 +1,31 @@
 package com.posthog.posthog_flutter;
 
-import androidx.annotation.NonNull;
+import static com.posthog.android.PostHog.LogLevel;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.posthog.android.PostHog;
-import com.posthog.android.PostHogContext;
-import com.posthog.android.Properties;
-import com.posthog.android.Options;
+import androidx.annotation.NonNull;
+
 import com.posthog.android.Middleware;
-import com.posthog.android.payloads.AliasPayload;
+import com.posthog.android.Options;
+import com.posthog.android.PostHog;
+import com.posthog.android.Properties;
 import com.posthog.android.payloads.BasePayload;
-import com.posthog.android.payloads.CapturePayload;
-import com.posthog.android.payloads.GroupPayload;
-import com.posthog.android.payloads.IdentifyPayload;
-import com.posthog.android.payloads.ScreenPayload;
 
-import static com.posthog.android.PostHog.LogLevel;
-
-import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
-import io.flutter.embedding.engine.plugins.FlutterPlugin;
 
 /** PosthogFlutterPlugin */
 public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
@@ -80,8 +71,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
         posthogBuilder.logLevel(LogLevel.DEBUG);
       }
 
-      // Here we build a middleware that just appends data to the current context
-      // using the [deepMerge] strategy.
+      // Here we build a middleware that just appends data to the current context.
       posthogBuilder.middleware(
         new Middleware() {
           @Override
