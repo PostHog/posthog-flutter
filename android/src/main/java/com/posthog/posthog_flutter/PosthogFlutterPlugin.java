@@ -93,22 +93,9 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
               }
 
               BasePayload payload = chain.payload();
-//              BasePayload newPayload = payload.toBuilder()
-//                .context(appendToContextMiddleware)
-//                .build();
-              BasePayload newPayload = null;
-              // great opportunity to use Sealed Classes and ensure a comprehensive check
-              if (payload instanceof AliasPayload) {
-                newPayload = ((AliasPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
-              } else if (payload instanceof CapturePayload) {
-                newPayload = ((CapturePayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
-              } else if (payload instanceof GroupPayload) {
-                newPayload = ((GroupPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
-              } else if (payload instanceof IdentifyPayload) {
-                newPayload = ((IdentifyPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
-              } else if (payload instanceof ScreenPayload) {
-                newPayload = ((ScreenPayload.Builder) payload.toBuilder()).context(appendToContextMiddleware).build();
-              }
+              BasePayload newPayload = payload.toBuilder()
+                .context(appendToContextMiddleware)
+                .build();
 
               chain.proceed(newPayload);
             } catch (Exception e) {
@@ -328,22 +315,4 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
     Options options = new Options();
     return options;
   }
-
-  /*
-  // Merges [newMap] into [original], *not* preserving [original]
-  // keys (deep) in case of conflicts.
-  private static Map deepMerge(Map original, Map newMap) {
-    for (Object key : newMap.keySet()) {
-      if (newMap.get(key) instanceof Map && original.get(key) instanceof Map) {
-        Map originalChild = (Map) original.get(key);
-        Map newChild = (Map) newMap.get(key);
-        original.put(key, deepMerge(originalChild, newChild));
-      } else {
-        original.put(key, newMap.get(key));
-      }
-    }
-    return original;
-  }
-   */
-
 }
