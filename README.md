@@ -1,12 +1,12 @@
-# Posthog plugin
+# PostHog plugin
 
-![Pub Version](https://img.shields.io/pub/v/posthog_flutter)
+[![Package on pub.dev][pubdev_badge]][pubdev_link]
 
 Flutter plugin to support iOS, Android and Web sources at https://posthog.com.
 
 ## Usage
 
-To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml file](https://flutter.io/platform-plugins/).
+To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml file](https://pub.dev/packages/posthog_flutter/install).
 
 ### Supported methods
 
@@ -153,3 +153,7 @@ If you wish to contribute a change to this repo, please send a [pull request](ht
 ## Questions?
 
 ### [Join our Slack community.](https://join.slack.com/t/posthogusers/shared_invite/enQtOTY0MzU5NjAwMDY3LTc2MWQ0OTZlNjhkODk3ZDI3NDVjMDE1YjgxY2I4ZjI4MzJhZmVmNjJkN2NmMGJmMzc2N2U3Yjc3ZjI5NGFlZDQ)
+
+
+[pubdev_badge]: https://img.shields.io/pub/v/posthog_flutter
+[pubdev_link]: https://pub.dev/packages/posthog_flutter

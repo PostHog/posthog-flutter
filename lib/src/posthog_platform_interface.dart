@@ -73,11 +73,10 @@ abstract class PosthogPlatform {
     throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
   }
 
-  Future<void> group({
-    required String groupType,
-    required String groupKey,
-    Map<String, dynamic>? groupProperties
-  }) {
+  Future<void> group(
+      {required String groupType,
+      required String groupKey,
+      Map<String, dynamic>? groupProperties}) {
     throw UnimplementedError('group() has not been implemented.');
   }
 }
