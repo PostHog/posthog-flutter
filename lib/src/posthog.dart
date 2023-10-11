@@ -17,7 +17,7 @@ class Posthog {
   String? currentScreen;
 
   Future<void> identify({
-    required userId,
+    required String userId,
     Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) {
@@ -97,6 +97,25 @@ class Posthog {
 
   Future<void> setContext(Map<String, dynamic> context) {
     return _posthog.setContext(context);
+  }
+
+  Future<bool?> isFeatureEnabled(String key) {
+    return _posthog.isFeatureEnabled(key);
+  }
+
+  Future<void> reloadFeatureFlags() {
+    return _posthog.reloadFeatureFlags();
+  }
+
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    required Map<String, dynamic> groupProperties,
+  }) {
+    return _posthog.group(
+        groupType: groupType,
+        groupKey: groupKey,
+        groupProperties: groupProperties);
   }
 
   Future<void> flush() {

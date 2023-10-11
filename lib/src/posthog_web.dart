@@ -8,7 +8,7 @@ class PosthogWeb {
     final MethodChannel channel = MethodChannel(
       'posthogflutter',
       const StandardMethodCodec(),
-      registrar.messenger,
+      registrar,
     );
     final PosthogWeb instance = PosthogWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
@@ -51,10 +51,32 @@ class PosthogWeb {
           call.arguments['debug'],
         ]);
         break;
+      case 'isFeatureEnabled':
+        final isFeatureEnabled = analytics.callMethod('isFeatureEnabled', [
+          call.arguments['key'],
+        ]);
+        return isFeatureEnabled;
+      case 'group':
+        analytics.callMethod('group', [
+          call.arguments['groupType'],
+          call.arguments['groupKey'],
+          JsObject.jsify(call.arguments['groupProperties']),
+        ]);
+        break;
+      case 'reloadFeatureFlags':
+        analytics.callMethod('reloadFeatureFlags');
+        break;
+      case 'enable':
+        analytics.callMethod('opt_in_capturing');
+        break;
+      case 'disable':
+        analytics.callMethod('opt_out_capturing');
+        break;
       default:
         throw PlatformException(
           code: 'Unimplemented',
-          details: "The posthog plugin for web doesn't implement the method '${call.method}'",
+          details:
+              "The posthog plugin for web doesn't implement the method '${call.method}'",
         );
     }
   }
