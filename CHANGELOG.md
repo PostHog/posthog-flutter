@@ -1,3 +1,26 @@
+## Next
+
+## 3.2.0
+
+- Add support to Dart v3.0.0 (#52)[https://github.com/PostHog/posthog-flutter/pull/52]
+
+## 3.1.0
+
+- Adds support for `groups`
+- Fixes a type issue with identify so that the userId is now always a String
+
+## 3.0.5
+
+- Fixes a bug with the iOS implementation for feature flags that stopped the SDK from building
+
+## 3.0.4
+
+- Adds CI/CD for deploying to pub.dev
+
+## 3.0.0
+
+- Adds basic feature flags support with `isFeatureEnabled` and `reloadFeatureFlags`
+
 ## 2.0.3
 
 - Bugfixes with flutter web and identify call https://github.com/PostHog/posthog-flutter/pull/16

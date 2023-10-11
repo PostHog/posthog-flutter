@@ -594,3 +594,8 @@ MigrationBackup/
 # Web related
 lib/generated_plugin_registrant.dart
 lib/example/generated_plugin_registrant.dart
+
+# FVM
+.fvm/
+
+posthog_flutter.iml

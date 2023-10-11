@@ -1,28 +1,30 @@
-# Posthog plugin
+# PostHog plugin
 
-![Pub Version](https://img.shields.io/pub/v/posthog_flutter)
+[![Package on pub.dev][pubdev_badge]][pubdev_link]
 
 Flutter plugin to support iOS, Android and Web sources at https://posthog.com.
 
 ## Usage
 
-To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml file](https://flutter.io/platform-plugins/).
+To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml file](https://pub.dev/packages/posthog_flutter/install).
 
 ### Supported methods
 
-| Method           | Android | iOS | Web |
-| ---------------- | ------- | --- | --- |
-| `identify`       | X       | X   | X   |
-| `capture`        | X       | X   | X   |
-| `screen`         | X       | X   | X   |
-| `alias`          | X       | X   | X   |
-| `getAnonymousId` | X       | X   | X   |
-| `reset`          | X       | X   | X   |
-| `disable`        | X       | X   |     |
-| `enable`         | X       | X   |     |
-| `debug`          | X\*     | X   | X   |
-| `setContext`     | X       | X   |     |
-| `flush`          | X       | X   |     |
+| Method               | Android | iOS | Web |
+|----------------------| ------- | --- | --- |
+| `identify`           | X       | X   | X   |
+| `capture`            | X       | X   | X   |
+| `screen`             | X       | X   | X   |
+| `alias`              | X       | X   | X   |
+| `getAnonymousId`     | X       | X   | X   |
+| `reset`              | X       | X   | X   |
+| `disable`            | X       | X   |     |
+| `enable`             | X       | X   |     |
+| `debug`              | X\*     | X   | X   |
+| `setContext`         | X       | X   |     |
+| `isFeatureEnabled`   | X       | X   | X   |
+| `reloadFeatureFlags` | X       | X   | X   |
+| `flush`              | X       | X   |     |
 
 \* Debugging must be set as a configuration parameter in `AndroidManifest.xml` (see below). The official posthog library does not offer the debug method for Android.
 
@@ -152,3 +154,7 @@ If you wish to contribute a change to this repo, please send a [pull request](ht
 ## Questions?
 
 ### [Join our Slack community.](https://join.slack.com/t/posthogusers/shared_invite/enQtOTY0MzU5NjAwMDY3LTc2MWQ0OTZlNjhkODk3ZDI3NDVjMDE1YjgxY2I4ZjI4MzJhZmVmNjJkN2NmMGJmMzc2N2U3Yjc3ZjI5NGFlZDQ)
+
+
+[pubdev_badge]: https://img.shields.io/pub/v/posthog_flutter
+[pubdev_link]: https://pub.dev/packages/posthog_flutter

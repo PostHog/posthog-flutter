@@ -17,8 +17,8 @@ static NSDictionary *_appendToContextMiddleware;
     BOOL captureApplicationLifecycleEvents = [[dict objectForKey: @"com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS"] boolValue];
     BOOL shouldSendDeviceID = [[dict objectForKey: @"com.posthog.posthog.TRACK_DEVICE_ID"] boolValue];
     NSArray *trackingBlacklist = [dict objectForKey: @"com.posthog.posthog.TRACK_BLACKLIST"];
-    PHGPostHogConfiguration *configuration = [PHGPostHogConfiguration 
-      configurationWithApiKey:writeKey 
+    PHGPostHogConfiguration *configuration = [PHGPostHogConfiguration
+      configurationWithApiKey:writeKey
       host:posthogHost
       trackingBlacklist: trackingBlacklist];
 
@@ -121,10 +121,41 @@ static NSDictionary *_appendToContextMiddleware;
     [self debug:call result:result];
   } else if ([@"setContext" isEqualToString:call.method]) {
     [self setContext:call result:result];
+  } else if ([@"isFeatureEnabled" isEqualToString:call.method]) {
+    [self isFeatureEnabled:call result:result];
+  } else if ([@"reloadFeatureFlags" isEqualToString:call.method]) {
+    [self reloadFeatureFlags:call result:result];
+  } else if ([@"group" isEqualToString:call.method]) {
+    [self group:call result:result];
   } else if ([@"flush" isEqualToString:call.method]) {
     [self flush:result];
   } else {
     result(FlutterMethodNotImplemented);
+  }
+}
+
+- (void)isFeatureEnabled:(FlutterMethodCall*)call result:(FlutterResult)result {
+  @try {
+    NSString *key = call.arguments[@"key"];
+
+    BOOL *isFeatureEnabledResult = [[PHGPostHog sharedPostHog] isFeatureEnabled: key];
+    result([NSNumber numberWithBool:isFeatureEnabledResult]);
+  }
+  @catch (NSException *exception) {
+    result([FlutterError
+      errorWithCode:@"PosthogFlutterException"
+      message:[exception reason]
+      details: nil]);
+  }
+}
+
+- (void)reloadFeatureFlags:(FlutterMethodCall*)call result:(FlutterResult)result {
+  @try {
+    [[PHGPostHog sharedPostHog] reloadFeatureFlags];
+    result([NSNumber numberWithBool:YES]);
+  }
+  @catch (NSException *exception) {
+    result([FlutterError errorWithCode:@"PosthogFlutterException" message:[exception reason] details: nil]);
   }
 }
 
@@ -140,7 +171,25 @@ static NSDictionary *_appendToContextMiddleware;
       message:[exception reason]
       details: nil]);
   }
+}
 
+
+- (void)group:(FlutterMethodCall*)call result:(FlutterResult)result {
+  @try {
+    NSString *groupType = call.arguments[@"groupType"];
+    NSString *groupKey = call.arguments[@"groupKey"];
+    NSDictionary *groupProperties = call.arguments[@"groupProperties"];
+    [[PHGPostHog sharedPostHog] group: groupType
+                                groupKey: groupKey
+                                properties: groupProperties];
+    result([NSNumber numberWithBool:YES]);
+  }
+  @catch (NSException *exception) {
+    result([FlutterError
+      errorWithCode:@"PosthogFlutterException"
+      message:[exception reason]
+      details: nil]);
+  }
 }
 
 - (void)identify:(FlutterMethodCall*)call result:(FlutterResult)result {

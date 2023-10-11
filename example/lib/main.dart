@@ -99,6 +99,25 @@ class MyApp extends StatelessWidget {
               ),
             ),
             Spacer(),
+            Center(
+              child: TextButton(
+                child: Text('Is Feature enabled'),
+                onPressed: () async {
+                  Posthog().isFeatureEnabled('feature').then((value) {
+                    print('Feature enabled: $value');
+                  });
+                },
+              ),
+            ),
+            Spacer(),
+            Center(
+              child: TextButton(
+                child: Text('Reload feature flag'),
+                onPressed: () async {
+                  Posthog().reloadFeatureFlags();
+                },
+              ),
+            ),
           ],
         ),
       ),
