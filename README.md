@@ -38,10 +38,11 @@ void main() => runApp(MyApp());
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    Posthog().screen(
-      screenName: 'Example Screen',
-    );
     return MaterialApp(
+      navigatorObservers: [
+        // The PosthogObserver records screen views
+        PosthogObserver(),
+      ],
       home: Scaffold(
         appBar: AppBar(
           title: Text('Posthog example app'),
@@ -62,9 +63,6 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      navigatorObservers: [
-        PosthogObserver(),
-      ],
     );
   }
 }
