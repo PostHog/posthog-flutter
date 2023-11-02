@@ -10,6 +10,9 @@ on:
 jobs:
   validation:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./example/android/gradle/wrapper
     steps:
       - uses: actions/checkout@v4
       - uses: gradle/wrapper-validation-action@56b90f209b02bf6d1deae490e9ef18b21a389cd4 # pin@v1.1.0
