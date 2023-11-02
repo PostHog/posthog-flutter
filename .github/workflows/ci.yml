@@ -4,6 +4,8 @@ on:
     branches:
       - master
   pull_request:
+    paths-ignore:
+      - "**/*.md"
 
 # Publish using custom workflow
 jobs:
@@ -11,6 +13,13 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: 'Set up Java'
+        uses: actions/setup-java@v3
+        with:
+          java-version: 11
+          distribution: 'temurin'
+
       - uses: dart-lang/setup-dart@v1
       - uses: subosito/flutter-action@v2
         with:
