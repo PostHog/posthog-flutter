@@ -1,34 +1,31 @@
 package com.posthog.posthog_flutter;
 
-import androidx.annotation.NonNull;
+import static com.posthog.android.PostHog.LogLevel;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.posthog.android.PostHog;
-import com.posthog.android.PostHogContext;
-import com.posthog.android.Properties;
-import com.posthog.android.Options;
-import com.posthog.android.Middleware;
-import com.posthog.android.payloads.BasePayload;
-import static com.posthog.android.PostHog.LogLevel;
+import androidx.annotation.NonNull;
 
-import java.util.LinkedHashMap;
+import com.posthog.android.Middleware;
+import com.posthog.android.Options;
+import com.posthog.android.PostHog;
+import com.posthog.android.Properties;
+import com.posthog.android.payloads.BasePayload;
+
 import java.util.HashMap;
 import java.util.Map;
 
+import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
-import io.flutter.embedding.engine.plugins.FlutterPlugin;
 
 /** PosthogFlutterPlugin */
 public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
@@ -38,6 +35,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   static HashMap<String, Object> appendToContextMiddleware;
 
   /** Plugin registration. */
+  @SuppressWarnings("deprecation")
   public static void registerWith(PluginRegistry.Registrar registrar) {
     final PosthogFlutterPlugin instance = new PosthogFlutterPlugin();
     instance.setupChannels(registrar.context(), registrar.messenger());
@@ -73,8 +71,7 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
         posthogBuilder.logLevel(LogLevel.DEBUG);
       }
 
-      // Here we build a middleware that just appends data to the current context
-      // using the [deepMerge] strategy.
+      // Here we build a middleware that just appends data to the current context.
       posthogBuilder.middleware(
         new Middleware() {
           @Override
@@ -307,20 +304,5 @@ public class PosthogFlutterPlugin implements MethodCallHandler, FlutterPlugin {
   private Options buildOptions(HashMap<String, Object> optionsData) {
     Options options = new Options();
     return options;
-  }
-
-  // Merges [newMap] into [original], *not* preserving [original]
-  // keys (deep) in case of conflicts.
-  private static Map deepMerge(Map original, Map newMap) {
-    for (Object key : newMap.keySet()) {
-      if (newMap.get(key) instanceof Map && original.get(key) instanceof Map) {
-        Map originalChild = (Map) original.get(key);
-        Map newChild = (Map) newMap.get(key);
-        original.put(key, deepMerge(originalChild, newChild));
-      } else {
-        original.put(key, newMap.get(key));
-      }
-    }
-    return original;
   }
 }

@@ -1,39 +1,50 @@
-group 'com.posthog.posthog_flutter'
-version '1.0-SNAPSHOT'
-
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.2.1'
+        classpath 'com.android.tools.build:gradle:7.4.2'
     }
 }
 
 rootProject.allprojects {
     repositories {
         google()
-        jcenter()
-        maven { url 'https://jitpack.io' }
+        mavenCentral()
     }
 }
 
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 28
+    compileSdk 33
+
+    // Conditional for compatibility with AGP <4.2.
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.posthog.posthog_flutter'
+    }
 
     defaultConfig {
-        minSdkVersion 16
-        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        minSdkVersion 19
+
+        ndk {
+            // Flutter does not currently support building for x86 Android (See Issue 9253).
+            abiFilters("armeabi-v7a", "x86_64", "arm64-v8a")
+        }
     }
+
     lintOptions {
         disable 'InvalidPackage'
     }
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
     dependencies {
-        implementation 'com.posthog.android:posthog:2.0.3'
+        api 'com.posthog.android:posthog:2.0.3'
     }
 }
