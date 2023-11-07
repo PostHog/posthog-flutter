@@ -36,7 +36,7 @@
     special context set for you by the time it is initialized. -->
         <meta-data
             android:name="com.posthog.posthog.API_KEY"
-            android:value="phc_wQk4bviJPdeaHqQA6n78KHmWFJ1bGLydWY9OWBeZgF3" />
+            android:value="[YOUR_POSTHOG_API_KEY]" />
         <meta-data
             android:name="com.posthog.posthog.POSTHOG_HOST"
             android:value="https://app.posthog.com" />
