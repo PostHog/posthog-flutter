@@ -3,6 +3,8 @@
 ![Pub Version](https://img.shields.io/pub/v/posthog_flutter)
 
 Flutter plugin to support iOS, Android and Web sources at https://posthog.com.
+- Using PostAndroid 3.0.0-beta.3
+- Using PostIOS 3.0.0-alpha.5
 
 <img src="https://github.com/djamoapp/posthog-flutter/assets/6081388/f35cce89-bb1a-49f4-8f80-6aa47709dff9" width=300 />
 
