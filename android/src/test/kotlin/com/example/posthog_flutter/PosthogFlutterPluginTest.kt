@@ -30,8 +30,21 @@ internal class PosthogFlutterPluginTest {
         val plugin = PosthogFlutterPlugin()
 
         var arguments = mapOf("userId" to "abc");
-        
+
         val call = MethodCall("identify", arguments)
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(true)
+    }
+
+    @Test
+    fun onMethodCall_alias_returnsExpectedValue() {
+        val plugin = PosthogFlutterPlugin()
+
+        var arguments = mapOf("alias" to "abc");
+
+        val call = MethodCall("alias", arguments)
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
