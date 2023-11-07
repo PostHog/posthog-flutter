@@ -18,6 +18,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
   final _posthogFlutterPlugin = Posthog();
+  dynamic _result = "";
 
   @override
   void initState() {
@@ -52,10 +53,121 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text('Posthog Flutter App'),
         ),
-        body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: Column(
+              children: [
+                Text('Running on: $_platformVersion\n'),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "Capture",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        _posthogFlutterPlugin.screen(screenName: "screenName");
+                      },
+                      child: const Text("Capture Screen"),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _posthogFlutterPlugin
+                            .capture(eventName: "eventName", properties: {});
+                      },
+                      child: const Text("Capture Event"),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "Activity",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                      onPressed: () {
+                        _posthogFlutterPlugin.disable();
+                      },
+                      child: const Text("Disable Capture"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                      ),
+                      onPressed: () {
+                        _posthogFlutterPlugin.enable();
+                      },
+                      child: const Text("Enable Capture"),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "Feature flags",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final result = await _posthogFlutterPlugin
+                        .getFeatureFlag("feature_name");
+                    setState(() {
+                      _result = result;
+                    });
+                  },
+                  child: const Text("Get Feature Flag status"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final result = await _posthogFlutterPlugin
+                        .getFeatureFlagAndPayload("feature_name");
+                    setState(() {
+                      _result = result;
+                    });
+                  },
+                  child: const Text("Get Feature Flag and Payload"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final result = await _posthogFlutterPlugin
+                        .isFeatureEnabled("feature_name");
+                    setState(() {
+                      _result = result;
+                    });
+                  },
+                  child: const Text("isFeatureEnabled"),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "Data result",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Text(_result.toString()),
+              ],
+            ),
+          ),
         ),
       ),
     );
