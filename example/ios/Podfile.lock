@@ -2,13 +2,19 @@ PODS:
   - Flutter (1.0.0)
   - integration_test (0.0.1):
     - Flutter
+  - PostHog (3.0.0-alpha.5)
   - posthog_flutter (0.0.1):
     - Flutter
+    - PostHog (~> 3.0.0-alpha.5)
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - posthog_flutter (from `.symlinks/plugins/posthog_flutter/ios`)
+
+SPEC REPOS:
+  trunk:
+    - PostHog
 
 EXTERNAL SOURCES:
   Flutter:
@@ -21,8 +27,9 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
   integration_test: 13825b8a9334a850581300559b8839134b124670
-  posthog_flutter: 6dd617697145a66c454d7ebb42fe2e004456c394
+  PostHog: bdd91417b5aa887b91c6ab296ba7b442db1fd5b2
+  posthog_flutter: c3fdbf937161067d63601dcbe8b721bf38210292
 
-PODFILE CHECKSUM: 70d9d25280d0dd177a5f637cdb0f0b0b12c6a189
+PODFILE CHECKSUM: a57f30d18f102dd3ce366b1d62a55ecbef2158e5
 
 COCOAPODS: 1.12.1
