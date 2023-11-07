@@ -34,20 +34,20 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             val bundle = ai.metaData
             val apiKey = bundle.getString("com.posthog.posthog.API_KEY", "")
             val posthogHost = bundle.getString("com.posthog.posthog.POSTHOG_HOST", "")
-            var captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
-            var debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
+            val trackApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
+            val enableDebug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
             // Init PostHog
             val config = PostHogAndroidConfig(apiKey, posthogHost).apply {
                 captureScreenViews = false
                 captureDeepLinks = false
-                captureApplicationLifecycleEvents = captureApplicationLifecycleEvents
-                debug = debug
+                captureApplicationLifecycleEvents = trackApplicationLifecycleEvents
+                debug = enableDebug
             }
             PostHogAndroid.setup(applicationContext, config)
 
         } catch (e: Exception) {
-            Log.e("initPlugin", e.localizedMessage)
+            e.localizedMessage?.let { Log.e("initPlugin", it) }
         }
     }
 
@@ -125,7 +125,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         channel.setMethodCallHandler(null)
     }
 
-    private fun getFeatureFlag(call: MethodCall, result: MethodChannel.Result) {
+    private fun getFeatureFlag(call: MethodCall, result: Result) {
         try {
             val featureFlagKey: String? = call.argument("key")
             val value: Any? = PostHog.getFeatureFlag(featureFlagKey!!)
@@ -135,7 +135,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun getFeatureFlagPayload(call: MethodCall, result: MethodChannel.Result) {
+    private fun getFeatureFlagPayload(call: MethodCall, result: Result) {
         try {
             val featureFlagKey: String? = call.argument("key")
             val value: Any? = PostHog.getFeatureFlagPayload(featureFlagKey!!)
@@ -145,12 +145,12 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun getFeatureFlagAndPayload(call: MethodCall, result: MethodChannel.Result) {
+    private fun getFeatureFlagAndPayload(call: MethodCall, result: Result) {
         try {
             val featureFlagKey: String? = call.argument("key")
-            val status: Any? = PostHog.getFeatureFlag(featureFlagKey!!);
-            val payload: Any? = PostHog.getFeatureFlagPayload(featureFlagKey!!)
-            val featureAndPayload = mutableMapOf<String, Any?>();
+            val status: Any? = PostHog.getFeatureFlag(featureFlagKey!!)
+            val payload: Any? = PostHog.getFeatureFlagPayload(featureFlagKey)
+            val featureAndPayload = mutableMapOf<String, Any?>()
 
             when (status) {
                 null -> {
@@ -174,7 +174,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun identify(call: MethodCall, result: MethodChannel.Result) {
+    private fun identify(call: MethodCall, result: Result) {
         try {
             val userId: String? = call.argument("userId")
             val propertiesData: HashMap<String, Any>? = call.argument("properties")
@@ -186,7 +186,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun capture(call: MethodCall, result: MethodChannel.Result) {
+    private fun capture(call: MethodCall, result: Result) {
         try {
             val eventName: String? = call.argument("eventName")
             val distinctId: String? = call.argument("distinctId")
@@ -199,7 +199,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun screen(call: MethodCall, result: MethodChannel.Result) {
+    private fun screen(call: MethodCall, result: Result) {
         try {
             val screenName: String? = call.argument("screenName")
             val propertiesData: HashMap<String, Any>? = call.argument("properties")
@@ -210,7 +210,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun alias(call: MethodCall, result: MethodChannel.Result) {
+    private fun alias(call: MethodCall, result: Result) {
         try {
             val alias: String? = call.argument("alias")
             PostHog.alias(alias!!)
@@ -220,7 +220,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun distinctId(result: MethodChannel.Result) {
+    private fun distinctId(result: Result) {
         try {
             val anonymousId: String = PostHog.distinctId()
             result.success(anonymousId)
@@ -229,7 +229,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun reset(result: MethodChannel.Result) {
+    private fun reset(result: Result) {
         try {
             PostHog.reset()
             result.success(true)
@@ -240,7 +240,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     // There is no enable method at this time for PostHog on Android.
     // Instead, we use optOut as a proxy to achieve the same result.
-    private fun enable(result: MethodChannel.Result) {
+    private fun enable(result: Result) {
         try {
             PostHog.optIn()
             result.success(true)
@@ -251,7 +251,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     // There is no disable method at this time for PostHog on Android.
     // Instead, we use optOut as a proxy to achieve the same result.
-    private fun disable(result: MethodChannel.Result) {
+    private fun disable(result: Result) {
         try {
             PostHog.optOut()
             result.success(true)
@@ -260,7 +260,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun isFeatureEnabled(call: MethodCall, result: MethodChannel.Result) {
+    private fun isFeatureEnabled(call: MethodCall, result: Result) {
         try {
             val key: String? = call.argument("key")
             val isEnabled: Boolean = PostHog.isFeatureEnabled(key!!)
@@ -270,7 +270,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun reloadFeatureFlags(result: MethodChannel.Result) {
+    private fun reloadFeatureFlags(result: Result) {
         try {
             PostHog.reloadFeatureFlags()
             result.success(true)
@@ -279,7 +279,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun group(call: MethodCall, result: MethodChannel.Result) {
+    private fun group(call: MethodCall, result: Result) {
         try {
             val groupType: String? = call.argument("groupType")
             val groupKey: String? = call.argument("groupKey")
