@@ -133,10 +133,7 @@
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 			);
-			name = Products;
 			sourceTree = "<group>";
-		};
-		97C146F01CF9000F007C117D /* Runner */ = {
 			isa = PBXGroup;
 			children = (
 				97C146FA1CF9000F007C117D /* Main.storyboard */,
