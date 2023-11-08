@@ -86,9 +86,9 @@ class Posthog {
     return _posthog.debug(enabled);
   }
 
-  // Future<void> setContext(Map<String, dynamic> context) {
-  //   return _posthog.setContext(context);
-  // }
+  Future<void> register(String key, dynamic value) {
+    return _posthog.register(key, value);
+  }
 
   Future<bool?> isFeatureEnabled(String key) {
     return _posthog.isFeatureEnabled(key);

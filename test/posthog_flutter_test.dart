@@ -105,8 +105,8 @@ class MockPosthogFlutterPlatform
   }
 
   @override
-  Future<void> setContext(Map<String, dynamic> context) {
-    // TODO: implement setContext
+  Future<void> register(String key, dynamic value) {
+    // TODO: implement register
     throw UnimplementedError();
   }
 }

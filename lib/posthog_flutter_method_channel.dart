@@ -106,16 +106,6 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     }
   }
 
-  Future<void> setContext(Map<String, dynamic> context) async {
-    try {
-      await methodChannel.invokeMethod('setContext', {
-        'context': context,
-      });
-    } on PlatformException catch (exception) {
-      print(exception);
-    }
-  }
-
   Future<bool?> isFeatureEnabled(String key) async {
     try {
       return await methodChannel.invokeMethod('isFeatureEnabled', {
@@ -191,6 +181,15 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     } on PlatformException catch (exception) {
       print(exception);
       return {};
+    }
+  }
+
+  Future<void> register(String key, dynamic value) async {
+    try {
+      return await methodChannel
+          .invokeMethod('register', {'key': key, 'value': value});
+    } on PlatformException catch (exception) {
+      print(exception);
     }
   }
 }

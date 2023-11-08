@@ -114,6 +114,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 getFeatureFlagAndPayload(call, result)
             }
 
+            "register" -> {
+                register(call, result)
+            }
+
             else -> {
                 result.notImplemented()
             }
@@ -285,6 +289,17 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             val groupKey: String? = call.argument("groupKey")
             val propertiesData: HashMap<String, Any>? = call.argument("groupProperties")
             PostHog.group(groupType!!, groupKey!!, propertiesData)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun register(call: MethodCall, result: Result) {
+        try {
+            val key: String? = call.argument("key")
+            val value: Any? = call.argument("value")
+            PostHog.register(key!!, value!!)
             result.success(true)
         } catch (e: Exception) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
