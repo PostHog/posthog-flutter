@@ -118,6 +118,12 @@ class _MyAppState extends State<MyApp> {
                     ),
                   ],
                 ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.register("foo", "bar");
+                  },
+                  child: const Text("Register"),
+                ),
                 const Divider(),
                 const Padding(
                   padding: EdgeInsets.all(8.0),

@@ -57,6 +57,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         reloadFeatureFlags(call, result: result)
     case "group":
         group(call, result: result)
+    case "register":
+        register(call, result: result)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -253,6 +255,20 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
            let groupKey = args["groupKey"] as? String,
            let groupProperties = args["groupProperties"] as? Dictionary<String,Any>{
             PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties)
+            result(true)
+          } else {
+              _badArgumentError(result: result)
+          }
+    }
+    
+    private func register(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ){
+        if let args = call.arguments as? Dictionary<String, Any>,
+           let key = args["key"] as? String,
+           let value = args["value"] as? String {
+            PostHogSDK.shared.register([key: value])
             result(true)
           } else {
               _badArgumentError(result: result)

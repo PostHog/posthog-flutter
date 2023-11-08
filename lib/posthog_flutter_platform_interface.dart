@@ -72,8 +72,8 @@ abstract class PosthogFlutterPlatform extends PlatformInterface {
     throw UnimplementedError('debug() has not been implemented.');
   }
 
-  Future<void> setContext(Map<String, dynamic> context) {
-    throw UnimplementedError('setContext() has not been implemented.');
+  Future<void> register(String key, dynamic value) {
+    throw UnimplementedError('register() has not been implemented.');
   }
 
   Future<bool?> isFeatureEnabled(String key) {
