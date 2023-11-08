@@ -1,6 +1,6 @@
 name: posthog_flutter
 description: Postog flutter plugin
-version: 4.0.0
+version: 3.3.0
 homepage: .
 
 environment:
