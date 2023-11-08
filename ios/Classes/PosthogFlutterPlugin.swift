@@ -267,7 +267,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     ){
         if let args = call.arguments as? Dictionary<String, Any>,
            let key = args["key"] as? String,
-           let value = args["value"] as? String {
+           let value = args["value"] {
             PostHogSDK.shared.register([key: value])
             result(true)
           } else {
