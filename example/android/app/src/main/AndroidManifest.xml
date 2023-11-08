@@ -51,6 +51,5 @@
                 D/Analytics(32684): Ran TrackPayload{event="ButtonClicked"} on integration Posthog.com in 480110 ns.
                 D/Analytics(32684): Ran TrackPayload{event="ButtonClicked"} on integration Posthog.com in 104410 ns.
         -->
-
     </application>
 </manifest>

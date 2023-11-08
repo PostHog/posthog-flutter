@@ -1,11 +1,11 @@
 name: posthog_flutter
 description: Postog flutter plugin
-version: 0.0.1
-homepage:
+version: 3.3.0
+homepage: .
 
 environment:
-  sdk: '>=3.1.5 <4.0.0'
-  flutter: '>=3.3.0'
+  sdk: ">=3.1.5 <4.0.0"
+  flutter: ">=3.3.0"
 
 dependencies:
   flutter:

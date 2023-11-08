@@ -1,5 +1,7 @@
 # Posthog plugin
 
+[![Package on pub.dev][pubdev_badge]][pubdev_link]
+
 Flutter plugin to support iOS, Android and Web sources at https://posthog.com.
 - Using PostAndroid 3.0.0-beta.3
 - Using PostIOS 3.0.0-alpha.5
