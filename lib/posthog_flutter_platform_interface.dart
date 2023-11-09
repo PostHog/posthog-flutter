@@ -1,4 +1,5 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:posthog_flutter/src/models/feature_flag_data.dart';
 
 import 'posthog_flutter_method_channel.dart';
 
@@ -105,7 +106,7 @@ abstract class PosthogFlutterPlatform extends PlatformInterface {
         'getFeatureFlagPayload() has not been implemented.');
   }
 
-  Future<Map> getFeatureFlagAndPayload({
+  Future<FeatureFlagData?> getFeatureFlagAndPayload({
     required String key,
   }) {
     throw UnimplementedError(
