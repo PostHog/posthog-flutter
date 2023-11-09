@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:posthog_flutter/posthog_flutter_platform_interface.dart';
+import 'package:posthog_flutter/src/models/feature_flag_data.dart';
 export 'package:posthog_flutter/src/posthog_observer.dart';
 
 class Posthog {
@@ -118,7 +119,7 @@ class Posthog {
     return _posthog.getFeatureFlagPayload(key: key);
   }
 
-  Future<Map> getFeatureFlagAndPayload(String key) {
+  Future<FeatureFlagData?> getFeatureFlagAndPayload(String key) {
     return _posthog.getFeatureFlagAndPayload(key: key);
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'posthog_flutter_platform_interface.dart';
+import 'src/models/feature_flag_data.dart';
 
 /// An implementation of [PosthogFlutterPlatform] that uses method channels.
 class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
@@ -171,16 +172,25 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   }
 
   @override
-  Future<Map> getFeatureFlagAndPayload({
+  Future<FeatureFlagData?> getFeatureFlagAndPayload({
     required String key,
   }) async {
     try {
-      return await methodChannel.invokeMethod('getFeatureFlagAndPayload', {
+      final Map<String, dynamic>? result =
+          await methodChannel.invokeMethod('getFeatureFlagAndPayload', {
         'key': key,
       });
+
+      if (result != null) {
+        return FeatureFlagData.fromMap(result);
+      }
+
+      return null;
     } on PlatformException catch (exception) {
-      print(exception);
-      return {};
+      if (kDebugMode) {
+        print('Exeption on getFeatureFlagAndPayload(): $exception');
+      }
+      rethrow;
     }
   }
 

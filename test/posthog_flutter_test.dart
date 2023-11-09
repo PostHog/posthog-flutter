@@ -3,6 +3,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/posthog_flutter_method_channel.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:posthog_flutter/src/models/feature_flag_data.dart';
 
 class MockPosthogFlutterPlatform
     with MockPlatformInterfaceMixin
@@ -52,7 +53,7 @@ class MockPosthogFlutterPlatform
   }
 
   @override
-  Future<Map> getFeatureFlagAndPayload({required String key}) {
+  Future<FeatureFlagData?> getFeatureFlagAndPayload({required String key}) {
     // TODO: implement getFeatureFlagAndPayload
     throw UnimplementedError();
   }
