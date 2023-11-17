@@ -175,12 +175,9 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     required String key,
   }) async {
     try {
-      final Map<String, dynamic>? result =
-          await methodChannel.invokeMethod('getFeatureFlagAndPayload', {
+      return await methodChannel.invokeMethod('getFeatureFlagAndPayload', {
         'key': key,
       });
-
-      return result;
     } on PlatformException catch (exception) {
       if (kDebugMode) {
         print('Exeption on getFeatureFlagAndPayload(): $exception');
