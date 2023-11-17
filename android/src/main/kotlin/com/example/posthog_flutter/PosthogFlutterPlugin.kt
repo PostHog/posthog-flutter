@@ -180,7 +180,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun identify(call: MethodCall, result: Result) {
         try {
-            val userId: String? = call.argument("userId")
+            val userId = call.argument("userId") as? String
             val propertiesData: HashMap<String, Any>? = call.argument("properties")
             val optionsData: HashMap<String, Any>? = call.argument("options")
             PostHog.identify(userId!!, propertiesData, optionsData)

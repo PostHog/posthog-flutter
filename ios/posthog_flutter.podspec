@@ -5,7 +5,7 @@
 Pod::Spec.new do |s|
   s.name             = 'posthog_flutter'
   s.version          = '0.0.1'
-  s.summary          = 'Postog flutter plugin'
+  s.summary          = 'A new flutter plugin project.'
   s.description      = <<-DESC
 Postog flutter plugin
                        DESC

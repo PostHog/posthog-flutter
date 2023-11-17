@@ -11,9 +11,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
   }
     
    public static func initPlugin(){
-    // Initialise Poshog
+    // Initialise PostHog
        let postHogApiKey = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? ""
-       let postHogHost = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? ""
+       let postHogHost = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? "https://app.posthog.com"
          let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
          
          let config = PostHogConfig(
@@ -76,7 +76,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ){
             
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String {
            let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
             result(value)
@@ -89,7 +89,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String {
             let value : Bool = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
             result(value)
@@ -102,7 +102,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String {
             let value : Any? = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
             result(value)
@@ -115,7 +115,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String {
             let status : Any? = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
             let payload : Any? = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
@@ -142,7 +142,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let userId = args["userId"] as? String,
            let propertiesData = args["properties"] as? Dictionary<String,Any> {
             PostHogSDK.shared.identify(
@@ -159,7 +159,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let eventName = args["eventName"] as? String,
            let propertiesData = args["properties"] as? Dictionary<String,Any> {
             PostHogSDK.shared.capture(
@@ -177,7 +177,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let screenName = args["screenName"] as? String,
            let propertiesData = args["properties"] as? Dictionary<String,Any> {
             PostHogSDK.shared.screen(
@@ -195,7 +195,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let alias = args["alias"] as? String {
             PostHogSDK.shared.alias(alias)
             result(true)
@@ -250,7 +250,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let groupType = args["groupType"] as? String,
            let groupKey = args["groupKey"] as? String,
            let groupProperties = args["groupProperties"] as? Dictionary<String,Any>{
@@ -265,7 +265,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ){
-        if let args = call.arguments as? Dictionary<String, Any>,
+        if let args = call.arguments as? [String: Any],
            let key = args["key"] as? String,
            let value = args["value"] {
             PostHogSDK.shared.register([key: value])

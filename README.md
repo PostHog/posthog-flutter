@@ -1,17 +1,15 @@
-# Posthog plugin
+# PostHog plugin
 
-![Pub Version](https://img.shields.io/pub/v/posthog_flutter)
+[![Package on pub.dev][pubdev_badge]][pubdev_link]
 
 Flutter plugin to support iOS, Android and Web sources at https://posthog.com.
-- Using PostAndroid 3.0.0-beta.3
-- Using PostIOS 3.0.0-alpha.5
 
 <img src="https://github.com/djamoapp/posthog-flutter/assets/6081388/f35cce89-bb1a-49f4-8f80-6aa47709dff9" width=300 />
 
 
 ## Usage
 
-To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml file](https://flutter.io/platform-plugins/).
+To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml file](https://pub.dev/packages/posthog_flutter/install).
 
 ### Supported methods
 
@@ -45,10 +43,11 @@ void main() => runApp(MyApp());
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    Posthog().screen(
-      screenName: 'Example Screen',
-    );
     return MaterialApp(
+      navigatorObservers: [
+        // The PosthogObserver records screen views
+        PosthogObserver(),
+      ],
       home: Scaffold(
         appBar: AppBar(
           title: Text('Posthog example app'),
@@ -68,10 +67,7 @@ class MyApp extends StatelessWidget {
             },
           ),
         ),
-      ),
-      navigatorObservers: [
-        PosthogObserver(),
-      ],
+      )
     );
   }
 }
