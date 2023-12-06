@@ -43,7 +43,7 @@
 	<string>https://app.posthog.com</string>
 	<key>com.posthog.posthog.API_KEY</key>
 	<string>YOUR_API_KEY_GOES_HERE</string>
-	<key>com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS</key>
+	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
 	<false/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
