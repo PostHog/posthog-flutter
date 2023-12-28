@@ -33,15 +33,18 @@ class Posthog {
     Map<String, dynamic>? properties,
     Map<String, dynamic>? options,
   }) {
-    if (properties != null &&
-        !properties.containsKey('\$screen_name') &&
+    final _properties = properties == null ? null : {...properties};
+    final _options = options == null ? null : {...options};
+
+    if (_properties != null &&
+        !_properties.containsKey('\$screen_name') &&
         this.currentScreen != null) {
-      properties['\$screen_name'] = this.currentScreen;
+      _properties['\$screen_name'] = this.currentScreen;
     }
     return _posthog.capture(
       eventName: eventName,
-      properties: properties,
-      options: options,
+      properties: _properties,
+      options: _options,
     );
   }
 
