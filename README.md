@@ -4,9 +4,6 @@
 
 Flutter plugin to support iOS, Android and Web sources at https://posthog.com.
 
-<img src="https://github.com/djamoapp/posthog-flutter/assets/6081388/f35cce89-bb1a-49f4-8f80-6aa47709dff9" width=300 />
-
-
 ## Usage
 
 To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml file](https://pub.dev/packages/posthog_flutter/install).

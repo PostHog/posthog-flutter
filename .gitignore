@@ -630,3 +630,6 @@ lib/example/generated_plugin_registrant.dart
 .fvm/
 
 posthog_flutter.iml
+
+# pod files
+Podfile.lock
