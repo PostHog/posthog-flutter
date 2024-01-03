@@ -1,4 +1,4 @@
-group 'com.example.posthog_flutter'
+group 'com.posthog.posthog_flutter'
 version '1.0-SNAPSHOT'
 
 buildscript {
@@ -26,7 +26,7 @@ apply plugin: 'kotlin-android'
 
 android {
     if (project.android.hasProperty("namespace")) {
-        namespace 'com.example.posthog_flutter'
+        namespace 'com.posthog.posthog_flutter'
     }
 
     compileSdkVersion 33
@@ -38,6 +38,8 @@ android {
 
     kotlinOptions {
         jvmTarget = '1.8'
+        languageVersion = "1.6"
+        apiVersion = "1.6"
     }
 
     sourceSets {
@@ -52,7 +54,7 @@ android {
     dependencies {
         testImplementation 'org.jetbrains.kotlin:kotlin-test'
         testImplementation 'org.mockito:mockito-core:5.0.0'
-        implementation 'com.posthog:posthog-android:3.0.0-beta.6'
+        implementation 'com.posthog:posthog-android:3.0.1'
     }
 
     testOptions {

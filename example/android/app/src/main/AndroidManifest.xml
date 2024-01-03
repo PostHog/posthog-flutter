@@ -36,13 +36,16 @@
     special context set for you by the time it is initialized. -->
         <meta-data
             android:name="com.posthog.posthog.API_KEY"
-            android:value="[YOUR_POSTHOG_API_KEY]" />
+            android:value="_6SG-F7I1vCuZ-HdJL3VZQqjBlaSb1_20hDPwqMNnGI" />
         <meta-data
             android:name="com.posthog.posthog.POSTHOG_HOST"
             android:value="https://app.posthog.com" />
         <meta-data
             android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS"
             android:value="false" />
+        <meta-data 
+            android:name="com.posthog.posthog.DEBUG" 
+            android:value="true" />
         <!--
             If you want to debug the plugin events. Default is false.
             <meta-data android:name="com.posthog.posthog.DEBUG" android:value="true" />

@@ -85,7 +85,7 @@ Remember that the application lifecycle events won't have any special context se
 #### AndroidManifest.xml
 
 ```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.posthog.posthog_flutter_example">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.posthog_flutter_example">
     <application>
         <activity>
             [...]
@@ -112,11 +112,17 @@ Remember that the application lifecycle events won't have any special context se
 	<string>YOUR_API_KEY_GOES_HERE</string>
 	<key>com.posthog.posthog.POSTHOG_HOST</key>
 	<string>https://app.posthog.com</string>
-	<key>com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS</key>
+	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
 	<false/>
 	[...]
 </dict>
 </plist>
+```
+
+For `debug` mode on iOS, you can use the following snippet:
+
+```dart
+PostHog().debug(true);
 ```
 
 ### Web

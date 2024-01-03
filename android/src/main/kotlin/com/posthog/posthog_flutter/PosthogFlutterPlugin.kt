@@ -1,4 +1,4 @@
-package com.example.posthog_flutter
+package com.posthog.posthog_flutter
 
 import android.content.Context
 import android.content.pm.PackageManager
