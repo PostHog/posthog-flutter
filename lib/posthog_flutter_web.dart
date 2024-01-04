@@ -2,7 +2,6 @@
 // of your plugin as a separate package, instead of inlining it in the same
 // package as the core of your plugin.
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show window;
 import 'dart:js';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -22,13 +21,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
     );
     final PosthogFlutterWeb instance = PosthogFlutterWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
-  }
-
-  /// Returns a [String] containing the version of the platform.
-  @override
-  Future<String?> getPlatformVersion() async {
-    final version = html.window.navigator.userAgent;
-    return version;
   }
 
   Future<dynamic> handleMethodCall(MethodCall call) async {
@@ -57,9 +49,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
           call.arguments['alias'],
         ]);
         break;
-      case 'getAnonymousId':
-        final anonymousId = analytics.callMethod('get_distinct_id');
-        return anonymousId;
+      case 'getDistinctId':
+        final distinctId = analytics.callMethod('get_distinct_id');
+        return distinctId;
       case 'reset':
         analytics.callMethod('reset');
         break;
@@ -94,9 +86,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
         break;
       case 'getFeatureFlagPayload':
         analytics.callMethod('getFeatureFlagPayload');
-        break;
-      case 'getFeatureFlagAndPayload':
-        analytics.callMethod('getFeatureFlagAndPayload');
         break;
       default:
         throw PlatformException(

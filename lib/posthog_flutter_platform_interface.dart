@@ -23,25 +23,23 @@ abstract class PosthogFlutterPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<String?> getPlatformVersion() {
-    throw UnimplementedError('platformVersion() has not been implemented.');
-  }
-
   Future<void> identify(
-      {required String userId, Map<String, dynamic>? properties}) {
+      {required String userId,
+      Map<String, Object>? userProperties,
+      Map<String, Object>? userPropertiesSetOnce}) {
     throw UnimplementedError('identify() has not been implemented.');
   }
 
   Future<void> capture({
     required String eventName,
-    Map<String, dynamic>? properties,
+    Map<String, Object>? properties,
   }) {
     throw UnimplementedError('capture() has not been implemented.');
   }
 
   Future<void> screen({
     required String screenName,
-    Map<String, dynamic>? properties,
+    Map<String, Object>? properties,
   }) {
     throw UnimplementedError('screen() has not been implemented.');
   }
@@ -52,8 +50,8 @@ abstract class PosthogFlutterPlatform extends PlatformInterface {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
-  Future<String?> get getDistinctId {
-    throw UnimplementedError('getAnonymousId() has not been implemented.');
+  Future<String> get getDistinctId {
+    throw UnimplementedError('getDistinctId() has not been implemented.');
   }
 
   Future<void> reset() {
@@ -72,11 +70,11 @@ abstract class PosthogFlutterPlatform extends PlatformInterface {
     throw UnimplementedError('debug() has not been implemented.');
   }
 
-  Future<void> register(String key, dynamic value) {
+  Future<void> register(String key, Object value) {
     throw UnimplementedError('register() has not been implemented.');
   }
 
-  Future<bool?> isFeatureEnabled(String key) {
+  Future<bool> isFeatureEnabled(String key) {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');
   }
 
@@ -87,28 +85,23 @@ abstract class PosthogFlutterPlatform extends PlatformInterface {
   Future<void> group({
     required String groupType,
     required String groupKey,
-    Map<String, dynamic>? groupProperties,
+    Map<String, Object>? groupProperties,
   }) {
     throw UnimplementedError('group() has not been implemented.');
   }
 
-  Future<dynamic> getFeatureFlag({
+  Future<Object?> getFeatureFlag({
     required String key,
   }) {
     throw UnimplementedError('getFeatureFlag() has not been implemented.');
   }
 
-  Future<Map?> getFeatureFlagPayload({
+  Future<Object?> getFeatureFlagPayload({
     required String key,
   }) {
     throw UnimplementedError(
         'getFeatureFlagPayload() has not been implemented.');
   }
 
-  Future<Map?> getFeatureFlagAndPayload({
-    required String key,
-  }) {
-    throw UnimplementedError(
-        'getFeatureFlagAndPayload() has not been implemented.');
-  }
+  // TODO: missing unregister, flush, capture with more parameters, close
 }

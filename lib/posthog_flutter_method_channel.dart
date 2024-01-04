@@ -10,52 +10,54 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   final methodChannel = const MethodChannel('posthog_flutter');
 
   @override
-  Future<String?> getPlatformVersion() async {
-    final version =
-        await methodChannel.invokeMethod<String>('getPlatformVersion');
-    return version;
-  }
-
   Future<void> identify({
     required String userId,
-    Map<String, dynamic>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
     try {
       await methodChannel.invokeMethod('identify', {
         'userId': userId,
-        'properties': properties ?? {},
+        if (userProperties != null) 'userProperties': userProperties,
+        if (userPropertiesSetOnce != null)
+          'userPropertiesSetOnce': userPropertiesSetOnce,
       });
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on identify: $exception');
     }
   }
 
+  @override
   Future<void> capture({
     required String eventName,
-    Map<String, dynamic>? properties,
+    Map<String, Object>? properties,
   }) async {
     try {
-      await methodChannel.invokeMethod(
-          'capture', {'eventName': eventName, 'properties': properties ?? {}});
+      await methodChannel.invokeMethod('capture', {
+        'eventName': eventName,
+        if (properties != null) 'properties': properties,
+      });
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on capture: $exception');
     }
   }
 
+  @override
   Future<void> screen({
     required String screenName,
-    Map<String, dynamic>? properties,
+    Map<String, Object>? properties,
   }) async {
     try {
       await methodChannel.invokeMethod('screen', {
         'screenName': screenName,
-        'properties': properties ?? {},
+        if (properties != null) 'properties': properties,
       });
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on screen: $exception');
     }
   }
 
+  @override
   Future<void> alias({
     required String alias,
   }) async {
@@ -64,56 +66,67 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
         'alias': alias,
       });
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on alias: $exception');
     }
   }
 
-  Future<String?> get getDistinctId async {
-    return await methodChannel.invokeMethod('getDistinctId');
+  @override
+  Future<String> get getDistinctId async {
+    try {
+      return await methodChannel.invokeMethod('getDistinctId');
+    } on PlatformException catch (exception) {
+      _printIfDebug('Exeption on reset: $exception');
+      return "";
+    }
   }
 
+  @override
   Future<void> reset() async {
     try {
       await methodChannel.invokeMethod('reset');
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on reset: $exception');
     }
   }
 
+  @override
   Future<void> disable() async {
     try {
       await methodChannel.invokeMethod('disable');
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on disable: $exception');
     }
   }
 
+  @override
   Future<void> enable() async {
     try {
       await methodChannel.invokeMethod('enable');
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on enable: $exception');
     }
   }
 
+  @override
   Future<void> debug(bool enabled) async {
     try {
       await methodChannel.invokeMethod('debug', {
         'debug': enabled,
       });
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on debug: $exception');
     }
   }
 
-  Future<bool?> isFeatureEnabled(String key) async {
+  @override
+  Future<bool> isFeatureEnabled(String key) async {
     try {
       return await methodChannel.invokeMethod('isFeatureEnabled', {
         'key': key,
       });
     } on PlatformException catch (exception) {
-      print(exception);
-      return null;
+      _printIfDebug('Exeption on isFeatureEnabled: $exception');
+      return false;
     }
   }
 
@@ -122,28 +135,29 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     try {
       await methodChannel.invokeMethod('reloadFeatureFlags');
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on reloadFeatureFlags: $exception');
     }
   }
 
+  @override
   Future<void> group({
     required String groupType,
     required String groupKey,
-    Map<String, dynamic>? groupProperties,
+    Map<String, Object>? groupProperties,
   }) async {
     try {
       await methodChannel.invokeMethod('group', {
         'groupType': groupType,
         'groupKey': groupKey,
-        'groupProperties': groupProperties ?? {},
+        if (groupProperties != null) 'groupProperties': groupProperties,
       });
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on group: $exception');
     }
   }
 
   @override
-  Future<dynamic> getFeatureFlag({
+  Future<Object?> getFeatureFlag({
     required String key,
   }) async {
     try {
@@ -151,13 +165,13 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
         'key': key,
       });
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on getFeatureFlag: $exception');
       return null;
     }
   }
 
   @override
-  Future<Map?> getFeatureFlagPayload({
+  Future<Object?> getFeatureFlagPayload({
     required String key,
   }) async {
     try {
@@ -165,33 +179,24 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
         'key': key,
       });
     } on PlatformException catch (exception) {
-      print(exception);
-      return {};
+      _printIfDebug('Exeption on getFeatureFlagPayload: $exception');
+      return null;
     }
   }
 
   @override
-  Future<Map?> getFeatureFlagAndPayload({
-    required String key,
-  }) async {
-    try {
-      return await methodChannel.invokeMethod('getFeatureFlagAndPayload', {
-        'key': key,
-      });
-    } on PlatformException catch (exception) {
-      if (kDebugMode) {
-        print('Exeption on getFeatureFlagAndPayload(): $exception');
-      }
-      rethrow;
-    }
-  }
-
-  Future<void> register(String key, dynamic value) async {
+  Future<void> register(String key, Object value) async {
     try {
       return await methodChannel
           .invokeMethod('register', {'key': key, 'value': value});
     } on PlatformException catch (exception) {
-      print(exception);
+      _printIfDebug('Exeption on register: $exception');
+    }
+  }
+
+  void _printIfDebug(String message) {
+    if (kDebugMode) {
+      print(message);
     }
   }
 }
