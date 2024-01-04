@@ -7,7 +7,7 @@ issue_tracker: https://github.com/posthog/posthog-flutter/issues
 documentation: https://github.com/posthog/posthog-flutter#readme
 
 environment:
-  sdk: '>=3.2.3 <4.0.0'
+  sdk: '>=2.18.0 <4.0.0'
   flutter: '>=3.3.0'
 
 dependencies:
