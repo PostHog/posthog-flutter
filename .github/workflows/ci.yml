@@ -25,18 +25,21 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+      
+      - run: flutter --version
 
       - name: SDK format check
         working-directory: ./lib
         run: dart format --set-exit-if-changed ./
 
+      - name: Install dependencies
+        working-directory: ./example
+        run: flutter pub get
+
       - name: SDK analyze check
         working-directory: ./lib
         run: flutter analyze
 
-      - name: Install dependencies
-        working-directory: ./example
-        run: flutter pub get
       - name: Build iOS
         working-directory: ./example
         run: flutter build ios --simulator --no-codesign
