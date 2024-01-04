@@ -10,6 +10,7 @@
 - Flutter min version 3.3.0
 - Upgraded PostHog Android SDK to [v3](https://github.com/PostHog/posthog-android/blob/main/USAGE.md)
 - Upgraded PostHog iOS SDK to [v3 preview](https://github.com/PostHog/posthog-ios/blob/main/USAGE.md)
+- Upgraded PostHog JS SDK to the latest version
 - PostHog Flutter Plugins are written in Kotlin and Swift
 
 ### Acknowledgements
