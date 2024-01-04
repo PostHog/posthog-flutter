@@ -16,18 +16,15 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 | `capture`                 | X       | X   | X   |
 | `screen`                  | X       | X   | X   |
 | `alias`                   | X       | X   | X   |
-| `getAnonymousId`          | X       | X   | X   |
+| `getDistinctId`           | X       | X   | X   |
 | `reset`                   | X       | X   | X   |
 | `disable`                 | X       | X   |     |
 | `enable`                  | X       | X   |     |
-| `debug`                   | X\*     | X   | X   |
+| `debug`                   | X       | X   | X   |
 | `setContext`              | X       | X   |     |
 | `isFeatureEnabled`        | X       | X   | X   |
 | `getFeatureFlag`          | X       | X   | X   |
 | `getFeatureFlagPayload`   | X       | X   | X   |
-| `getFeatureFlagAndPayload`| X       | X   | X   |
-
-\* Debugging must be set as a configuration parameter in `AndroidManifest.xml` (see below). The official posthog library does not offer the debug method for Android.
 
 ### Example
 
@@ -116,7 +113,7 @@ Remember that the application lifecycle events won't have any special context se
 </plist>
 ```
 
-For `debug` mode on iOS, you can use the following snippet:
+For `debug` mode on Android and iOS, you can use the following snippet:
 
 ```dart
 PostHog().debug(true);

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 void main() {
@@ -16,36 +14,12 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
   final _posthogFlutterPlugin = Posthog();
   dynamic _result = "";
 
   @override
   void initState() {
     super.initState();
-    initPlatformState();
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      platformVersion = await _posthogFlutterPlugin.getPlatformVersion() ??
-          'Unknown platform version';
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
-    });
   }
 
   @override
@@ -53,15 +27,14 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Posthog Flutter App'),
+          title: const Text('PostHog Flutter App'),
         ),
-        body: Padding(
+        body: SingleChildScrollView(
+          child: Padding(
           padding: const EdgeInsets.all(16),
           child: Center(
             child: Column(
               children: [
-                Text('Running on: $_platformVersion\n'),
-                const Divider(),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
@@ -74,14 +47,18 @@ class _MyAppState extends State<MyApp> {
                   children: [
                     ElevatedButton(
                       onPressed: () {
-                        _posthogFlutterPlugin.screen(screenName: "screenName");
+                        _posthogFlutterPlugin.screen(screenName: "my screen", properties: {
+                          "foo": "bar",
+                        });
                       },
                       child: const Text("Capture Screen"),
                     ),
                     ElevatedButton(
                       onPressed: () {
                         _posthogFlutterPlugin
-                            .capture(eventName: "eventName", properties: {});
+                            .capture(eventName: "eventName", properties: {
+                              "foo": "bar",
+                            });
                       },
                       child: const Text("Capture Event"),
                     ),
@@ -124,6 +101,48 @@ class _MyAppState extends State<MyApp> {
                   },
                   child: const Text("Register"),
                 ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.group(groupType: "theType", groupKey: "theKey", groupProperties: {
+                      "foo": "bar",
+                    });
+                  },
+                  child: const Text("Group"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.identify(userId: "myId", userProperties: {"foo": "bar",}, userPropertiesSetOnce: {"foo1": "bar1",});
+                  },
+                  child: const Text("Identify"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.alias(alias: "myAlias");;
+                  },
+                  child: const Text("Alias"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.debug(true);
+                  },
+                  child: const Text("Debug"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.reset();
+                  },
+                  child: const Text("Reset"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final result = await _posthogFlutterPlugin
+                        .getDistinctId;
+                    setState(() {
+                      _result = result;
+                    });
+                  },
+                  child: const Text("distinctId"),
+                ),
                 const Divider(),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
@@ -145,22 +164,29 @@ class _MyAppState extends State<MyApp> {
                 ElevatedButton(
                   onPressed: () async {
                     final result = await _posthogFlutterPlugin
-                        .getFeatureFlagAndPayload("feature_name");
-                    setState(() {
-                      _result = result;
-                    });
-                  },
-                  child: const Text("Get Feature Flag and Payload"),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final result = await _posthogFlutterPlugin
                         .isFeatureEnabled("feature_name");
                     setState(() {
                       _result = result;
                     });
                   },
                   child: const Text("isFeatureEnabled"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final result = await _posthogFlutterPlugin
+                        .getFeatureFlagPayload("feature_name");
+                    setState(() {
+                      _result = result;
+                    });
+                  },
+                  child: const Text("getFeatureFlagPayload"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin
+                        .reloadFeatureFlags();
+                  },
+                  child: const Text("reloadFeatureFlags"),
                 ),
                 const Divider(),
                 const Padding(
@@ -174,6 +200,7 @@ class _MyAppState extends State<MyApp> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

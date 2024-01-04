@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import com.posthog.PostHog
+import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -30,15 +31,22 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun initPlugin(applicationContext: Context) {
         try {
+            // TODO: replace deprecated method API 33
             val ai = applicationContext.packageManager.getApplicationInfo(applicationContext.packageName, PackageManager.GET_META_DATA)
             val bundle = ai.metaData
-            val apiKey = bundle.getString("com.posthog.posthog.API_KEY", "")
-            val posthogHost = bundle.getString("com.posthog.posthog.POSTHOG_HOST", "")
+            val apiKey = bundle.getString("com.posthog.posthog.API_KEY", null)
+
+            if (apiKey.isNullOrEmpty()) {
+                Log.e("PostHog", "com.posthog.posthog.API_KEY is missing!")
+                return
+            }
+
+            val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.defaultHost)
             val trackApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
             val enableDebug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
             // Init PostHog
-            val config = PostHogAndroidConfig(apiKey, posthogHost).apply {
+            val config = PostHogAndroidConfig(apiKey, host).apply {
                 captureScreenViews = false
                 captureDeepLinks = false
                 captureApplicationLifecycleEvents = trackApplicationLifecycleEvents
@@ -47,16 +55,13 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             PostHogAndroid.setup(applicationContext, config)
 
         } catch (e: Throwable) {
-            e.localizedMessage?.let { Log.e("initPlugin", it) }
+            e.localizedMessage?.let { Log.e("PostHog", "initPlugin error: $it") }
         }
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
 
         when (call.method) {
-            "getPlatformVersion" -> {
-                result.success("Android ${android.os.Build.VERSION.RELEASE}")
-            }
 
             "identify" -> {
                 identify(call, result)
@@ -110,12 +115,11 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 getFeatureFlagPayload(call, result)
             }
 
-            "getFeatureFlagAndPayload" -> {
-                getFeatureFlagAndPayload(call, result)
-            }
-
             "register" -> {
                 register(call, result)
+            }
+            "debug" -> {
+                debug(call, result)
             }
 
             else -> {
@@ -131,9 +135,9 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun getFeatureFlag(call: MethodCall, result: Result) {
         try {
-            val featureFlagKey: String? = call.argument("key")
-            val value: Any? = PostHog.getFeatureFlag(featureFlagKey!!)
-            result.success(value)
+            val featureFlagKey: String = call.argument("key")!!
+            val flag = PostHog.getFeatureFlag(featureFlagKey)
+            result.success(flag)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -141,38 +145,9 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun getFeatureFlagPayload(call: MethodCall, result: Result) {
         try {
-            val featureFlagKey: String? = call.argument("key")
-            val value: Any? = PostHog.getFeatureFlagPayload(featureFlagKey!!)
-            result.success(value)
-        } catch (e: Throwable) {
-            result.error("PosthogFlutterException", e.localizedMessage, null)
-        }
-    }
-
-    private fun getFeatureFlagAndPayload(call: MethodCall, result: Result) {
-        try {
-            val featureFlagKey: String? = call.argument("key")
-            val status: Any? = PostHog.getFeatureFlag(featureFlagKey!!)
-            val payload: Any? = PostHog.getFeatureFlagPayload(featureFlagKey)
-            val featureAndPayload = mutableMapOf<String, Any?>()
-
-            when (status) {
-                null -> {
-                    featureAndPayload["isEnabled"] = false
-                }
-
-                is String -> {
-                    featureAndPayload["isEnabled"] = true
-                    featureAndPayload["variant"] = status
-                }
-
-                else -> {
-                    featureAndPayload["isEnabled"] = status
-                }
-            }
-            featureAndPayload["data"] = payload
-
-            result.success(featureAndPayload)
+            val featureFlagKey: String = call.argument("key")!!
+            val flag = PostHog.getFeatureFlagPayload(featureFlagKey)
+            result.success(flag)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -180,11 +155,11 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun identify(call: MethodCall, result: Result) {
         try {
-            val userId = call.argument("userId") as? String
-            val propertiesData: HashMap<String, Any>? = call.argument("properties")
-            val optionsData: HashMap<String, Any>? = call.argument("options")
-            PostHog.identify(userId!!, propertiesData, optionsData)
-            result.success(true)
+            val userId: String = call.argument("userId")!!
+            val userProperties: Map<String, Any>? = call.argument("userProperties")
+            val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
+            PostHog.identify(userId, userProperties, userPropertiesSetOnce)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -192,12 +167,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun capture(call: MethodCall, result: Result) {
         try {
-            val eventName: String? = call.argument("eventName")
-            val distinctId: String? = call.argument("distinctId")
-            val propertiesData: HashMap<String, Any>? = call.argument("properties")
-            val optionsData: HashMap<String, Any>? = call.argument("options")
-            PostHog.capture(eventName!!, distinctId, propertiesData, optionsData)
-            result.success(true)
+            val eventName: String = call.argument("eventName")!!
+            val properties: Map<String, Any>? = call.argument("properties")
+            PostHog.capture(eventName, properties = properties)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -205,10 +178,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun screen(call: MethodCall, result: Result) {
         try {
-            val screenName: String? = call.argument("screenName")
-            val propertiesData: HashMap<String, Any>? = call.argument("properties")
-            PostHog.screen(screenName!!, propertiesData)
-            result.success(true)
+            val screenName: String = call.argument("screenName")!!
+            val properties: Map<String, Any>? = call.argument("properties")
+            PostHog.screen(screenName, properties)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -216,9 +189,9 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun alias(call: MethodCall, result: Result) {
         try {
-            val alias: String? = call.argument("alias")
-            PostHog.alias(alias!!)
-            result.success(true)
+            val alias: String = call.argument("alias")!!
+            PostHog.alias(alias)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -226,8 +199,8 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun distinctId(result: Result) {
         try {
-            val anonymousId: String = PostHog.distinctId()
-            result.success(anonymousId)
+            val distinctId: String = PostHog.distinctId()
+            result.success(distinctId)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -236,29 +209,35 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     private fun reset(result: Result) {
         try {
             PostHog.reset()
-            result.success(true)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 
-    // There is no enable method at this time for PostHog on Android.
-    // Instead, we use optOut as a proxy to achieve the same result.
     private fun enable(result: Result) {
         try {
             PostHog.optIn()
-            result.success(true)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 
-    // There is no disable method at this time for PostHog on Android.
-    // Instead, we use optOut as a proxy to achieve the same result.
+    private fun debug(call: MethodCall, result: Result) {
+        try {
+            val debug: Boolean = call.argument("debug")!!
+            PostHog.debug(debug)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
     private fun disable(result: Result) {
         try {
             PostHog.optOut()
-            result.success(true)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -266,8 +245,8 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun isFeatureEnabled(call: MethodCall, result: Result) {
         try {
-            val key: String? = call.argument("key")
-            val isEnabled: Boolean = PostHog.isFeatureEnabled(key!!)
+            val key: String = call.argument("key")!!
+            val isEnabled = PostHog.isFeatureEnabled(key)
             result.success(isEnabled)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -277,7 +256,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     private fun reloadFeatureFlags(result: Result) {
         try {
             PostHog.reloadFeatureFlags()
-            result.success(true)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -285,11 +264,11 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun group(call: MethodCall, result: Result) {
         try {
-            val groupType: String? = call.argument("groupType")
-            val groupKey: String? = call.argument("groupKey")
-            val propertiesData: HashMap<String, Any>? = call.argument("groupProperties")
-            PostHog.group(groupType!!, groupKey!!, propertiesData)
-            result.success(true)
+            val groupType: String = call.argument("groupType")!!
+            val groupKey: String = call.argument("groupKey")!!
+            val groupProperties: Map<String, Any>? = call.argument("groupProperties")
+            PostHog.group(groupType, groupKey, groupProperties)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -297,10 +276,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun register(call: MethodCall, result: Result) {
         try {
-            val key: String? = call.argument("key")
-            val value: Any? = call.argument("value")
-            PostHog.register(key!!, value!!)
-            result.success(true)
+            val key: String = call.argument("key")!!
+            val value: Any = call.argument("value")!!
+            PostHog.register(key, value)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }

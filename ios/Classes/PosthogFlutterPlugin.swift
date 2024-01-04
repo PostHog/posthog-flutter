@@ -27,16 +27,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
-    case "getPlatformVersion":
-        getPlatformVersion(call, result: result)
     case "getFeatureFlag":
         getFeatureFlag(call, result: result)
     case "isFeatureEnabled":
         isFeatureEnabled(call, result: result)
     case "getFeatureFlagPayload":
         getFeatureFlagPayload(call, result: result)
-    case "getFeatureFlagAndPayload":
-        getFeatureFlagAndPayload(call, result: result)
     case "identify":
         identify(call, result: result)
     case "capture":
@@ -63,13 +59,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
       result(FlutterMethodNotImplemented)
     }
   }
-
-    private func getPlatformVersion(
-        _ call: FlutterMethodCall,
-        result: @escaping FlutterResult
-    ){
-        result("iOS " + UIDevice.current.systemVersion)
-    }
     
     private func getFeatureFlag(
         _ call: FlutterMethodCall,
@@ -106,33 +95,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
            let featureFlagKey = args["key"] as? String {
             let value : Any? = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
             result(value)
-          } else {
-              _badArgumentError(result: result)
-          }
-    }
-    
-    private func getFeatureFlagAndPayload(
-        _ call: FlutterMethodCall,
-        result: @escaping FlutterResult
-    ){
-        if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String {
-            let status : Any? = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
-            let payload : Any? = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
-            var featureAndPayload : Dictionary<String, Any?> = [String: Any?]()
-            
-            if (status == nil){
-                featureAndPayload["isEnabled"] = false
-            }
-            if (status is String){
-                featureAndPayload["isEnabled"] = true
-                featureAndPayload["variant"] = status
-            }else {
-                featureAndPayload["isEnabled"] = status
-            }
-            featureAndPayload["data"] = payload
-            
-            result(featureAndPayload)
           } else {
               _badArgumentError(result: result)
           }
