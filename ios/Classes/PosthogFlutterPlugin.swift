@@ -1,248 +1,276 @@
 import Flutter
-import UIKit
 import PostHog
+import UIKit
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
-  public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
-    let instance = PosthogFlutterPlugin()
-    initPlugin()
-    registrar.addMethodCallDelegate(instance, channel: channel)
-  }
-    
-   public static func initPlugin(){
-    // Initialise PostHog
-       let postHogApiKey = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? ""
-       let postHogHost = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? "https://app.posthog.com"
-         let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
-         
-         let config = PostHogConfig(
-           apiKey: postHogApiKey,
-           host: postHogHost
-         )
-         config.captureApplicationLifecycleEvents = postHogCaptureLifecyleEvents
-         PostHogSDK.shared.setup(config)
-       //
-  }
-
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    switch call.method {
-    case "getFeatureFlag":
-        getFeatureFlag(call, result: result)
-    case "isFeatureEnabled":
-        isFeatureEnabled(call, result: result)
-    case "getFeatureFlagPayload":
-        getFeatureFlagPayload(call, result: result)
-    case "identify":
-        identify(call, result: result)
-    case "capture":
-        capture(call, result: result)
-    case "screen":
-        screen(call, result: result)
-    case "alias":
-        alias(call, result: result)
-    case "distinctId":
-        distinctId(call, result: result)
-    case "reset":
-        reset(call, result: result)
-    case "enable":
-        enable(call, result: result)
-    case "disable":
-        disable(call, result: result)
-    case "reloadFeatureFlags":
-        reloadFeatureFlags(call, result: result)
-    case "group":
-        group(call, result: result)
-    case "register":
-        register(call, result: result)
-    default:
-      result(FlutterMethodNotImplemented)
+    public static func register(with registrar: FlutterPluginRegistrar) {
+        let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
+        let instance = PosthogFlutterPlugin()
+        initPlugin()
+        registrar.addMethodCallDelegate(instance, channel: channel)
     }
-  }
-    
+
+    public static func initPlugin() {
+        // Initialise PostHog
+        let apiKey = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? ""
+
+        if apiKey.isEmpty {
+            print("[PostHog] com.posthog.posthog.API_KEY is missing!")
+            return
+        }
+
+        let host = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost
+        let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
+
+        let config = PostHogConfig(
+            apiKey: apiKey,
+            host: host
+        )
+        config.captureApplicationLifecycleEvents = postHogCaptureLifecyleEvents
+        config.captureScreenViews = false
+        PostHogSDK.shared.setup(config)
+        //
+    }
+
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        switch call.method {
+        case "getFeatureFlag":
+            getFeatureFlag(call, result: result)
+        case "isFeatureEnabled":
+            isFeatureEnabled(call, result: result)
+        case "getFeatureFlagPayload":
+            getFeatureFlagPayload(call, result: result)
+        case "identify":
+            identify(call, result: result)
+        case "capture":
+            capture(call, result: result)
+        case "screen":
+            screen(call, result: result)
+        case "alias":
+            alias(call, result: result)
+        case "getDistinctId":
+            distinctId(call, result: result)
+        case "reset":
+            reset(call, result: result)
+        case "enable":
+            enable(call, result: result)
+        case "disable":
+            disable(call, result: result)
+        case "debug":
+            debug(call, result: result)
+        case "reloadFeatureFlags":
+            reloadFeatureFlags(call, result: result)
+        case "group":
+            group(call, result: result)
+        case "register":
+            register(call, result: result)
+        default:
+            result(FlutterMethodNotImplemented)
+        }
+    }
+
     private func getFeatureFlag(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
-            
+    ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String {
-           let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
+           let featureFlagKey = args["key"] as? String
+        {
+            let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
             result(value)
-          } else {
-              _badArgumentError(result: result)
-          }
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func isFeatureEnabled(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String {
-            let value : Bool = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
+           let featureFlagKey = args["key"] as? String
+        {
+            let value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
             result(value)
-          } else {
-              _badArgumentError(result: result)
-          }
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func getFeatureFlagPayload(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String {
-            let value : Any? = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
+           let featureFlagKey = args["key"] as? String
+        {
+            let value = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
             result(value)
-          } else {
-              _badArgumentError(result: result)
-          }
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func identify(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
-           let userId = args["userId"] as? String,
-           let propertiesData = args["properties"] as? Dictionary<String,Any> {
+           let userId = args["userId"] as? String
+        {
+            let userProperties = args["userProperties"] as? [String: Any]
+            let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
+
             PostHogSDK.shared.identify(
                 userId,
-                userProperties: propertiesData
+                userProperties: userProperties,
+                userPropertiesSetOnce: userPropertiesSetOnce
             )
-            result(true)
-          } else {
-              _badArgumentError(result: result)
-          }
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func capture(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
-           let eventName = args["eventName"] as? String,
-           let propertiesData = args["properties"] as? Dictionary<String,Any> {
+           let eventName = args["eventName"] as? String
+        {
+            let properties = args["properties"] as? [String: Any]
             PostHogSDK.shared.capture(
                 eventName,
-                userProperties: propertiesData
+                properties: properties
             )
-            result(true)
-          } else {
-              _badArgumentError(result: result)
-          }
-        
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func screen(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
-           let screenName = args["screenName"] as? String,
-           let propertiesData = args["properties"] as? Dictionary<String,Any> {
+           let screenName = args["screenName"] as? String
+        {
+            let properties = args["properties"] as? [String: Any]
             PostHogSDK.shared.screen(
                 screenName,
-                properties: propertiesData
+                properties: properties
             )
-            result(true)
-          } else {
-              _badArgumentError(result: result)
-          }
-        
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func alias(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
-           let alias = args["alias"] as? String {
+           let alias = args["alias"] as? String
+        {
             PostHogSDK.shared.alias(alias)
-            result(true)
-          } else {
-              _badArgumentError(result: result)
-          }
-        
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func distinctId(
-        _ call: FlutterMethodCall,
+        _: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         let val = PostHogSDK.shared.getDistinctId()
         result(val)
     }
-    
+
     private func reset(
-        _ call: FlutterMethodCall,
+        _: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         PostHogSDK.shared.reset()
-        result(true)
+        result(nil)
     }
-    
+
     private func enable(
-        _ call: FlutterMethodCall,
+        _: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         PostHogSDK.shared.optIn()
-        result(true)
-        
+        result(nil)
     }
-    
+
     private func disable(
-        _ call: FlutterMethodCall,
+        _: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         PostHogSDK.shared.optOut()
-        result(true)
+        result(nil)
     }
-    
-    private func reloadFeatureFlags(
+
+    private func debug(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
-        PostHogSDK.shared.reloadFeatureFlags()
-        result(true)
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let debug = args["debug"] as? Bool
+        {
+            PostHogSDK.shared.debug(debug)
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
+    private func reloadFeatureFlags(
+        _: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        PostHogSDK.shared.reloadFeatureFlags()
+        result(nil)
+    }
+
     private func group(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
            let groupType = args["groupType"] as? String,
-           let groupKey = args["groupKey"] as? String,
-           let groupProperties = args["groupProperties"] as? Dictionary<String,Any>{
+           let groupKey = args["groupKey"] as? String
+        {
+            let groupProperties = args["groupProperties"] as? [String: Any]
             PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties)
-            result(true)
-          } else {
-              _badArgumentError(result: result)
-          }
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     private func register(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
-    ){
+    ) {
         if let args = call.arguments as? [String: Any],
            let key = args["key"] as? String,
-           let value = args["value"] {
+           let value = args["value"]
+        {
             PostHogSDK.shared.register([key: value])
-            result(true)
-          } else {
-              _badArgumentError(result: result)
-          }
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
     }
-    
+
     // Return bad Arguments error
     private func _badArgumentError(result: @escaping FlutterResult) {
-        result(FlutterError.init(
-            code: "bad args", message: nil, details: nil
+        result(FlutterError(
+            code: "PosthogFlutterException", message: "Missing arguments!", details: nil
         ))
     }
-    
-    
 }
