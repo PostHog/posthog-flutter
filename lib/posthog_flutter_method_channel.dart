@@ -6,8 +6,7 @@ import 'posthog_flutter_platform_interface.dart';
 /// An implementation of [PosthogFlutterPlatform] that uses method channels.
 class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   /// The method channel used to interact with the native platform.
-  @visibleForTesting
-  final methodChannel = const MethodChannel('posthog_flutter');
+  final _methodChannel = const MethodChannel('posthog_flutter');
 
   @override
   Future<void> identify({
@@ -16,7 +15,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
     try {
-      await methodChannel.invokeMethod('identify', {
+      await _methodChannel.invokeMethod('identify', {
         'userId': userId,
         if (userProperties != null) 'userProperties': userProperties,
         if (userPropertiesSetOnce != null)
@@ -33,7 +32,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     Map<String, Object>? properties,
   }) async {
     try {
-      await methodChannel.invokeMethod('capture', {
+      await _methodChannel.invokeMethod('capture', {
         'eventName': eventName,
         if (properties != null) 'properties': properties,
       });
@@ -48,7 +47,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     Map<String, Object>? properties,
   }) async {
     try {
-      await methodChannel.invokeMethod('screen', {
+      await _methodChannel.invokeMethod('screen', {
         'screenName': screenName,
         if (properties != null) 'properties': properties,
       });
@@ -62,7 +61,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     required String alias,
   }) async {
     try {
-      await methodChannel.invokeMethod('alias', {
+      await _methodChannel.invokeMethod('alias', {
         'alias': alias,
       });
     } on PlatformException catch (exception) {
@@ -73,9 +72,9 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<String> get getDistinctId async {
     try {
-      return await methodChannel.invokeMethod('getDistinctId');
+      return await _methodChannel.invokeMethod('getDistinctId');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on reset: $exception');
+      _printIfDebug('Exeption on getDistinctId: $exception');
       return "";
     }
   }
@@ -83,7 +82,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<void> reset() async {
     try {
-      await methodChannel.invokeMethod('reset');
+      await _methodChannel.invokeMethod('reset');
     } on PlatformException catch (exception) {
       _printIfDebug('Exeption on reset: $exception');
     }
@@ -92,7 +91,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<void> disable() async {
     try {
-      await methodChannel.invokeMethod('disable');
+      await _methodChannel.invokeMethod('disable');
     } on PlatformException catch (exception) {
       _printIfDebug('Exeption on disable: $exception');
     }
@@ -101,7 +100,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<void> enable() async {
     try {
-      await methodChannel.invokeMethod('enable');
+      await _methodChannel.invokeMethod('enable');
     } on PlatformException catch (exception) {
       _printIfDebug('Exeption on enable: $exception');
     }
@@ -110,7 +109,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<void> debug(bool enabled) async {
     try {
-      await methodChannel.invokeMethod('debug', {
+      await _methodChannel.invokeMethod('debug', {
         'debug': enabled,
       });
     } on PlatformException catch (exception) {
@@ -121,7 +120,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<bool> isFeatureEnabled(String key) async {
     try {
-      return await methodChannel.invokeMethod('isFeatureEnabled', {
+      return await _methodChannel.invokeMethod('isFeatureEnabled', {
         'key': key,
       });
     } on PlatformException catch (exception) {
@@ -133,7 +132,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<void> reloadFeatureFlags() async {
     try {
-      await methodChannel.invokeMethod('reloadFeatureFlags');
+      await _methodChannel.invokeMethod('reloadFeatureFlags');
     } on PlatformException catch (exception) {
       _printIfDebug('Exeption on reloadFeatureFlags: $exception');
     }
@@ -146,7 +145,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     Map<String, Object>? groupProperties,
   }) async {
     try {
-      await methodChannel.invokeMethod('group', {
+      await _methodChannel.invokeMethod('group', {
         'groupType': groupType,
         'groupKey': groupKey,
         if (groupProperties != null) 'groupProperties': groupProperties,
@@ -161,7 +160,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     required String key,
   }) async {
     try {
-      return await methodChannel.invokeMethod('getFeatureFlag', {
+      return await _methodChannel.invokeMethod('getFeatureFlag', {
         'key': key,
       });
     } on PlatformException catch (exception) {
@@ -175,7 +174,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
     required String key,
   }) async {
     try {
-      return await methodChannel.invokeMethod('getFeatureFlagPayload', {
+      return await _methodChannel.invokeMethod('getFeatureFlagPayload', {
         'key': key,
       });
     } on PlatformException catch (exception) {
@@ -187,7 +186,7 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   @override
   Future<void> register(String key, Object value) async {
     try {
-      return await methodChannel
+      return await _methodChannel
           .invokeMethod('register', {'key': key, 'value': value});
     } on PlatformException catch (exception) {
       _printIfDebug('Exeption on register: $exception');
