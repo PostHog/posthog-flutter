@@ -27,9 +27,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
     final analytics = JsObject.fromBrowserObject(context['posthog']);
     switch (call.method) {
       case 'identify':
+        final userProperties = call.arguments['userProperties'];
+        final userPropertiesSetOnce = call.arguments['userPropertiesSetOnce'];
         analytics.callMethod('identify', [
           call.arguments['userId'],
-          JsObject.jsify(call.arguments['properties']),
+          JsObject.jsify(userProperties),
+          JsObject.jsify(userPropertiesSetOnce),
         ]);
         break;
       case 'capture':
@@ -39,9 +42,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
         ]);
         break;
       case 'screen':
+        final properties = call.arguments['properties'] ?? {};
+        final screenName = call.arguments['screenName'];
+        if (screenName != null) {
+          properties['\$screen_name'] = screenName;
+        }
         analytics.callMethod('capture', [
-          call.arguments['screenName'],
-          JsObject.jsify(call.arguments['properties']),
+          '\$screen',
+          JsObject.jsify(properties),
         ]);
         break;
       case 'alias':
@@ -82,10 +90,20 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
         analytics.callMethod('opt_out_capturing');
         break;
       case 'getFeatureFlag':
-        analytics.callMethod('getFeatureFlag');
+        analytics.callMethod('getFeatureFlag', [
+          call.arguments['key'],
+        ]);
         break;
       case 'getFeatureFlagPayload':
-        analytics.callMethod('getFeatureFlagPayload');
+        analytics.callMethod('getFeatureFlagPayload', [
+          call.arguments['key'],
+        ]);
+        break;
+      case 'register':
+        final properties = {call.arguments['key']: call.arguments['value']};
+        analytics.callMethod('register', [
+          properties,
+        ]);
         break;
       default:
         throw PlatformException(
