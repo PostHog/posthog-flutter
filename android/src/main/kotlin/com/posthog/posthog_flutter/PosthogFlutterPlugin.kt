@@ -79,7 +79,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 alias(call, result)
             }
 
-            "getDistinctId" -> {
+            "distinctId" -> {
                 distinctId(result)
             }
 

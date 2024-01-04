@@ -48,7 +48,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             screen(call, result: result)
         case "alias":
             alias(call, result: result)
-        case "getDistinctId":
+        case "distinctId":
             distinctId(call, result: result)
         case "reset":
             reset(call, result: result)

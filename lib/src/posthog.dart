@@ -60,8 +60,8 @@ class Posthog {
     );
   }
 
-  Future<String> get getDistinctId {
-    return _posthog.getDistinctId;
+  Future<String> getDistinctId() {
+    return _posthog.getDistinctId();
   }
 
   Future<void> reset() {

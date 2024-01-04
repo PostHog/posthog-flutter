@@ -70,9 +70,9 @@ class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
   }
 
   @override
-  Future<String> get getDistinctId async {
+  Future<String> getDistinctId() async {
     try {
-      return await _methodChannel.invokeMethod('getDistinctId');
+      return await _methodChannel.invokeMethod('distinctId');
     } on PlatformException catch (exception) {
       _printIfDebug('Exeption on getDistinctId: $exception');
       return "";

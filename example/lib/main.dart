@@ -144,7 +144,8 @@ class _MyAppState extends State<MyApp> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      final result = await _posthogFlutterPlugin.getDistinctId;
+                      final result =
+                          await _posthogFlutterPlugin.getDistinctId();
                       setState(() {
                         _result = result;
                       });

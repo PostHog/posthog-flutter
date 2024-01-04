@@ -57,7 +57,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
           call.arguments['alias'],
         ]);
         break;
-      case 'getDistinctId':
+      case 'distinctId':
         final distinctId = analytics.callMethod('get_distinct_id');
         return distinctId;
       case 'reset':

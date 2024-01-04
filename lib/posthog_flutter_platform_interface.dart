@@ -50,7 +50,7 @@ abstract class PosthogFlutterPlatform extends PlatformInterface {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
-  Future<String> get getDistinctId {
+  Future<String> getDistinctId() {
     throw UnimplementedError('getDistinctId() has not been implemented.');
   }
 
