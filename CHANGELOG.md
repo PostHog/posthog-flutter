@@ -1,5 +1,7 @@
 ## Next
 
+## 4.0.0-alpha.1
+
 - Migrate to the new SDKs and latest tooling [#70](https://github.com/PostHog/posthog-flutter/pull/70)
   - Added missing features such as feature flags payloads, debug, and more
 
