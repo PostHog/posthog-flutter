@@ -1,24 +1,24 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-import 'posthog_flutter_method_channel.dart';
+import 'posthog_flutter_io.dart';
 
-abstract class PosthogFlutterPlatform extends PlatformInterface {
+abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PosthogFlutterPlatform.
-  PosthogFlutterPlatform() : super(token: _token);
+  PosthogFlutterPlatformInterface() : super(token: _token);
 
   static final Object _token = Object();
 
-  static PosthogFlutterPlatform _instance = MethodChannelPosthogFlutter();
+  static PosthogFlutterPlatformInterface _instance = PosthogFlutterIO();
 
-  /// The default instance of [PosthogFlutterPlatform] to use.
+  /// The default instance of [PosthogFlutterPlatformInterface] to use.
   ///
-  /// Defaults to [MethodChannelPosthogFlutter].
-  static PosthogFlutterPlatform get instance => _instance;
+  /// Defaults to [PosthogFlutterIO].
+  static PosthogFlutterPlatformInterface get instance => _instance;
 
   /// Platform-specific implementations should set this with their own
-  /// platform-specific class that extends [PosthogFlutterPlatform] when
+  /// platform-specific class that extends [PosthogFlutterPlatformInterface] when
   /// they register themselves.
-  static set instance(PosthogFlutterPlatform instance) {
+  static set instance(PosthogFlutterPlatformInterface instance) {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
   }

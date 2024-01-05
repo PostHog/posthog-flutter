@@ -1,8 +1,8 @@
-import 'package:posthog_flutter/posthog_flutter_platform_interface.dart';
-export 'package:posthog_flutter/src/posthog_observer.dart';
+import 'posthog_flutter_platform_interface.dart';
 
 class Posthog {
-  static PosthogFlutterPlatform get _posthog => PosthogFlutterPlatform.instance;
+  static PosthogFlutterPlatformInterface get _posthog =>
+      PosthogFlutterPlatformInterface.instance;
 
   static final Posthog _instance = Posthog._internal();
 

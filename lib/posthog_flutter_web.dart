@@ -6,10 +6,11 @@ import 'dart:js';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
-import 'posthog_flutter_platform_interface.dart';
+import 'src/posthog_flutter_platform_interface.dart';
+import 'src/posthog_flutter_web_handler.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
-class PosthogFlutterWeb extends PosthogFlutterPlatform {
+class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Constructs a PosthogFlutterWeb
   PosthogFlutterWeb();
 
@@ -24,93 +25,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatform {
   }
 
   Future<dynamic> handleMethodCall(MethodCall call) async {
-    final analytics = JsObject.fromBrowserObject(context['posthog']);
-    switch (call.method) {
-      case 'identify':
-        final userProperties = call.arguments['userProperties'];
-        final userPropertiesSetOnce = call.arguments['userPropertiesSetOnce'];
-        analytics.callMethod('identify', [
-          call.arguments['userId'],
-          JsObject.jsify(userProperties),
-          JsObject.jsify(userPropertiesSetOnce),
-        ]);
-        break;
-      case 'capture':
-        analytics.callMethod('capture', [
-          call.arguments['eventName'],
-          JsObject.jsify(call.arguments['properties']),
-        ]);
-        break;
-      case 'screen':
-        final properties = call.arguments['properties'] ?? {};
-        final screenName = call.arguments['screenName'];
-        if (screenName != null) {
-          properties['\$screen_name'] = screenName;
-        }
-        analytics.callMethod('capture', [
-          '\$screen',
-          JsObject.jsify(properties),
-        ]);
-        break;
-      case 'alias':
-        analytics.callMethod('alias', [
-          call.arguments['alias'],
-        ]);
-        break;
-      case 'distinctId':
-        final distinctId = analytics.callMethod('get_distinct_id');
-        return distinctId;
-      case 'reset':
-        analytics.callMethod('reset');
-        break;
-      case 'debug':
-        analytics.callMethod('debug', [
-          call.arguments['debug'],
-        ]);
-        break;
-      case 'isFeatureEnabled':
-        final isFeatureEnabled = analytics.callMethod('isFeatureEnabled', [
-          call.arguments['key'],
-        ]);
-        return isFeatureEnabled;
-      case 'group':
-        analytics.callMethod('group', [
-          call.arguments['groupType'],
-          call.arguments['groupKey'],
-          JsObject.jsify(call.arguments['groupProperties']),
-        ]);
-        break;
-      case 'reloadFeatureFlags':
-        analytics.callMethod('reloadFeatureFlags');
-        break;
-      case 'enable':
-        analytics.callMethod('opt_in_capturing');
-        break;
-      case 'disable':
-        analytics.callMethod('opt_out_capturing');
-        break;
-      case 'getFeatureFlag':
-        analytics.callMethod('getFeatureFlag', [
-          call.arguments['key'],
-        ]);
-        break;
-      case 'getFeatureFlagPayload':
-        analytics.callMethod('getFeatureFlagPayload', [
-          call.arguments['key'],
-        ]);
-        break;
-      case 'register':
-        final properties = {call.arguments['key']: call.arguments['value']};
-        analytics.callMethod('register', [
-          properties,
-        ]);
-        break;
-      default:
-        throw PlatformException(
-          code: 'Unimplemented',
-          details:
-              "The posthog plugin for web doesn't implement the method '${call.method}'",
-        );
-    }
+    handleWebMethodCall(call, context);
   }
 }
