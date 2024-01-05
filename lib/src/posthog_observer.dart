@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
-import 'package:posthog_flutter/posthog_flutter.dart';
+
+import 'posthog.dart';
 
 typedef ScreenNameExtractor = String? Function(RouteSettings settings);
 

@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 
 import 'posthog_flutter_platform_interface.dart';
 
-/// An implementation of [PosthogFlutterPlatform] that uses method channels.
-class MethodChannelPosthogFlutter extends PosthogFlutterPlatform {
+/// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
+class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
