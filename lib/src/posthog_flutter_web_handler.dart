@@ -69,15 +69,15 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       analytics.callMethod('opt_out_capturing');
       break;
     case 'getFeatureFlag':
-      analytics.callMethod('getFeatureFlag', [
+      final featureFlag = analytics.callMethod('getFeatureFlag', [
         call.arguments['key'],
       ]);
-      break;
+      return featureFlag;
     case 'getFeatureFlagPayload':
-      analytics.callMethod('getFeatureFlagPayload', [
+      final featureFlag = analytics.callMethod('getFeatureFlagPayload', [
         call.arguments['key'],
       ]);
-      break;
+      return featureFlag;
     case 'register':
       final properties = {call.arguments['key']: call.arguments['value']};
       analytics.callMethod('register', [
