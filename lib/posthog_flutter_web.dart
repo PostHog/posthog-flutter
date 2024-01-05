@@ -1,16 +1,25 @@
+// In order to *not* need this ignore, consider extracting the "web" version
+// of your plugin as a separate package, instead of inlining it in the same
+// package as the core of your plugin.
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:js';
-
 import 'package:flutter/services.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart' show Registrar;
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
-class PosthogWeb {
+import 'posthog_flutter_platform_interface.dart';
+
+/// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
+class PosthogFlutterWeb extends PosthogFlutterPlatform {
+  /// Constructs a PosthogFlutterWeb
+  PosthogFlutterWeb();
+
   static void registerWith(Registrar registrar) {
     final MethodChannel channel = MethodChannel(
-      'posthogflutter',
+      'posthog_flutter',
       const StandardMethodCodec(),
       registrar,
     );
-    final PosthogWeb instance = PosthogWeb();
+    final PosthogFlutterWeb instance = PosthogFlutterWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
   }
 
@@ -18,9 +27,12 @@ class PosthogWeb {
     final analytics = JsObject.fromBrowserObject(context['posthog']);
     switch (call.method) {
       case 'identify':
+        final userProperties = call.arguments['userProperties'];
+        final userPropertiesSetOnce = call.arguments['userPropertiesSetOnce'];
         analytics.callMethod('identify', [
           call.arguments['userId'],
-          JsObject.jsify(call.arguments['properties']),
+          JsObject.jsify(userProperties),
+          JsObject.jsify(userPropertiesSetOnce),
         ]);
         break;
       case 'capture':
@@ -30,9 +42,14 @@ class PosthogWeb {
         ]);
         break;
       case 'screen':
+        final properties = call.arguments['properties'] ?? {};
+        final screenName = call.arguments['screenName'];
+        if (screenName != null) {
+          properties['\$screen_name'] = screenName;
+        }
         analytics.callMethod('capture', [
-          call.arguments['screenName'],
-          JsObject.jsify(call.arguments['properties']),
+          '\$screen',
+          JsObject.jsify(properties),
         ]);
         break;
       case 'alias':
@@ -40,9 +57,9 @@ class PosthogWeb {
           call.arguments['alias'],
         ]);
         break;
-      case 'getAnonymousId':
-        final anonymousId = analytics.callMethod('get_distinct_id');
-        return anonymousId;
+      case 'distinctId':
+        final distinctId = analytics.callMethod('get_distinct_id');
+        return distinctId;
       case 'reset':
         analytics.callMethod('reset');
         break;
@@ -71,6 +88,22 @@ class PosthogWeb {
         break;
       case 'disable':
         analytics.callMethod('opt_out_capturing');
+        break;
+      case 'getFeatureFlag':
+        analytics.callMethod('getFeatureFlag', [
+          call.arguments['key'],
+        ]);
+        break;
+      case 'getFeatureFlagPayload':
+        analytics.callMethod('getFeatureFlagPayload', [
+          call.arguments['key'],
+        ]);
+        break;
+      case 'register':
+        final properties = {call.arguments['key']: call.arguments['value']};
+        analytics.callMethod('register', [
+          properties,
+        ]);
         break;
       default:
         throw PlatformException(

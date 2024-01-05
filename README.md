@@ -10,22 +10,23 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 
 ### Supported methods
 
-| Method              | Android | iOS | Web |
-| ------------------  | ------- | --- | --- |
-| `identify`          | X       | X   | X   |
-| `capture`           | X       | X   | X   |
-| `screen`            | X       | X   | X   |
-| `alias`             | X       | X   | X   |
-| `getAnonymousId`    | X       | X   | X   |
-| `reset`             | X       | X   | X   |
-| `disable`           | X       | X   |     |
-| `enable`            | X       | X   |     |
-| `debug`             | X\*     | X   | X   |
-| `setContext`        | X       | X   |     |
-| `isFeatureEnabled`  | X       | X   | X   |
-| `reloadFeatureFlags`| X       | X   | X   |
-
-\* Debugging must be set as a configuration parameter in `AndroidManifest.xml` (see below). The official posthog library does not offer the debug method for Android.
+| Method                    | Android | iOS | Web |
+| ------------------------- | ------- | --- | --- |
+| `identify`                | X       | X   | X   |
+| `capture`                 | X       | X   | X   |
+| `screen`                  | X       | X   | X   |
+| `alias`                   | X       | X   | X   |
+| `getDistinctId`           | X       | X   | X   |
+| `reset`                   | X       | X   | X   |
+| `disable`                 | X       | X   | X   |
+| `enable`                  | X       | X   | X   |
+| `debug`                   | X       | X   | X   |
+| `register`                | X       | X   | X   |
+| `register`                | X       | X   | X   |
+| `reloadFeatureFlags`      | X       | X   | X   |
+| `getFeatureFlag`          | X       | X   | X   |
+| `group`                   | X       | X   | X   |
+| `getFeatureFlagPayload`   | X       | X   | X   |
 
 ### Example
 
@@ -62,7 +63,7 @@ class MyApp extends StatelessWidget {
             },
           ),
         ),
-      ),
+      )
     );
   }
 }
@@ -80,7 +81,7 @@ Remember that the application lifecycle events won't have any special context se
 #### AndroidManifest.xml
 
 ```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.posthog.posthog_flutter_example">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.posthog_flutter_example">
     <application>
         <activity>
             [...]
@@ -114,7 +115,7 @@ Remember that the application lifecycle events won't have any special context se
 </plist>
 ```
 
-For `debug` mode on iOS, you can use the following snippet:
+For `debug` mode on Android, iOS and Web, you can use the following snippet:
 
 ```dart
 PostHog().debug(true);
@@ -125,21 +126,21 @@ PostHog().debug(true);
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>example</title>
-</head>
-<body>
-  <script>
-    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
-      posthog.init("YOUR_WRITE_KEY_GOES_HERE", {api_host: 'https://app.posthog.com'});
-  </script>
-<script src="main.dart.js" type="application/javascript"></script>
-</body>
+  <head>
+    ...
+    <script>
+      !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+      posthog.init('YOUR_WRITE_KEY_GOES_HERE', {api_host: 'https://app.posthog.com'})
+    </script>
+  </head>
+
+  <body>
+    ...
+  </body>
 </html>
 ```
 
-For more informations please check: https://posthog.com/docs/integrations/js-integration
+For more informations please check the [docs](https://posthog.com/docs/libraries/js).
 
 ## Issues
 
@@ -149,15 +150,6 @@ Please file any issues, bugs, or feature requests in the [GitHub repo](https://g
 
 If you wish to contribute a change to this repo, please send a [pull request](https://github.com/posthog/posthog-flutter/pulls).
 
-## Deploying to pub.dev
-
-- [Developing and publishing packages & plugins](https://flutter.dev/docs/development/packages-and-plugins/developing-packages#publish)
-- [Publishing packages](https://dart.dev/tools/pub/publishing)
-
 ## Questions?
 
 ### [Join our Slack community.](https://join.slack.com/t/posthogusers/shared_invite/enQtOTY0MzU5NjAwMDY3LTc2MWQ0OTZlNjhkODk3ZDI3NDVjMDE1YjgxY2I4ZjI4MzJhZmVmNjJkN2NmMGJmMzc2N2U3Yjc3ZjI5NGFlZDQ)
-
-
-[pubdev_badge]: https://img.shields.io/pub/v/posthog_flutter
-[pubdev_link]: https://pub.dev/packages/posthog_flutter

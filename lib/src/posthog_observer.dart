@@ -1,17 +1,18 @@
 import 'package:flutter/widgets.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
-typedef String? ScreenNameExtractor(RouteSettings settings);
+typedef ScreenNameExtractor = String? Function(RouteSettings settings);
 
 String? defaultNameExtractor(RouteSettings settings) => settings.name;
 
 class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
-  PosthogObserver({this.nameExtractor = defaultNameExtractor});
+  PosthogObserver({ScreenNameExtractor nameExtractor = defaultNameExtractor})
+      : _nameExtractor = nameExtractor;
 
-  final ScreenNameExtractor nameExtractor;
+  final ScreenNameExtractor _nameExtractor;
 
   void _sendScreenView(PageRoute<dynamic> route) {
-    final String? screenName = nameExtractor(route.settings);
+    final String? screenName = _nameExtractor(route.settings);
     if (screenName != null) {
       Posthog().screen(screenName: screenName);
     }
