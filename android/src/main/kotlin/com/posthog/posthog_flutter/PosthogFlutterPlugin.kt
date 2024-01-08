@@ -51,6 +51,8 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 captureDeepLinks = false
                 captureApplicationLifecycleEvents = trackApplicationLifecycleEvents
                 debug = enableDebug
+                sdkName = "posthog-flutter"
+                sdkVersion = postHogVersion
             }
             PostHogAndroid.setup(applicationContext, config)
 
