@@ -28,6 +28,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         )
         config.captureApplicationLifecycleEvents = postHogCaptureLifecyleEvents
         config.captureScreenViews = false
+        
+        // Update SDK name and version
+         postHogSdkName = "posthog-flutter"
+         postHogVersion = postHogFlutterVersion
+        
         PostHogSDK.shared.setup(config)
         //
     }
