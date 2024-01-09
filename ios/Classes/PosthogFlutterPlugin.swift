@@ -30,8 +30,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         config.captureScreenViews = false
         
         // Update SDK name and version
-        // postHogSdkName = "posthog-flutter"
-        // postHogVersion = postHogFlutterVersion
+         postHogSdkName = "posthog-flutter"
+         postHogVersion = postHogFlutterVersion
         
         PostHogSDK.shared.setup(config)
         //
