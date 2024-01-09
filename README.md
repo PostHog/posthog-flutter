@@ -41,7 +41,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorObservers: [
-        // The PosthogObserver records screen views
+        // The PosthogObserver records screen views automatically
         PosthogObserver(),
       ],
       home: Scaffold(

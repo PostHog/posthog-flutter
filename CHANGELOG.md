@@ -1,5 +1,9 @@
 ## Next
 
+- Record the root view as `root ("/")` instead of not recording at all [#70](https://github.com/PostHog/posthog-flutter/pull/70)
+- Do not mutate the given properties when calling capture [#70](https://github.com/PostHog/posthog-flutter/pull/70)
+  - Thanks @lukepighetti for the [PR](https://github.com/PostHog/posthog-flutter/pull/66)!
+
 ## 4.0.0-alpha.2
 
 - Internal changes only
