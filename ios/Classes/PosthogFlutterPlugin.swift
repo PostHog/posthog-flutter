@@ -20,7 +20,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         }
 
         let host = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost
-        let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
+        let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
 
         let config = PostHogConfig(
             apiKey: apiKey,
