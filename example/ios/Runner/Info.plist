@@ -46,7 +46,7 @@
 	<key>com.posthog.posthog.API_KEY</key>
 	<string>_6SG-F7I1vCuZ-HdJL3VZQqjBlaSb1_20hDPwqMNnGI</string>
 	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
-	<false/>
+	<true/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

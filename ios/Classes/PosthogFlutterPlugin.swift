@@ -21,12 +21,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
         let host = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost
         let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
+        let postHogDebug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
 
         let config = PostHogConfig(
             apiKey: apiKey,
             host: host
         )
         config.captureApplicationLifecycleEvents = postHogCaptureLifecyleEvents
+        config.debug = postHogDebug
         config.captureScreenViews = false
         
         // Update SDK name and version
