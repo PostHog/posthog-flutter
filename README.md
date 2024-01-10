@@ -110,6 +110,8 @@ Remember that the application lifecycle events won't have any special context se
 	<string>https://app.posthog.com</string>
 	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
 	<true/>
+	<key>com.posthog.posthog.DEBUG</key>
+	<true/>
 	[...]
 </dict>
 </plist>

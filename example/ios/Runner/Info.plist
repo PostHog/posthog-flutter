@@ -47,6 +47,8 @@
 	<string>_6SG-F7I1vCuZ-HdJL3VZQqjBlaSb1_20hDPwqMNnGI</string>
 	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
 	<true/>
+	<key>com.posthog.posthog.DEBUG</key>
+	<true/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
