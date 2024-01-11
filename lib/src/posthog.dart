@@ -27,15 +27,17 @@ class Posthog {
     required String eventName,
     Map<String, Object>? properties,
   }) {
+    final propertiesCopy = properties == null ? null : {...properties};
+
     final currentScreen = _currentScreen;
-    if (properties != null &&
-        !properties.containsKey('\$screen_name') &&
+    if (propertiesCopy != null &&
+        !propertiesCopy.containsKey('\$screen_name') &&
         currentScreen != null) {
-      properties['\$screen_name'] = currentScreen;
+      propertiesCopy['\$screen_name'] = currentScreen;
     }
     return _posthog.capture(
       eventName: eventName,
-      properties: properties,
+      properties: propertiesCopy,
     );
   }
 
@@ -43,9 +45,8 @@ class Posthog {
     required String screenName,
     Map<String, Object>? properties,
   }) {
-    if (screenName != '/') {
-      _currentScreen = screenName;
-    }
+    _currentScreen = screenName;
+
     return _posthog.screen(
       screenName: screenName,
       properties: properties,

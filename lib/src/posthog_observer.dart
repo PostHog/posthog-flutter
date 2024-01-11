@@ -13,8 +13,13 @@ class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
   final ScreenNameExtractor _nameExtractor;
 
   void _sendScreenView(PageRoute<dynamic> route) {
-    final String? screenName = _nameExtractor(route.settings);
+    String? screenName = _nameExtractor(route.settings);
     if (screenName != null) {
+      // if the screen name is the root route, we send it as root ("/") instead of only "/"
+      if (screenName == '/') {
+        screenName = 'root (\'/\')';
+      }
+
       Posthog().screen(screenName: screenName);
     }
   }

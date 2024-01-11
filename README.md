@@ -41,7 +41,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorObservers: [
-        // The PosthogObserver records screen views
+        // The PosthogObserver records screen views automatically
         PosthogObserver(),
       ],
       home: Scaffold(
@@ -88,8 +88,8 @@ Remember that the application lifecycle events won't have any special context se
         </activity>
         <meta-data android:name="com.posthog.posthog.API_KEY" android:value="YOUR_API_KEY_GOES_HERE" />
         <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://app.posthog.com" />
-        <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="false" />
-        <meta-data android:name="com.posthog.posthog.DEBUG" android:value="false" />
+        <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="true" />
+        <meta-data android:name="com.posthog.posthog.DEBUG" android:value="true" />
     </application>
 </manifest>
 ```
@@ -109,7 +109,9 @@ Remember that the application lifecycle events won't have any special context se
 	<key>com.posthog.posthog.POSTHOG_HOST</key>
 	<string>https://app.posthog.com</string>
 	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
-	<false/>
+	<true/>
+	<key>com.posthog.posthog.DEBUG</key>
+	<true/>
 	[...]
 </dict>
 </plist>

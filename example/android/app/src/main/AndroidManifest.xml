@@ -42,17 +42,9 @@
             android:value="https://app.posthog.com" />
         <meta-data
             android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS"
-            android:value="false" />
+            android:value="true" />
         <meta-data 
             android:name="com.posthog.posthog.DEBUG" 
             android:value="true" />
-        <!--
-            If you want to debug the plugin events. Default is false.
-            <meta-data android:name="com.posthog.posthog.DEBUG" android:value="true" />
-
-            Expected shell output (flutter run) when this flag is enabled:
-                D/Analytics(32684): Ran TrackPayload{event="ButtonClicked"} on integration Posthog.com in 480110 ns.
-                D/Analytics(32684): Ran TrackPayload{event="ButtonClicked"} on integration Posthog.com in 104410 ns.
-        -->
     </application>
 </manifest>

@@ -25,6 +25,10 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorObservers: [
+        // The PosthogObserver records screen views automatically
+        PosthogObserver()
+      ],
       home: Scaffold(
         appBar: AppBar(
           title: const Text('PostHog Flutter App'),
@@ -52,7 +56,7 @@ class _MyAppState extends State<MyApp> {
                             "foo": "bar",
                           });
                         },
-                        child: const Text("Capture Screen"),
+                        child: const Text("Capture Screen manually"),
                       ),
                       ElevatedButton(
                         onPressed: () {
