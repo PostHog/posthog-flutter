@@ -15,7 +15,7 @@ Postog flutter plugin
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'PostHog', '~> 3.0.0-beta.2'
+  s.dependency 'PostHog', '~> 3.0.0-beta.3'
   s.platform = :ios, '13.0'
 
   # Flutter.framework does not contain a i386 slice.
