@@ -5,6 +5,7 @@
   - Thanks @lukepighetti for the [PR](https://github.com/PostHog/posthog-flutter/pull/66)!
 - Fix `CAPTURE_APPLICATION_LIFECYCLE_EVENTS` typo for iOS [#74](https://github.com/PostHog/posthog-flutter/pull/74)
 - Added iOS support for the `DEBUG` config [#74](https://github.com/PostHog/posthog-flutter/pull/74)
+- Upgrade iOS SDK that fixes missing `Application Opened` events [#74](https://github.com/PostHog/posthog-flutter/pull/74)
 
 ## 4.0.0-alpha.2
 
