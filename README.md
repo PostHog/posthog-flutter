@@ -2,7 +2,7 @@
 
 [![Package on pub.dev][pubdev_badge]][pubdev_link]
 
-Flutter plugin to support iOS, Android and Web sources at https://posthog.com.
+Flutter plugin to support iOS/macOS, Android and Web sources at https://posthog.com.
 
 ## Usage
 
@@ -10,23 +10,23 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 
 ### Supported methods
 
-| Method                    | Android | iOS | Web |
-| ------------------------- | ------- | --- | --- |
-| `identify`                | X       | X   | X   |
-| `capture`                 | X       | X   | X   |
-| `screen`                  | X       | X   | X   |
-| `alias`                   | X       | X   | X   |
-| `getDistinctId`           | X       | X   | X   |
-| `reset`                   | X       | X   | X   |
-| `disable`                 | X       | X   | X   |
-| `enable`                  | X       | X   | X   |
-| `debug`                   | X       | X   | X   |
-| `register`                | X       | X   | X   |
-| `register`                | X       | X   | X   |
-| `reloadFeatureFlags`      | X       | X   | X   |
-| `getFeatureFlag`          | X       | X   | X   |
-| `group`                   | X       | X   | X   |
-| `getFeatureFlagPayload`   | X       | X   | X   |
+| Method                    | Android | iOS/macOS | Web |
+| ------------------------- | ------- | --------- | --- |
+| `identify`                | X       | X         | X   |
+| `capture`                 | X       | X         | X   |
+| `screen`                  | X       | X         | X   |
+| `alias`                   | X       | X         | X   |
+| `getDistinctId`           | X       | X         | X   |
+| `reset`                   | X       | X         | X   |
+| `disable`                 | X       | X         | X   |
+| `enable`                  | X       | X         | X   |
+| `debug`                   | X       | X         | X   |
+| `register`                | X       | X         | X   |
+| `register`                | X       | X         | X   |
+| `reloadFeatureFlags`      | X       | X         | X   |
+| `getFeatureFlag`          | X       | X         | X   |
+| `group`                   | X       | X         | X   |
+| `getFeatureFlagPayload`   | X       | X         | X   |
 
 ### Example
 
@@ -71,7 +71,7 @@ class MyApp extends StatelessWidget {
 
 ## Installation
 
-Setup your Android, iOS and/or web sources as described at Posthog.com and generate your api keys.
+Setup your Android, iOS/macOS and/or web sources as described at Posthog.com and generate your api keys.
 
 Set your Posthog api key and change the automatic event tracking (only for Android and iOS) on if you wish the library to take care of it for you.
 Remember that the application lifecycle events won't have any special context set for you by the time it is initialized. If you are using a self hosted instance of Posthog you will need to have the public hostname or ip for your instance as well.
@@ -94,7 +94,7 @@ Remember that the application lifecycle events won't have any special context se
 </manifest>
 ```
 
-### iOS
+### iOS/macOS
 
 #### Info.plist
 
@@ -115,12 +115,6 @@ Remember that the application lifecycle events won't have any special context se
 	[...]
 </dict>
 </plist>
-```
-
-For `debug` mode on Android, iOS and Web, you can use the following snippet:
-
-```dart
-PostHog().debug(true);
 ```
 
 ### Web
