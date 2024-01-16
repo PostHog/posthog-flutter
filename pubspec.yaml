@@ -42,6 +42,8 @@ flutter:
         pluginClass: PosthogFlutterPlugin
       ios:
         pluginClass: PosthogFlutterPlugin
+      macos:
+        pluginClass: PosthogFlutterPlugin
       web:
         pluginClass: PosthogFlutterWeb
         fileName: posthog_flutter_web.dart

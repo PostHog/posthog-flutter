@@ -1,5 +1,7 @@
 ## Next
 
+- Flutter macOS support [#76](https://github.com/PostHog/posthog-flutter/pull/76)
+
 ## 4.0.0-beta.1
 
 - Record the root view as `root ('/')` instead of not recording at all [#74](https://github.com/PostHog/posthog-flutter/pull/74)

@@ -1,10 +1,19 @@
-import Flutter
 import PostHog
+#if os(iOS)
+import Flutter
 import UIKit
+#elseif os(macOS)
+import FlutterMacOS
+import AppKit
+#endif
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
+#if os(iOS)
         let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
+#elseif os(macOS)
+        let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
+#endif
         let instance = PosthogFlutterPlugin()
         initPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
