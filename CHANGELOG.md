@@ -1,5 +1,7 @@
 ## Next
 
+## 4.0.0-beta.2
+
 - Flutter macOS support [#76](https://github.com/PostHog/posthog-flutter/pull/76)
 
 ## 4.0.0-beta.1
