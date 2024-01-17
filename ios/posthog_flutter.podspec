@@ -13,12 +13,21 @@ Postog flutter plugin
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'PostHog' => 'engineering@posthog.com' }
   s.source           = { :path => '.' }
+  s.social_media_url = 'https://twitter.com/PostHog'
+
   s.source_files = 'Classes/**/*'
-  s.dependency 'Flutter'
-  s.dependency 'PostHog', '~> 3.0.0-beta.3'
-  s.platform = :ios, '13.0'
+  
+  s.ios.dependency 'Flutter'
+  s.osx.dependency 'FlutterMacOS'
+
+  s.dependency 'PostHog', '~> 3.0.0-RC.1'
+
+  s.ios.deployment_target = '13.0'
+  # PH iOS SDK 3.0.0 requires >= 10.15
+  s.osx.deployment_target = '10.15'
 
   # Flutter.framework does not contain a i386 slice.
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
-  s.swift_version = '5.0'
+  s.ios.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
+  s.osx.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
+  s.swift_version = '5.3'
 end

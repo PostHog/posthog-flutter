@@ -36,6 +36,10 @@ jobs:
         working-directory: ./example
         run: flutter build ios --simulator --no-codesign
 
+      - name: Build macOS
+        working-directory: ./example
+        run: flutter build macos
+
       - name: Build Android
         working-directory: ./example
         run: flutter build apk
