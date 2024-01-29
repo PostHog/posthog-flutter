@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 void main() {
   runApp(const MyApp());
 }
+
+// extension ServicesBindingExtension on ServicesBinding {
+//   static bool? isRootIsolateToken() {
+//     try {
+//       return (ServicesBinding as dynamic).rootIsolateToken;
+//     } on NoSuchMethodError catch (_) {
+//       return null;
+//     }
+//   }
+// }
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -186,8 +197,15 @@ class _MyAppState extends State<MyApp> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      final result = await _posthogFlutterPlugin
-                          .getFeatureFlagPayload("feature_name");
+                      // final result = await _posthogFlutterPlugin
+                      //     .getFeatureFlagPayload("feature_name");
+                        dynamic result;
+                        try {
+                            result = RootIsolateToken.instance != null;
+                        } on NoSuchMethodError catch (_) {
+                            result = false;
+                        }
+                      // final result = ServicesBinding.isRootIsolateToken();
                       setState(() {
                         _result = result;
                       });
@@ -218,3 +236,13 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
+
+// extension ServicesBindingExtension on ServicesBinding {
+//   static bool? isRootIsolateToken() {
+//     try {
+//       return (ServicesBinding as dynamic).rootIsolateToken;
+//     } on NoSuchMethodError catch (_) {
+//       return null;
+//     }
+//   }
+// }
