@@ -148,7 +148,7 @@ If you wish to contribute a change to this repo, please send a [pull request](ht
 
 ## Questions?
 
-### [Join our Slack community.](https://join.slack.com/t/posthogusers/shared_invite/enQtOTY0MzU5NjAwMDY3LTc2MWQ0OTZlNjhkODk3ZDI3NDVjMDE1YjgxY2I4ZjI4MzJhZmVmNjJkN2NmMGJmMzc2N2U3Yjc3ZjI5NGFlZDQ)
+### [Check out our community page.](https://posthog.com/posts)
 
 [pubdev_badge]: https://img.shields.io/pub/v/posthog_flutter
 [pubdev_link]: https://pub.dev/packages/posthog_flutter
