@@ -218,13 +218,3 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
-
-// extension ServicesBindingExtension on ServicesBinding {
-//   static bool? isRootIsolateToken() {
-//     try {
-//       return (ServicesBinding as dynamic).rootIsolateToken;
-//     } on NoSuchMethodError catch (_) {
-//       return null;
-//     }
-//   }
-// }
