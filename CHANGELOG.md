@@ -1,6 +1,6 @@
 ## Next
 
-- Upgrade iOS SDK to [3.0.0](https://github.com/PostHog/posthog-ios/releases/tag/3.0.0) [#76](https://github.com/PostHog/posthog-flutter/pull/76)
+- Upgrade iOS SDK to [3.0.0](https://github.com/PostHog/posthog-ios/releases/tag/3.0.0) [#78](https://github.com/PostHog/posthog-flutter/pull/78)
 
 ## 4.0.0-beta.2
 
