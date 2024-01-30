@@ -9,7 +9,7 @@ Releasing
     ```bash
     ./scripts/prepare-release.sh 3.0.0
     ```
- 3. Go to [GH Releases](https://github.com/PostHog/posthog-android/releases)
+ 3. Go to [GH Releases](https://github.com/PostHog/posthog-flutter/releases)
  4. Choose a tag name (e.g. `3.0.0`), same as step 2.
  5. Choose a release name (e.g. `3.0.0`), ideally it matches the above.
  6. Write a description of the release.
