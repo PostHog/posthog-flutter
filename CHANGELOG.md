@@ -2,7 +2,7 @@
 
 ## 4.0.0-RC.2
 
-- Upgrade iOS SDK to [3.1.0](https://github.com/PostHog/posthog-ios/releases/tag/3.1.0) [#78](https://github.com/PostHog/posthog-flutter/pull/78)
+- Upgrade iOS SDK to [3.1.0](https://github.com/PostHog/posthog-ios/releases/tag/3.1.0) [#78](https://github.com/PostHog/posthog-flutter/pull/79)
 
 ## 4.0.0-RC.1
 
