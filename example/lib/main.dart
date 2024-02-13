@@ -50,8 +50,8 @@ class _MyAppState extends State<MyApp> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       ElevatedButton(
-                        onPressed: () {
-                          _posthogFlutterPlugin
+                        onPressed: () async {
+                          await _posthogFlutterPlugin
                               .screen(screenName: "my screen", properties: {
                             "foo": "bar",
                           });
@@ -196,6 +196,13 @@ class _MyAppState extends State<MyApp> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
+                      await Posthog().capture(
+  eventName: 'user_signed_up',
+  properties: {
+    'login_type': 'email',
+    'is_free_trial': true
+  }
+);
                       await _posthogFlutterPlugin.reloadFeatureFlags();
                     },
                     child: const Text("reloadFeatureFlags"),
