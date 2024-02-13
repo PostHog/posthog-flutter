@@ -1,5 +1,16 @@
 ## Next
 
+## 4.0.0
+
+- Android minSdkVersion 21
+- iOS min version 13.0
+- Flutter min version 3.3.0
+- Upgraded PostHog Android SDK to [v3](https://github.com/PostHog/posthog-android/blob/main/USAGE.md)
+- Upgraded PostHog iOS SDK to [v3](https://github.com/PostHog/posthog-ios/blob/main/USAGE.md)
+- Upgraded PostHog JS SDK to the latest version
+- PostHog Flutter Plugins are written in Kotlin and Swift
+- Added missing features such as feature flags payloads, debug, and more
+
 ## 4.0.0-RC.2
 
 - Upgrade iOS SDK to [3.1.0](https://github.com/PostHog/posthog-ios/releases/tag/3.1.0) [#79](https://github.com/PostHog/posthog-flutter/pull/79)
