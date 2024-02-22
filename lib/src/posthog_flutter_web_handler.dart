@@ -7,7 +7,8 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
   switch (call.method) {
     case 'identify':
       final userProperties = call.arguments['userProperties'] ?? {};
-      final userPropertiesSetOnce = call.arguments['userPropertiesSetOnce'] ?? {};
+      final userPropertiesSetOnce =
+          call.arguments['userPropertiesSetOnce'] ?? {};
       analytics.callMethod('identify', [
         call.arguments['userId'],
         JsObject.jsify(userProperties),
@@ -15,7 +16,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       ]);
       break;
     case 'capture':
-    final properties = call.arguments['properties'] ?? {};
+      final properties = call.arguments['properties'] ?? {};
       analytics.callMethod('capture', [
         call.arguments['eventName'],
         JsObject.jsify(properties),
@@ -56,7 +57,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       analytics.callMethod('group', [
         call.arguments['groupType'],
         call.arguments['groupKey'],
-        JsObject.jsify(call.arguments['groupProperties']  ?? {}),
+        JsObject.jsify(call.arguments['groupProperties'] ?? {}),
       ]);
       break;
     case 'reloadFeatureFlags':
