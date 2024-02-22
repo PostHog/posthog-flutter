@@ -6,8 +6,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
   final analytics = JsObject.fromBrowserObject(context['posthog']);
   switch (call.method) {
     case 'identify':
-      final userProperties = call.arguments['userProperties'];
-      final userPropertiesSetOnce = call.arguments['userPropertiesSetOnce'];
+      final userProperties = call.arguments['userProperties'] ?? {};
+      final userPropertiesSetOnce =
+          call.arguments['userPropertiesSetOnce'] ?? {};
       analytics.callMethod('identify', [
         call.arguments['userId'],
         JsObject.jsify(userProperties),
@@ -15,17 +16,17 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       ]);
       break;
     case 'capture':
+      final properties = call.arguments['properties'] ?? {};
       analytics.callMethod('capture', [
         call.arguments['eventName'],
-        JsObject.jsify(call.arguments['properties']),
+        JsObject.jsify(properties),
       ]);
       break;
     case 'screen':
       final properties = call.arguments['properties'] ?? {};
       final screenName = call.arguments['screenName'];
-      if (screenName != null) {
-        properties['\$screen_name'] = screenName;
-      }
+      properties['\$screen_name'] = screenName;
+
       analytics.callMethod('capture', [
         '\$screen',
         JsObject.jsify(properties),
@@ -56,7 +57,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       analytics.callMethod('group', [
         call.arguments['groupType'],
         call.arguments['groupKey'],
-        JsObject.jsify(call.arguments['groupProperties']),
+        JsObject.jsify(call.arguments['groupProperties'] ?? {}),
       ]);
       break;
     case 'reloadFeatureFlags':
@@ -81,7 +82,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
     case 'register':
       final properties = {call.arguments['key']: call.arguments['value']};
       analytics.callMethod('register', [
-        properties,
+        JsObject.jsify(properties),
       ]);
       break;
     default:
