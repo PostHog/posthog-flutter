@@ -25,6 +25,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   Future<dynamic> handleMethodCall(MethodCall call) async {
-    handleWebMethodCall(call, context);
+    return handleWebMethodCall(call, context);
   }
 }

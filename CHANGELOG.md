@@ -1,5 +1,7 @@
 ## Next
 
+- Fix passing optional values to the JS SDK
+
 ## 4.0.0
 
 - Android minSdkVersion 21
