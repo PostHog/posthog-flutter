@@ -1,5 +1,7 @@
 ## Next
 
+## 4.0.1
+
 - Fix passing optional values to the JS SDK ([#84](https://github.com/PostHog/posthog-flutter/pull/84))
 
 ## 4.0.0
