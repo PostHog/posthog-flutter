@@ -196,8 +196,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   @override
   Future<void> unregister(String key) async {
     try {
-      return await _methodChannel
-          .invokeMethod('unregister', {'key': key});
+      return await _methodChannel.invokeMethod('unregister', {'key': key});
     } on PlatformException catch (exception) {
       _printIfDebug('Exeption on unregister: $exception');
     }
