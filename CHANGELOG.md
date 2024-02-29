@@ -1,5 +1,7 @@
 ## Next
 
+## 4.1.0
+
 - add unregister method ([#86](https://github.com/PostHog/posthog-flutter/pull/86))
 
 ## 4.0.1
