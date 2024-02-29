@@ -85,6 +85,10 @@ class Posthog {
     return _posthog.register(key, value);
   }
 
+  Future<void> unregister(String key) {
+    return _posthog.unregister(key);
+  }
+
   Future<bool> isFeatureEnabled(String key) {
     return _posthog.isFeatureEnabled(key);
   }

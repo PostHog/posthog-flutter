@@ -80,6 +80,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             group(call, result: result)
         case "register":
             register(call, result: result)
+        case "unregister":
+            unregister(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -277,6 +279,20 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
            let value = args["value"]
         {
             PostHogSDK.shared.register([key: value])
+            result(nil)
+        } else {
+            _badArgumentError(result: result)
+        }
+    }
+
+    private func unregister(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let key = args["key"] as? String
+        {
+            PostHogSDK.shared.unregister(key)
             result(nil)
         } else {
             _badArgumentError(result: result)

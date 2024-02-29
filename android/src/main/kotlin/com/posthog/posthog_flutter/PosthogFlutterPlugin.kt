@@ -120,6 +120,9 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             "register" -> {
                 register(call, result)
             }
+            "unregister" -> {
+                unregister(call, result)
+            }
             "debug" -> {
                 debug(call, result)
             }
@@ -287,5 +290,13 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-
+    private fun unregister(call: MethodCall, result: Result) {
+        try {
+            val key: String = call.argument("key")!!
+            PostHog.unregister(key)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
 }

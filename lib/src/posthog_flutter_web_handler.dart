@@ -85,6 +85,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
         JsObject.jsify(properties),
       ]);
       break;
+    case 'unregister':
+      analytics.callMethod('unregister', [
+        call.arguments['key'],
+      ]);
+      break;
     default:
       throw PlatformException(
         code: 'Unimplemented',
