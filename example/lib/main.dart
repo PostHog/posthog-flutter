@@ -108,6 +108,12 @@ class _MyAppState extends State<MyApp> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
+                      await _posthogFlutterPlugin.unregister("foo");
+                    },
+                    child: const Text("Unregister"),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
                       await _posthogFlutterPlugin.group(
                           groupType: "theType",
                           groupKey: "theKey",
