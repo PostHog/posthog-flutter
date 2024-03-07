@@ -22,11 +22,13 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 | `enable`                  | X       | X         | X   |
 | `debug`                   | X       | X         | X   |
 | `register`                | X       | X         | X   |
-| `register`                | X       | X         | X   |
+| `unregister`              | X       | X         | X   |
+| `flush`                   | X       | X         | X   |
+| `isFeatureEnabled`        | X       | X         | X   |
 | `reloadFeatureFlags`      | X       | X         | X   |
 | `getFeatureFlag`          | X       | X         | X   |
-| `group`                   | X       | X         | X   |
 | `getFeatureFlagPayload`   | X       | X         | X   |
+| `group`                   | X       | X         | X   |
 
 ### Example
 

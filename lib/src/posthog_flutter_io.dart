@@ -202,6 +202,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
   }
 
+  @override
+  Future<void> flush() async {
+    try {
+      return await _methodChannel.invokeMethod('flush');
+    } on PlatformException catch (exception) {
+      _printIfDebug('Exeption on flush: $exception');
+    }
+  }
+
   void _printIfDebug(String message) {
     if (kDebugMode) {
       print(message);

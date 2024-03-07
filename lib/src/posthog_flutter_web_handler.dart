@@ -90,6 +90,10 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
         call.arguments['key'],
       ]);
       break;
+    case 'flush':
+      // not supported on Web
+      // analytics.callMethod('flush');
+      break;
     default:
       throw PlatformException(
         code: 'Unimplemented',

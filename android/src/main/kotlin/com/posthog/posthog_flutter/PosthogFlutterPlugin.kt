@@ -126,7 +126,9 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             "debug" -> {
                 debug(call, result)
             }
-
+            "flush" -> {
+                flush(result)
+            }
             else -> {
                 result.notImplemented()
             }
@@ -294,6 +296,15 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         try {
             val key: String = call.argument("key")!!
             PostHog.unregister(key)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun flush(result: Result) {
+        try {
+            PostHog.flush()
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

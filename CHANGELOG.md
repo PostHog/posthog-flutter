@@ -1,5 +1,7 @@
 ## Next
 
+- add flush method ([#92](https://github.com/PostHog/posthog-flutter/pull/92))
+
 ## 4.1.0
 
 - add unregister method ([#86](https://github.com/PostHog/posthog-flutter/pull/86))
