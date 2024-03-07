@@ -1,5 +1,7 @@
 ## Next
 
+## 4.2.0
+
 - add flush method ([#92](https://github.com/PostHog/posthog-flutter/pull/92))
 
 ## 4.1.0
