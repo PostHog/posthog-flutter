@@ -117,5 +117,9 @@ class Posthog {
     return _posthog.getFeatureFlagPayload(key: key);
   }
 
+  Future<void> flush() async {
+    return _posthog.flush();
+  }
+
   Posthog._internal();
 }

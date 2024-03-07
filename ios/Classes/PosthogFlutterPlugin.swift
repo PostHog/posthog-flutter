@@ -65,23 +65,25 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         case "alias":
             alias(call, result: result)
         case "distinctId":
-            distinctId(call, result: result)
+            distinctId(result)
         case "reset":
-            reset(call, result: result)
+            reset(result)
         case "enable":
-            enable(call, result: result)
+            enable(result)
         case "disable":
-            disable(call, result: result)
+            disable(result)
         case "debug":
             debug(call, result: result)
         case "reloadFeatureFlags":
-            reloadFeatureFlags(call, result: result)
+            reloadFeatureFlags(result)
         case "group":
             group(call, result: result)
         case "register":
             register(call, result: result)
         case "unregister":
             unregister(call, result: result)
+        case "flush":
+            flush(result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -97,7 +99,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
             result(value)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -111,7 +113,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             let value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
             result(value)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -125,7 +127,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             let value = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
             result(value)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -146,7 +148,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             )
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -164,7 +166,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             )
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -182,7 +184,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             )
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -196,38 +198,26 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             PostHogSDK.shared.alias(alias)
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
-    private func distinctId(
-        _: FlutterMethodCall,
-        result: @escaping FlutterResult
-    ) {
+    private func distinctId(_ result: @escaping FlutterResult) {
         let val = PostHogSDK.shared.getDistinctId()
         result(val)
     }
 
-    private func reset(
-        _: FlutterMethodCall,
-        result: @escaping FlutterResult
-    ) {
+    private func reset(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.reset()
         result(nil)
     }
 
-    private func enable(
-        _: FlutterMethodCall,
-        result: @escaping FlutterResult
-    ) {
+    private func enable(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.optIn()
         result(nil)
     }
 
-    private func disable(
-        _: FlutterMethodCall,
-        result: @escaping FlutterResult
-    ) {
+    private func disable(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.optOut()
         result(nil)
     }
@@ -242,13 +232,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             PostHogSDK.shared.debug(debug)
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
-    private func reloadFeatureFlags(
-        _: FlutterMethodCall,
-        result: @escaping FlutterResult
+    private func reloadFeatureFlags(_ result: @escaping FlutterResult
     ) {
         PostHogSDK.shared.reloadFeatureFlags()
         result(nil)
@@ -266,7 +254,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties)
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -281,7 +269,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             PostHogSDK.shared.register([key: value])
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
     }
 
@@ -295,12 +283,17 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             PostHogSDK.shared.unregister(key)
             result(nil)
         } else {
-            _badArgumentError(result: result)
+            _badArgumentError(result)
         }
+    }
+    
+    private func flush(_ result: @escaping FlutterResult) {
+        PostHogSDK.shared.flush()
+        result(nil)
     }
 
     // Return bad Arguments error
-    private func _badArgumentError(result: @escaping FlutterResult) {
+    private func _badArgumentError(_ result: @escaping FlutterResult) {
         result(FlutterError(
             code: "PosthogFlutterException", message: "Missing arguments!", details: nil
         ))

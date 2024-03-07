@@ -107,5 +107,9 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
         'getFeatureFlagPayload() has not been implemented.');
   }
 
-  // TODO: missing unregister, flush, capture with more parameters, close
+  Future<void> flush() {
+    throw UnimplementedError('flush() has not been implemented.');
+  }
+
+  // TODO: missing capture with more parameters, close
 }
