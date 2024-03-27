@@ -1,5 +1,7 @@
 ## Next
 
+## 4.3.0
+
 - add PrivacyInfo ([#94](https://github.com/PostHog/posthog-flutter/pull/94))
 
 ## 4.2.0
