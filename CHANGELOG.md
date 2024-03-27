@@ -1,5 +1,7 @@
 ## Next
 
+- add PrivacyInfo ([#94](https://github.com/PostHog/posthog-flutter/pull/94))
+
 ## 4.2.0
 
 - add flush method ([#92](https://github.com/PostHog/posthog-flutter/pull/92))
