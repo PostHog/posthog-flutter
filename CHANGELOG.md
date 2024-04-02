@@ -1,5 +1,7 @@
 ## Next
 
+- Allow tracking non `PageRoute` screens using the `PosthogObserver` ([#108](
+
 ## 4.3.0
 
 - add PrivacyInfo ([#94](https://github.com/PostHog/posthog-flutter/pull/94))

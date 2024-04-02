@@ -12,39 +12,44 @@ class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
 
   final ScreenNameExtractor _nameExtractor;
 
-  void _sendScreenView(PageRoute<dynamic> route) {
-    String? screenName = _nameExtractor(route.settings);
-    if (screenName != null) {
+  bool _isTrackeableRoute(String? name) {
+    return name != null && name.trim().isNotEmpty;
+  }
+
+  void _sendScreenView(Route<dynamic>? route) {
+    if (route == null) {
+      return;
+    }
+
+    var screenName = _nameExtractor(route.settings);
+    if (_isTrackeableRoute(screenName)) {
       // if the screen name is the root route, we send it as root ("/") instead of only "/"
       if (screenName == '/') {
         screenName = 'root (\'/\')';
       }
 
-      Posthog().screen(screenName: screenName);
+      Posthog().screen(screenName: screenName!);
     }
   }
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
-    if (route is PageRoute) {
-      _sendScreenView(route);
-    }
+
+    _sendScreenView(route);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    if (newRoute is PageRoute) {
-      _sendScreenView(newRoute);
-    }
+
+    _sendScreenView(newRoute);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
-    if (previousRoute is PageRoute && route is PageRoute) {
-      _sendScreenView(previousRoute);
-    }
+
+    _sendScreenView(previousRoute);
   }
 }
