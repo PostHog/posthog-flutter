@@ -122,9 +122,4 @@ class Posthog {
   }
 
   Posthog._internal();
-
-  // @internal
-  // void overridePostHogForTesting(PosthogFlutterPlatformInterface posthog) {
-  //   PosthogFlutterPlatformInterface.instance = posthog;
-  // }
 }

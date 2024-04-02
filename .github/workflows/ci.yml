@@ -32,6 +32,9 @@ jobs:
         working-directory: ./example
         run: flutter pub get
 
+      - name: Test
+        run: flutter test
+
       - name: Build iOS
         working-directory: ./example
         run: flutter build ios --simulator --no-codesign

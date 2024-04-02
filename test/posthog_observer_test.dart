@@ -38,7 +38,6 @@ void main() {
     final sut = getSut();
     sut.didPush(currentRoute, null);
 
-    // expectAsync0(() => expect(fake.screenName, 'Current Route'));
     expect(fake.screenName, 'Current Route');
   });
 
