@@ -4,7 +4,7 @@ class Posthog {
   static PosthogFlutterPlatformInterface get _posthog =>
       PosthogFlutterPlatformInterface.instance;
 
-  static final Posthog _instance = Posthog._internal();
+  static final _instance = Posthog._internal();
 
   factory Posthog() {
     return _instance;
@@ -122,4 +122,9 @@ class Posthog {
   }
 
   Posthog._internal();
+
+  // @internal
+  // void overridePostHogForTesting(PosthogFlutterPlatformInterface posthog) {
+  //   PosthogFlutterPlatformInterface.instance = posthog;
+  // }
 }
