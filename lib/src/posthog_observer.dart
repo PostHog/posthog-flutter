@@ -13,7 +13,7 @@ String? defaultNameExtractor(RouteSettings settings) => settings.name;
 
 bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
 
-class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
+class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   PosthogObserver(
       {ScreenNameExtractor nameExtractor = defaultNameExtractor,
       PostHogRouteFilter routeFilter = defaultPostHogRouteFilter})
