@@ -1,6 +1,6 @@
 ## Next
 
-- Allow tracking non `PageRoute` screens using the `PosthogObserver` ([#95](https://github.com/PostHog/posthog-flutter/pull/95))
+- Allow overriding the route filtering usint a ctor param `routeFilter` ([#95](https://github.com/PostHog/posthog-flutter/pull/95))
 
 ## 4.3.0
 

@@ -4,13 +4,25 @@ import 'posthog.dart';
 
 typedef ScreenNameExtractor = String? Function(RouteSettings settings);
 
+/// [PostHogRouteFilter] allows to filter out routes that should not be tracked.
+///
+/// By default, only [PageRoute]s are tracked.
+typedef PostHogRouteFilter = bool Function(Route<dynamic>? route);
+
 String? defaultNameExtractor(RouteSettings settings) => settings.name;
 
+bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
+
 class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
-  PosthogObserver({ScreenNameExtractor nameExtractor = defaultNameExtractor})
-      : _nameExtractor = nameExtractor;
+  PosthogObserver(
+      {ScreenNameExtractor nameExtractor = defaultNameExtractor,
+      PostHogRouteFilter routeFilter = defaultPostHogRouteFilter})
+      : _nameExtractor = nameExtractor,
+        _routeFilter = routeFilter;
 
   final ScreenNameExtractor _nameExtractor;
+
+  final PostHogRouteFilter _routeFilter;
 
   bool _isTrackeableRoute(String? name) {
     return name != null && name.trim().isNotEmpty;
@@ -36,6 +48,10 @@ class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
 
+    if (!_routeFilter(route)) {
+      return;
+    }
+
     _sendScreenView(route);
   }
 
@@ -43,12 +59,20 @@ class PosthogObserver extends RouteObserver<PageRoute<dynamic>> {
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
 
+    if (!_routeFilter(newRoute)) {
+      return;
+    }
+
     _sendScreenView(newRoute);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
+
+    if (!_routeFilter(previousRoute)) {
+      return;
+    }
 
     _sendScreenView(previousRoute);
   }

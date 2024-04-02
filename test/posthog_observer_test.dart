@@ -1,8 +1,5 @@
-import 'dart:math';
-
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:posthog_flutter/src/posthog.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_observer.dart';
@@ -28,8 +25,10 @@ void main() {
   });
 
   PosthogObserver getSut(
-      {ScreenNameExtractor nameExtractor = defaultNameExtractor}) {
-    return PosthogObserver(nameExtractor: nameExtractor);
+      {ScreenNameExtractor nameExtractor = defaultNameExtractor,
+      PostHogRouteFilter routeFilter = defaultPostHogRouteFilter}) {
+    return PosthogObserver(
+        nameExtractor: nameExtractor, routeFilter: routeFilter);
   }
 
   test('returns current route name', () {
@@ -78,4 +77,39 @@ void main() {
 
     expect(fake.screenName, null);
   });
+
+  test('does not capture filtered routes', () {
+    // CustomOverlawRoute isn't a PageRoute
+    final overlayRoute = CustomOverlawRoute(
+      settings: const RouteSettings(name: 'Overlay Route'),
+    );
+
+    final sut = getSut();
+    sut.didPush(overlayRoute, null);
+
+    expect(fake.screenName, null);
+  });
+
+  test('allows overriding the route filter', () {
+    final overlayRoute = CustomOverlawRoute(
+      settings: const RouteSettings(name: 'Overlay Route'),
+    );
+
+    bool defaultPostHogRouteFilter(Route<dynamic>? route) =>
+        route is PageRoute || route is OverlayRoute;
+
+    final sut = getSut(routeFilter: defaultPostHogRouteFilter);
+    sut.didPush(overlayRoute, null);
+
+    expect(fake.screenName, 'Overlay Route');
+  });
+}
+
+class CustomOverlawRoute extends OverlayRoute {
+  CustomOverlawRoute({super.settings});
+
+  @override
+  Iterable<OverlayEntry> createOverlayEntries() {
+    return [];
+  }
 }
