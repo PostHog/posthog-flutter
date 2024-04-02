@@ -1,6 +1,12 @@
 ## Next
 
-- Allow overriding the route filtering usint a ctor param `routeFilter` ([#95](https://github.com/PostHog/posthog-flutter/pull/95))
+- chore: Allow overriding the route filtering using a ctor param `routeFilter` ([#95](https://github.com/PostHog/posthog-flutter/pull/95))
+
+```dart
+bool myRouteFilter(Route<dynamic>? route) =>
+        route is PageRoute || route is OverlayRoute;
+final observer = PosthogObserver(routeFilter: myRouteFilter);
+```
 
 ## 4.3.0
 
