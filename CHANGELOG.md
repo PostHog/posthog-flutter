@@ -1,5 +1,7 @@
 ## Next
 
+## 4.4.0
+
 - chore: Allow overriding the route filtering using a ctor param `routeFilter` ([#95](https://github.com/PostHog/posthog-flutter/pull/95))
 
 ```dart
