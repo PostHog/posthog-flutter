@@ -41,7 +41,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 return
             }
 
-            val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.defaultHost)
+            val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
             val trackApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
             val enableDebug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
