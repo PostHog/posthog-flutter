@@ -1,5 +1,7 @@
 ## Next
 
+## 4.4.1
+
 - fix: const `defaultHost` was renamed to `DEFAULT_HOST` and broke the Android build ([#98](https://github.com/PostHog/posthog-flutter/issues/98))
 
 ## 4.4.0
