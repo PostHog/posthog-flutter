@@ -1,5 +1,7 @@
 ## Next
 
+- fix: const `defaultHost` was renamed to `DEFAULT_HOST` and broke the Android build ([#96](https://github.com/PostHog/posthog-flutter/issues/96))
+
 ## 4.4.0
 
 - chore: Allow overriding the route filtering using a ctor param `routeFilter` ([#95](https://github.com/PostHog/posthog-flutter/pull/95))
