@@ -12,6 +12,17 @@ class Posthog {
 
   String? _currentScreen;
 
+  Future<void> configure({
+    required String apiKey,
+    required String host,
+    bool debug = false,
+    bool trackApplicationLifecycleEvents = false,
+  }) {
+    return _posthog.configure(apiKey, host,
+        debug: debug,
+        trackApplicationLifecycleEvents: trackApplicationLifecycleEvents);
+  }
+
   Future<void> identify({
     required String userId,
     Map<String, Object>? userProperties,
