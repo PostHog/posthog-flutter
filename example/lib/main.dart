@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter_example/constants.dart';
 
 void main() {
   runApp(const MyApp());
@@ -39,6 +40,24 @@ class _MyAppState extends State<MyApp> {
             child: Center(
               child: Column(
                 children: [
+                  const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text(
+                      "Configure",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Divider(),
+                  ElevatedButton(
+                    onPressed: () async {
+                      await _posthogFlutterPlugin.configure(
+                        apiKey: apiKey,
+                        host: host,
+                        debug: true,
+                      );
+                    },
+                    child: const Text("Configure"),
+                  ),
                   const Padding(
                     padding: EdgeInsets.all(8.0),
                     child: Text(

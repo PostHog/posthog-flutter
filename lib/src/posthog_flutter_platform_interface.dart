@@ -23,6 +23,11 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     _instance = instance;
   }
 
+  Future<void> configure(String apiKey, String host,
+      {bool debug = false, bool trackApplicationLifecycleEvents = false}) {
+    throw UnimplementedError('configure() has not been implemented.');
+  }
+
   Future<void> identify(
       {required String userId,
       Map<String, Object>? userProperties,

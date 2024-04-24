@@ -9,6 +9,22 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   final _methodChannel = const MethodChannel('posthog_flutter');
 
   @override
+  Future<void> configure(String apiKey, String host,
+      {bool debug = false,
+      bool trackApplicationLifecycleEvents = false}) async {
+    try {
+      await _methodChannel.invokeMethod('configure', {
+        'apiKey': apiKey,
+        'host': host,
+        'debug': debug,
+        'trackApplicationLifecycleEvents': trackApplicationLifecycleEvents,
+      });
+    } on PlatformException catch (e) {
+      _printIfDebug('Exception on configure: $e');
+    }
+  }
+
+  @override
   Future<void> identify({
     required String userId,
     Map<String, Object>? userProperties,

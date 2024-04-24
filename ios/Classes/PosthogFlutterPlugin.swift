@@ -20,36 +20,33 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     public static func initPlugin() {
-        // Initialise PostHog
+        // Initial static setup might be performed here if required
         let apiKey = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? ""
-
-        if apiKey.isEmpty {
-            print("[PostHog] com.posthog.posthog.API_KEY is missing!")
-            return
-        }
-
         let host = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost
-        let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
-        let postHogDebug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
+        let trackLifecycleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
+        let debug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
 
-        let config = PostHogConfig(
-            apiKey: apiKey,
-            host: host
-        )
-        config.captureApplicationLifecycleEvents = postHogCaptureLifecyleEvents
-        config.debug = postHogDebug
-        config.captureScreenViews = false
-        
-        // Update SDK name and version
-         postHogSdkName = "posthog-flutter"
-         postHogVersion = postHogFlutterVersion
-        
-        PostHogSDK.shared.setup(config)
-        //
+        print("\nApiKey:", apiKey)
+        print("\nhost:", host)
+
+        if !apiKey.isEmpty {
+            let config = PostHogConfig(apiKey: apiKey, host: host)
+            config.captureApplicationLifecycleEvents = trackLifecycleEvents
+            config.debug = debug
+            config.captureScreenViews = false
+ 
+            // Update SDK name and version
+            postHogSdkName = "posthog-flutter"
+            postHogVersion = postHogFlutterVersion
+
+            PostHogSDK.shared.setup(config)
+        }
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "configure":
+            configure(call, result: result)
         case "getFeatureFlag":
             getFeatureFlag(call, result: result)
         case "isFeatureEnabled":
@@ -87,6 +84,31 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+
+    private func configure(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let apiKey = args["apiKey"] as? String,
+              let host = args["host"] as? String else {
+            return _badArgumentError(result)
+        }
+        
+        let trackLifecycleEvents = args["trackLifecycleEvents"] as? Bool ?? false
+        let debug = args["debug"] as? Bool ?? false
+        
+        let config = PostHogConfig(apiKey: apiKey, host: host)
+        config.captureApplicationLifecycleEvents = trackLifecycleEvents
+        config.debug = debug
+        config.captureScreenViews = false
+
+        postHogSdkName = "posthog-flutter"
+        postHogVersion = postHogFlutterVersion
+
+        print("\nApiKey:", apiKey)
+        print("\nhost:", host)
+        
+        PostHogSDK.shared.setup(config)
+        result(nil)
     }
 
     private func getFeatureFlag(
@@ -292,10 +314,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result(nil)
     }
 
-    // Return bad Arguments error
+    // Utility method for handling errors
     private func _badArgumentError(_ result: @escaping FlutterResult) {
-        result(FlutterError(
-            code: "PosthogFlutterException", message: "Missing arguments!", details: nil
-        ))
+        result(FlutterError(code: "BAD_ARGS", message: "Bad or missing arguments", details: nil))
     }
 }
