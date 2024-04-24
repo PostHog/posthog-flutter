@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import com.posthog.PostHog
-import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -15,126 +14,88 @@ import io.flutter.plugin.common.MethodChannel.Result
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
-    /// The MethodChannel that will the communication between Flutter and native Android
-    ///
-    /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-    /// when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
+    private lateinit var applicationContext: Context
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
-
-        initPlugin(flutterPluginBinding.applicationContext)
-
+        applicationContext = flutterPluginBinding.applicationContext
+        initPlugin(applicationContext)
         channel.setMethodCallHandler(this)
     }
 
-    private fun initPlugin(applicationContext: Context) {
+    private fun initPlugin(context: Context) {
         try {
-            // TODO: replace deprecated method API 33
-            val ai = applicationContext.packageManager.getApplicationInfo(applicationContext.packageName, PackageManager.GET_META_DATA)
+            val ai = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
             val bundle = ai.metaData
             val apiKey = bundle.getString("com.posthog.posthog.API_KEY", null)
-
             if (apiKey.isNullOrEmpty()) {
                 Log.e("PostHog", "com.posthog.posthog.API_KEY is missing!")
                 return
             }
-
             val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
             val trackApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
             val enableDebug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
-            // Init PostHog
             val config = PostHogAndroidConfig(apiKey, host).apply {
                 captureScreenViews = false
                 captureDeepLinks = false
                 captureApplicationLifecycleEvents = trackApplicationLifecycleEvents
                 debug = enableDebug
                 sdkName = "posthog-flutter"
-                sdkVersion = postHogVersion
+                sdkVersion = PostHog.VERSION
             }
             PostHogAndroid.setup(applicationContext, config)
 
-        } catch (e: Throwable) {
-            e.localizedMessage?.let { Log.e("PostHog", "initPlugin error: $it") }
+        } catch (e: Exception) {
+            Log.e("PostHog", "initPlugin error: ${e.localizedMessage}")
         }
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
-
         when (call.method) {
-
-            "identify" -> {
-                identify(call, result)
-            }
-
-            "capture" -> {
-                capture(call, result)
-            }
-
-            "screen" -> {
-                screen(call, result)
-            }
-
-            "alias" -> {
-                alias(call, result)
-            }
-
-            "distinctId" -> {
-                distinctId(result)
-            }
-
-            "reset" -> {
-                reset(result)
-            }
-
-            "disable" -> {
-                disable(result)
-            }
-
-            "enable" -> {
-                enable(result)
-            }
-
-            "isFeatureEnabled" -> {
-                isFeatureEnabled(call, result)
-            }
-
-            "reloadFeatureFlags" -> {
-                reloadFeatureFlags(result)
-            }
-
-            "group" -> {
-                group(call, result)
-            }
-
-            "getFeatureFlag" -> {
-                getFeatureFlag(call, result)
-            }
-
-            "getFeatureFlagPayload" -> {
-                getFeatureFlagPayload(call, result)
-            }
-
-            "register" -> {
-                register(call, result)
-            }
-            "unregister" -> {
-                unregister(call, result)
-            }
-            "debug" -> {
-                debug(call, result)
-            }
-            "flush" -> {
-                flush(result)
-            }
-            else -> {
-                result.notImplemented()
-            }
+            "configure" -> configure(call, result)
+            "identify" -> identify(call, result)
+            "capture" -> capture(call, result)
+            "screen" -> screen(call, result)
+            "alias" -> alias(call, result)
+            "distinctId" -> distinctId(result)
+            "reset" -> reset(result)
+            "disable" -> disable(result)
+            "enable" -> enable(result)
+            "debug" -> debug(call, result)
+            "register" -> register(call, result)
+            "unregister" -> unregister(call, result)
+            "flush" -> flush(result)
+            "isFeatureEnabled" -> isFeatureEnabled(call, result)
+            "reloadFeatureFlags" -> reloadFeatureFlags(result)
+            "group" -> group(call, result)
+            "getFeatureFlag" -> getFeatureFlag(call, result)
+            "getFeatureFlagPayload" -> getFeatureFlagPayload(call, result)
+            else -> result.notImplemented()
         }
-
     }
+
+    private fun configure(call: MethodCall, result: Result) {
+        try {
+            val apiKey: String = call.argument("apiKey") ?: return result.error("Invalid API Key", "API Key is null or empty", null)
+            val host: String = call.argument("host") ?: return result.error("Invalid Host", "Host is null or empty", null)
+            val trackLifecycleEvents: Boolean = call.argument("trackLifecycleEvents") ?: false
+            val enableDebug: Boolean = call.argument("enableDebug") ?: false
+
+            val config = PostHogAndroidConfig(apiKey, host).apply {
+                captureApplicationLifecycleEvents = trackLifecycleEvents
+                debug = enableDebug
+                sdkName = "posthog-flutter"
+                sdkVersion = PostHog.VERSION
+            }
+            PostHogAndroid.setup(applicationContext, config)
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("ConfigurationError", "Failed to configure PostHog: ${e.localizedMessage}", null)
+        }
+    }
+
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
