@@ -80,7 +80,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     private fun configure(call: MethodCall, result: Result) {
         try {
             val apiKey: String = call.argument("apiKey") ?: return result.error("Invalid API Key", "API Key is null or empty", null)
-            val host: String = call.argument("host")?.takeIf { it.isNotEmpty() } ?: PostHogConfig.DEFAULT_HOST
+            val host: String = call.argument("host") ?: PostHogConfig.DEFAULT_HOST
             val trackLifecycleEvents: Boolean = call.argument("trackLifecycleEvents") ?: false
             val enableDebug: Boolean = call.argument("enableDebug") ?: false
 
