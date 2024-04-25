@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import com.posthog.PostHog
+import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -43,7 +44,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 captureApplicationLifecycleEvents = trackApplicationLifecycleEvents
                 debug = enableDebug
                 sdkName = "posthog-flutter"
-                sdkVersion = PostHog.VERSION
+                sdkVersion = postHogVersion
             }
             PostHogAndroid.setup(applicationContext, config)
 
@@ -87,7 +88,7 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 captureApplicationLifecycleEvents = trackLifecycleEvents
                 debug = enableDebug
                 sdkName = "posthog-flutter"
-                sdkVersion = PostHog.VERSION
+                sdkVersion = postHogVersion
             }
             PostHogAndroid.setup(applicationContext, config)
             result.success(null)
