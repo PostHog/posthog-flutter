@@ -88,10 +88,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     private func configure(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let apiKey = args["apiKey"] as? String,
-              let host = args["host"] as? String else {
+              let apiKey = args["apiKey"] as? String, !apiKey.isEmpty else{
             return _badArgumentError(result)
         }
+
+        let host = (args["host"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? (args["host"] as? String) ?? PostHogConfig.defaultHost : PostHogConfig.defaultHost
         
         let trackLifecycleEvents = args["trackLifecycleEvents"] as? Bool ?? false
         let debug = args["debug"] as? Bool ?? false
