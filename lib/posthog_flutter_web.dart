@@ -2,7 +2,8 @@
 // of your plugin as a separate package, instead of inlining it in the same
 // package as the core of your plugin.
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:js';
+import 'dart:js_interop';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
@@ -25,6 +26,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   Future<dynamic> handleMethodCall(MethodCall call) async {
-    return handleWebMethodCall(call, context);
+    return handleWebMethodCall(call, globalContext);
   }
 }
