@@ -6,30 +6,30 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
   final JSObject analytics = context.getProperty('posthog'.toJS)!;
   switch (call.method) {
     case 'identify':
-      final userProperties = call.arguments['userProperties'] ?? {};
-      final userPropertiesSetOnce =
+      final Map userProperties = call.arguments['userProperties'] ?? {};
+      final Map userPropertiesSetOnce =
           call.arguments['userPropertiesSetOnce'] ?? {};
       analytics.callMethodVarArgs('identify'.toJS, [
         call.arguments['userId'],
-        userProperties,
-        jsify(userPropertiesSetOnce),
+        userProperties.toJSBox,
+        userPropertiesSetOnce.toJSBox,
       ]);
       break;
     case 'capture':
       final properties = call.arguments['properties'] ?? {};
       analytics.callMethodVarArgs('capture'.toJS, [
         call.arguments['eventName'],
-        jsify(properties),
+        properties.jsify(),
       ]);
       break;
     case 'screen':
-      final properties = call.arguments['properties'] ?? {};
+      final Map properties = call.arguments['properties'] ?? {};
       final screenName = call.arguments['screenName'];
       properties['\$screen_name'] = screenName;
 
       analytics.callMethodVarArgs('capture'.toJS, [
         '\$screen'.toJS,
-        jsify(properties),
+        properties.toJSBox,
       ]);
       break;
     case 'alias':
@@ -39,13 +39,13 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
       break;
     case 'distinctId':
       final distinctId = analytics.callMethod('get_distinct_id'.toJS);
-      return distinctId;
+      return distinctId?.dartify();
     case 'reset':
       analytics.callMethod('reset'.toJS);
       break;
     case 'debug':
       analytics.callMethodVarArgs('debug'.toJS, [
-        call.arguments['debug'],
+        call.arguments['debug'].toJS,
       ]);
       break;
     case 'isFeatureEnabled':
@@ -56,9 +56,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
       return isFeatureEnabled;
     case 'group':
       analytics.callMethodVarArgs('group'.toJS, [
-        call.arguments['groupType'],
-        call.arguments['groupKey'],
-        jsify(call.arguments['groupProperties'] ?? {}),
+        call.arguments['groupType'].toJS,
+        call.arguments['groupKey'].toJS,
+        (call.arguments['groupProperties'] ?? {}).jsify(),
       ]);
       break;
     case 'reloadFeatureFlags':
@@ -72,24 +72,24 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
       break;
     case 'getFeatureFlag':
       final featureFlag = analytics.callMethodVarArgs('getFeatureFlag'.toJS, [
-        call.arguments['key'],
+        call.arguments['key'].toJS,
       ]);
       return featureFlag;
     case 'getFeatureFlagPayload':
       final featureFlag =
           analytics.callMethodVarArgs('getFeatureFlagPayload'.toJS, [
-        call.arguments['key'],
+        call.arguments['key'].toJS,
       ]);
-      return featureFlag;
+      return featureFlag?.dartify();
     case 'register':
       final properties = {call.arguments['key']: call.arguments['value']};
       analytics.callMethodVarArgs('register'.toJS, [
-        jsify(properties),
+        properties.toJSBox,
       ]);
       break;
     case 'unregister':
       analytics.callMethodVarArgs('unregister'.toJS, [
-        call.arguments['key'],
+        call.arguments['key'].toJS,
       ]);
       break;
     case 'flush':
@@ -103,8 +103,4 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
             "The posthog plugin for web doesn't implement the method '${call.method}'",
       );
   }
-}
-
-JSAny jsify(dynamic any) {
-  return any as JSAny;
 }
