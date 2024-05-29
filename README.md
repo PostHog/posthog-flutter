@@ -110,7 +110,7 @@ Remember that the application lifecycle events won't have any special context se
 	<key>com.posthog.posthog.API_KEY</key>
 	<string>YOUR_API_KEY_GOES_HERE</string>
 	<key>com.posthog.posthog.POSTHOG_HOST</key>
-  <!-- or EU Host: 'https://eu.i.posthog.com' -->
+	<!-- or EU Host: 'https://eu.i.posthog.com' -->
 	<string>https://us.i.posthog.com</string>
 	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
 	<true/>
