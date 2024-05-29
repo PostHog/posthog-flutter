@@ -39,7 +39,7 @@
             android:value="_6SG-F7I1vCuZ-HdJL3VZQqjBlaSb1_20hDPwqMNnGI" />
         <meta-data
             android:name="com.posthog.posthog.POSTHOG_HOST"
-            android:value="https://app.posthog.com" />
+            android:value="https://us.i.posthog.com" />
         <meta-data
             android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS"
             android:value="true" />
