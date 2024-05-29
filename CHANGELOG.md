@@ -1,6 +1,6 @@
 ## Next
 
-- chore: change host to new address ([#105](https://github.com/PostHog/posthog-flutter/pull/105))
+- chore: change host to new address ([#106](https://github.com/PostHog/posthog-flutter/pull/106))
 
 ## 4.5.0
 
