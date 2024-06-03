@@ -8,6 +8,9 @@ import AppKit
 #endif
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
+
+    let isLoadedSubject = CurrentValueSubject<Bool, Error>(false)
+
     public static func register(with registrar: FlutterPluginRegistrar) {
 #if os(iOS)
         let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
@@ -44,6 +47,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
          postHogSdkName = "posthog-flutter"
          postHogVersion = postHogFlutterVersion
         
+        NotificationCenter.default.addObserver(forName: PostHogSDK.didReceiveFeatureFlags, object: nil, queue: nil)  { (notification) in
+            isLoadedSubject.send(true)
+        }
         PostHogSDK.shared.setup(config)
         //
     }
@@ -84,6 +90,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             unregister(call, result: result)
         case "flush":
             flush(result)
+        case "awaitFeatureFlagsLoaded":
+            awaitFeatureFlagsLoaded(result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -240,6 +248,19 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     ) {
         PostHogSDK.shared.reloadFeatureFlags()
         result(nil)
+    }
+
+    private func awaitFeatureFlagsLoaded(_ result: @escaping FlutterResult
+    ) {
+        do {
+            isLoadedSubject.sink { completion in
+                if completion {
+                    result(nil)
+                }
+            }
+        } catch let error {
+            result(FlutterError(code: "PosthogFlutterException", message: error.localizedDescription, details: nil))
+        }
     }
 
     private func group(
