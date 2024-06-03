@@ -139,6 +139,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> awaitFeatureFlagsLoaded() async {
+    try {
+      await _methodChannel.invokeMethod('awaitFeatureFlagsLoaded');
+    } on PlatformException catch (exception) {
+      _printIfDebug('Exception on awaitFeatureFlagsLoaded: $exception');
+    }
+  }
+
+  @override
   Future<void> group({
     required String groupType,
     required String groupKey,

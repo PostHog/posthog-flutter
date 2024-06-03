@@ -86,6 +86,11 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
   }
 
+  /// Returns a Future, that completes only once the Feature Flags are loaded
+  Future<void> awaitFeatureFlagsLoaded() {
+    throw UnimplementedError('awaitFeatureFlagsLoaded() has not been implemented.');
+  }
+
   Future<void> group({
     required String groupType,
     required String groupKey,

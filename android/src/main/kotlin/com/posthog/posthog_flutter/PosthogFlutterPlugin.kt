@@ -12,6 +12,10 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
@@ -28,6 +32,8 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
         channel.setMethodCallHandler(this)
     }
+
+    private val isLoaded = MutableStateFlow(false);
 
     private fun initPlugin(applicationContext: Context) {
         try {
@@ -53,6 +59,9 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 debug = enableDebug
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
+                onFeatureFlags = PostHogOnFeatureFlags {
+                    isLoaded.value = true;
+                }
             }
             PostHogAndroid.setup(applicationContext, config)
 
@@ -64,74 +73,25 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     override fun onMethodCall(call: MethodCall, result: Result) {
 
         when (call.method) {
-
-            "identify" -> {
-                identify(call, result)
-            }
-
-            "capture" -> {
-                capture(call, result)
-            }
-
-            "screen" -> {
-                screen(call, result)
-            }
-
-            "alias" -> {
-                alias(call, result)
-            }
-
-            "distinctId" -> {
-                distinctId(result)
-            }
-
-            "reset" -> {
-                reset(result)
-            }
-
-            "disable" -> {
-                disable(result)
-            }
-
-            "enable" -> {
-                enable(result)
-            }
-
-            "isFeatureEnabled" -> {
-                isFeatureEnabled(call, result)
-            }
-
-            "reloadFeatureFlags" -> {
-                reloadFeatureFlags(result)
-            }
-
-            "group" -> {
-                group(call, result)
-            }
-
-            "getFeatureFlag" -> {
-                getFeatureFlag(call, result)
-            }
-
-            "getFeatureFlagPayload" -> {
-                getFeatureFlagPayload(call, result)
-            }
-
-            "register" -> {
-                register(call, result)
-            }
-            "unregister" -> {
-                unregister(call, result)
-            }
-            "debug" -> {
-                debug(call, result)
-            }
-            "flush" -> {
-                flush(result)
-            }
-            else -> {
-                result.notImplemented()
-            }
+            "identify" -> identify(call, result)
+            "capture" -> capture(call, result)
+            "screen" -> screen(call, result)
+            "alias" -> alias(call, result)
+            "distinctId" -> distinctId(result)
+            "reset" -> reset(result)
+            "disable" -> disable(result)
+            "enable" -> enable(result)
+            "isFeatureEnabled" -> isFeatureEnabled(call, result)
+            "reloadFeatureFlags" -> reloadFeatureFlags(result)
+            "group" -> group(call, result)
+            "getFeatureFlag" -> getFeatureFlag(call, result)
+            "getFeatureFlagPayload" -> getFeatureFlagPayload(call, result)
+            "register" -> register(call, result)
+            "unregister" -> unregister(call, result)
+            "debug" -> debug(call, result)
+            "flush" -> flush(result)
+            "awaitFeatureFlagsLoaded" -> awaitFeatureFlagsLoaded(result)
+            else -> result.notImplemented()
         }
 
     }
@@ -265,6 +225,20 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             PostHog.reloadFeatureFlags()
             result.success(null)
         } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun awaitFeatureFlagsLoaded(result: Result){
+        try {
+            GlobalScope.launch {
+                isLoaded.collect { isLoaded ->
+                    if(isLoaded){
+                        result.success()
+                    }
+                }
+            }
+        } catch (error: Throwable){
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
