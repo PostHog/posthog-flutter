@@ -89,7 +89,8 @@ Remember that the application lifecycle events won't have any special context se
             [...]
         </activity>
         <meta-data android:name="com.posthog.posthog.API_KEY" android:value="YOUR_API_KEY_GOES_HERE" />
-        <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://app.posthog.com" />
+        <!-- or EU Host: 'https://eu.i.posthog.com' -->
+        <meta-data android:name="com.posthog.posthog.POSTHOG_HOST" android:value="https://us.i.posthog.com" />
         <meta-data android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS" android:value="true" />
         <meta-data android:name="com.posthog.posthog.DEBUG" android:value="true" />
     </application>
@@ -109,7 +110,8 @@ Remember that the application lifecycle events won't have any special context se
 	<key>com.posthog.posthog.API_KEY</key>
 	<string>YOUR_API_KEY_GOES_HERE</string>
 	<key>com.posthog.posthog.POSTHOG_HOST</key>
-	<string>https://app.posthog.com</string>
+	<!-- or EU Host: 'https://eu.i.posthog.com' -->
+	<string>https://us.i.posthog.com</string>
 	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
 	<true/>
 	<key>com.posthog.posthog.DEBUG</key>
@@ -128,7 +130,8 @@ Remember that the application lifecycle events won't have any special context se
     ...
     <script>
       !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
-      posthog.init('YOUR_WRITE_KEY_GOES_HERE', {api_host: 'https://app.posthog.com'})
+      // or EU Host: 'https://eu.i.posthog.com'
+      posthog.init('YOUR_WRITE_KEY_GOES_HERE', {api_host: 'https://us.i.posthog.com'})
     </script>
   </head>
 

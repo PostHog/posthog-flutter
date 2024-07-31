@@ -1,5 +1,11 @@
 ## Next
 
+- chore: change host to new address ([#106](https://github.com/PostHog/posthog-flutter/pull/106))
+
+## 4.5.0
+
+- add PrivacyInfo for macOS ([#105](https://github.com/PostHog/posthog-flutter/pull/105))
+
 ## 4.4.1
 
 - fix: const `defaultHost` was renamed to `DEFAULT_HOST` and broke the Android build ([#98](https://github.com/PostHog/posthog-flutter/issues/98))
