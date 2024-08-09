@@ -6,8 +6,8 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
   final JSObject analytics = context.getProperty('posthog'.toJS)!;
   switch (call.method) {
     case 'identify':
-      final Map userProperties = call.arguments['userProperties'] ?? {};
-      final Map userPropertiesSetOnce =
+      final userProperties = call.arguments['userProperties'] ?? {};
+      final userPropertiesSetOnce =
           call.arguments['userPropertiesSetOnce'] ?? {};
       analytics.callMethodVarArgs('identify'.toJS, [
         call.arguments['userId'],
@@ -23,7 +23,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
       ]);
       break;
     case 'screen':
-      final Map properties = call.arguments['properties'] ?? {};
+      final properties = call.arguments['properties'] ?? {};
       final screenName = call.arguments['screenName'];
       properties['\$screen_name'] = screenName;
 
