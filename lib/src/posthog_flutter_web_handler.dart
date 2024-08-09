@@ -11,8 +11,8 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
           call.arguments['userPropertiesSetOnce'] ?? {};
       analytics.callMethodVarArgs('identify'.toJS, [
         call.arguments['userId'],
-        userProperties.toJSBox,
-        userPropertiesSetOnce.toJSBox,
+        userProperties.jsify(),
+        userPropertiesSetOnce.jsify(),
       ]);
       break;
     case 'capture':
@@ -29,7 +29,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
 
       analytics.callMethodVarArgs('capture'.toJS, [
         '\$screen'.toJS,
-        properties.toJSBox,
+        properties.jsify(),
       ]);
       break;
     case 'alias':
@@ -84,7 +84,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JSObject context) async {
     case 'register':
       final properties = {call.arguments['key']: call.arguments['value']};
       analytics.callMethodVarArgs('register'.toJS, [
-        properties.toJSBox,
+        properties.jsify(),
       ]);
       break;
     case 'unregister':
