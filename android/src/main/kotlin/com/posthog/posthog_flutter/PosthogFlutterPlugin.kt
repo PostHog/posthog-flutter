@@ -1,17 +1,22 @@
 package com.posthog.posthog_flutter
 
 import android.content.Context
-import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import com.posthog.PostHog
-import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
+import com.posthog.internal.replay.RRFullSnapshotEvent
+import com.posthog.internal.replay.RRStyle
+import com.posthog.internal.replay.RRWireframe
+import com.posthog.internal.replay.capture
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.io.ByteArrayOutputStream
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
@@ -21,44 +26,14 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     /// when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
 
+    private lateinit var context: Context
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
 
-        initPlugin(flutterPluginBinding.applicationContext)
+        context = flutterPluginBinding.applicationContext
 
         channel.setMethodCallHandler(this)
-    }
-
-    private fun initPlugin(applicationContext: Context) {
-        try {
-            // TODO: replace deprecated method API 33
-            val ai = applicationContext.packageManager.getApplicationInfo(applicationContext.packageName, PackageManager.GET_META_DATA)
-            val bundle = ai.metaData
-            val apiKey = bundle.getString("com.posthog.posthog.API_KEY", null)
-
-            if (apiKey.isNullOrEmpty()) {
-                Log.e("PostHog", "com.posthog.posthog.API_KEY is missing!")
-                return
-            }
-
-            val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
-            val trackApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
-            val enableDebug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
-
-            // Init PostHog
-            val config = PostHogAndroidConfig(apiKey, host).apply {
-                captureScreenViews = false
-                captureDeepLinks = false
-                captureApplicationLifecycleEvents = trackApplicationLifecycleEvents
-                debug = enableDebug
-                sdkName = "posthog-flutter"
-                sdkVersion = postHogVersion
-            }
-            PostHogAndroid.setup(applicationContext, config)
-
-        } catch (e: Throwable) {
-            e.localizedMessage?.let { Log.e("PostHog", "initPlugin error: $it") }
-        }
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -120,20 +95,122 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             "register" -> {
                 register(call, result)
             }
+
             "unregister" -> {
                 unregister(call, result)
             }
+
             "debug" -> {
                 debug(call, result)
             }
+
             "flush" -> {
                 flush(result)
             }
+
+            "initNativeSdk" -> {
+                val configMap = call.arguments as? Map<String, Any>
+                println()
+                if (configMap != null) {
+                    initPlugin(configMap)
+                    result.success(null)
+                } else {
+                    result.error("INVALID_ARGUMENT", "Config map is null or invalid", null)
+                }
+            }
+
+            "sendReplayScreenshot" -> {
+                sendReplayScreenshot(call, result)
+            }
+
             else -> {
                 result.notImplemented()
             }
         }
 
+    }
+
+    private fun initPlugin(configMap: Map<String, Any>) {
+        val apiKey = configMap["apiKey"] as? String ?: ""
+        val options = configMap["options"] as? Map<String, Any> ?: emptyMap()
+
+        val captureNativeAppLifecycleEvents =
+            options["captureNativeAppLifecycleEvents"] as? Boolean ?: false
+        val enableSessionReplay = options["enableSessionReplay"] as? Boolean ?: false
+        val sessionReplayConfigMap =
+            options["sessionReplayConfig"] as? Map<String, Any> ?: emptyMap()
+
+        val maskAllTextInputs = sessionReplayConfigMap["maskAllTextInputs"] as? Boolean ?: true
+        val maskAllImages = sessionReplayConfigMap["maskAllImages"] as? Boolean ?: true
+        val captureLog = sessionReplayConfigMap["captureLog"] as? Boolean ?: true
+        val debouncerDelayMs =
+            (sessionReplayConfigMap["androidDebouncerDelayMs"] as? Int ?: 500).toLong()
+
+        val config = PostHogAndroidConfig(apiKey).apply {
+            debug = false
+            captureDeepLinks = false
+            captureApplicationLifecycleEvents = captureNativeAppLifecycleEvents
+            captureScreenViews = false
+            sessionReplay = enableSessionReplay
+            sessionReplayConfig.screenshot = true
+            sessionReplayConfig.captureLogcat = captureLog
+            sessionReplayConfig.debouncerDelayMs = debouncerDelayMs
+            sessionReplayConfig.maskAllImages = maskAllImages
+            sessionReplayConfig.maskAllTextInputs = maskAllTextInputs
+        }
+
+        PostHogAndroid.setup(context, config)
+    }
+
+    /*
+    * TEMPORARY FUNCTION FOR TESTING PURPOSES
+    * This function sends a screenshot to PostHog.
+    * It should be removed or refactored in the other version.
+    */
+    private fun sendReplayScreenshot(call: MethodCall, result: Result) {
+        val imageBytes = call.argument<ByteArray>("imageBytes")
+        if (imageBytes != null) {
+            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+
+            val base64String = bitmapToBase64(bitmap)
+
+            val wireframe = RRWireframe(
+                id = System.identityHashCode(bitmap),
+                x = 0,
+                y = 0,
+                width = bitmap.width,
+                height = bitmap.height,
+                type = "screenshot",
+                base64 = base64String,
+                style = RRStyle()
+            )
+
+            val snapshotEvent = RRFullSnapshotEvent(
+                listOf(wireframe),
+                initialOffsetTop = 0,
+                initialOffsetLeft = 0,
+                timestamp = System.currentTimeMillis()
+            )
+
+            listOf(snapshotEvent).capture()
+            if (base64String != null) {
+                Log.d("PostHog", base64String)
+            }
+        } else {
+            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+        }
+    }
+
+    private fun bitmapToBase64(bitmap: Bitmap): String? {
+        ByteArrayOutputStream().use { byteArrayOutputStream ->
+            bitmap.compress(
+                Bitmap.CompressFormat.JPEG,
+                30,
+                byteArrayOutputStream
+            )
+            val byteArray = byteArrayOutputStream.toByteArray()
+            return android.util.Base64.encodeToString(byteArray, android.util.Base64.NO_WRAP)
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
