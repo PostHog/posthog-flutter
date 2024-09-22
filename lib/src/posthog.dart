@@ -105,6 +105,58 @@ class Posthog {
     return _posthog.getDistinctId();
   }
 
+  Future<void> reset() {
+    return _posthog.reset();
+  }
+
+  Future<void> disable() {
+    return _posthog.disable();
+  }
+
+  Future<void> enable() {
+    return _posthog.enable();
+  }
+
+  Future<void> debug(bool enabled) {
+    return _posthog.debug(enabled);
+  }
+
+  Future<void> register(String key, Object value) {
+    return _posthog.register(key, value);
+  }
+
+  Future<void> unregister(String key) {
+    return _posthog.unregister(key);
+  }
+
+  Future<bool> isFeatureEnabled(String key) {
+    return _posthog.isFeatureEnabled(key);
+  }
+
+  Future<void> reloadFeatureFlags() {
+    return _posthog.reloadFeatureFlags();
+  }
+
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    Map<String, Object>? groupProperties,
+  }) {
+    return _posthog.group(
+      groupType: groupType,
+      groupKey: groupKey,
+      groupProperties: groupProperties,
+    );
+  }
+
+  Future<Object?> getFeatureFlag(String key) {
+    return _posthog.getFeatureFlag(key: key);
+  }
+
+  Future<Object?> getFeatureFlagPayload(String key) {
+    return _posthog.getFeatureFlagPayload(key: key);
+  }
+
   Future<void> flush() async {
     if (!_initialized) {
       throw Exception('Posthog is not initialized');
