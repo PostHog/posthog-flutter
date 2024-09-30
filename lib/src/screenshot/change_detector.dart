@@ -20,7 +20,7 @@ import 'package:flutter/widgets.dart';
 /// the operations performed are efficient to avoid impacting app performance.
 class ChangeDetector {
   final VoidCallback onChange;
-  bool _isRunning = false; // Flag to track if the detection is running
+  bool _isRunning = false;
 
   /// Creates a [ChangeDetector] with the given [onChange] callback.
   ChangeDetector(this.onChange);
@@ -51,7 +51,7 @@ class ChangeDetector {
   /// if the change detector is still running.
   void _onFrameRendered() {
     if (!_isRunning) {
-      return; // Stop further frame callbacks if no longer running
+      return;
     }
 
     onChange();
