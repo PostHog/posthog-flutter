@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-
-
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/screenshot/mask/posthog_mask_controller.dart';
@@ -14,7 +12,7 @@ import 'screenshot_capturer.dart';
 class PostHogScreenshotWidget extends StatefulWidget {
   final Widget child;
 
-  const PostHogScreenshotWidget({Key? key, required this.child}) : super(key: key);
+  PostHogScreenshotWidget({Key? key, required this.child}) : super(key: key);
 
   @override
   _PostHogScreenshotWidgetState createState() => _PostHogScreenshotWidgetState();
@@ -30,6 +28,10 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   @override
   void initState() {
     super.initState();
+
+    if (!PostHogConfig().options.enableSessionReplay) {
+      return;
+    }
 
     _screenshotCapturer = ScreenshotCapturer();
     _nativeCommunicator = NativeCommunicator();
