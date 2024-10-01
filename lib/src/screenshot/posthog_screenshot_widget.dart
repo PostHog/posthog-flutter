@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
@@ -44,7 +47,22 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   }
 
   Future<void> _captureAndSendScreenshot() async {
-    await _screenshotCapturer.captureScreenshot(_nativeCommunicator);
+    final ui.Image? image = await _screenshotCapturer.captureScreenshot();
+    if (image == null) {
+      print('Error: Failed to capture screenshot.');
+      return;
+    }
+
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      print('Error: Failed to convert image to byte data.');
+      return;
+    }
+
+    Uint8List pngBytes = byteData.buffer.asUint8List();
+    image.dispose();
+
+    await _nativeCommunicator.sendImageAndRectsToNative(pngBytes);
   }
 
   Duration _getDebounceDuration() {

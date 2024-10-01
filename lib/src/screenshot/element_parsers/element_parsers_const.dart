@@ -1,15 +1,20 @@
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/screenshot/element_parsers/element_parser.dart';
 import 'package:posthog_flutter/src/screenshot/element_parsers/element_parser_factory.dart';
+import 'package:posthog_flutter/src/posthog_options.dart';
 
 class ElementParsersConst {
   final ElementParserFactory _factory;
   final Map<String, ElementParser> parsersMap = {};
 
-  ElementParsersConst(this._factory) {
-    registerElementParser<RenderImage>();
-    registerElementParser<RenderParagraph>();
-    registerElementParser<RenderTransform>();
+  ElementParsersConst(this._factory, PostHogSessionReplayConfig config) {
+    if (config.maskAllImages) {
+      registerElementParser<RenderImage>();
+    }
+    if (config.maskAllTextInputs) {
+      registerElementParser<RenderParagraph>();
+      registerElementParser<RenderTransform>();
+    }
   }
 
   void registerElementParser<T>() {
