@@ -15,7 +15,8 @@ class Posthog {
 
   /// Android and iOS only
   /// Only used for the manual setup
-  /// Requires disabling the automatic init on Android and iOS
+  /// Requires disabling the automatic init on Android and iOS:
+  /// com.posthog.posthog.AUTO_INIT: false
   Future<void> setup(PostHogConfig config) => _posthog.setup(config);
 
   Future<void> identify({
