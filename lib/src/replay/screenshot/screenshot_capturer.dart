@@ -2,8 +2,8 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
-import 'package:posthog_flutter/src/screenshot/mask/image_mask_painter.dart';
-import 'package:posthog_flutter/src/screenshot/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 class ScreenshotCapturer {
   final PostHogConfig config = PostHogConfig();
@@ -11,7 +11,6 @@ class ScreenshotCapturer {
 
   ScreenshotCapturer();
 
-  /// Get the appropriate pixel ratio for the screenshot.
   double _getPixelRatio({
     int? width,
     int? height,
@@ -25,7 +24,6 @@ class ScreenshotCapturer {
     return min(width / srcWidth, height / srcHeight);
   }
 
-  /// Captures the screenshot and processes the image and rects.
   Future<ui.Image?> captureScreenshot() async {
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {

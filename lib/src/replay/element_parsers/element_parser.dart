@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:posthog_flutter/src/screenshot/element_parsers/element_data.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 
 class ElementParser {
   ElementParser();

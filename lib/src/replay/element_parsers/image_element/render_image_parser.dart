@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:posthog_flutter/src/screenshot/element_parsers/element_parser.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
 
 import 'position_calculator.dart';
 import 'scaler.dart';

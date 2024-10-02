@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:posthog_flutter/src/screenshot/element_parsers/element_data.dart';
-import 'package:posthog_flutter/src/screenshot/mask/element_data_factory.dart';
-import 'package:posthog_flutter/src/screenshot/mask/element_object_parser.dart';
-import 'package:posthog_flutter/src/screenshot/mask/root_element_provider.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_data_factory.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_object_parser.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/root_element_provider.dart';
 
 class WidgetElementsDecipher {
   late ElementData rootElementData;

@@ -3,11 +3,11 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
-import 'package:posthog_flutter/src/screenshot/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 import 'change_detector.dart';
 import 'native_communicator.dart';
-import 'screenshot_capturer.dart';
+import 'screenshot/screenshot_capturer.dart';
 
 class PostHogScreenshotWidget extends StatefulWidget {
   final Widget child;
@@ -44,11 +44,11 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     _debounceTimer?.cancel();
 
     _debounceTimer = Timer(_getDebounceDuration(), () {
-      _captureAndSendScreenshot();
+      _capture();
     });
   }
 
-  Future<void> _captureAndSendScreenshot() async {
+  Future<void> _capture() async {
     final ui.Image? image = await _screenshotCapturer.captureScreenshot();
     if (image == null) {
       print('Error: Failed to capture screenshot.');
@@ -72,7 +72,7 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     final sessionReplayConfig = options.sessionReplayConfig;
 
     if (Theme.of(context).platform == TargetPlatform.android) {
-      return sessionReplayConfig?.androidDebouncerDelay ?? const Duration(milliseconds: 0);
+      return sessionReplayConfig?.androidDebouncerDelay ?? const Duration(milliseconds: 100);
     } else if (Theme.of(context).platform == TargetPlatform.iOS) {
       return sessionReplayConfig?.iOSDebouncerDelay ?? const Duration(seconds: 1);
     } else {

@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import 'package:posthog_flutter/src/screenshot/element_parsers/element_data.dart';
-import 'package:posthog_flutter/src/screenshot/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 class ElementObjectParser {
   ElementData? relateRenderObject(

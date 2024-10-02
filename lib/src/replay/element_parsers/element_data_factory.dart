@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
-import 'package:posthog_flutter/src/screenshot/element_parsers/element_data.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 
 class ElementDataFactory {
   /// Creates an ElementData object from an Element

@@ -30,7 +30,7 @@ class PostHogSessionReplayConfig {
   /// This is used for capturing the view as a screenshot
   /// The lower the number, the more snapshots will be captured but higher the performance impact
   /// Defaults to 0.5s on Android
-  final Duration? androidDebouncerDelay;
+  Duration? androidDebouncerDelay;
 
   /// Enable capturing network telemetry
   /// iOS only
