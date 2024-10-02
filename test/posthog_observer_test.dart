@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_observer.dart';
@@ -13,6 +14,15 @@ void main() {
       );
 
   final fake = PosthogFlutterPlatformFake();
+
+  Future<void> main() async {
+    final config = PostHogConfig('YOUR_API_KEY_GOES_HERE');
+    config.debug = true;
+    config.captureApplicationLifecycleEvents = true;
+    // or EU Host: 'https://eu.i.posthog.com'
+    config.host = 'https://us.i.posthog.com';
+    await Posthog().setup(config);
+  }
 
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();

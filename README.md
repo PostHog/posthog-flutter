@@ -80,6 +80,8 @@ Remember that the application lifecycle events won't have any special context se
 
 ### Android
 
+Automatically:
+
 #### AndroidManifest.xml
 
 ```xml
@@ -95,6 +97,33 @@ Remember that the application lifecycle events won't have any special context se
         <meta-data android:name="com.posthog.posthog.DEBUG" android:value="true" />
     </application>
 </manifest>
+```
+
+Or manually, disable the auto init:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.posthog_flutter_example">
+    <application>
+        <activity>
+            [...]
+        </activity>
+        <meta-data android:name="com.posthog.posthog.AUTO_INIT" android:value="false" />
+    </application>
+</manifest>
+```
+
+And setup the SDK manually:
+
+```dart
+Future<void> main() async {
+    final config = PostHogConfig('YOUR_API_KEY_GOES_HERE');
+    config.debug = true;
+    config.captureApplicationLifecycleEvents = true;
+    // or EU Host: 'https://eu.i.posthog.com'
+    config.host = 'https://us.i.posthog.com';
+    await Posthog().setup(config);
+    runApp(MyApp());
+}
 ```
 
 ### iOS/macOS
