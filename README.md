@@ -82,9 +82,7 @@ Remember that the application lifecycle events won't have any special context se
 
 Automatically:
 
-#### AndroidManifest.xml
-
-```xml
+```xml file=AndroidManifest.xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.posthog_flutter_example">
     <application>
         <activity>
@@ -101,7 +99,7 @@ Automatically:
 
 Or manually, disable the auto init:
 
-```xml
+```xml file=AndroidManifest.xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.posthog_flutter_example">
     <application>
         <activity>
@@ -128,9 +126,7 @@ Future<void> main() async {
 
 ### iOS/macOS
 
-#### Info.plist
-
-```xml
+```xml file=Info.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -152,7 +148,7 @@ Future<void> main() async {
 
 ### Web
 
-```html
+```html file=index.html
 <!DOCTYPE html>
 <html>
   <head>
