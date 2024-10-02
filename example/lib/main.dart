@@ -12,7 +12,7 @@ void main() {
       sessionReplayConfig: PostHogSessionReplayConfig(
         maskAllTextInputs: true,
         maskAllImages: true,
-        androidDebouncerDelay: const Duration(milliseconds: 0),
+        androidDebouncerDelay: const Duration(milliseconds: 200),
       ),
     ),
   );
