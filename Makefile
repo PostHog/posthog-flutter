@@ -1,6 +1,11 @@
-.PHONY: format
+.PHONY: formatKotlin formatSwift
 
 # brew install ktlint
 # TODO: add ktlint steps in CI
-format:
+formatKotlin:
 	ktlint --format
+
+# brew install swiftlint
+# TODO: add swiftlint steps in CI
+formatSwift:
+	swiftlint ios/Classes --fix

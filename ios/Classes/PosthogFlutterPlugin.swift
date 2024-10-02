@@ -39,22 +39,22 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             "debug": debug
         ])
     }
-    
+
     private static func setupPostHog(_ posthogConfig: [String: Any]) {
         let apiKey = posthogConfig["apiKey"] as? String ?? ""
         if apiKey.isEmpty {
             print("[PostHog] apiKey is missing!")
             return
         }
-        
+
         let host = posthogConfig["host"] as? String ?? PostHogConfig.defaultHost
-        
+
         let config = PostHogConfig(
             apiKey: apiKey,
             host: host
         )
         config.captureScreenViews = false
-        
+
         if let captureApplicationLifecycleEvents = posthogConfig["captureApplicationLifecycleEvents"] as? Bool {
             config.captureApplicationLifecycleEvents = captureApplicationLifecycleEvents
         }
@@ -106,11 +106,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 break
             }
         }
-        
+
         // Update SDK name and version
          postHogSdkName = "posthog-flutter"
          postHogVersion = postHogFlutterVersion
-        
+
         PostHogSDK.shared.setup(config)
     }
 
@@ -163,22 +163,20 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ) {
-        if let args = call.arguments as? [String: Any]
-        {
+        if let args = call.arguments as? [String: Any] {
             PosthogFlutterPlugin.setupPostHog(args)
             result(nil)
         } else {
             _badArgumentError(result)
         }
     }
-    
+
     private func getFeatureFlag(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String
-        {
+           let featureFlagKey = args["key"] as? String {
             let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
             result(value)
         } else {
@@ -191,8 +189,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String
-        {
+           let featureFlagKey = args["key"] as? String {
             let value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
             result(value)
         } else {
@@ -205,8 +202,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String
-        {
+           let featureFlagKey = args["key"] as? String {
             let value = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
             result(value)
         } else {
@@ -219,8 +215,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let userId = args["userId"] as? String
-        {
+           let userId = args["userId"] as? String {
             let userProperties = args["userProperties"] as? [String: Any]
             let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
 
@@ -240,8 +235,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let eventName = args["eventName"] as? String
-        {
+           let eventName = args["eventName"] as? String {
             let properties = args["properties"] as? [String: Any]
             PostHogSDK.shared.capture(
                 eventName,
@@ -258,8 +252,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let screenName = args["screenName"] as? String
-        {
+           let screenName = args["screenName"] as? String {
             let properties = args["properties"] as? [String: Any]
             PostHogSDK.shared.screen(
                 screenName,
@@ -276,8 +269,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let alias = args["alias"] as? String
-        {
+           let alias = args["alias"] as? String {
             PostHogSDK.shared.alias(alias)
             result(nil)
         } else {
@@ -310,8 +302,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let debug = args["debug"] as? Bool
-        {
+           let debug = args["debug"] as? Bool {
             PostHogSDK.shared.debug(debug)
             result(nil)
         } else {
@@ -331,8 +322,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     ) {
         if let args = call.arguments as? [String: Any],
            let groupType = args["groupType"] as? String,
-           let groupKey = args["groupKey"] as? String
-        {
+           let groupKey = args["groupKey"] as? String {
             let groupProperties = args["groupProperties"] as? [String: Any]
             PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties)
             result(nil)
@@ -347,8 +337,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     ) {
         if let args = call.arguments as? [String: Any],
            let key = args["key"] as? String,
-           let value = args["value"]
-        {
+           let value = args["value"] {
             PostHogSDK.shared.register([key: value])
             result(nil)
         } else {
@@ -361,20 +350,19 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let key = args["key"] as? String
-        {
+           let key = args["key"] as? String {
             PostHogSDK.shared.unregister(key)
             result(nil)
         } else {
             _badArgumentError(result)
         }
     }
-    
+
     private func flush(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.flush()
         result(nil)
     }
-    
+
     private func close(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.close()
         result(nil)
