@@ -7,10 +7,7 @@ import android.util.Log
 import com.posthog.PostHog
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
-import com.posthog.internal.replay.RRFullSnapshotEvent
-import com.posthog.internal.replay.RRStyle
-import com.posthog.internal.replay.RRWireframe
-import com.posthog.internal.replay.capture
+import com.posthog.internal.replay.*
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -19,7 +16,7 @@ import io.flutter.plugin.common.MethodChannel.Result
 import java.io.ByteArrayOutputStream
 
 /** PosthogFlutterPlugin */
-class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
+class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     /// The MethodChannel that will the communication between Flutter and native Android
     ///
     /// This local reference serves to register the plugin with the Flutter Engine and unregister it
@@ -110,7 +107,6 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
             "initNativeSdk" -> {
                 val configMap = call.arguments as? Map<String, Any>
-                println()
                 if (configMap != null) {
                     initPlugin(configMap)
                     result.success(null)
@@ -118,11 +114,12 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                     result.error("INVALID_ARGUMENT", "Config map is null or invalid", null)
                 }
             }
-
-            "sendReplayScreenshot" -> {
-                sendReplayScreenshot(call, result)
+            "sendFullSnapshot" -> {
+                sendFullSnapshot(call, result)
             }
-
+            "sendIncrementalSnapshot" -> {
+                sendIncrementalSnapshot(call, result)
+            }
             else -> {
                 result.notImplemented()
             }
@@ -167,15 +164,16 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     * This function sends a screenshot to PostHog.
     * It should be removed or refactored in the other version.
     */
-    private fun sendReplayScreenshot(call: MethodCall, result: Result) {
+    private fun sendFullSnapshot(call: MethodCall, result: MethodChannel.Result) {
         val imageBytes = call.argument<ByteArray>("imageBytes")
+        val id = call.argument<Int>("id") ?: 1
         if (imageBytes != null) {
             val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
 
             val base64String = bitmapToBase64(bitmap)
 
             val wireframe = RRWireframe(
-                id = System.identityHashCode(bitmap),
+                id = id,
                 x = 0,
                 y = 0,
                 width = bitmap.width,
@@ -192,14 +190,60 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 timestamp = System.currentTimeMillis()
             )
 
+            Log.d("Snapshot", "Sending Full Snapshot")
             listOf(snapshotEvent).capture()
-            if (base64String != null) {
-                Log.d("PostHog", base64String)
-            }
+            result.success(null)
         } else {
             result.error("INVALID_ARGUMENT", "Image bytes are null", null)
         }
     }
+
+    /*
+    * TEMPORARY FUNCTION FOR TESTING PURPOSES
+    * This function sends a screenshot to PostHog.
+    * It should be removed or refactored in the other version.
+    */
+    private fun sendIncrementalSnapshot(call: MethodCall, result: MethodChannel.Result) {
+        val imageBytes = call.argument<ByteArray>("imageBytes")
+        val id = call.argument<Int>("id") ?: 1
+        if (imageBytes != null) {
+            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+
+            val base64String = bitmapToBase64(bitmap)
+
+            val wireframe = RRWireframe(
+                id = id,
+                x = 0,
+                y = 0,
+                width = bitmap.width,
+                height = bitmap.height,
+                type = "screenshot",
+                base64 = base64String,
+                style = RRStyle()
+            )
+
+            val mutatedNode = RRMutatedNode(wireframe, parentId = null)
+            val updatedNodes = listOf(mutatedNode)
+
+            val incrementalMutationData = RRIncrementalMutationData(
+                adds = null,
+                removes = null,
+                updates = updatedNodes
+            )
+
+            val incrementalSnapshotEvent = RRIncrementalSnapshotEvent(
+                mutationData = incrementalMutationData,
+                timestamp = System.currentTimeMillis()
+            )
+
+            Log.d("Snapshot", "Sending Incremental Snapshot")
+            listOf(incrementalSnapshotEvent).capture()
+            result.success(null)
+        } else {
+            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+        }
+    }
+    ponte
 
     private fun bitmapToBase64(bitmap: Bitmap): String? {
         ByteArrayOutputStream().use { byteArrayOutputStream ->

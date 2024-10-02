@@ -16,6 +16,7 @@ class ElementData {
     children!.add(elementData);
   }
 
+  //TODO: THIS MAY BE BETTER
   List<Rect> extractRects([bool isRoot = true]) {
     List<Rect> rects = [];
 

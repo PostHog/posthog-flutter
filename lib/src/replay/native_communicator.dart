@@ -8,13 +8,25 @@ import 'package:flutter/services.dart';
 class NativeCommunicator {
   static const MethodChannel _channel = MethodChannel('posthog_flutter');
 
-  Future<void> sendImageAndRectsToNative(Uint8List imageBytes) async {
+  Future<void> sendFullSnapshot(Uint8List imageBytes, {required int id}) async {
     try {
-      await _channel.invokeMethod('sendReplayScreenshot', {
+      await _channel.invokeMethod('sendFullSnapshot', {
         'imageBytes': imageBytes,
+        'id': id,
       });
     } catch (e) {
-      print('Error sending image and rects to native: $e');
+      print('Error sending full snapshot to native: $e');
+    }
+  }
+
+  Future<void> sendIncrementalSnapshot(Uint8List imageBytes, {required int id}) async {
+    try {
+      await _channel.invokeMethod('sendIncrementalSnapshot', {
+        'imageBytes': imageBytes,
+        'id': id,
+      });
+    } catch (e) {
+      print('Error sending incremental snapshot to native: $e');
     }
   }
 }

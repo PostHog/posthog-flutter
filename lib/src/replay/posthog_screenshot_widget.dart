@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
@@ -25,6 +26,10 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
 
   Timer? _debounceTimer;
 
+  Uint8List? _lastImageBytes;
+  bool _sentFullSnapshot = false;
+  final int _wireframeId = 1;
+
   @override
   void initState() {
     super.initState();
@@ -40,15 +45,16 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     _changeDetector.start();
   }
 
+  // This works as onRootViewsChangedListeners
   void _onChangeDetected() {
     _debounceTimer?.cancel();
 
     _debounceTimer = Timer(_getDebounceDuration(), () {
-      _capture();
+      generateSnapshot();
     });
   }
 
-  Future<void> _capture() async {
+  Future<void> generateSnapshot() async {
     final ui.Image? image = await _screenshotCapturer.captureScreenshot();
     if (image == null) {
       print('Error: Failed to capture screenshot.');
@@ -64,7 +70,19 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     Uint8List pngBytes = byteData.buffer.asUint8List();
     image.dispose();
 
-    await _nativeCommunicator.sendImageAndRectsToNative(pngBytes);
+    if (!_sentFullSnapshot) {
+
+      await _nativeCommunicator.sendFullSnapshot(pngBytes, id: _wireframeId);
+      _lastImageBytes = pngBytes;
+      _sentFullSnapshot = true;
+    } else {
+      if (_lastImageBytes == null || !listEquals(_lastImageBytes, pngBytes)) {
+        await _nativeCommunicator.sendIncrementalSnapshot(pngBytes, id: _wireframeId);
+        _lastImageBytes = pngBytes;
+      } else {
+        // Images are the same, do nothing for while
+      }
+    }
   }
 
   Duration _getDebounceDuration() {
@@ -83,12 +101,13 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-        key: PostHogMaskController.instance.containerKey,
-        child: Column(
-          children: [
-            Expanded(child: Container(child: widget.child)),
-          ],
-        ));
+      key: PostHogMaskController.instance.containerKey,
+      child: Column(
+        children: [
+          Expanded(child: Container(child: widget.child)),
+        ],
+      ),
+    );
   }
 
   @override
