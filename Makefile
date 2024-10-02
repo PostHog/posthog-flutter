@@ -8,5 +8,5 @@ formatKotlin:
 # brew install swiftlint
 # TODO: add swiftlint steps in CI
 formatSwift:
-	swiftlint ios/Classes --fix
 	swiftformat ios/Classes --swiftversion 5.3
+	swiftlint ios/Classes --fix
