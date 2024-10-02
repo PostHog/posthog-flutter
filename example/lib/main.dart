@@ -2,7 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'package:posthog_flutter/posthog_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  // init WidgetsFlutterBinding if not yet
+  // WidgetsFlutterBinding.ensureInitialized();
+  // final config =
+  //     PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
+  // config.debug = true;
+  // config.captureApplicationLifecycleEvents = true;
+  // config.host = 'https://us.i.posthog.com';
+  // await Posthog().setup(config);
+
   runApp(const MyApp());
 }
 

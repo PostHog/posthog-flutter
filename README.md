@@ -114,6 +114,8 @@ And setup the SDK manually:
 
 ```dart
 Future<void> main() async {
+    // init WidgetsFlutterBinding if not yet
+    WidgetsFlutterBinding.ensureInitialized();
     final config = PostHogConfig('YOUR_API_KEY_GOES_HERE');
     config.debug = true;
     config.captureApplicationLifecycleEvents = true;
