@@ -20,36 +20,104 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     public static func initPlugin() {
-        // Initialise PostHog
-        let apiKey = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? ""
-
-        if apiKey.isEmpty {
-            print("[PostHog] com.posthog.posthog.API_KEY is missing!")
+        let autoInit = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.AUTO_INIT") as? Bool ?? true
+        if !autoInit {
+            print("[PostHog] com.posthog.posthog.AUTO_INIT is disabled!")
             return
         }
 
-        let host = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost
-        let postHogCaptureLifecyleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
-        let postHogDebug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
+        let apiKey = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? ""
 
+        let host = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost
+        let captureApplicationLifecycleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
+        let debug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
+
+        setupPostHog([
+            "apiKey": apiKey,
+            "host": host,
+            "captureApplicationLifecycleEvents": captureApplicationLifecycleEvents,
+            "debug": debug
+        ])
+    }
+    
+    private static func setupPostHog(_ posthogConfig: [String: Any]) {
+        let apiKey = posthogConfig["apiKey"] as? String ?? ""
+        if apiKey.isEmpty {
+            print("[PostHog] apiKey is missing!")
+            return
+        }
+        
+        let host = posthogConfig["host"] as? String ?? PostHogConfig.defaultHost
+        
         let config = PostHogConfig(
             apiKey: apiKey,
             host: host
         )
-        config.captureApplicationLifecycleEvents = postHogCaptureLifecyleEvents
-        config.debug = postHogDebug
         config.captureScreenViews = false
+        
+        if let captureApplicationLifecycleEvents = posthogConfig["captureApplicationLifecycleEvents"] as? Bool {
+            config.captureApplicationLifecycleEvents = captureApplicationLifecycleEvents
+        }
+        if let debug = posthogConfig["debug"] as? Bool {
+            config.debug = debug
+        }
+        if let flushAt = posthogConfig["flushAt"] as? Int {
+            config.flushAt = flushAt
+        }
+        if let maxQueueSize = posthogConfig["maxQueueSize"] as? Int {
+            config.maxQueueSize = maxQueueSize
+        }
+        if let maxBatchSize = posthogConfig["maxBatchSize"] as? Int {
+            config.maxBatchSize = maxBatchSize
+        }
+        if let flushInterval = posthogConfig["flushInterval"] as? Int {
+            config.flushIntervalSeconds = Double(flushInterval)
+        }
+        if let sendFeatureFlagEvents = posthogConfig["sendFeatureFlagEvents"] as? Bool {
+            config.sendFeatureFlagEvent = sendFeatureFlagEvents
+        }
+        if let preloadFeatureFlags = posthogConfig["preloadFeatureFlags"] as? Bool {
+            config.preloadFeatureFlags = preloadFeatureFlags
+        }
+        if let optOut = posthogConfig["optOut"] as? Bool {
+            config.optOut = optOut
+        }
+        if let personProfiles = posthogConfig["personProfiles"] as? String {
+            switch personProfiles {
+            case "never":
+                config.personProfiles = .never
+            case "always":
+                config.personProfiles = .always
+            case "identifiedOnly":
+                config.personProfiles = .identifiedOnly
+            default:
+                break
+            }
+        }
+        if let dataMode = posthogConfig["dataMode"] as? String {
+            switch dataMode {
+            case "wifi":
+                config.dataMode = .wifi
+            case "cellular":
+                config.dataMode = .cellular
+            case "any":
+                config.dataMode = .any
+            default:
+                break
+            }
+        }
         
         // Update SDK name and version
          postHogSdkName = "posthog-flutter"
          postHogVersion = postHogFlutterVersion
         
         PostHogSDK.shared.setup(config)
-        //
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "setup":
+            setup(call, result: result)
         case "getFeatureFlag":
             getFeatureFlag(call, result: result)
         case "isFeatureEnabled":
@@ -84,11 +152,26 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             unregister(call, result: result)
         case "flush":
             flush(result)
+        case "close":
+            close(result)
         default:
             result(FlutterMethodNotImplemented)
         }
     }
 
+    private func setup(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any]
+        {
+            PosthogFlutterPlugin.setupPostHog(args)
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+    
     private func getFeatureFlag(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
@@ -289,6 +372,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     
     private func flush(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.flush()
+        result(nil)
+    }
+    
+    private func close(_ result: @escaping FlutterResult) {
+        PostHogSDK.shared.close()
         result(nil)
     }
 

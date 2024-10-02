@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 Future<void> main() async {
-  // init WidgetsFlutterBinding if not yet
+  // // init WidgetsFlutterBinding if not yet
   // WidgetsFlutterBinding.ensureInitialized();
   // final config =
   //     PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');

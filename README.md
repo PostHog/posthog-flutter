@@ -128,6 +128,8 @@ Future<void> main() async {
 
 ### iOS/macOS
 
+Automatically:
+
 ```xml file=Info.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -146,6 +148,37 @@ Future<void> main() async {
 	[...]
 </dict>
 </plist>
+```
+
+Or manually, disable the auto init:
+
+```xml file=Info.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	[...]
+	<key>com.posthog.posthog.AUTO_INIT</key>
+	<false/>
+	[...]
+</dict>
+</plist>
+```
+
+And setup the SDK manually:
+
+```dart
+Future<void> main() async {
+    // init WidgetsFlutterBinding if not yet
+    WidgetsFlutterBinding.ensureInitialized();
+    final config = PostHogConfig('YOUR_API_KEY_GOES_HERE');
+    config.debug = true;
+    config.captureApplicationLifecycleEvents = true;
+    // or EU Host: 'https://eu.i.posthog.com'
+    config.host = 'https://us.i.posthog.com';
+    await Posthog().setup(config);
+    runApp(MyApp());
+}
 ```
 
 ### Web
