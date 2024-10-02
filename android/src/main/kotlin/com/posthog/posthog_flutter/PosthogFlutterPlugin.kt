@@ -1,8 +1,12 @@
 package com.posthog.posthog_flutter
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
 import android.util.Log
+import com.posthog.PersonProfiles
 import com.posthog.PostHog
 import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
@@ -13,6 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 
+
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     /// The MethodChannel that will the communication between Flutter and native Android
@@ -21,20 +26,47 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
     /// when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
 
+    private lateinit var applicationContext: Context
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
 
-        initPlugin(flutterPluginBinding.applicationContext)
+        this.applicationContext = flutterPluginBinding.applicationContext
+        initPlugin()
 
         channel.setMethodCallHandler(this)
     }
 
-    private fun initPlugin(applicationContext: Context) {
+    // TODO: expose on the android SDK instead
+    @Throws(PackageManager.NameNotFoundException::class)
+    private fun getApplicationInfo(
+        context: Context,
+    ): ApplicationInfo {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context
+                .packageManager
+                .getApplicationInfo(
+                    context.packageName, PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong())
+                )
+        } else {
+            context
+                .packageManager
+                .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+        }
+    }
+
+    private fun initPlugin() {
         try {
-            // TODO: replace deprecated method API 33
-            val ai = applicationContext.packageManager.getApplicationInfo(applicationContext.packageName, PackageManager.GET_META_DATA)
-            val bundle = ai.metaData
-            val apiKey = bundle.getString("com.posthog.posthog.API_KEY", null)
+            val ai = getApplicationInfo(applicationContext)
+            val bundle = ai.metaData ?: Bundle()
+            val autoInit = bundle.getBoolean("com.posthog.posthog.AUTO_INIT", true)
+
+            if (!autoInit) {
+                Log.i("PostHog", "com.posthog.posthog.AUTO_INIT is disabled!")
+                return
+            }
+
+            val apiKey = bundle.getString("com.posthog.posthog.API_KEY")
 
             if (apiKey.isNullOrEmpty()) {
                 Log.e("PostHog", "com.posthog.posthog.API_KEY is missing!")
@@ -42,29 +74,26 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             }
 
             val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
-            val trackApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
-            val enableDebug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
+            val captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
+            val debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
-            // Init PostHog
-            val config = PostHogAndroidConfig(apiKey, host).apply {
-                captureScreenViews = false
-                captureDeepLinks = false
-                captureApplicationLifecycleEvents = trackApplicationLifecycleEvents
-                debug = enableDebug
-                sdkName = "posthog-flutter"
-                sdkVersion = postHogVersion
-            }
-            PostHogAndroid.setup(applicationContext, config)
+            val posthogConfig = mutableMapOf<String, Any>()
+            posthogConfig["apiKey"] = apiKey
+            posthogConfig["host"] = host
+            posthogConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
+            posthogConfig["debug"] = debug
 
+            setupPostHog(posthogConfig)
         } catch (e: Throwable) {
-            e.localizedMessage?.let { Log.e("PostHog", "initPlugin error: $it") }
+            Log.e("PostHog", "initPlugin error: $e")
         }
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
-
         when (call.method) {
-
+            "setup" -> {
+                setup(call, result)
+            }
             "identify" -> {
                 identify(call, result)
             }
@@ -129,11 +158,82 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             "flush" -> {
                 flush(result)
             }
+            "close" -> {
+                close(result)
+            }
             else -> {
                 result.notImplemented()
             }
         }
 
+    }
+
+    private fun setup(call: MethodCall, result: Result) {
+        try {
+            val args = call.arguments() as Map<String, Any>? ?: mapOf<String, Any>()
+            if (args.isEmpty()) {
+                result.error("PosthogFlutterException", "Arguments is null or empty", null)
+                return
+            }
+
+            setupPostHog(args)
+
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun setupPostHog(posthogConfig: Map<String, Any>) {
+        val apiKey = posthogConfig["apiKey"] as String?
+        if (apiKey.isNullOrEmpty()) {
+            Log.e("PostHog", "apiKey is missing!")
+            return
+        }
+
+        val host = posthogConfig["host"] as String? ?: PostHogConfig.DEFAULT_HOST
+
+        val config = PostHogAndroidConfig(apiKey, host).apply {
+            captureScreenViews = false
+            captureDeepLinks = false
+            posthogConfig.getIfNotNull<Boolean>("captureApplicationLifecycleEvents") {
+                captureApplicationLifecycleEvents = it
+            }
+            posthogConfig.getIfNotNull<Boolean>("debug") {
+                debug = it
+            }
+            posthogConfig.getIfNotNull<Int>("flushAt") {
+                flushAt = it
+            }
+            posthogConfig.getIfNotNull<Int>("maxQueueSize") {
+                maxQueueSize = it
+            }
+            posthogConfig.getIfNotNull<Int>("maxBatchSize") {
+                maxBatchSize = it
+            }
+            posthogConfig.getIfNotNull<Int>("flushInterval") {
+                flushIntervalSeconds = it
+            }
+            posthogConfig.getIfNotNull<Boolean>("sendFeatureFlagEvents") {
+                sendFeatureFlagEvent = it
+            }
+            posthogConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
+                preloadFeatureFlags = it
+            }
+            posthogConfig.getIfNotNull<Boolean>("optOut") {
+                optOut = it
+            }
+            posthogConfig.getIfNotNull<String>("personProfiles") {
+                when (it) {
+                    "never" -> personProfiles = PersonProfiles.NEVER
+                    "always" -> personProfiles = PersonProfiles.ALWAYS
+                    "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
+                }
+            }
+            sdkName = "posthog-flutter"
+            sdkVersion = postHogVersion
+        }
+        PostHogAndroid.setup(applicationContext, config)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -308,6 +408,26 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun close(result: Result) {
+        try {
+            PostHog.close()
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    // Call the `completion` closure if cast to map value with `key` and type `T` is successful.
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> Map<String, Any>.getIfNotNull(
+        key: String,
+        callback: (T) -> Unit,
+    ) {
+        (get(key) as? T)?.let {
+            callback(it)
         }
     }
 }

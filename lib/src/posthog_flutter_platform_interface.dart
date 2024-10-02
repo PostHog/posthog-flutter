@@ -1,5 +1,6 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
 abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
@@ -21,6 +22,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   static set instance(PosthogFlutterPlatformInterface instance) {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
+  }
+
+  Future<void> setup(PostHogConfig config) {
+    throw UnimplementedError('setup() has not been implemented.');
   }
 
   Future<void> identify(
@@ -111,5 +116,9 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('flush() has not been implemented.');
   }
 
-  // TODO: missing capture with more parameters, close
+  Future<void> close() {
+    throw UnimplementedError('close() has not been implemented.');
+  }
+
+  // TODO: missing capture with more parameters
 }

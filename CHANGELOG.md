@@ -1,6 +1,7 @@
 ## Next
 
 - chore: change host to new address ([#106](https://github.com/PostHog/posthog-flutter/pull/106))
+- chore: allow manual initialization of the SDK ([#106](https://github.com/PostHog/posthog-flutter/pull/106))
 
 ## 4.5.0
 
