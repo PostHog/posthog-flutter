@@ -8,6 +8,11 @@ class AndroidInitializer implements PlatformInitializer {
 
   @override
   Future<void> init(String apiKey, PostHogOptions options) async {
+
+    if (options.enableSessionReplay){
+      setDefaultDebouncerDelay(options);
+    }
+
     final Map<String, dynamic> configMap = {
       'apiKey': apiKey,
       'options': options.toMap(),
@@ -18,5 +23,9 @@ class AndroidInitializer implements PlatformInitializer {
     } on PlatformException catch (e) {
       print('Failed to initialize PostHog on Android: ${e.message}');
     }
+  }
+
+  void setDefaultDebouncerDelay(PostHogOptions options){
+    options.sessionReplayConfig?.androidDebouncerDelay ??= const Duration(milliseconds: 200);
   }
 }

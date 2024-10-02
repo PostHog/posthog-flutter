@@ -90,9 +90,9 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     final sessionReplayConfig = options.sessionReplayConfig;
 
     if (Theme.of(context).platform == TargetPlatform.android) {
-      return sessionReplayConfig?.androidDebouncerDelay ?? const Duration(milliseconds: 100);
+      return sessionReplayConfig?.androidDebouncerDelay ?? const Duration(milliseconds: 200);
     } else if (Theme.of(context).platform == TargetPlatform.iOS) {
-      return sessionReplayConfig?.iOSDebouncerDelay ?? const Duration(seconds: 1);
+      return sessionReplayConfig?.iOSDebouncerDelay ?? const Duration(milliseconds: 200);
     } else {
       return const Duration(milliseconds: 500);
     }
