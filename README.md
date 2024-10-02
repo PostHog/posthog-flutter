@@ -12,6 +12,7 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 
 | Method                    | Android | iOS/macOS | Web |
 | ------------------------- | ------- | --------- | --- |
+| `setup`                   | X       | X         |     |
 | `identify`                | X       | X         | X   |
 | `capture`                 | X       | X         | X   |
 | `screen`                  | X       | X         | X   |
@@ -29,6 +30,7 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 | `getFeatureFlag`          | X       | X         | X   |
 | `getFeatureFlagPayload`   | X       | X         | X   |
 | `group`                   | X       | X         | X   |
+| `close`                   | X       | X         |     |
 
 ### Example
 
