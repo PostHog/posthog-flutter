@@ -2,8 +2,8 @@ package com.posthog.posthog_flutter
 
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import kotlin.test.Test
 import org.mockito.Mockito
+import kotlin.test.Test
 
 /*
  * This demonstrates a simple unit test of the Kotlin portion of this plugin's implementation.
@@ -14,12 +14,11 @@ import org.mockito.Mockito
  */
 
 internal class PosthogFlutterPluginTest {
-
     @Test
     fun onMethodCall_identify_returnsExpectedValue() {
         val plugin = PosthogFlutterPlugin()
 
-        var arguments = mapOf("userId" to "abc");
+        var arguments = mapOf("userId" to "abc")
 
         val call = MethodCall("identify", arguments)
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
@@ -32,7 +31,7 @@ internal class PosthogFlutterPluginTest {
     fun onMethodCall_alias_returnsExpectedValue() {
         val plugin = PosthogFlutterPlugin()
 
-        var arguments = mapOf("alias" to "abc");
+        var arguments = mapOf("alias" to "abc")
 
         val call = MethodCall("alias", arguments)
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)

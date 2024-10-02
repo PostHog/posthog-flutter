@@ -17,13 +17,14 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 
-
 /** PosthogFlutterPlugin */
-class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
-    /// The MethodChannel that will the communication between Flutter and native Android
-    ///
-    /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-    /// when the Flutter Engine is detached from the Activity
+class PosthogFlutterPlugin :
+    FlutterPlugin,
+    MethodCallHandler {
+    // / The MethodChannel that will the communication between Flutter and native Android
+    // /
+    // / This local reference serves to register the plugin with the Flutter Engine and unregister it
+    // / when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
 
     private lateinit var applicationContext: Context
@@ -39,21 +40,19 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
     // TODO: expose on the android SDK instead
     @Throws(PackageManager.NameNotFoundException::class)
-    private fun getApplicationInfo(
-        context: Context,
-    ): ApplicationInfo {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    private fun getApplicationInfo(context: Context): ApplicationInfo =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context
                 .packageManager
                 .getApplicationInfo(
-                    context.packageName, PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong())
+                    context.packageName,
+                    PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
                 )
         } else {
             context
                 .packageManager
                 .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
         }
-    }
 
     private fun initPlugin() {
         try {
@@ -89,7 +88,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    override fun onMethodCall(call: MethodCall, result: Result) {
+    override fun onMethodCall(
+        call: MethodCall,
+        result: Result,
+    ) {
         when (call.method) {
             "setup" -> {
                 setup(call, result)
@@ -165,10 +167,12 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
                 result.notImplemented()
             }
         }
-
     }
 
-    private fun setup(call: MethodCall, result: Result) {
+    private fun setup(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val args = call.arguments() as Map<String, Any>? ?: mapOf<String, Any>()
             if (args.isEmpty()) {
@@ -193,46 +197,47 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
 
         val host = posthogConfig["host"] as String? ?: PostHogConfig.DEFAULT_HOST
 
-        val config = PostHogAndroidConfig(apiKey, host).apply {
-            captureScreenViews = false
-            captureDeepLinks = false
-            posthogConfig.getIfNotNull<Boolean>("captureApplicationLifecycleEvents") {
-                captureApplicationLifecycleEvents = it
-            }
-            posthogConfig.getIfNotNull<Boolean>("debug") {
-                debug = it
-            }
-            posthogConfig.getIfNotNull<Int>("flushAt") {
-                flushAt = it
-            }
-            posthogConfig.getIfNotNull<Int>("maxQueueSize") {
-                maxQueueSize = it
-            }
-            posthogConfig.getIfNotNull<Int>("maxBatchSize") {
-                maxBatchSize = it
-            }
-            posthogConfig.getIfNotNull<Int>("flushInterval") {
-                flushIntervalSeconds = it
-            }
-            posthogConfig.getIfNotNull<Boolean>("sendFeatureFlagEvents") {
-                sendFeatureFlagEvent = it
-            }
-            posthogConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
-                preloadFeatureFlags = it
-            }
-            posthogConfig.getIfNotNull<Boolean>("optOut") {
-                optOut = it
-            }
-            posthogConfig.getIfNotNull<String>("personProfiles") {
-                when (it) {
-                    "never" -> personProfiles = PersonProfiles.NEVER
-                    "always" -> personProfiles = PersonProfiles.ALWAYS
-                    "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
+        val config =
+            PostHogAndroidConfig(apiKey, host).apply {
+                captureScreenViews = false
+                captureDeepLinks = false
+                posthogConfig.getIfNotNull<Boolean>("captureApplicationLifecycleEvents") {
+                    captureApplicationLifecycleEvents = it
                 }
+                posthogConfig.getIfNotNull<Boolean>("debug") {
+                    debug = it
+                }
+                posthogConfig.getIfNotNull<Int>("flushAt") {
+                    flushAt = it
+                }
+                posthogConfig.getIfNotNull<Int>("maxQueueSize") {
+                    maxQueueSize = it
+                }
+                posthogConfig.getIfNotNull<Int>("maxBatchSize") {
+                    maxBatchSize = it
+                }
+                posthogConfig.getIfNotNull<Int>("flushInterval") {
+                    flushIntervalSeconds = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("sendFeatureFlagEvents") {
+                    sendFeatureFlagEvent = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
+                    preloadFeatureFlags = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("optOut") {
+                    optOut = it
+                }
+                posthogConfig.getIfNotNull<String>("personProfiles") {
+                    when (it) {
+                        "never" -> personProfiles = PersonProfiles.NEVER
+                        "always" -> personProfiles = PersonProfiles.ALWAYS
+                        "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
+                    }
+                }
+                sdkName = "posthog-flutter"
+                sdkVersion = postHogVersion
             }
-            sdkName = "posthog-flutter"
-            sdkVersion = postHogVersion
-        }
         PostHogAndroid.setup(applicationContext, config)
     }
 
@@ -240,7 +245,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         channel.setMethodCallHandler(null)
     }
 
-    private fun getFeatureFlag(call: MethodCall, result: Result) {
+    private fun getFeatureFlag(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val featureFlagKey: String = call.argument("key")!!
             val flag = PostHog.getFeatureFlag(featureFlagKey)
@@ -250,7 +258,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun getFeatureFlagPayload(call: MethodCall, result: Result) {
+    private fun getFeatureFlagPayload(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val featureFlagKey: String = call.argument("key")!!
             val flag = PostHog.getFeatureFlagPayload(featureFlagKey)
@@ -260,7 +271,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun identify(call: MethodCall, result: Result) {
+    private fun identify(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val userId: String = call.argument("userId")!!
             val userProperties: Map<String, Any>? = call.argument("userProperties")
@@ -272,7 +286,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun capture(call: MethodCall, result: Result) {
+    private fun capture(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val eventName: String = call.argument("eventName")!!
             val properties: Map<String, Any>? = call.argument("properties")
@@ -283,7 +300,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun screen(call: MethodCall, result: Result) {
+    private fun screen(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val screenName: String = call.argument("screenName")!!
             val properties: Map<String, Any>? = call.argument("properties")
@@ -294,7 +314,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun alias(call: MethodCall, result: Result) {
+    private fun alias(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val alias: String = call.argument("alias")!!
             PostHog.alias(alias)
@@ -331,7 +354,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun debug(call: MethodCall, result: Result) {
+    private fun debug(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val debug: Boolean = call.argument("debug")!!
             PostHog.debug(debug)
@@ -350,7 +376,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun isFeatureEnabled(call: MethodCall, result: Result) {
+    private fun isFeatureEnabled(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val key: String = call.argument("key")!!
             val isEnabled = PostHog.isFeatureEnabled(key)
@@ -369,7 +398,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun group(call: MethodCall, result: Result) {
+    private fun group(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val groupType: String = call.argument("groupType")!!
             val groupKey: String = call.argument("groupKey")!!
@@ -381,7 +413,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun register(call: MethodCall, result: Result) {
+    private fun register(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val key: String = call.argument("key")!!
             val value: Any = call.argument("value")!!
@@ -392,7 +427,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun unregister(call: MethodCall, result: Result) {
+    private fun unregister(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val key: String = call.argument("key")!!
             PostHog.unregister(key)
