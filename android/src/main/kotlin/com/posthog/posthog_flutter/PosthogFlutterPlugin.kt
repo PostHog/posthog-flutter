@@ -243,7 +243,6 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             result.error("INVALID_ARGUMENT", "Image bytes are null", null)
         }
     }
-    ponte
 
     private fun bitmapToBase64(bitmap: Bitmap): String? {
         ByteArrayOutputStream().use { byteArrayOutputStream ->
