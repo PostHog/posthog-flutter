@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_observer.dart';
