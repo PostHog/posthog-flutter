@@ -2,7 +2,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 class ImageMaskPainter {
-  /// Draw the image and apply the black mask over the rects.
   Future<ui.Image> drawMaskedImage(ui.Image image, List<Rect> rects, double pixelRatio) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);

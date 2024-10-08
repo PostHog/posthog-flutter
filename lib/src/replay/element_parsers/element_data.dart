@@ -24,20 +24,21 @@ class ElementData {
       rects.add(rect);
     }
 
-    for (var child in children!) {
-      if (child.children == null) {
-        rects.add(child.rect);
-        continue;
-      }
-      if (child.children!.length > 1) {
-        for (var grandChild in child.children!) {
-          rects.add(grandChild.rect);
+    if (children != null) {
+      for (var child in children!) {
+        if (child.children == null) {
+          rects.add(child.rect);
+          continue;
         }
-      } else {
-        rects.add(child.rect);
+        if (child.children!.length > 1) {
+          for (var grandChild in child.children!) {
+            rects.add(grandChild.rect);
+          }
+        } else {
+          rects.add(child.rect);
+        }
       }
     }
-
     return rects;
   }
 }

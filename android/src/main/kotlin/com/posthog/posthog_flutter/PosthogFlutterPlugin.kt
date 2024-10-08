@@ -1,13 +1,25 @@
 package com.posthog.posthog_flutter
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
+import android.os.Bundle
 import android.util.Log
+import com.posthog.PersonProfiles
 import com.posthog.PostHog
+import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
-import com.posthog.internal.replay.*
+import com.posthog.internal.replay.RRFullSnapshotEvent
+import com.posthog.internal.replay.RRIncrementalMutationData
+import com.posthog.internal.replay.RRIncrementalSnapshotEvent
+import com.posthog.internal.replay.RRMutatedNode
+import com.posthog.internal.replay.RRStyle
+import com.posthog.internal.replay.RRWireframe
+import com.posthog.internal.replay.capture
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -16,27 +28,87 @@ import io.flutter.plugin.common.MethodChannel.Result
 import java.io.ByteArrayOutputStream
 
 /** PosthogFlutterPlugin */
-class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
-    /// The MethodChannel that will the communication between Flutter and native Android
-    ///
-    /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-    /// when the Flutter Engine is detached from the Activity
+class PosthogFlutterPlugin :
+    FlutterPlugin,
+    MethodCallHandler {
+    // / The MethodChannel that will be the communication between Flutter and native Android
+    // /
+    // / This local reference serves to register the plugin with the Flutter Engine and unregister it
+    // / when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
 
-    private lateinit var context: Context
+    private lateinit var applicationContext: Context
+
+    private val snapshotSender = SnapshotSender()
+
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
 
-        context = flutterPluginBinding.applicationContext
+        this.applicationContext = flutterPluginBinding.applicationContext
+        initPlugin()
 
         channel.setMethodCallHandler(this)
     }
 
-    override fun onMethodCall(call: MethodCall, result: Result) {
+    // TODO: expose on the android SDK instead
+    @Throws(PackageManager.NameNotFoundException::class)
+    private fun getApplicationInfo(context: Context): ApplicationInfo =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context
+                .packageManager
+                .getApplicationInfo(
+                    context.packageName,
+                    PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
+                )
+        } else {
+            context
+                .packageManager
+                .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+        }
 
+    private fun initPlugin() {
+        try {
+            val ai = getApplicationInfo(applicationContext)
+            val bundle = ai.metaData ?: Bundle()
+            val autoInit = bundle.getBoolean("com.posthog.posthog.AUTO_INIT", true)
+
+            if (!autoInit) {
+                Log.i("PostHog", "com.posthog.posthog.AUTO_INIT is disabled!")
+                return
+            }
+
+            val apiKey = bundle.getString("com.posthog.posthog.API_KEY")
+
+            if (apiKey.isNullOrEmpty()) {
+                Log.e("PostHog", "com.posthog.posthog.API_KEY is missing!")
+                return
+            }
+
+            val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
+            val captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
+            val debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
+
+            val posthogConfig = mutableMapOf<String, Any>()
+            posthogConfig["apiKey"] = apiKey
+            posthogConfig["host"] = host
+            posthogConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
+            posthogConfig["debug"] = debug
+
+            setupPostHog(posthogConfig)
+        } catch (e: Throwable) {
+            Log.e("PostHog", "initPlugin error: $e")
+        }
+    }
+
+    override fun onMethodCall(
+        call: MethodCall,
+        result: Result,
+    ) {
         when (call.method) {
-
+            "setup" -> {
+                setup(call, result)
+            }
             "identify" -> {
                 identify(call, result)
             }
@@ -92,175 +164,143 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "register" -> {
                 register(call, result)
             }
-
             "unregister" -> {
                 unregister(call, result)
             }
-
             "debug" -> {
                 debug(call, result)
             }
-
             "flush" -> {
                 flush(result)
             }
-
-            "initNativeSdk" -> {
-                val configMap = call.arguments as? Map<String, Any>
-                if (configMap != null) {
-                    initPlugin(configMap)
-                    result.success(null)
-                } else {
-                    result.error("INVALID_ARGUMENT", "Config map is null or invalid", null)
-                }
+            "close" -> {
+                close(result)
             }
             "sendFullSnapshot" -> {
-                sendFullSnapshot(call, result)
+                handleSendFullSnapshot(call, result)
             }
             "sendIncrementalSnapshot" -> {
-                sendIncrementalSnapshot(call, result)
+                handleSendIncrementalSnapshot(call, result)
             }
             else -> {
                 result.notImplemented()
             }
         }
-
     }
 
-    private fun initPlugin(configMap: Map<String, Any>) {
-        val apiKey = configMap["apiKey"] as? String ?: ""
-        val options = configMap["options"] as? Map<String, Any> ?: emptyMap()
+    private fun setup(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val args = call.arguments() as Map<String, Any>? ?: mapOf<String, Any>()
+            if (args.isEmpty()) {
+                result.error("PosthogFlutterException", "Arguments is null or empty", null)
+                return
+            }
 
-        val captureNativeAppLifecycleEvents =
-            options["captureNativeAppLifecycleEvents"] as? Boolean ?: false
-        val enableSessionReplay = options["enableSessionReplay"] as? Boolean ?: false
-        val sessionReplayConfigMap =
-            options["sessionReplayConfig"] as? Map<String, Any> ?: emptyMap()
+            setupPostHog(args)
 
-        val maskAllTextInputs = sessionReplayConfigMap["maskAllTextInputs"] as? Boolean ?: true
-        val maskAllImages = sessionReplayConfigMap["maskAllImages"] as? Boolean ?: true
-        val captureLog = sessionReplayConfigMap["captureLog"] as? Boolean ?: true
-        val debouncerDelayMs =
-            (sessionReplayConfigMap["androidDebouncerDelayMs"] as? Int ?: 500).toLong()
-
-        val config = PostHogAndroidConfig(apiKey).apply {
-            debug = false
-            captureDeepLinks = false
-            captureApplicationLifecycleEvents = captureNativeAppLifecycleEvents
-            captureScreenViews = false
-            sessionReplay = enableSessionReplay
-            sessionReplayConfig.screenshot = true
-            sessionReplayConfig.captureLogcat = captureLog
-            sessionReplayConfig.debouncerDelayMs = debouncerDelayMs
-            sessionReplayConfig.maskAllImages = maskAllImages
-            sessionReplayConfig.maskAllTextInputs = maskAllTextInputs
-        }
-
-        PostHogAndroid.setup(context, config)
-    }
-
-    /*
-    * TEMPORARY FUNCTION FOR TESTING PURPOSES
-    * This function sends a screenshot to PostHog.
-    * It should be removed or refactored in the other version.
-    */
-    private fun sendFullSnapshot(call: MethodCall, result: MethodChannel.Result) {
-        val imageBytes = call.argument<ByteArray>("imageBytes")
-        val id = call.argument<Int>("id") ?: 1
-        if (imageBytes != null) {
-            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-
-            val base64String = bitmapToBase64(bitmap)
-
-            val wireframe = RRWireframe(
-                id = id,
-                x = 0,
-                y = 0,
-                width = bitmap.width,
-                height = bitmap.height,
-                type = "screenshot",
-                base64 = base64String,
-                style = RRStyle()
-            )
-
-            val snapshotEvent = RRFullSnapshotEvent(
-                listOf(wireframe),
-                initialOffsetTop = 0,
-                initialOffsetLeft = 0,
-                timestamp = System.currentTimeMillis()
-            )
-
-            Log.d("Snapshot", "Sending Full Snapshot")
-            listOf(snapshotEvent).capture()
             result.success(null)
-        } else {
-            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 
-    /*
-    * TEMPORARY FUNCTION FOR TESTING PURPOSES
-    * This function sends a screenshot to PostHog.
-    * It should be removed or refactored in the other version.
-    */
-    private fun sendIncrementalSnapshot(call: MethodCall, result: MethodChannel.Result) {
-        val imageBytes = call.argument<ByteArray>("imageBytes")
-        val id = call.argument<Int>("id") ?: 1
-        if (imageBytes != null) {
-            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-
-            val base64String = bitmapToBase64(bitmap)
-
-            val wireframe = RRWireframe(
-                id = id,
-                x = 0,
-                y = 0,
-                width = bitmap.width,
-                height = bitmap.height,
-                type = "screenshot",
-                base64 = base64String,
-                style = RRStyle()
-            )
-
-            val mutatedNode = RRMutatedNode(wireframe, parentId = null)
-            val updatedNodes = listOf(mutatedNode)
-
-            val incrementalMutationData = RRIncrementalMutationData(
-                adds = null,
-                removes = null,
-                updates = updatedNodes
-            )
-
-            val incrementalSnapshotEvent = RRIncrementalSnapshotEvent(
-                mutationData = incrementalMutationData,
-                timestamp = System.currentTimeMillis()
-            )
-
-            Log.d("Snapshot", "Sending Incremental Snapshot")
-            listOf(incrementalSnapshotEvent).capture()
-            result.success(null)
-        } else {
-            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+    private fun setupPostHog(posthogConfig: Map<String, Any>) {
+        val apiKey = posthogConfig["apiKey"] as String?
+        if (apiKey.isNullOrEmpty()) {
+            Log.e("PostHog", "apiKey is missing!")
+            return
         }
-    }
 
-    private fun bitmapToBase64(bitmap: Bitmap): String? {
-        ByteArrayOutputStream().use { byteArrayOutputStream ->
-            bitmap.compress(
-                Bitmap.CompressFormat.JPEG,
-                30,
-                byteArrayOutputStream
-            )
-            val byteArray = byteArrayOutputStream.toByteArray()
-            return android.util.Base64.encodeToString(byteArray, android.util.Base64.NO_WRAP)
-        }
+        val host = posthogConfig["host"] as String? ?: PostHogConfig.DEFAULT_HOST
+
+        val config =
+            PostHogAndroidConfig(apiKey, host).apply {
+                captureScreenViews = false
+                captureDeepLinks = false
+                posthogConfig.getIfNotNull<Boolean>("captureApplicationLifecycleEvents") {
+                    captureApplicationLifecycleEvents = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("debug") {
+                    debug = it
+                }
+                posthogConfig.getIfNotNull<Int>("flushAt") {
+                    flushAt = it
+                }
+                posthogConfig.getIfNotNull<Int>("maxQueueSize") {
+                    maxQueueSize = it
+                }
+                posthogConfig.getIfNotNull<Int>("maxBatchSize") {
+                    maxBatchSize = it
+                }
+                posthogConfig.getIfNotNull<Int>("flushInterval") {
+                    flushIntervalSeconds = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("sendFeatureFlagEvents") {
+                    sendFeatureFlagEvent = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
+                    preloadFeatureFlags = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("optOut") {
+                    optOut = it
+                }
+                posthogConfig.getIfNotNull<String>("personProfiles") {
+                    when (it) {
+                        "never" -> personProfiles = PersonProfiles.NEVER
+                        "always" -> personProfiles = PersonProfiles.ALWAYS
+                        "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
+                    }
+                }
+                posthogConfig.getIfNotNull<Boolean>("enableSessionReplay") {
+                    sessionReplay = it
+                }
+
+                posthogConfig.getIfNotNull<Map<String, Any>>("sessionReplayConfig") { sessionReplayConfig ->
+                    sessionReplayConfig.getIfNotNull<Long>("androidDebouncerDelayMs") {
+                        this.sessionReplayConfig.debouncerDelayMs = it
+                    }
+                }
+
+                sdkName = "posthog-flutter"
+                sdkVersion = postHogVersion
+
+            }
+        PostHogAndroid.setup(applicationContext, config)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
     }
 
-    private fun getFeatureFlag(call: MethodCall, result: Result) {
+    private fun handleSendFullSnapshot(call: MethodCall, result: Result) {
+        val imageBytes = call.argument<ByteArray>("imageBytes")
+        val id = call.argument<Int>("id") ?: 1
+        if (imageBytes != null) {
+            snapshotSender.sendFullSnapshot(imageBytes, id)
+            result.success(null)
+        } else {
+            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+        }
+    }
+
+    private fun handleSendIncrementalSnapshot(call: MethodCall, result: Result) {
+        val imageBytes = call.argument<ByteArray>("imageBytes")
+        val id = call.argument<Int>("id") ?: 1
+        if (imageBytes != null) {
+            snapshotSender.sendIncrementalSnapshot(imageBytes, id)
+            result.success(null)
+        } else {
+            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+        }
+    }
+
+    private fun getFeatureFlag(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val featureFlagKey: String = call.argument("key")!!
             val flag = PostHog.getFeatureFlag(featureFlagKey)
@@ -270,7 +310,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun getFeatureFlagPayload(call: MethodCall, result: Result) {
+    private fun getFeatureFlagPayload(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val featureFlagKey: String = call.argument("key")!!
             val flag = PostHog.getFeatureFlagPayload(featureFlagKey)
@@ -280,7 +323,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun identify(call: MethodCall, result: Result) {
+    private fun identify(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val userId: String = call.argument("userId")!!
             val userProperties: Map<String, Any>? = call.argument("userProperties")
@@ -292,7 +338,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun capture(call: MethodCall, result: Result) {
+    private fun capture(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val eventName: String = call.argument("eventName")!!
             val properties: Map<String, Any>? = call.argument("properties")
@@ -303,7 +352,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun screen(call: MethodCall, result: Result) {
+    private fun screen(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val screenName: String = call.argument("screenName")!!
             val properties: Map<String, Any>? = call.argument("properties")
@@ -314,7 +366,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun alias(call: MethodCall, result: Result) {
+    private fun alias(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val alias: String = call.argument("alias")!!
             PostHog.alias(alias)
@@ -351,7 +406,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun debug(call: MethodCall, result: Result) {
+    private fun debug(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val debug: Boolean = call.argument("debug")!!
             PostHog.debug(debug)
@@ -370,7 +428,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun isFeatureEnabled(call: MethodCall, result: Result) {
+    private fun isFeatureEnabled(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val key: String = call.argument("key")!!
             val isEnabled = PostHog.isFeatureEnabled(key)
@@ -389,7 +450,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun group(call: MethodCall, result: Result) {
+    private fun group(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val groupType: String = call.argument("groupType")!!
             val groupKey: String = call.argument("groupKey")!!
@@ -401,7 +465,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun register(call: MethodCall, result: Result) {
+    private fun register(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val key: String = call.argument("key")!!
             val value: Any = call.argument("value")!!
@@ -412,7 +479,10 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun unregister(call: MethodCall, result: Result) {
+    private fun unregister(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
             val key: String = call.argument("key")!!
             PostHog.unregister(key)
@@ -428,6 +498,26 @@ class PosthogFlutterPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun close(result: Result) {
+        try {
+            PostHog.close()
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    // Call the `completion` closure if cast to map value with `key` and type `T` is successful.
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> Map<String, Any>.getIfNotNull(
+        key: String,
+        callback: (T) -> Unit,
+    ) {
+        (get(key) as? T)?.let {
+            callback(it)
         }
     }
 }

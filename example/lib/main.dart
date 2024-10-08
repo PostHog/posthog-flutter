@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
+
 import 'package:posthog_flutter/posthog_flutter.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  Posthog().init(
-    'API-KEY',
-    options: PostHogOptions(
-      captureNativeAppLifecycleEvents: true,
-      enableSessionReplay: true,
-      sessionReplayConfig: PostHogSessionReplayConfig(
-        maskAllTextInputs: true,
-        maskAllImages: true,
-        androidDebouncerDelay: const Duration(milliseconds: 200),
-      ),
-    ),
-  );
+Future<void> main() async {
+  // // init WidgetsFlutterBinding if not yet
+  /*
+   WidgetsFlutterBinding.ensureInitialized();
+   final config =
+       PostHogConfig('phc_l9TgCltyBi2JjR5OnCO8tjNeuEhgbvYTuyG7cHgQuRu');
+   config.debug = true;
+   config.captureApplicationLifecycleEvents = true;
+   config.host = 'https://us.i.posthog.com';
+   config.enableSessionReplay = true;
+   config.postHogSessionReplayConfig.maskAllTextInputs = true;
+   config.postHogSessionReplayConfig.maskAllImages = true;
+   config.postHogSessionReplayConfig.androidDebouncerDelay = const Duration(milliseconds: 200);
+   await Posthog().setup(config);
+   */
 
   runApp(const MyApp());
 }

@@ -12,6 +12,7 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 
 | Method                    | Android | iOS/macOS | Web |
 | ------------------------- | ------- | --------- | --- |
+| `setup`                   | X       | X         |     |
 | `identify`                | X       | X         | X   |
 | `capture`                 | X       | X         | X   |
 | `screen`                  | X       | X         | X   |
@@ -29,6 +30,7 @@ To use this plugin, add `posthog_flutter` as a [dependency in your pubspec.yaml 
 | `getFeatureFlag`          | X       | X         | X   |
 | `getFeatureFlagPayload`   | X       | X         | X   |
 | `group`                   | X       | X         | X   |
+| `close`                   | X       | X         |     |
 
 ### Example
 
@@ -80,9 +82,9 @@ Remember that the application lifecycle events won't have any special context se
 
 ### Android
 
-#### AndroidManifest.xml
+Automatically:
 
-```xml
+```xml file=AndroidManifest.xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.posthog_flutter_example">
     <application>
         <activity>
@@ -97,11 +99,40 @@ Remember that the application lifecycle events won't have any special context se
 </manifest>
 ```
 
+Or manually, disable the auto init:
+
+```xml file=AndroidManifest.xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.posthog_flutter_example">
+    <application>
+        <activity>
+            [...]
+        </activity>
+        <meta-data android:name="com.posthog.posthog.AUTO_INIT" android:value="false" />
+    </application>
+</manifest>
+```
+
+And setup the SDK manually:
+
+```dart
+Future<void> main() async {
+    // init WidgetsFlutterBinding if not yet
+    WidgetsFlutterBinding.ensureInitialized();
+    final config = PostHogConfig('YOUR_API_KEY_GOES_HERE');
+    config.debug = true;
+    config.captureApplicationLifecycleEvents = true;
+    // or EU Host: 'https://eu.i.posthog.com'
+    config.host = 'https://us.i.posthog.com';
+    await Posthog().setup(config);
+    runApp(MyApp());
+}
+```
+
 ### iOS/macOS
 
-#### Info.plist
+Automatically:
 
-```xml
+```xml file=Info.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -121,9 +152,40 @@ Remember that the application lifecycle events won't have any special context se
 </plist>
 ```
 
+Or manually, disable the auto init:
+
+```xml file=Info.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	[...]
+	<key>com.posthog.posthog.AUTO_INIT</key>
+	<false/>
+	[...]
+</dict>
+</plist>
+```
+
+And setup the SDK manually:
+
+```dart
+Future<void> main() async {
+    // init WidgetsFlutterBinding if not yet
+    WidgetsFlutterBinding.ensureInitialized();
+    final config = PostHogConfig('YOUR_API_KEY_GOES_HERE');
+    config.debug = true;
+    config.captureApplicationLifecycleEvents = true;
+    // or EU Host: 'https://eu.i.posthog.com'
+    config.host = 'https://us.i.posthog.com';
+    await Posthog().setup(config);
+    runApp(MyApp());
+}
+```
+
 ### Web
 
-```html
+```html file=index.html
 <!DOCTYPE html>
 <html>
   <head>

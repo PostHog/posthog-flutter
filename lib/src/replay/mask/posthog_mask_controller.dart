@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
-import 'package:posthog_flutter/src/posthog_options.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser_factory.dart';
@@ -29,7 +29,7 @@ class PostHogMaskController {
   }
 
   static final PostHogMaskController instance =
-      PostHogMaskController._privateConstructor(PostHogConfig().options.sessionReplayConfig!);
+      PostHogMaskController._privateConstructor(Posthog().config!.postHogSessionReplayConfig);
 
   Future<List<Rect>?> getCurrentScreenRects() async {
     final BuildContext? context = containerKey.currentContext;

@@ -5,6 +5,10 @@ import 'package:flutter/services.dart';
 Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
   final analytics = JsObject.fromBrowserObject(context['posthog']);
   switch (call.method) {
+    case 'setup':
+      // not supported on Web
+      // analytics.callMethod('setup');
+      break;
     case 'identify':
       final userProperties = call.arguments['userProperties'] ?? {};
       final userPropertiesSetOnce =
@@ -93,6 +97,10 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
     case 'flush':
       // not supported on Web
       // analytics.callMethod('flush');
+      break;
+    case 'close':
+      // not supported on Web
+      // analytics.callMethod('close');
       break;
     default:
       throw PlatformException(

@@ -32,7 +32,7 @@
 	<key>com.posthog.posthog.POSTHOG_HOST</key>
 	<string>https://us.i.posthog.com</string>
 	<key>com.posthog.posthog.API_KEY</key>
-	<string>_6SG-F7I1vCuZ-HdJL3VZQqjBlaSb1_20hDPwqMNnGI</string>
+	<string>phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D</string>
 	<key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
 	<true/>
 	<key>com.posthog.posthog.DEBUG</key>

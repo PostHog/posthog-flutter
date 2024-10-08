@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:posthog_flutter/src/posthog_config.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 import 'change_detector.dart';
@@ -32,9 +32,11 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
 
   @override
   void initState() {
+    final options = Posthog().config;
+
     super.initState();
 
-    if (!PostHogConfig().options.enableSessionReplay) {
+    if (options!.enableSessionReplay == false) {
       return;
     }
 
@@ -71,7 +73,6 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     image.dispose();
 
     if (!_sentFullSnapshot) {
-
       await _nativeCommunicator.sendFullSnapshot(pngBytes, id: _wireframeId);
       _lastImageBytes = pngBytes;
       _sentFullSnapshot = true;
@@ -86,8 +87,9 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   }
 
   Duration _getDebounceDuration() {
-    final options = PostHogConfig().options;
-    final sessionReplayConfig = options.sessionReplayConfig;
+    final options = Posthog().config;
+
+    final sessionReplayConfig = options?.postHogSessionReplayConfig;
 
     if (Theme.of(context).platform == TargetPlatform.android) {
       return sessionReplayConfig?.androidDebouncerDelay ?? const Duration(milliseconds: 200);

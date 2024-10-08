@@ -1,12 +1,12 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
-import 'package:posthog_flutter/src/posthog_config.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 class ScreenshotCapturer {
-  final PostHogConfig config = PostHogConfig();
+  final config = Posthog().config;
   final ImageMaskPainter _imageMaskPainter = ImageMaskPainter();
 
   ScreenshotCapturer();
@@ -44,9 +44,9 @@ class ScreenshotCapturer {
 
       final ui.Image image = await renderObject.toImage(pixelRatio: pixelRatio);
 
-      final replayConfig = config.options.sessionReplayConfig;
+      final replayConfig = config!.postHogSessionReplayConfig;
 
-      if (replayConfig!.maskAllTextInputs || replayConfig.maskAllImages) {
+      if (replayConfig.maskAllTextInputs || replayConfig.maskAllImages) {
         final screenElementsRects = await PostHogMaskController.instance.getCurrentScreenRects();
 
         if (screenElementsRects == null) {

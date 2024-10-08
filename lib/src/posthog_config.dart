@@ -1,13 +1,95 @@
-import 'package:posthog_flutter/src/posthog_options.dart';
+enum PostHogPersonProfiles { never, always, identifiedOnly }
+
+enum PostHogDataMode { wifi, cellular, any }
 
 class PostHogConfig {
-  static final PostHogConfig _instance = PostHogConfig._internal();
+  final String apiKey;
+  var host = 'https://us.i.posthog.com';
+  var flushAt = 20;
+  var maxQueueSize = 1000;
+  var maxBatchSize = 50;
+  var flushInterval = const Duration(seconds: 30);
+  var sendFeatureFlagEvents = true;
+  var preloadFeatureFlags = true;
+  var captureApplicationLifecycleEvents = false;
+  var debug = false;
+  var optOut = false;
+  var personProfiles = PostHogPersonProfiles.identifiedOnly;
+  var enableSessionReplay = false;
 
-  factory PostHogConfig() {
-    return _instance;
+  var postHogSessionReplayConfig = PostHogSessionReplayConfig();
+
+  /// iOS only
+  var dataMode = PostHogDataMode.any;
+
+  // TODO: missing getAnonymousId, propertiesSanitizer, sessionReplay, captureDeepLinks
+  // onFeatureFlags, integrations
+
+  PostHogConfig(this.apiKey);
+
+  Map<String, dynamic> toMap() {
+    return {
+      'apiKey': apiKey,
+      'host': host,
+      'flushAt': flushAt,
+      'maxQueueSize': maxQueueSize,
+      'maxBatchSize': maxBatchSize,
+      'flushInterval': flushInterval.inSeconds,
+      'sendFeatureFlagEvents': sendFeatureFlagEvents,
+      'preloadFeatureFlags': preloadFeatureFlags,
+      'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
+      'debug': debug,
+      'optOut': optOut,
+      'personProfiles': personProfiles.name,
+      'enableSessionReplay':enableSessionReplay,
+      'dataMode': dataMode.name,
+      'sessionReplayConfig': postHogSessionReplayConfig.toMap(),
+    };
   }
+}
 
-  PostHogConfig._internal();
+class PostHogSessionReplayConfig {
+  /// Enable masking of all text input fields
+  /// Experimental support
+  /// Default: true
+  var maskAllTextInputs = true;
 
-  late PostHogOptions options;
+  /// Enable masking of all images to a placeholder
+  /// Experimental support
+  /// Default: true
+  var maskAllImages = true;
+
+  /// Enable capturing of logcat as console events
+  /// Android only
+  /// Experimental support
+  /// Default: true
+  var captureLog = true;
+
+  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
+  /// This is used for capturing the view as a screenshot
+  /// The lower the number, the more snapshots will be captured but higher the performance impact
+  /// Defaults to 1s on iOS
+  var iOSDebouncerDelay = const Duration(milliseconds: 200);
+
+  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
+  /// This is used for capturing the view as a screenshot
+  /// The lower the number, the more snapshots will be captured but higher the performance impact
+  /// Defaults to 0.3s on Android
+  var androidDebouncerDelay = const Duration(milliseconds: 200);
+
+  /// Enable capturing network telemetry
+  /// iOS only
+  /// Experimental support
+  /// Default: true
+  var captureNetworkTelemetry = true;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'maskAllImages': maskAllImages,
+      'captureLog': captureLog,
+      'iOSDebouncerDelayMs': iOSDebouncerDelay.inMilliseconds,
+      'androidDebouncerDelayMs': androidDebouncerDelay.inMilliseconds,
+      'captureNetworkTelemetry': captureNetworkTelemetry,
+    };
+  }
 }
