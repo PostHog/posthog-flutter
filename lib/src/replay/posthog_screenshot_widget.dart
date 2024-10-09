@@ -16,7 +16,8 @@ class PostHogScreenshotWidget extends StatefulWidget {
   PostHogScreenshotWidget({Key? key, required this.child}) : super(key: key);
 
   @override
-  _PostHogScreenshotWidgetState createState() => _PostHogScreenshotWidgetState();
+  _PostHogScreenshotWidgetState createState() =>
+      _PostHogScreenshotWidgetState();
 }
 
 class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
@@ -63,7 +64,8 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
       return;
     }
 
-    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
     if (byteData == null) {
       print('Error: Failed to convert image to byte data.');
       return;
@@ -78,7 +80,8 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
       _sentFullSnapshot = true;
     } else {
       if (_lastImageBytes == null || !listEquals(_lastImageBytes, pngBytes)) {
-        await _nativeCommunicator.sendIncrementalSnapshot(pngBytes, id: _wireframeId);
+        await _nativeCommunicator.sendIncrementalSnapshot(pngBytes,
+            id: _wireframeId);
         _lastImageBytes = pngBytes;
       } else {
         // Images are the same, do nothing for while
@@ -92,9 +95,11 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     final sessionReplayConfig = options?.postHogSessionReplayConfig;
 
     if (Theme.of(context).platform == TargetPlatform.android) {
-      return sessionReplayConfig?.androidDebouncerDelay ?? const Duration(milliseconds: 200);
+      return sessionReplayConfig?.androidDebouncerDelay ??
+          const Duration(milliseconds: 200);
     } else if (Theme.of(context).platform == TargetPlatform.iOS) {
-      return sessionReplayConfig?.iOSDebouncerDelay ?? const Duration(milliseconds: 200);
+      return sessionReplayConfig?.iOSDebouncerDelay ??
+          const Duration(milliseconds: 200);
     } else {
       return const Duration(milliseconds: 500);
     }

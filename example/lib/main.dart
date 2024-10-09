@@ -29,7 +29,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-
   @override
   void initState() {
     super.initState();
@@ -78,7 +77,8 @@ class _InitialScreenState extends State<InitialScreen> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const FirstRoute()),
+                      MaterialPageRoute(
+                          builder: (context) => const FirstRoute()),
                     );
                   },
                   child: const Text('Go to Second Route'),
@@ -95,7 +95,8 @@ class _InitialScreenState extends State<InitialScreen> {
                   children: [
                     ElevatedButton(
                       onPressed: () {
-                        _posthogFlutterPlugin.screen(screenName: "my screen", properties: {
+                        _posthogFlutterPlugin
+                            .screen(screenName: "my screen", properties: {
                           "foo": "bar",
                         });
                       },
@@ -103,7 +104,8 @@ class _InitialScreenState extends State<InitialScreen> {
                     ),
                     ElevatedButton(
                       onPressed: () {
-                        _posthogFlutterPlugin.capture(eventName: "eventName", properties: {
+                        _posthogFlutterPlugin
+                            .capture(eventName: "eventName", properties: {
                           "foo": "bar",
                         });
                       },
@@ -219,8 +221,8 @@ class _InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final result =
-                    await _posthogFlutterPlugin.getFeatureFlag("feature_name");
+                    final result = await _posthogFlutterPlugin
+                        .getFeatureFlag("feature_name");
                     setState(() {
                       _result = result;
                     });
@@ -229,8 +231,8 @@ class _InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final result =
-                    await _posthogFlutterPlugin.isFeatureEnabled("feature_name");
+                    final result = await _posthogFlutterPlugin
+                        .isFeatureEnabled("feature_name");
                     setState(() {
                       _result = result;
                     });
@@ -327,7 +329,6 @@ class _FirstRouteState extends State<FirstRoute> with WidgetsBindingObserver {
     );
   }
 }
-
 
 class ThirdRoute extends StatelessWidget {
   const ThirdRoute({super.key});

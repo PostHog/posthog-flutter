@@ -3,8 +3,6 @@ package com.posthog.posthog_flutter
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -13,19 +11,12 @@ import com.posthog.PostHog
 import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
-import com.posthog.internal.replay.RRFullSnapshotEvent
-import com.posthog.internal.replay.RRIncrementalMutationData
-import com.posthog.internal.replay.RRIncrementalSnapshotEvent
-import com.posthog.internal.replay.RRMutatedNode
-import com.posthog.internal.replay.RRStyle
-import com.posthog.internal.replay.RRWireframe
 import com.posthog.internal.replay.capture
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import java.io.ByteArrayOutputStream
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
@@ -40,7 +31,6 @@ class PosthogFlutterPlugin :
     private lateinit var applicationContext: Context
 
     private val snapshotSender = SnapshotSender()
-
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
@@ -266,7 +256,6 @@ class PosthogFlutterPlugin :
 
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
-
             }
         PostHogAndroid.setup(applicationContext, config)
     }
@@ -275,7 +264,10 @@ class PosthogFlutterPlugin :
         channel.setMethodCallHandler(null)
     }
 
-    private fun handleSendFullSnapshot(call: MethodCall, result: Result) {
+    private fun handleSendFullSnapshot(
+        call: MethodCall,
+        result: Result,
+    ) {
         val imageBytes = call.argument<ByteArray>("imageBytes")
         val id = call.argument<Int>("id") ?: 1
         if (imageBytes != null) {
@@ -286,7 +278,10 @@ class PosthogFlutterPlugin :
         }
     }
 
-    private fun handleSendIncrementalSnapshot(call: MethodCall, result: Result) {
+    private fun handleSendIncrementalSnapshot(
+        call: MethodCall,
+        result: Result,
+    ) {
         val imageBytes = call.argument<ByteArray>("imageBytes")
         val id = call.argument<Int>("id") ?: 1
         if (imageBytes != null) {

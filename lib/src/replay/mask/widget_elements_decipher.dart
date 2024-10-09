@@ -25,7 +25,8 @@ class WidgetElementsDecipher {
     final rootElement = _rootElementProvider.getRootElement(context);
     if (rootElement == null) return null;
 
-    final rootElementData = _elementDataFactory.createFromElement(rootElement, "Root");
+    final rootElementData =
+        _elementDataFactory.createFromElement(rootElement, "Root");
     if (rootElementData == null) return null;
 
     this.rootElementData = rootElementData;
@@ -42,7 +43,8 @@ class WidgetElementsDecipher {
     ElementData activeElementData,
     Element element,
   ) {
-    ElementData? newElementData = _elementObjectParser.relateRenderObject(activeElementData, element);
+    ElementData? newElementData =
+        _elementObjectParser.relateRenderObject(activeElementData, element);
 
     element.debugVisitOnstageChildren((childElement) {
       _parseAllElements(

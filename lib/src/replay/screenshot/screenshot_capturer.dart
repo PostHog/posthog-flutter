@@ -40,20 +40,23 @@ class ScreenshotCapturer {
     try {
       final srcWidth = renderObject.size.width;
       final srcHeight = renderObject.size.height;
-      final pixelRatio = _getPixelRatio(srcWidth: srcWidth, srcHeight: srcHeight);
+      final pixelRatio =
+          _getPixelRatio(srcWidth: srcWidth, srcHeight: srcHeight);
 
       final ui.Image image = await renderObject.toImage(pixelRatio: pixelRatio);
 
       final replayConfig = config!.postHogSessionReplayConfig;
 
       if (replayConfig.maskAllTextInputs || replayConfig.maskAllImages) {
-        final screenElementsRects = await PostHogMaskController.instance.getCurrentScreenRects();
+        final screenElementsRects =
+            await PostHogMaskController.instance.getCurrentScreenRects();
 
         if (screenElementsRects == null) {
           throw Exception('Failed to retrieve the element mask tree.');
         }
 
-        final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(image, screenElementsRects, pixelRatio);
+        final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(
+            image, screenElementsRects, pixelRatio);
         return maskedImage;
       }
 

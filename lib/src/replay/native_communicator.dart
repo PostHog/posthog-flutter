@@ -19,7 +19,8 @@ class NativeCommunicator {
     }
   }
 
-  Future<void> sendIncrementalSnapshot(Uint8List imageBytes, {required int id}) async {
+  Future<void> sendIncrementalSnapshot(Uint8List imageBytes,
+      {required int id}) async {
     try {
       await _channel.invokeMethod('sendIncrementalSnapshot', {
         'imageBytes': imageBytes,

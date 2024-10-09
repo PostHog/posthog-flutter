@@ -4,7 +4,9 @@ class RootElementProvider {
   Element? getRootElement(BuildContext context) {
     Element? rootElement;
     if (ModalRoute.of(context)?.isActive ?? false) {
-      Navigator.of(context, rootNavigator: true).context.visitChildElements((element) {
+      Navigator.of(context, rootNavigator: true)
+          .context
+          .visitChildElements((element) {
         rootElement = element;
       });
     } else {

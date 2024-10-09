@@ -4,7 +4,6 @@ import 'package:posthog_flutter/src/replay/element_parsers/image_element/positio
 import 'package:posthog_flutter/src/replay/element_parsers/image_element/render_image_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/image_element/scaler.dart';
 
-
 abstract class ElementParserFactory {
   ElementParser createElementParser(Type type);
 }

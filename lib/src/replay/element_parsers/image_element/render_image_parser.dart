@@ -34,10 +34,10 @@ class RenderImageParser extends ElementParser {
 
     final AlignmentGeometry alignment = renderImage.alignment;
 
-    final double left =
-        _positionCalculator.calculateLeftPosition(alignment, offset, renderImage.size.width, size.width);
-    final double top =
-        _positionCalculator.calculateTopPosition(alignment, offset, renderImage.size.height, size.height);
+    final double left = _positionCalculator.calculateLeftPosition(
+        alignment, offset, renderImage.size.width, size.width);
+    final double top = _positionCalculator.calculateTopPosition(
+        alignment, offset, renderImage.size.height, size.height);
 
     return Rect.fromLTWH(left, top, size.width, size.height);
   }

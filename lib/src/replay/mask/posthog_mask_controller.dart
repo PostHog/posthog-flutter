@@ -25,11 +25,13 @@ class PostHogMaskController {
           elementObjectParser: ElementObjectParser(),
           rootElementProvider: RootElementProvider(),
         ) {
-    parsers = ElementParsersConst(DefaultElementParserFactory(), config).parsersMap;
+    parsers =
+        ElementParsersConst(DefaultElementParserFactory(), config).parsersMap;
   }
 
   static final PostHogMaskController instance =
-      PostHogMaskController._privateConstructor(Posthog().config!.postHogSessionReplayConfig);
+      PostHogMaskController._privateConstructor(
+          Posthog().config!.postHogSessionReplayConfig);
 
   Future<List<Rect>?> getCurrentScreenRects() async {
     final BuildContext? context = containerKey.currentContext;
@@ -37,7 +39,8 @@ class PostHogMaskController {
     if (context == null) {
       return null;
     }
-    final ElementData? widgetElementsTree = _widgetScraper.parseRenderTree(context);
+    final ElementData? widgetElementsTree =
+        _widgetScraper.parseRenderTree(context);
 
     return widgetElementsTree?.extractRects();
   }

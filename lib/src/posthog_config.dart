@@ -41,7 +41,7 @@ class PostHogConfig {
       'debug': debug,
       'optOut': optOut,
       'personProfiles': personProfiles.name,
-      'enableSessionReplay':enableSessionReplay,
+      'enableSessionReplay': enableSessionReplay,
       'dataMode': dataMode.name,
       'sessionReplayConfig': postHogSessionReplayConfig.toMap(),
     };
