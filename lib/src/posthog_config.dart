@@ -15,6 +15,9 @@ class PostHogConfig {
   var debug = false;
   var optOut = false;
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
+  var enableSessionReplay = false;
+
+  var postHogSessionReplayConfig = PostHogSessionReplayConfig();
 
   /// iOS only
   var dataMode = PostHogDataMode.any;
@@ -38,7 +41,55 @@ class PostHogConfig {
       'debug': debug,
       'optOut': optOut,
       'personProfiles': personProfiles.name,
+      'enableSessionReplay':enableSessionReplay,
       'dataMode': dataMode.name,
+      'sessionReplayConfig': postHogSessionReplayConfig.toMap(),
+    };
+  }
+}
+
+class PostHogSessionReplayConfig {
+  /// Enable masking of all text input fields
+  /// Experimental support
+  /// Default: true
+  var maskAllTextInputs = true;
+
+  /// Enable masking of all images to a placeholder
+  /// Experimental support
+  /// Default: true
+  var maskAllImages = true;
+
+  /// Enable capturing of logcat as console events
+  /// Android only
+  /// Experimental support
+  /// Default: true
+  var captureLog = true;
+
+  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
+  /// This is used for capturing the view as a screenshot
+  /// The lower the number, the more snapshots will be captured but higher the performance impact
+  /// Defaults to 1s on iOS
+  var iOSDebouncerDelay = const Duration(milliseconds: 200);
+
+  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
+  /// This is used for capturing the view as a screenshot
+  /// The lower the number, the more snapshots will be captured but higher the performance impact
+  /// Defaults to 0.3s on Android
+  var androidDebouncerDelay = const Duration(milliseconds: 200);
+
+  /// Enable capturing network telemetry
+  /// iOS only
+  /// Experimental support
+  /// Default: true
+  var captureNetworkTelemetry = true;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'maskAllImages': maskAllImages,
+      'captureLog': captureLog,
+      'iOSDebouncerDelayMs': iOSDebouncerDelay.inMilliseconds,
+      'androidDebouncerDelayMs': androidDebouncerDelay.inMilliseconds,
+      'captureNetworkTelemetry': captureNetworkTelemetry,
     };
   }
 }

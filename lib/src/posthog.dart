@@ -7,6 +7,8 @@ class Posthog {
 
   static final _instance = Posthog._internal();
 
+  PostHogConfig? _config;
+
   factory Posthog() {
     return _instance;
   }
@@ -17,7 +19,12 @@ class Posthog {
   /// Only used for the manual setup
   /// Requires disabling the automatic init on Android and iOS:
   /// com.posthog.posthog.AUTO_INIT: false
-  Future<void> setup(PostHogConfig config) => _posthog.setup(config);
+  Future<void> setup(PostHogConfig config) {
+    _config = config; // Store the config
+    return _posthog.setup(config);
+  }
+
+  PostHogConfig? get config => _config;
 
   Future<void> identify({
     required String userId,
