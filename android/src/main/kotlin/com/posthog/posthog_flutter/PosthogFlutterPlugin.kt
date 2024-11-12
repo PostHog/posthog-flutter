@@ -1,9 +1,6 @@
 package com.posthog.posthog_flutter
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import com.posthog.PersonProfiles
@@ -11,7 +8,7 @@ import com.posthog.PostHog
 import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
-import com.posthog.internal.replay.capture
+import com.posthog.android.internal.getApplicationInfo
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -40,22 +37,6 @@ class PosthogFlutterPlugin :
 
         channel.setMethodCallHandler(this)
     }
-
-    // TODO: expose on the android SDK instead
-    @Throws(PackageManager.NameNotFoundException::class)
-    private fun getApplicationInfo(context: Context): ApplicationInfo =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context
-                .packageManager
-                .getApplicationInfo(
-                    context.packageName,
-                    PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
-                )
-        } else {
-            context
-                .packageManager
-                .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
-        }
 
     private fun initPlugin() {
         try {
@@ -244,7 +225,7 @@ class PosthogFlutterPlugin :
                         "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
                     }
                 }
-                posthogConfig.getIfNotNull<Boolean>("enableSessionReplay") {
+                posthogConfig.getIfNotNull<Boolean>("sessionReplay") {
                     sessionReplay = it
                 }
 

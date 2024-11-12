@@ -15,9 +15,9 @@ class PostHogConfig {
   var debug = false;
   var optOut = false;
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
-  var enableSessionReplay = false;
+  var sessionReplay = false;
 
-  var postHogSessionReplayConfig = PostHogSessionReplayConfig();
+  var sessionReplayConfig = PostHogSessionReplayConfig();
 
   /// iOS only
   var dataMode = PostHogDataMode.any;
@@ -41,9 +41,9 @@ class PostHogConfig {
       'debug': debug,
       'optOut': optOut,
       'personProfiles': personProfiles.name,
-      'enableSessionReplay': enableSessionReplay,
+      'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
-      'sessionReplayConfig': postHogSessionReplayConfig.toMap(),
+      'sessionReplayConfig': sessionReplayConfig.toMap(),
     };
   }
 }
@@ -69,13 +69,13 @@ class PostHogSessionReplayConfig {
   /// This is used for capturing the view as a screenshot
   /// The lower the number, the more snapshots will be captured but higher the performance impact
   /// Defaults to 1s on iOS
-  var iOSDebouncerDelay = const Duration(milliseconds: 200);
+  var iOSDebouncerDelay = const Duration(seconds: 1);
 
   /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
   /// This is used for capturing the view as a screenshot
   /// The lower the number, the more snapshots will be captured but higher the performance impact
-  /// Defaults to 0.3s on Android
-  var androidDebouncerDelay = const Duration(milliseconds: 200);
+  /// Defaults to 1s on Android
+  var androidDebouncerDelay = const Duration(seconds: 1);
 
   /// Enable capturing network telemetry
   /// iOS only

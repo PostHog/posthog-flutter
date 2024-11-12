@@ -37,7 +37,7 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
 
     super.initState();
 
-    if (options!.enableSessionReplay == false) {
+    if (options?.sessionReplay != true) {
       return;
     }
 
@@ -92,7 +92,7 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   Duration _getDebounceDuration() {
     final options = Posthog().config;
 
-    final sessionReplayConfig = options?.postHogSessionReplayConfig;
+    final sessionReplayConfig = options?.sessionReplayConfig;
 
     if (Theme.of(context).platform == TargetPlatform.android) {
       return sessionReplayConfig?.androidDebouncerDelay ??

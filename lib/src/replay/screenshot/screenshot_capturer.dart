@@ -6,10 +6,10 @@ import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 class ScreenshotCapturer {
-  final config = Posthog().config;
+  final PostHogConfig _config;
   final ImageMaskPainter _imageMaskPainter = ImageMaskPainter();
 
-  ScreenshotCapturer();
+  ScreenshotCapturer(this._config);
 
   double _getPixelRatio({
     int? width,
@@ -27,13 +27,13 @@ class ScreenshotCapturer {
   Future<ui.Image?> captureScreenshot() async {
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {
-      print('Error: screenshotKey has no context.');
+      // print('Error: screenshotKey has no context.');
       return null;
     }
 
     final renderObject = context.findRenderObject() as RenderRepaintBoundary?;
     if (renderObject == null) {
-      print('Error: Unable to find RenderRepaintBoundary.');
+      // print('Error: Unable to find RenderRepaintBoundary.');
       return null;
     }
 
@@ -45,14 +45,15 @@ class ScreenshotCapturer {
 
       final ui.Image image = await renderObject.toImage(pixelRatio: pixelRatio);
 
-      final replayConfig = config!.postHogSessionReplayConfig;
+      final replayConfig = _config.sessionReplayConfig;
 
       if (replayConfig.maskAllTextInputs || replayConfig.maskAllImages) {
         final screenElementsRects =
             await PostHogMaskController.instance.getCurrentScreenRects();
 
         if (screenElementsRects == null) {
-          throw Exception('Failed to retrieve the element mask tree.');
+          // throw Exception('Failed to retrieve the element mask tree.');
+          return null;
         }
 
         final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(

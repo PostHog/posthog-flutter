@@ -31,7 +31,7 @@ class PostHogMaskController {
 
   static final PostHogMaskController instance =
       PostHogMaskController._privateConstructor(
-          Posthog().config!.postHogSessionReplayConfig);
+          Posthog().config!.sessionReplayConfig);
 
   Future<List<Rect>?> getCurrentScreenRects() async {
     final BuildContext? context = containerKey.currentContext;
