@@ -22,7 +22,7 @@ class PostHogConfig {
   /// iOS only
   var dataMode = PostHogDataMode.any;
 
-  // TODO: missing getAnonymousId, propertiesSanitizer, sessionReplay, captureDeepLinks
+  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
 
   PostHogConfig(this.apiKey);
@@ -52,7 +52,7 @@ class PostHogSessionReplayConfig {
   /// Enable masking of all text input fields
   /// Experimental support
   /// Default: true
-  var maskAllTextInputs = true;
+  var maskAllTexts = true;
 
   /// Enable masking of all images to a placeholder
   /// Experimental support
@@ -69,13 +69,7 @@ class PostHogSessionReplayConfig {
   /// This is used for capturing the view as a screenshot
   /// The lower the number, the more snapshots will be captured but higher the performance impact
   /// Defaults to 1s on iOS
-  var iOSDebouncerDelay = const Duration(seconds: 1);
-
-  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
-  /// This is used for capturing the view as a screenshot
-  /// The lower the number, the more snapshots will be captured but higher the performance impact
-  /// Defaults to 1s on Android
-  var androidDebouncerDelay = const Duration(seconds: 1);
+  var debouncerDelay = const Duration(seconds: 1);
 
   /// Enable capturing network telemetry
   /// iOS only
@@ -86,9 +80,8 @@ class PostHogSessionReplayConfig {
   Map<String, dynamic> toMap() {
     return {
       'maskAllImages': maskAllImages,
+      'maskAllTexts': maskAllTexts,
       'captureLog': captureLog,
-      'iOSDebouncerDelayMs': iOSDebouncerDelay.inMilliseconds,
-      'androidDebouncerDelayMs': androidDebouncerDelay.inMilliseconds,
       'captureNetworkTelemetry': captureNetworkTelemetry,
     };
   }

@@ -4,18 +4,20 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 
 Future<void> main() async {
   // // init WidgetsFlutterBinding if not yet
-  
-  //  WidgetsFlutterBinding.ensureInitialized();
-  //  final config =
-  //      PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
-  //  config.debug = true;
-  //  config.captureApplicationLifecycleEvents = true;
-  //  config.host = 'https://us.i.posthog.com';
-  //  config.sessionReplay = true;
-  //  config.sessionReplayConfig.maskAllTextInputs = true;
-  //  config.sessionReplayConfig.maskAllImages = true;
-  //  config.sessionReplayConfig.androidDebouncerDelay = const Duration(milliseconds: 200);
-  //  await Posthog().setup(config);
+
+  WidgetsFlutterBinding.ensureInitialized();
+  final config =
+      PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
+  config.debug = true;
+  config.captureApplicationLifecycleEvents = false;
+  config.host = 'https://us.i.posthog.com';
+  config.sessionReplay = true;
+  config.sessionReplayConfig.maskAllTexts = true;
+  config.sessionReplayConfig.maskAllImages = false;
+  config.sessionReplayConfig.debouncerDelay =
+      const Duration(milliseconds: 1000);
+  config.flushAt = 1;
+  await Posthog().setup(config);
 
   runApp(const MyApp());
 }

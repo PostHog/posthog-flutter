@@ -29,8 +29,7 @@ class ElementData {
         if (child.children == null) {
           rects.add(child.rect);
           continue;
-        }
-        if (child.children!.length > 1) {
+        } else if (child.children!.length > 1) {
           for (var grandChild in child.children!) {
             rects.add(grandChild.rect);
           }

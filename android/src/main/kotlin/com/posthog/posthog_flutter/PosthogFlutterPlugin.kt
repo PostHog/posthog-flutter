@@ -147,15 +147,35 @@ class PosthogFlutterPlugin :
             "close" -> {
                 close(result)
             }
+            "sendMetaEvent" -> {
+                handleMetaEvent(call, result)
+            }
             "sendFullSnapshot" -> {
                 handleSendFullSnapshot(call, result)
-            }
-            "sendIncrementalSnapshot" -> {
-                handleSendIncrementalSnapshot(call, result)
             }
             else -> {
                 result.notImplemented()
             }
+        }
+    }
+
+    private fun handleMetaEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val width = call.argument<Int>("width") ?: 0
+            val height = call.argument<Int>("height") ?: 0
+
+            if (width == 0 || height == 0) {
+                result.error("INVALID_ARGUMENT", "Width or height is 0", null)
+                return
+            }
+
+            snapshotSender.sendMetaEvent(width, height)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 
@@ -230,8 +250,8 @@ class PosthogFlutterPlugin :
                 }
 
                 posthogConfig.getIfNotNull<Map<String, Any>>("sessionReplayConfig") { sessionReplayConfig ->
-                    sessionReplayConfig.getIfNotNull<Long>("androidDebouncerDelayMs") {
-                        this.sessionReplayConfig.debouncerDelayMs = it
+                    sessionReplayConfig.getIfNotNull<Boolean>("captureLog") {
+                        this.sessionReplayConfig.captureLogcat = it
                     }
                 }
 
@@ -249,27 +269,19 @@ class PosthogFlutterPlugin :
         call: MethodCall,
         result: Result,
     ) {
-        val imageBytes = call.argument<ByteArray>("imageBytes")
-        val id = call.argument<Int>("id") ?: 1
-        if (imageBytes != null) {
-            snapshotSender.sendFullSnapshot(imageBytes, id)
-            result.success(null)
-        } else {
-            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
-        }
-    }
-
-    private fun handleSendIncrementalSnapshot(
-        call: MethodCall,
-        result: Result,
-    ) {
-        val imageBytes = call.argument<ByteArray>("imageBytes")
-        val id = call.argument<Int>("id") ?: 1
-        if (imageBytes != null) {
-            snapshotSender.sendIncrementalSnapshot(imageBytes, id)
-            result.success(null)
-        } else {
-            result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+        try {
+            val imageBytes = call.argument<ByteArray>("imageBytes")
+            val id = call.argument<Int>("id") ?: 1
+            val x = call.argument<Int>("x") ?: 0
+            val y = call.argument<Int>("y") ?: 0
+            if (imageBytes != null) {
+                snapshotSender.sendFullSnapshot(imageBytes, id, x, y)
+                result.success(null)
+            } else {
+                result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+            }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 

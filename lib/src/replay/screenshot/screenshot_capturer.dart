@@ -1,13 +1,34 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
+
+class ImageInfo {
+  final ui.Image image;
+  final int id;
+  final int x;
+  final int y;
+  final int width;
+  final int height;
+  final bool shouldSendMetaEvent;
+
+  ImageInfo(this.image, this.id, this.x, this.y, this.width, this.height,
+      this.shouldSendMetaEvent);
+}
+
+class ViewTreeSnapshotStatus {
+  bool sentMetaEvent = false;
+  ViewTreeSnapshotStatus(this.sentMetaEvent);
+}
 
 class ScreenshotCapturer {
   final PostHogConfig _config;
   final ImageMaskPainter _imageMaskPainter = ImageMaskPainter();
+  final Map<RenderObject, ViewTreeSnapshotStatus> views = {};
 
   ScreenshotCapturer(this._config);
 
@@ -17,14 +38,13 @@ class ScreenshotCapturer {
     required double srcWidth,
     required double srcHeight,
   }) {
-    assert((width == null) == (height == null));
     if (width == null || height == null) {
       return 1.0;
     }
     return min(width / srcWidth, height / srcHeight);
   }
 
-  Future<ui.Image?> captureScreenshot() async {
+  Future<ImageInfo?> captureScreenshot() async {
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {
       // print('Error: screenshotKey has no context.');
@@ -37,6 +57,24 @@ class ScreenshotCapturer {
       return null;
     }
 
+    final statusView = views[renderObject] ?? ViewTreeSnapshotStatus(false);
+
+    var shouldSendMetaEvent = false;
+    if (!statusView.sentMetaEvent) {
+      shouldSendMetaEvent = true;
+      statusView.sentMetaEvent = true;
+    }
+    views[renderObject] = statusView;
+
+    var globalPosition = Offset.zero;
+    // Get the global position of the widget
+    final box = renderObject as RenderBox?;
+    if (box != null) {
+      globalPosition = box.localToGlobal(Offset.zero);
+    }
+
+    final viewId = identityHashCode(renderObject);
+
     try {
       final srcWidth = renderObject.size.width;
       final srcHeight = renderObject.size.height;
@@ -45,25 +83,50 @@ class ScreenshotCapturer {
 
       final ui.Image image = await renderObject.toImage(pixelRatio: pixelRatio);
 
+      // TODO: masking
       final replayConfig = _config.sessionReplayConfig;
 
-      if (replayConfig.maskAllTextInputs || replayConfig.maskAllImages) {
+      if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
         final screenElementsRects =
             await PostHogMaskController.instance.getCurrentScreenRects();
 
         if (screenElementsRects == null) {
           // throw Exception('Failed to retrieve the element mask tree.');
-          return null;
+          final imageInfo = ImageInfo(
+              image,
+              viewId,
+              globalPosition.dx.toInt(),
+              globalPosition.dy.toInt(),
+              srcWidth.toInt(),
+              srcHeight.toInt(),
+              shouldSendMetaEvent);
+          return imageInfo;
         }
 
         final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(
             image, screenElementsRects, pixelRatio);
-        return maskedImage;
+        final imageInfo = ImageInfo(
+            maskedImage,
+            viewId,
+            globalPosition.dx.toInt(),
+            globalPosition.dy.toInt(),
+            srcWidth.toInt(),
+            srcHeight.toInt(),
+            shouldSendMetaEvent);
+        return imageInfo;
       }
 
-      return image;
+      final imageInfo = ImageInfo(
+          image,
+          viewId,
+          globalPosition.dx.toInt(),
+          globalPosition.dy.toInt(),
+          srcWidth.toInt(),
+          srcHeight.toInt(),
+          shouldSendMetaEvent);
+      return imageInfo;
     } catch (e) {
-      print('Error capturing image: $e');
+      printIfDebug('Error capturing image: $e');
       return null;
     }
   }

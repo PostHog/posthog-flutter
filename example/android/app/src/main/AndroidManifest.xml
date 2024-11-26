@@ -47,8 +47,8 @@
             android:name="com.posthog.posthog.DEBUG" 
             android:value="true" />
 
-<!--        <meta-data-->
-<!--            android:name="com.posthog.posthog.AUTO_INIT"-->
-<!--            android:value="false" />-->
+       <meta-data
+            android:name="com.posthog.posthog.AUTO_INIT"
+            android:value="false" />
     </application>
 </manifest>

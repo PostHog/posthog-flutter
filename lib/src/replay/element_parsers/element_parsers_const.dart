@@ -7,11 +7,11 @@ class ElementParsersConst {
   final ElementParserFactory _factory;
   final Map<String, ElementParser> parsersMap = {};
 
-  ElementParsersConst(this._factory, PostHogSessionReplayConfig config) {
-    if (config.maskAllImages) {
+  ElementParsersConst(this._factory, PostHogSessionReplayConfig? config) {
+    if (config?.maskAllImages ?? true) {
       registerElementParser<RenderImage>();
     }
-    if (config.maskAllTextInputs) {
+    if (config?.maskAllTexts ?? true) {
       registerElementParser<RenderParagraph>();
       registerElementParser<RenderTransform>();
     }

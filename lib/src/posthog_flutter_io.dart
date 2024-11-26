@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
@@ -14,7 +15,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on setup: $exception');
+      printIfDebug('Exeption on setup: $exception');
     }
   }
 
@@ -32,7 +33,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           'userPropertiesSetOnce': userPropertiesSetOnce,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on identify: $exception');
+      printIfDebug('Exeption on identify: $exception');
     }
   }
 
@@ -47,7 +48,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         if (properties != null) 'properties': properties,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on capture: $exception');
+      printIfDebug('Exeption on capture: $exception');
     }
   }
 
@@ -62,7 +63,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         if (properties != null) 'properties': properties,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on screen: $exception');
+      printIfDebug('Exeption on screen: $exception');
     }
   }
 
@@ -75,7 +76,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         'alias': alias,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on alias: $exception');
+      printIfDebug('Exeption on alias: $exception');
     }
   }
 
@@ -84,7 +85,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       return await _methodChannel.invokeMethod('distinctId');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on getDistinctId: $exception');
+      printIfDebug('Exeption on getDistinctId: $exception');
       return "";
     }
   }
@@ -94,7 +95,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       await _methodChannel.invokeMethod('reset');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on reset: $exception');
+      printIfDebug('Exeption on reset: $exception');
     }
   }
 
@@ -103,7 +104,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       await _methodChannel.invokeMethod('disable');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on disable: $exception');
+      printIfDebug('Exeption on disable: $exception');
     }
   }
 
@@ -112,7 +113,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       await _methodChannel.invokeMethod('enable');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on enable: $exception');
+      printIfDebug('Exeption on enable: $exception');
     }
   }
 
@@ -123,7 +124,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         'debug': enabled,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on debug: $exception');
+      printIfDebug('Exeption on debug: $exception');
     }
   }
 
@@ -134,7 +135,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         'key': key,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on isFeatureEnabled: $exception');
+      printIfDebug('Exeption on isFeatureEnabled: $exception');
       return false;
     }
   }
@@ -144,7 +145,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       await _methodChannel.invokeMethod('reloadFeatureFlags');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on reloadFeatureFlags: $exception');
+      printIfDebug('Exeption on reloadFeatureFlags: $exception');
     }
   }
 
@@ -161,7 +162,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         if (groupProperties != null) 'groupProperties': groupProperties,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on group: $exception');
+      printIfDebug('Exeption on group: $exception');
     }
   }
 
@@ -174,7 +175,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         'key': key,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on getFeatureFlag: $exception');
+      printIfDebug('Exeption on getFeatureFlag: $exception');
       return null;
     }
   }
@@ -188,7 +189,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         'key': key,
       });
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on getFeatureFlagPayload: $exception');
+      printIfDebug('Exeption on getFeatureFlagPayload: $exception');
       return null;
     }
   }
@@ -199,7 +200,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return await _methodChannel
           .invokeMethod('register', {'key': key, 'value': value});
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on register: $exception');
+      printIfDebug('Exeption on register: $exception');
     }
   }
 
@@ -208,7 +209,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       return await _methodChannel.invokeMethod('unregister', {'key': key});
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on unregister: $exception');
+      printIfDebug('Exeption on unregister: $exception');
     }
   }
 
@@ -217,7 +218,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       return await _methodChannel.invokeMethod('flush');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on flush: $exception');
+      printIfDebug('Exeption on flush: $exception');
     }
   }
 
@@ -226,13 +227,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       return await _methodChannel.invokeMethod('close');
     } on PlatformException catch (exception) {
-      _printIfDebug('Exeption on close: $exception');
-    }
-  }
-
-  void _printIfDebug(String message) {
-    if (kDebugMode) {
-      print(message);
+      printIfDebug('Exeption on close: $exception');
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 /*
     * TEMPORARY CLASS FOR TESTING PURPOSES
@@ -8,26 +9,28 @@ import 'package:flutter/services.dart';
 class NativeCommunicator {
   static const MethodChannel _channel = MethodChannel('posthog_flutter');
 
-  Future<void> sendFullSnapshot(Uint8List imageBytes, {required int id}) async {
+  Future<void> sendFullSnapshot(Uint8List imageBytes,
+      {required int id, required int x, required int y}) async {
     try {
       await _channel.invokeMethod('sendFullSnapshot', {
         'imageBytes': imageBytes,
         'id': id,
+        'x': x,
+        'y': y,
       });
     } catch (e) {
-      print('Error sending full snapshot to native: $e');
+      printIfDebug('Error sending full snapshot to native: $e');
     }
   }
 
-  Future<void> sendIncrementalSnapshot(Uint8List imageBytes,
-      {required int id}) async {
+  Future<void> sendMetaEvent({required int width, required int height}) async {
     try {
-      await _channel.invokeMethod('sendIncrementalSnapshot', {
-        'imageBytes': imageBytes,
-        'id': id,
+      await _channel.invokeMethod('sendMetaEvent', {
+        'width': width,
+        'height': height,
       });
     } catch (e) {
-      print('Error sending incremental snapshot to native: $e');
+      printIfDebug('Error sending full snapshot to native: $e');
     }
   }
 }

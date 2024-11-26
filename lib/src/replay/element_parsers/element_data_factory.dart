@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 
 class ElementDataFactory {

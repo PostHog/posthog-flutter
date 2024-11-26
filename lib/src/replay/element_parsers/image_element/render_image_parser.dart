@@ -26,8 +26,8 @@ class RenderImageParser extends ElementParser {
     final BoxFit fit = renderImage.fit ?? BoxFit.scaleDown;
 
     final Size size = _scaler.getScaledSize(
-      renderImage.image!.width.toDouble(),
-      renderImage.image!.height.toDouble(),
+      renderImage.image?.width.toDouble() ?? 0,
+      renderImage.image?.height.toDouble() ?? 0,
       renderImage.size,
       fit,
     );

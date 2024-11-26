@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'change_detector.dart';
 import 'native_communicator.dart';
@@ -26,10 +27,7 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   late final NativeCommunicator _nativeCommunicator;
 
   Timer? _debounceTimer;
-
-  Uint8List? _lastImageBytes;
-  bool _sentFullSnapshot = false;
-  final int _wireframeId = 1;
+  Duration _debounceDuration = const Duration(milliseconds: 1000);
 
   @override
   void initState() {
@@ -37,11 +35,17 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
 
     super.initState();
 
-    if (options?.sessionReplay != true) {
+    if (options == null) {
       return;
     }
 
-    _screenshotCapturer = ScreenshotCapturer();
+    if (!options.sessionReplay) {
+      return;
+    }
+
+    _debounceDuration = options.sessionReplayConfig.debouncerDelay;
+
+    _screenshotCapturer = ScreenshotCapturer(options);
     _nativeCommunicator = NativeCommunicator();
 
     _changeDetector = ChangeDetector(_onChangeDetected);
@@ -52,41 +56,36 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   void _onChangeDetected() {
     _debounceTimer?.cancel();
 
-    _debounceTimer = Timer(_getDebounceDuration(), () {
+    _debounceTimer = Timer(_debounceDuration, () {
       generateSnapshot();
     });
   }
 
   Future<void> generateSnapshot() async {
-    final ui.Image? image = await _screenshotCapturer.captureScreenshot();
-    if (image == null) {
-      print('Error: Failed to capture screenshot.');
+    final imageInfo = await _screenshotCapturer.captureScreenshot();
+    if (imageInfo == null) {
+      printIfDebug('Error: Failed to capture screenshot.');
       return;
     }
 
+    if (imageInfo.shouldSendMetaEvent) {
+      await _nativeCommunicator.sendMetaEvent(
+          width: imageInfo.width, height: imageInfo.height);
+    }
+
+    // TODO: package:image/image.dart to convert to jpeg instead
     final ByteData? byteData =
-        await image.toByteData(format: ui.ImageByteFormat.png);
+        await imageInfo.image.toByteData(format: ui.ImageByteFormat.png);
     if (byteData == null) {
-      print('Error: Failed to convert image to byte data.');
+      printIfDebug('Error: Failed to convert image to byte data.');
       return;
     }
 
     Uint8List pngBytes = byteData.buffer.asUint8List();
-    image.dispose();
+    imageInfo.image.dispose();
 
-    if (!_sentFullSnapshot) {
-      await _nativeCommunicator.sendFullSnapshot(pngBytes, id: _wireframeId);
-      _lastImageBytes = pngBytes;
-      _sentFullSnapshot = true;
-    } else {
-      if (_lastImageBytes == null || !listEquals(_lastImageBytes, pngBytes)) {
-        await _nativeCommunicator.sendIncrementalSnapshot(pngBytes,
-            id: _wireframeId);
-        _lastImageBytes = pngBytes;
-      } else {
-        // Images are the same, do nothing for while
-      }
-    }
+    await _nativeCommunicator.sendFullSnapshot(pngBytes,
+        id: imageInfo.id, x: imageInfo.x, y: imageInfo.y);
   }
 
   Duration _getDebounceDuration() {
@@ -94,15 +93,8 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
 
     final sessionReplayConfig = options?.sessionReplayConfig;
 
-    if (Theme.of(context).platform == TargetPlatform.android) {
-      return sessionReplayConfig?.androidDebouncerDelay ??
-          const Duration(milliseconds: 200);
-    } else if (Theme.of(context).platform == TargetPlatform.iOS) {
-      return sessionReplayConfig?.iOSDebouncerDelay ??
-          const Duration(milliseconds: 200);
-    } else {
-      return const Duration(milliseconds: 500);
-    }
+    return sessionReplayConfig?.debouncerDelay ??
+        const Duration(milliseconds: 1000);
   }
 
   @override

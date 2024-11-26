@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
-import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser_factory.dart';
@@ -19,7 +18,7 @@ class PostHogMaskController {
 
   final WidgetElementsDecipher _widgetScraper;
 
-  PostHogMaskController._privateConstructor(PostHogSessionReplayConfig config)
+  PostHogMaskController._privateConstructor(PostHogSessionReplayConfig? config)
       : _widgetScraper = WidgetElementsDecipher(
           elementDataFactory: ElementDataFactory(),
           elementObjectParser: ElementObjectParser(),
@@ -31,7 +30,7 @@ class PostHogMaskController {
 
   static final PostHogMaskController instance =
       PostHogMaskController._privateConstructor(
-          Posthog().config!.sessionReplayConfig);
+          Posthog().config?.sessionReplayConfig);
 
   Future<List<Rect>?> getCurrentScreenRects() async {
     final BuildContext? context = containerKey.currentContext;
