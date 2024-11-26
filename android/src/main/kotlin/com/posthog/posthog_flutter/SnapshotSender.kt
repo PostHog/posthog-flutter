@@ -1,15 +1,13 @@
 package com.posthog.posthog_flutter
 
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Base64
+import com.posthog.android.internal.base64
 import com.posthog.internal.replay.RREvent
 import com.posthog.internal.replay.RRFullSnapshotEvent
 import com.posthog.internal.replay.RRMetaEvent
 import com.posthog.internal.replay.RRStyle
 import com.posthog.internal.replay.RRWireframe
 import com.posthog.internal.replay.capture
-import java.io.ByteArrayOutputStream
 
 class SnapshotSender {
     fun sendFullSnapshot(
@@ -60,26 +58,5 @@ class SnapshotSender {
         events.add(metaEvent)
 
         events.capture()
-    }
-
-    // TODO: reuse from Android
-    private fun Bitmap.isValid(): Boolean =
-        !isRecycled &&
-            width > 0 &&
-            height > 0
-
-    // TODO: reuse from Android
-    private fun Bitmap.base64(): String? {
-        if (!isValid()) {
-            return null
-        }
-
-        ByteArrayOutputStream(allocationByteCount).use {
-            // we can make format and type configurable
-            compress(Bitmap.CompressFormat.JPEG, 30, it)
-            val byteArray = it.toByteArray()
-            val encoded = Base64.encodeToString(byteArray, Base64.DEFAULT) ?: return null
-            return "data:image/jpeg;base64,$encoded"
-        }
     }
 }
