@@ -33,4 +33,13 @@ class NativeCommunicator {
       printIfDebug('Error sending full snapshot to native: $e');
     }
   }
+
+  Future<bool> isSessionReplayActive() async {
+    try {
+      return await _channel.invokeMethod('isSessionReplayActive');
+    } catch (e) {
+      printIfDebug('Error sending full snapshot to native: $e');
+      return false;
+    }
+  }
 }

@@ -153,11 +153,16 @@ class PosthogFlutterPlugin :
             "sendFullSnapshot" -> {
                 handleSendFullSnapshot(call, result)
             }
+            "isSessionReplayActive" -> {
+                result.success(isSessionReplayActive())
+            }
             else -> {
                 result.notImplemented()
             }
         }
     }
+
+    private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
 
     private fun handleMetaEvent(
         call: MethodCall,

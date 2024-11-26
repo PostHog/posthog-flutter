@@ -31,21 +31,21 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
 
   @override
   void initState() {
-    final options = Posthog().config;
+    final config = Posthog().config;
 
     super.initState();
 
-    if (options == null) {
+    if (config == null) {
       return;
     }
 
-    if (!options.sessionReplay) {
+    if (!config.sessionReplay) {
       return;
     }
 
-    _debounceDuration = options.sessionReplayConfig.debouncerDelay;
+    _debounceDuration = config.sessionReplayConfig.debouncerDelay;
 
-    _screenshotCapturer = ScreenshotCapturer(options);
+    _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
 
     _changeDetector = ChangeDetector(_onChangeDetected);
@@ -62,6 +62,12 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
   }
 
   Future<void> generateSnapshot() async {
+    final isSessionReplayActive =
+        await _nativeCommunicator.isSessionReplayActive();
+    if (!isSessionReplayActive) {
+      return;
+    }
+
     final imageInfo = await _screenshotCapturer.captureScreenshot();
     if (imageInfo == null) {
       printIfDebug('Error: Failed to capture screenshot.');
