@@ -59,12 +59,6 @@ class PostHogSessionReplayConfig {
   /// Default: true
   var maskAllImages = true;
 
-  /// Enable capturing of logcat as console events
-  /// Android only
-  /// Experimental support
-  /// Default: true
-  var captureLog = true;
-
   /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
   /// This is used for capturing the view as a screenshot
   /// The lower the number, the more snapshots will be captured but higher the performance impact
@@ -81,8 +75,8 @@ class PostHogSessionReplayConfig {
     return {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
-      'captureLog': captureLog,
       'captureNetworkTelemetry': captureNetworkTelemetry,
+      'debouncerDelayMs': debouncerDelay.inMilliseconds,
     };
   }
 }

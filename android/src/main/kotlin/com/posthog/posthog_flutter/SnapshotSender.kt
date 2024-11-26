@@ -3,7 +3,12 @@ package com.posthog.posthog_flutter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
-import com.posthog.internal.replay.*
+import com.posthog.internal.replay.RREvent
+import com.posthog.internal.replay.RRFullSnapshotEvent
+import com.posthog.internal.replay.RRMetaEvent
+import com.posthog.internal.replay.RRStyle
+import com.posthog.internal.replay.RRWireframe
+import com.posthog.internal.replay.capture
 import java.io.ByteArrayOutputStream
 
 class SnapshotSender {

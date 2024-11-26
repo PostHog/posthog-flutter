@@ -12,7 +12,7 @@ Future<void> main() async {
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
   config.sessionReplay = true;
-  config.sessionReplayConfig.maskAllTexts = true;
+  config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
   config.sessionReplayConfig.debouncerDelay =
       const Duration(milliseconds: 1000);

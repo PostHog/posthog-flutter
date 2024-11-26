@@ -249,11 +249,7 @@ class PosthogFlutterPlugin :
                     sessionReplay = it
                 }
 
-                posthogConfig.getIfNotNull<Map<String, Any>>("sessionReplayConfig") { sessionReplayConfig ->
-                    sessionReplayConfig.getIfNotNull<Boolean>("captureLog") {
-                        this.sessionReplayConfig.captureLogcat = it
-                    }
-                }
+                this.sessionReplayConfig.captureLogcat = false
 
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
