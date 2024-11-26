@@ -24,7 +24,6 @@ if (flutterVersionName == null) {
 
 allprojects {
     repositories {
-        mavenLocal()
         google()
         mavenCentral()
     }
