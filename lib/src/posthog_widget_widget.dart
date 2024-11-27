@@ -7,21 +7,20 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
-import 'change_detector.dart';
-import 'native_communicator.dart';
-import 'screenshot/screenshot_capturer.dart';
+import 'replay/change_detector.dart';
+import 'replay/native_communicator.dart';
+import 'replay/screenshot/screenshot_capturer.dart';
 
-class PostHogScreenshotWidget extends StatefulWidget {
+class PostHogWidget extends StatefulWidget {
   final Widget child;
 
-  PostHogScreenshotWidget({Key? key, required this.child}) : super(key: key);
+  const PostHogWidget({super.key, required this.child});
 
   @override
-  _PostHogScreenshotWidgetState createState() =>
-      _PostHogScreenshotWidgetState();
+  PostHogWidgetState createState() => PostHogWidgetState();
 }
 
-class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
+class PostHogWidgetState extends State<PostHogWidget> {
   late final ChangeDetector _changeDetector;
   late final ScreenshotCapturer _screenshotCapturer;
   late final NativeCommunicator _nativeCommunicator;
@@ -57,11 +56,11 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
     _debounceTimer?.cancel();
 
     _debounceTimer = Timer(_debounceDuration, () {
-      generateSnapshot();
+      _generateSnapshot();
     });
   }
 
-  Future<void> generateSnapshot() async {
+  Future<void> _generateSnapshot() async {
     final isSessionReplayActive =
         await _nativeCommunicator.isSessionReplayActive();
     if (!isSessionReplayActive) {
@@ -92,15 +91,6 @@ class _PostHogScreenshotWidgetState extends State<PostHogScreenshotWidget> {
 
     await _nativeCommunicator.sendFullSnapshot(pngBytes,
         id: imageInfo.id, x: imageInfo.x, y: imageInfo.y);
-  }
-
-  Duration _getDebounceDuration() {
-    final options = Posthog().config;
-
-    final sessionReplayConfig = options?.sessionReplayConfig;
-
-    return sessionReplayConfig?.debouncerDelay ??
-        const Duration(milliseconds: 1000);
   }
 
   @override

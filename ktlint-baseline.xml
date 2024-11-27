@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseline version="1.0">
+    <file name="android/src/main/kotlin/com/posthog/posthog_flutter/PostHogVersion.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="android/src/main/kotlin/com/posthog/posthog_flutter/PosthogFlutterPlugin.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="android/src/main/kotlin/com/posthog/posthog_flutter/SnapshotSender.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="android/src/test/kotlin/com/posthog/posthog_flutter/PosthogFlutterPluginTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="example/android/app/src/main/kotlin/com/example/posthog_flutter_example/MainActivity.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+</baseline>

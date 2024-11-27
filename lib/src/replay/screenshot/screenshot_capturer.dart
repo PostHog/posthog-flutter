@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';

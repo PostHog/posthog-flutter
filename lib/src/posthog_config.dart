@@ -62,7 +62,7 @@ class PostHogSessionReplayConfig {
   /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
   /// This is used for capturing the view as a screenshot
   /// The lower the number, the more snapshots will be captured but higher the performance impact
-  /// Defaults to 1s on iOS
+  /// Defaults to 1s
   var debouncerDelay = const Duration(seconds: 1);
 
   /// Enable capturing network telemetry

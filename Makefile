@@ -1,9 +1,8 @@
-.PHONY: formatKotlin formatSwift formatDart
+.PHONY: formatKotlin formatSwift formatDart checkDart
 
 # brew install ktlint
-# TODO: add ktlint steps in CI
 formatKotlin:
-	ktlint --format
+	ktlint --format --baseline=ktlint-baseline.xml
 
 # brew install swiftlint
 # TODO: add swiftlint steps in CI
@@ -13,4 +12,7 @@ formatSwift:
 
 formatDart:
 	dart format .
+
+checkDart:
+	dart format --set-exit-if-changed ./
 	dart analyze .

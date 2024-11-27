@@ -37,23 +37,23 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return PostHogScreenshotWidget(
+    return const PostHogWidget(
       child: MaterialApp(
         title: 'Flutter App',
-        home: InitialScreen(),
+        home: _InitialScreen(),
       ),
     );
   }
 }
 
-class InitialScreen extends StatefulWidget {
-  InitialScreen({Key? key}) : super(key: key);
+class _InitialScreen extends StatefulWidget {
+  const _InitialScreen({Key? key}) : super(key: key);
 
   @override
   _InitialScreenState createState() => _InitialScreenState();
 }
 
-class _InitialScreenState extends State<InitialScreen> {
+class _InitialScreenState extends State<_InitialScreen> {
   final _posthogFlutterPlugin = Posthog();
   dynamic _result = "";
 
@@ -79,7 +79,7 @@ class _InitialScreenState extends State<InitialScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const FirstRoute()),
+                          builder: (context) => const _FirstRoute()),
                     );
                   },
                   child: const Text('Go to Second Route'),
@@ -274,14 +274,14 @@ class _InitialScreenState extends State<InitialScreen> {
   }
 }
 
-class FirstRoute extends StatefulWidget {
-  const FirstRoute({super.key});
+class _FirstRoute extends StatefulWidget {
+  const _FirstRoute();
 
   @override
   _FirstRouteState createState() => _FirstRouteState();
 }
 
-class _FirstRouteState extends State<FirstRoute> with WidgetsBindingObserver {
+class _FirstRouteState extends State<_FirstRoute> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
