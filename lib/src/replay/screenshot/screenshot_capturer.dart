@@ -43,10 +43,12 @@ class ScreenshotCapturer {
     return min(width / srcWidth, height / srcHeight);
   }
 
-  void _updaeStatusView(
-      RenderObject renderObject, ViewTreeSnapshotStatus statusView) {
-    statusView.sentMetaEvent = true;
-    views[renderObject] = statusView;
+  void _updaeStatusView(bool shouldSendMetaEvent, RenderObject renderObject,
+      ViewTreeSnapshotStatus statusView) {
+    if (shouldSendMetaEvent) {
+      statusView.sentMetaEvent = true;
+      views[renderObject] = statusView;
+    }
   }
 
   Future<ImageInfo?> captureScreenshot() async {
@@ -91,7 +93,6 @@ class ScreenshotCapturer {
             await PostHogMaskController.instance.getCurrentScreenRects();
 
         if (screenElementsRects != null) {
-          _updaeStatusView(renderObject, statusView);
           final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(
               image, screenElementsRects, pixelRatio);
           final imageInfo = ImageInfo(
@@ -102,7 +103,7 @@ class ScreenshotCapturer {
               srcWidth.toInt(),
               srcHeight.toInt(),
               shouldSendMetaEvent);
-          _updaeStatusView(renderObject, statusView);
+          _updaeStatusView(shouldSendMetaEvent, renderObject, statusView);
           return imageInfo;
         }
       }
@@ -115,7 +116,7 @@ class ScreenshotCapturer {
           srcWidth.toInt(),
           srcHeight.toInt(),
           shouldSendMetaEvent);
-      _updaeStatusView(renderObject, statusView);
+      _updaeStatusView(shouldSendMetaEvent, renderObject, statusView);
       return imageInfo;
     } catch (e) {
       printIfDebug('Error capturing image: $e');
