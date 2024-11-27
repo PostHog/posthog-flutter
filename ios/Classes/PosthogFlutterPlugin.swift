@@ -109,7 +109,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         if let sessionReplay = posthogConfig["sessionReplay"] as? Bool {
             config.sessionReplay = sessionReplay
         }
-        // TODO: test if it works on ios
+        // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
         config.sessionReplayConfig.captureNetworkTelemetry = false
 
         // Update SDK name and version

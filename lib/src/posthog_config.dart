@@ -65,17 +65,10 @@ class PostHogSessionReplayConfig {
   /// Defaults to 1s
   var debouncerDelay = const Duration(seconds: 1);
 
-  /// Enable capturing network telemetry
-  /// iOS only
-  /// Experimental support
-  /// Default: true
-  var captureNetworkTelemetry = true;
-
   Map<String, dynamic> toMap() {
     return {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
-      'captureNetworkTelemetry': captureNetworkTelemetry,
       'debouncerDelayMs': debouncerDelay.inMilliseconds,
     };
   }
