@@ -498,3 +498,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         ))
     }
 }
+
+extension Date {
+    func toMillis() -> Int64 {
+        Int64(timeIntervalSince1970 * 1000)
+    }
+}
