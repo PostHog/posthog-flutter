@@ -46,13 +46,11 @@ class ScreenshotCapturer {
   Future<ImageInfo?> captureScreenshot() async {
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {
-      // print('Error: screenshotKey has no context.');
       return null;
     }
 
     final renderObject = context.findRenderObject() as RenderRepaintBoundary?;
     if (renderObject == null) {
-      // print('Error: Unable to find RenderRepaintBoundary.');
       return null;
     }
 
@@ -82,7 +80,6 @@ class ScreenshotCapturer {
 
       final ui.Image image = await renderObject.toImage(pixelRatio: pixelRatio);
 
-      // TODO: masking
       final replayConfig = _config.sessionReplayConfig;
 
       if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
@@ -90,7 +87,7 @@ class ScreenshotCapturer {
             await PostHogMaskController.instance.getCurrentScreenRects();
 
         if (screenElementsRects == null) {
-          // throw Exception('Failed to retrieve the element mask tree.');
+          // Failed to retrieve the element mask tree.
           final imageInfo = ImageInfo(
               image,
               viewId,

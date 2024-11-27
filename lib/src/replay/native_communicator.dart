@@ -1,11 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
-/*
-    * TEMPORARY CLASS FOR TESTING PURPOSES
-    * This function sends a screenshot to PostHog.
-    * It should be removed or refactored in the other version.
-    */
 class NativeCommunicator {
   static const MethodChannel _channel = MethodChannel('posthog_flutter');
 
