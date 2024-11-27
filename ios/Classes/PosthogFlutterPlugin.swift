@@ -217,14 +217,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             let id = args["id"] as? Int ?? 1
             let x = args["x"] as? Int ?? 0
             let y = args["y"] as? Int ?? 0
-            let imageBytes = args["imageBytes"] as? FlutterStandardTypedData
 
             guard let imageBytes = args["imageBytes"] as? FlutterStandardTypedData else {
                 _badArgumentError(result)
                 return
             }
-
-            let bytes = imageBytes.data
 
             guard let image = UIImage(data: imageBytes.data) else {
                 _badArgumentError(result)
