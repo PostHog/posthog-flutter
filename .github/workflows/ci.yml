@@ -27,7 +27,7 @@ jobs:
 
       - name: SDK format check
         run: |
-          make checkDart
+          make checkFormatDart
           make formatKotlin
 
       - name: Install dependencies

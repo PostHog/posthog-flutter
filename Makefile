@@ -13,6 +13,8 @@ formatSwift:
 formatDart:
 	dart format .
 
-checkDart:
+checkFormatDart:
 	dart format --set-exit-if-changed ./
+
+analyzeDart:
 	dart analyze .
