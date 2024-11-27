@@ -240,10 +240,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 "id": id,
                 "x": x,
                 "y": y,
-                "width": 0,
-                "height": 0,
+                "width": Int(image.size.width),
+                "height": Int(image.size.height),
                 "type": "screenshot",
                 "base64": base64,
+                "style": [:]
             ]
 
             wireframes.append(wireframe)
