@@ -26,13 +26,16 @@ jobs:
           channel: 'stable'
 
       - name: Install dependencies
-        working-directory: ./example
-        run: flutter pub get
+        run: |
+          flutter pub get
+          cd example
+          flutter pub get
 
       - name: SDK format check
         run: |
           make installKtLint
           make checkFormatDart
+          make analyzeDart
           make formatKotlin
 
       - name: Test

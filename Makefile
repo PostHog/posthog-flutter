@@ -18,6 +18,5 @@ formatDart:
 checkFormatDart:
 	dart format --set-exit-if-changed ./
 
-# TODO: add analyze steps in CI
 analyzeDart:
 	dart analyze .
