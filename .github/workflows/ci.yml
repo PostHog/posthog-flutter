@@ -33,10 +33,11 @@ jobs:
 
       - name: SDK format check
         run: |
-          make installKtLint
+          make installLinters
           make checkFormatDart
           make analyzeDart
           make formatKotlin
+          make formatSwift
 
       - name: Test
         run: flutter test
