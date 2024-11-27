@@ -19,6 +19,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
 
+    private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
+                                              target: .global(qos: .utility))
+
     public static func initPlugin() {
         let autoInit = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.AUTO_INIT") as? Bool ?? true
         if !autoInit {
@@ -106,11 +109,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 break
             }
         }
-        if let sessionReplay = posthogConfig["sessionReplay"] as? Bool {
-            config.sessionReplay = sessionReplay
-        }
-        // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
-        config.sessionReplayConfig.captureNetworkTelemetry = false
+        #if os(iOS)
+            if let sessionReplay = posthogConfig["sessionReplay"] as? Bool {
+                config.sessionReplay = sessionReplay
+            }
+            // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
+            config.sessionReplayConfig.captureNetworkTelemetry = false
+        #endif
 
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
@@ -173,92 +178,95 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private func sendMetaEvent(_ call: FlutterMethodCall,
                                result: @escaping FlutterResult)
     {
-        let timestamp = Date().toMillis()
-        if let args = call.arguments as? [String: Any] {
-            let width = args["width"] as? Int ?? 0
-            let height = args["height"] as? Int ?? 0
-            let screen = args["screen"] as? String ?? ""
+        #if os(iOS)
+            let timestamp = Date().toMillis()
+            if let args = call.arguments as? [String: Any] {
+                let width = args["width"] as? Int ?? 0
+                let height = args["height"] as? Int ?? 0
+                let screen = args["screen"] as? String ?? ""
 
-            if width == 0 || height == 0 {
+                if width == 0 || height == 0 {
+                    _badArgumentError(result)
+                    return
+                }
+
+                dispatchQueue.async {
+                    var snapshotsData: [Any] = []
+                    let data: [String: Any] = ["width": width, "height": height, "href": screen]
+
+                    let snapshotData: [String: Any] = ["type": 4, "data": data, "timestamp": timestamp]
+                    snapshotsData.append(snapshotData)
+
+                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
+                }
+
+                result(nil)
+            } else {
                 _badArgumentError(result)
-                return
             }
-
-            var snapshotsData: [Any] = []
-            let data: [String: Any] = ["width": width, "height": height, "href": screen]
-
-            let snapshotData: [String: Any] = ["type": 4, "data": data, "timestamp": timestamp]
-            snapshotsData.append(snapshotData)
-
-            PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
-
+        #else
             result(nil)
-        } else {
-            _badArgumentError(result)
-        }
-    }
-
-    private func imageToBase64(_ image: UIImage) -> String? {
-        let jpegData = image.jpegData(compressionQuality: 0.3)
-        let base64 = jpegData?.base64EncodedString()
-
-        if let base64 = base64 {
-            return "data:image/jpeg;base64,\(base64)"
-        }
-
-        return nil
+        #endif
     }
 
     private func sendFullSnapshot(_ call: FlutterMethodCall,
                                   result: @escaping FlutterResult)
     {
-        let timestamp = Date().toMillis()
-        if let args = call.arguments as? [String: Any] {
-            let id = args["id"] as? Int ?? 1
-            let x = args["x"] as? Int ?? 0
-            let y = args["y"] as? Int ?? 0
+        #if os(iOS)
+            let timestamp = Date().toMillis()
+            if let args = call.arguments as? [String: Any] {
+                let id = args["id"] as? Int ?? 1
+                let x = args["x"] as? Int ?? 0
+                let y = args["y"] as? Int ?? 0
 
-            guard let imageBytes = args["imageBytes"] as? FlutterStandardTypedData else {
+                guard let imageBytes = args["imageBytes"] as? FlutterStandardTypedData else {
+                    _badArgumentError(result)
+                    return
+                }
+
+                dispatchQueue.async {
+                    guard let image = UIImage(data: imageBytes.data) else {
+                        // bad data but we cannot do this in the calling thread
+                        // otherwise we are doing slow operatios in the main thread
+                        return
+                    }
+
+                    guard let base64 = image.toBase64() else {
+                        // bad data but we cannot do this in the calling thread
+                        // otherwise we are doing slow operatios in the main thread
+                        return
+                    }
+
+                    var snapshotsData: [Any] = []
+                    var wireframes: [Any] = []
+
+                    let wireframe: [String: Any] = [
+                        "id": id,
+                        "x": x,
+                        "y": y,
+                        "width": Int(image.size.width),
+                        "height": Int(image.size.height),
+                        "type": "screenshot",
+                        "base64": base64,
+                        "style": [:],
+                    ]
+
+                    wireframes.append(wireframe)
+                    let initialOffset = ["top": 0, "left": 0]
+                    let data: [String: Any] = ["initialOffset": initialOffset, "wireframes": wireframes]
+                    let snapshotData: [String: Any] = ["type": 2, "data": data, "timestamp": timestamp]
+                    snapshotsData.append(snapshotData)
+
+                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
+                }
+
+                result(nil)
+            } else {
                 _badArgumentError(result)
-                return
             }
-
-            guard let image = UIImage(data: imageBytes.data) else {
-                _badArgumentError(result)
-                return
-            }
-
-            guard let base64 = imageToBase64(image) else {
-                _badArgumentError(result)
-                return
-            }
-
-            var snapshotsData: [Any] = []
-            var wireframes: [Any] = []
-
-            let wireframe: [String: Any] = [
-                "id": id,
-                "x": x,
-                "y": y,
-                "width": Int(image.size.width),
-                "height": Int(image.size.height),
-                "type": "screenshot",
-                "base64": base64,
-                "style": [:]
-            ]
-
-            wireframes.append(wireframe)
-            let initialOffset = ["top": 0, "left": 0]
-            let data: [String: Any] = ["initialOffset": initialOffset, "wireframes": wireframes]
-            let snapshotData: [String: Any] = ["type": 2, "data": data, "timestamp": timestamp]
-            snapshotsData.append(snapshotData)
-
-            PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
-
+        #else
             result(nil)
-        } else {
-            _badArgumentError(result)
-        }
+        #endif
     }
 
     private func isSessionReplayActive(result: @escaping FlutterResult) {
@@ -494,11 +502,5 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result(FlutterError(
             code: "PosthogFlutterException", message: "Missing arguments!", details: nil
         ))
-    }
-}
-
-extension Date {
-    func toMillis() -> Int64 {
-        Int64(timeIntervalSince1970 * 1000)
     }
 }
