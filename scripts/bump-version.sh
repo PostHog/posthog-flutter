@@ -14,7 +14,7 @@ NEW_VERSION="$1"
 perl -pi -e "s/postHogFlutterVersion = \".*\"/postHogFlutterVersion = \"$NEW_VERSION\"/" ios/Classes/PostHogFlutterVersion.swift
 
 # Replace Android `postHogVersion` with the given version
-perl -pi -e "s/postHogVersion = \".*\"/postHogVersion = \"$NEW_VERSION\"/" android/src/main/kotlin/com/posthog/posthog_flutter/PostHogVersion.kt
+perl -pi -e "s/postHogVersion = \".*\"/postHogVersion = \"$NEW_VERSION\"/" android/src/main/kotlin/com/posthog/flutter/PostHogVersion.kt
 
 # Replace Flutter `version` with the given version
 perl -pi -e "s/^version: .*/version: $NEW_VERSION/" pubspec.yaml

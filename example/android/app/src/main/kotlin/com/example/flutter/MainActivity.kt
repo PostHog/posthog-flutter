@@ -1,4 +1,4 @@
-package com.example.posthog_flutter_example
+package com.example.flutter
 
 import io.flutter.embedding.android.FlutterActivity
 

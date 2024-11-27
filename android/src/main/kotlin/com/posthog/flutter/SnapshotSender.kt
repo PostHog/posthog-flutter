@@ -1,4 +1,4 @@
-package com.posthog.posthog_flutter
+package com.posthog.flutter
 
 import android.graphics.BitmapFactory
 import com.posthog.android.internal.base64

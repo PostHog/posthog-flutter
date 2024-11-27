@@ -40,7 +40,7 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.posthog.posthog_flutter
+        package: com.posthog.flutter
         pluginClass: PosthogFlutterPlugin
       ios:
         pluginClass: PosthogFlutterPlugin

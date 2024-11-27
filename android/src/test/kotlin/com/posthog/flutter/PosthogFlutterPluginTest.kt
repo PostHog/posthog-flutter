@@ -1,4 +1,4 @@
-package com.posthog.posthog_flutter
+package com.posthog.flutter
 
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel

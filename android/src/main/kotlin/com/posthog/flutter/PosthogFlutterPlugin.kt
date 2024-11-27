@@ -1,4 +1,4 @@
-package com.posthog.posthog_flutter
+package com.posthog.flutter
 
 import android.content.Context
 import android.os.Bundle
