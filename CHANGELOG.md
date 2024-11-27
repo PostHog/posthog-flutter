@@ -1,5 +1,7 @@
 ## Next
 
+- chore: flutter session replay (Android and iOS) ([#123](https://github.com/PostHog/posthog-flutter/pull/123))
+
 ## 4.6.0
 
 - chore: change host to new address ([#106](https://github.com/PostHog/posthog-flutter/pull/106))
