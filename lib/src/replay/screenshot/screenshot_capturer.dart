@@ -43,6 +43,12 @@ class ScreenshotCapturer {
     return min(width / srcWidth, height / srcHeight);
   }
 
+  void _updaeStatusView(
+      RenderObject renderObject, ViewTreeSnapshotStatus statusView) {
+    statusView.sentMetaEvent = true;
+    views[renderObject] = statusView;
+  }
+
   Future<ImageInfo?> captureScreenshot() async {
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {
@@ -59,9 +65,7 @@ class ScreenshotCapturer {
     var shouldSendMetaEvent = false;
     if (!statusView.sentMetaEvent) {
       shouldSendMetaEvent = true;
-      statusView.sentMetaEvent = true;
     }
-    views[renderObject] = statusView;
 
     var globalPosition = Offset.zero;
     // Get the global position of the widget
@@ -86,30 +90,21 @@ class ScreenshotCapturer {
         final screenElementsRects =
             await PostHogMaskController.instance.getCurrentScreenRects();
 
-        if (screenElementsRects == null) {
-          // Failed to retrieve the element mask tree.
+        if (screenElementsRects != null) {
+          _updaeStatusView(renderObject, statusView);
+          final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(
+              image, screenElementsRects, pixelRatio);
           final imageInfo = ImageInfo(
-              image,
+              maskedImage,
               viewId,
               globalPosition.dx.toInt(),
               globalPosition.dy.toInt(),
               srcWidth.toInt(),
               srcHeight.toInt(),
               shouldSendMetaEvent);
+          _updaeStatusView(renderObject, statusView);
           return imageInfo;
         }
-
-        final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(
-            image, screenElementsRects, pixelRatio);
-        final imageInfo = ImageInfo(
-            maskedImage,
-            viewId,
-            globalPosition.dx.toInt(),
-            globalPosition.dy.toInt(),
-            srcWidth.toInt(),
-            srcHeight.toInt(),
-            shouldSendMetaEvent);
-        return imageInfo;
       }
 
       final imageInfo = ImageInfo(
@@ -120,6 +115,7 @@ class ScreenshotCapturer {
           srcWidth.toInt(),
           srcHeight.toInt(),
           shouldSendMetaEvent);
+      _updaeStatusView(renderObject, statusView);
       return imageInfo;
     } catch (e) {
       printIfDebug('Error capturing image: $e');
