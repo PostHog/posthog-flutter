@@ -36,7 +36,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             "apiKey": apiKey,
             "host": host,
             "captureApplicationLifecycleEvents": captureApplicationLifecycleEvents,
-            "debug": debug
+            "debug": debug,
         ])
     }
 
@@ -106,6 +106,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 break
             }
         }
+        if let sessionReplay = posthogConfig["sessionReplay"] as? Bool {
+            config.sessionReplay = sessionReplay
+        }
+        // TODO: test if it works on ios
+        config.sessionReplayConfig.captureNetworkTelemetry = false
 
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
@@ -154,9 +159,116 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             flush(result)
         case "close":
             close(result)
+        case "sendMetaEvent":
+            sendMetaEvent(call, result: result)
+        case "sendFullSnapshot":
+            sendFullSnapshot(call, result: result)
+        case "isSessionReplayActive":
+            isSessionReplayActive(result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+
+    private func sendMetaEvent(_ call: FlutterMethodCall,
+                               result: @escaping FlutterResult)
+    {
+        let timestamp = Date().toMillis()
+        if let args = call.arguments as? [String: Any] {
+            let width = args["width"] as? Int ?? 0
+            let height = args["height"] as? Int ?? 0
+            let screen = args["screen"] as? String ?? ""
+
+            if width == 0 || height == 0 {
+                _badArgumentError(result)
+                return
+            }
+
+            var snapshotsData: [Any] = []
+            let data: [String: Any] = ["width": width, "height": height, "href": screen]
+
+            let snapshotData: [String: Any] = ["type": 4, "data": data, "timestamp": timestamp]
+            snapshotsData.append(snapshotData)
+
+            PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
+
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func imageToBase64(_ image: UIImage) -> String? {
+        let jpegData = image.jpegData(compressionQuality: 0.3)
+        let base64 = jpegData?.base64EncodedString()
+
+        if let base64 = base64 {
+            return "data:image/jpeg;base64,\(base64)"
+        }
+
+        return nil
+    }
+
+    private func sendFullSnapshot(_ call: FlutterMethodCall,
+                                  result: @escaping FlutterResult)
+    {
+        let timestamp = Date().toMillis()
+        if let args = call.arguments as? [String: Any] {
+            let id = args["id"] as? Int ?? 1
+            let x = args["x"] as? Int ?? 0
+            let y = args["y"] as? Int ?? 0
+            let imageBytes = args["imageBytes"] as? FlutterStandardTypedData
+
+            guard let imageBytes = args["imageBytes"] as? FlutterStandardTypedData else {
+                _badArgumentError(result)
+                return
+            }
+
+            let bytes = imageBytes.data
+
+            guard let image = UIImage(data: imageBytes.data) else {
+                _badArgumentError(result)
+                return
+            }
+
+            guard let base64 = imageToBase64(image) else {
+                _badArgumentError(result)
+                return
+            }
+
+            var snapshotsData: [Any] = []
+            var wireframes: [Any] = []
+
+            let wireframe: [String: Any] = [
+                "id": id,
+                "x": x,
+                "y": y,
+                "width": 0,
+                "height": 0,
+                "type": "screenshot",
+                "base64": base64,
+            ]
+
+            wireframes.append(wireframe)
+            let initialOffset = ["top": 0, "left": 0]
+            let data: [String: Any] = ["initialOffset": initialOffset, "wireframes": wireframes]
+            let snapshotData: [String: Any] = ["type": 2, "data": data, "timestamp": timestamp]
+            snapshotsData.append(snapshotData)
+
+            PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
+
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func isSessionReplayActive(result: @escaping FlutterResult) {
+        #if os(iOS)
+            result(PostHogSDK.shared.isSessionReplayActive())
+        #else
+            result(false)
+        #endif
     }
 
     private func setup(
@@ -176,7 +288,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String {
+           let featureFlagKey = args["key"] as? String
+        {
             let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
             result(value)
         } else {
@@ -189,7 +302,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String {
+           let featureFlagKey = args["key"] as? String
+        {
             let value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
             result(value)
         } else {
@@ -202,7 +316,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String {
+           let featureFlagKey = args["key"] as? String
+        {
             let value = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
             result(value)
         } else {
@@ -215,7 +330,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let userId = args["userId"] as? String {
+           let userId = args["userId"] as? String
+        {
             let userProperties = args["userProperties"] as? [String: Any]
             let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
 
@@ -235,7 +351,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let eventName = args["eventName"] as? String {
+           let eventName = args["eventName"] as? String
+        {
             let properties = args["properties"] as? [String: Any]
             PostHogSDK.shared.capture(
                 eventName,
@@ -252,7 +369,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let screenName = args["screenName"] as? String {
+           let screenName = args["screenName"] as? String
+        {
             let properties = args["properties"] as? [String: Any]
             PostHogSDK.shared.screen(
                 screenName,
@@ -269,7 +387,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let alias = args["alias"] as? String {
+           let alias = args["alias"] as? String
+        {
             PostHogSDK.shared.alias(alias)
             result(nil)
         } else {
@@ -302,7 +421,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let debug = args["debug"] as? Bool {
+           let debug = args["debug"] as? Bool
+        {
             PostHogSDK.shared.debug(debug)
             result(nil)
         } else {
@@ -322,7 +442,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     ) {
         if let args = call.arguments as? [String: Any],
            let groupType = args["groupType"] as? String,
-           let groupKey = args["groupKey"] as? String {
+           let groupKey = args["groupKey"] as? String
+        {
             let groupProperties = args["groupProperties"] as? [String: Any]
             PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties)
             result(nil)
@@ -337,7 +458,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     ) {
         if let args = call.arguments as? [String: Any],
            let key = args["key"] as? String,
-           let value = args["value"] {
+           let value = args["value"]
+        {
             PostHogSDK.shared.register([key: value])
             result(nil)
         } else {
@@ -350,7 +472,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any],
-           let key = args["key"] as? String {
+           let key = args["key"] as? String
+        {
             PostHogSDK.shared.unregister(key)
             result(nil)
         } else {
