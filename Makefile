@@ -1,6 +1,8 @@
-.PHONY: formatKotlin formatSwift formatDart checkDart
+.PHONY: formatKotlin formatSwift formatDart checkDart installKtLint
 
-# brew install ktlint
+installKtLint:
+	brew install ktlint
+
 formatKotlin:
 	ktlint --format --baseline=ktlint-baseline.xml
 
