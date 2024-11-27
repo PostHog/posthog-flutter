@@ -21,24 +21,19 @@ class PostHogWidget extends StatefulWidget {
 }
 
 class PostHogWidgetState extends State<PostHogWidget> {
-  late final ChangeDetector _changeDetector;
-  late final ScreenshotCapturer _screenshotCapturer;
-  late final NativeCommunicator _nativeCommunicator;
+  ChangeDetector? _changeDetector;
+  ScreenshotCapturer? _screenshotCapturer;
+  NativeCommunicator? _nativeCommunicator;
 
   Timer? _debounceTimer;
   Duration _debounceDuration = const Duration(milliseconds: 1000);
 
   @override
   void initState() {
-    final config = Posthog().config;
-
     super.initState();
 
-    if (config == null) {
-      return;
-    }
-
-    if (!config.sessionReplay) {
+    final config = Posthog().config;
+    if (config == null || !config.sessionReplay) {
       return;
     }
 
@@ -48,7 +43,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _nativeCommunicator = NativeCommunicator();
 
     _changeDetector = ChangeDetector(_onChangeDetected);
-    _changeDetector.start();
+    _changeDetector?.start();
   }
 
   // This works as onRootViewsChangedListeners
@@ -62,20 +57,22 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   Future<void> _generateSnapshot() async {
     final isSessionReplayActive =
-        await _nativeCommunicator.isSessionReplayActive();
+        await _nativeCommunicator?.isSessionReplayActive() ?? false;
     if (!isSessionReplayActive) {
       return;
     }
 
-    final imageInfo = await _screenshotCapturer.captureScreenshot();
+    final imageInfo = await _screenshotCapturer?.captureScreenshot();
     if (imageInfo == null) {
       printIfDebug('Error: Failed to capture screenshot.');
       return;
     }
 
     if (imageInfo.shouldSendMetaEvent) {
-      await _nativeCommunicator.sendMetaEvent(
-          width: imageInfo.width, height: imageInfo.height);
+      await _nativeCommunicator?.sendMetaEvent(
+          width: imageInfo.width,
+          height: imageInfo.height,
+          screen: Posthog().currentScreen);
     }
 
     // TODO: package:image/image.dart to convert to jpeg instead
@@ -89,7 +86,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
     Uint8List pngBytes = byteData.buffer.asUint8List();
     imageInfo.image.dispose();
 
-    await _nativeCommunicator.sendFullSnapshot(pngBytes,
+    await _nativeCommunicator?.sendFullSnapshot(pngBytes,
         id: imageInfo.id, x: imageInfo.x, y: imageInfo.y);
   }
 
@@ -108,6 +105,12 @@ class PostHogWidgetState extends State<PostHogWidget> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _changeDetector?.stop();
+    _changeDetector = null;
+    _screenshotCapturer = null;
+    _nativeCommunicator = null;
+
     super.dispose();
   }
 }

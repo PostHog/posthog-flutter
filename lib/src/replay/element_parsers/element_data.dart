@@ -13,7 +13,7 @@ class ElementData {
 
   void addChildren(ElementData elementData) {
     children ??= [];
-    children!.add(elementData);
+    children?.add(elementData);
   }
 
   //TODO: THIS MAY BE BETTER
@@ -25,12 +25,12 @@ class ElementData {
     }
 
     if (children != null) {
-      for (var child in children!) {
+      for (var child in children ?? []) {
         if (child.children == null) {
           rects.add(child.rect);
           continue;
-        } else if (child.children!.length > 1) {
-          for (var grandChild in child.children!) {
+        } else if ((child.children?.length ?? 0) > 1) {
+          for (var grandChild in child.children ?? []) {
             rects.add(grandChild.rect);
           }
         } else {

@@ -23,11 +23,15 @@ class NativeCommunicator {
     }
   }
 
-  Future<void> sendMetaEvent({required int width, required int height}) async {
+  Future<void> sendMetaEvent(
+      {required int width,
+      required int height,
+      required String? screen}) async {
     try {
       await _channel.invokeMethod('sendMetaEvent', {
         'width': width,
         'height': height,
+        'screen': screen,
       });
     } catch (e) {
       printIfDebug('Error sending full snapshot to native: $e');

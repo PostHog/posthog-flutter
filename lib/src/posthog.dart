@@ -1,5 +1,6 @@
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'posthog_observer.dart';
 
 class Posthog {
   static PosthogFlutterPlatformInterface get _posthog =>
@@ -25,6 +26,10 @@ class Posthog {
   }
 
   PostHogConfig? get config => _config;
+
+  /// Returns the current screen name (or route name)
+  /// Only returns a value if [PosthogObserver] is used
+  String? get currentScreen => _currentScreen;
 
   Future<void> identify({
     required String userId,
@@ -57,11 +62,13 @@ class Posthog {
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
-  }) =>
-      _posthog.screen(
-        screenName: screenName,
-        properties: properties,
-      );
+  }) {
+    _currentScreen = screenName;
+    return _posthog.screen(
+      screenName: screenName,
+      properties: properties,
+    );
+  }
 
   Future<void> alias({
     required String alias,
@@ -108,7 +115,11 @@ class Posthog {
 
   Future<void> flush() => _posthog.flush();
 
-  Future<void> close() => _posthog.close();
+  Future<void> close() {
+    _config = null;
+    _currentScreen = null;
+    return _posthog.close();
+  }
 
   Posthog._internal();
 }

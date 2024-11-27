@@ -171,13 +171,14 @@ class PosthogFlutterPlugin :
         try {
             val width = call.argument<Int>("width") ?: 0
             val height = call.argument<Int>("height") ?: 0
+            val screen = call.argument<String>("screen") ?: ""
 
             if (width == 0 || height == 0) {
                 result.error("INVALID_ARGUMENT", "Width or height is 0", null)
                 return
             }
 
-            snapshotSender.sendMetaEvent(width, height)
+            snapshotSender.sendMetaEvent(width, height, screen)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

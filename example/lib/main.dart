@@ -37,10 +37,11 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return const PostHogWidget(
+    return PostHogWidget(
       child: MaterialApp(
+        navigatorObservers: [PosthogObserver()],
         title: 'Flutter App',
-        home: _InitialScreen(),
+        home: const _InitialScreen(),
       ),
     );
   }

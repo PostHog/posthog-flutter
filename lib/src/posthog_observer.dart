@@ -40,7 +40,11 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
         screenName = 'root (\'/\')';
       }
 
-      Posthog().screen(screenName: screenName!);
+      if (screenName == null) {
+        return;
+      }
+
+      Posthog().screen(screenName: screenName);
     }
   }
 

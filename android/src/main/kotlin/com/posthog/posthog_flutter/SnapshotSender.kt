@@ -45,10 +45,11 @@ class SnapshotSender {
     fun sendMetaEvent(
         width: Int,
         height: Int,
+        screen: String,
     ) {
         val metaEvent =
             RRMetaEvent(
-                href = "", // TODO: get href from flutter
+                href = screen,
                 width = width,
                 height = height,
                 timestamp = System.currentTimeMillis(),
