@@ -15,8 +15,16 @@ class PostHogConfig {
   var debug = false;
   var optOut = false;
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
+
+  /// Enable Recording of Session replay for Android and iOS.
+  /// Requires Record user sessions to be enabled in the PostHog Project Settings.
+  /// Experimental support.
+  /// Defaults to false.
   var sessionReplay = false;
 
+  /// Configurations for Session replay.
+  /// [sessionReplay] has to be enabled for this to take effect.
+  /// Experimental support
   var sessionReplayConfig = PostHogSessionReplayConfig();
 
   /// iOS only
@@ -49,20 +57,20 @@ class PostHogConfig {
 }
 
 class PostHogSessionReplayConfig {
-  /// Enable masking of all text input fields
-  /// Experimental support
-  /// Default: true
+  /// Enable masking of all text and text input fields.
+  /// Experimental support.
+  /// Default: true.
   var maskAllTexts = true;
 
-  /// Enable masking of all images to a placeholder
-  /// Experimental support
-  /// Default: true
+  /// Enable masking of all images.
+  /// Experimental support.
+  /// Default: true.
   var maskAllImages = true;
 
-  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact
-  /// This is used for capturing the view as a screenshot
-  /// The lower the number, the more snapshots will be captured but higher the performance impact
-  /// Defaults to 1s
+  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
+  /// This is used for capturing the view as a screenshot.
+  /// The lower the number, the more snapshots will be captured but higher the performance impact.
+  /// Defaults to 1s.
   var debouncerDelay = const Duration(seconds: 1);
 
   Map<String, dynamic> toMap() {
