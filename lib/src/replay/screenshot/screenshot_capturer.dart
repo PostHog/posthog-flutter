@@ -27,7 +27,8 @@ class ViewTreeSnapshotStatus {
 class ScreenshotCapturer {
   final PostHogConfig _config;
   final ImageMaskPainter _imageMaskPainter = ImageMaskPainter();
-  final Map<RenderObject, ViewTreeSnapshotStatus> views = {};
+  // Expando is the equivalent of weakref
+  final _views = Expando();
 
   ScreenshotCapturer(this._config);
 
@@ -47,7 +48,7 @@ class ScreenshotCapturer {
       ViewTreeSnapshotStatus statusView) {
     if (shouldSendMetaEvent) {
       statusView.sentMetaEvent = true;
-      views[renderObject] = statusView;
+      _views[renderObject] = statusView;
     }
   }
 
@@ -62,7 +63,8 @@ class ScreenshotCapturer {
       return null;
     }
 
-    final statusView = views[renderObject] ?? ViewTreeSnapshotStatus(false);
+    final statusView = (_views[renderObject] as ViewTreeSnapshotStatus?) ??
+        ViewTreeSnapshotStatus(false);
 
     var shouldSendMetaEvent = false;
     if (!statusView.sentMetaEvent) {
