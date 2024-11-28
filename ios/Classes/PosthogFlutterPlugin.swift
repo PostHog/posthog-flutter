@@ -179,7 +179,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                                result: @escaping FlutterResult)
     {
         #if os(iOS)
-            let timestamp = Date().toMillis()
+            let timestamp = dateToMillis(Date())
             if let args = call.arguments as? [String: Any] {
                 let width = args["width"] as? Int ?? 0
                 let height = args["height"] as? Int ?? 0
@@ -213,7 +213,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                                   result: @escaping FlutterResult)
     {
         #if os(iOS)
-            let timestamp = Date().toMillis()
+            let timestamp = dateToMillis(Date())
             if let args = call.arguments as? [String: Any] {
                 let id = args["id"] as? Int ?? 1
                 let x = args["x"] as? Int ?? 0
@@ -231,7 +231,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                         return
                     }
 
-                    guard let base64 = image.toBase64() else {
+                    guard let base64 = imageToBase64(image) else {
                         // bad data but we cannot do this in the calling thread
                         // otherwise we are doing slow operatios in the main thread
                         return
