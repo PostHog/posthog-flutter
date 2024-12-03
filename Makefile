@@ -1,16 +1,21 @@
-.PHONY: formatKotlin formatSwift formatDart
+.PHONY: formatKotlin formatSwift formatDart checkDart installLinters
 
-# brew install ktlint
-# TODO: add ktlint steps in CI
+installLinters:
+	brew install ktlint
+	brew install swiftformat
+
 formatKotlin:
-	ktlint --format
+	ktlint --format --baseline=ktlint-baseline.xml
 
-# brew install swiftlint
-# TODO: add swiftlint steps in CI
+# swiftlint ios/Classes --fix conflicts with swiftformat
 formatSwift:
 	swiftformat ios/Classes --swiftversion 5.3
-	swiftlint ios/Classes --fix
 
 formatDart:
 	dart format .
+
+checkFormatDart:
+	dart format --set-exit-if-changed ./
+
+analyzeDart:
 	dart analyze .

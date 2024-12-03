@@ -53,7 +53,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<!-- <key>com.posthog.posthog.AUTO_INIT</key>
-	<false/> -->
+	<key>com.posthog.posthog.AUTO_INIT</key>
+	<false/>
 </dict>
 </plist>

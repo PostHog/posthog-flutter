@@ -1,9 +1,6 @@
-package com.posthog.posthog_flutter
+package com.posthog.flutter
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import com.posthog.PersonProfiles
@@ -11,6 +8,7 @@ import com.posthog.PostHog
 import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
+import com.posthog.android.internal.getApplicationInfo
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -29,6 +27,8 @@ class PosthogFlutterPlugin :
 
     private lateinit var applicationContext: Context
 
+    private val snapshotSender = SnapshotSender()
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
 
@@ -37,22 +37,6 @@ class PosthogFlutterPlugin :
 
         channel.setMethodCallHandler(this)
     }
-
-    // TODO: expose on the android SDK instead
-    @Throws(PackageManager.NameNotFoundException::class)
-    private fun getApplicationInfo(context: Context): ApplicationInfo =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context
-                .packageManager
-                .getApplicationInfo(
-                    context.packageName,
-                    PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
-                )
-        } else {
-            context
-                .packageManager
-                .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
-        }
 
     private fun initPlugin() {
         try {
@@ -163,9 +147,41 @@ class PosthogFlutterPlugin :
             "close" -> {
                 close(result)
             }
+            "sendMetaEvent" -> {
+                handleMetaEvent(call, result)
+            }
+            "sendFullSnapshot" -> {
+                handleSendFullSnapshot(call, result)
+            }
+            "isSessionReplayActive" -> {
+                result.success(isSessionReplayActive())
+            }
             else -> {
                 result.notImplemented()
             }
+        }
+    }
+
+    private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
+
+    private fun handleMetaEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val width = call.argument<Int>("width") ?: 0
+            val height = call.argument<Int>("height") ?: 0
+            val screen = call.argument<String>("screen") ?: ""
+
+            if (width == 0 || height == 0) {
+                result.error("INVALID_ARGUMENT", "Width or height is 0", null)
+                return
+            }
+
+            snapshotSender.sendMetaEvent(width, height, screen)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 
@@ -235,6 +251,12 @@ class PosthogFlutterPlugin :
                         "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
                     }
                 }
+                posthogConfig.getIfNotNull<Boolean>("sessionReplay") {
+                    sessionReplay = it
+                }
+
+                this.sessionReplayConfig.captureLogcat = false
+
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
             }
@@ -243,6 +265,26 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+    }
+
+    private fun handleSendFullSnapshot(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val imageBytes = call.argument<ByteArray>("imageBytes")
+            val id = call.argument<Int>("id") ?: 1
+            val x = call.argument<Int>("x") ?: 0
+            val y = call.argument<Int>("y") ?: 0
+            if (imageBytes != null) {
+                snapshotSender.sendFullSnapshot(imageBytes, id, x, y)
+                result.success(null)
+            } else {
+                result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+            }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
     }
 
     private fun getFeatureFlag(

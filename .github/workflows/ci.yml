@@ -25,12 +25,19 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: SDK format check
-        run: dart format --set-exit-if-changed ./
-
       - name: Install dependencies
-        working-directory: ./example
-        run: flutter pub get
+        run: |
+          flutter pub get
+          cd example
+          flutter pub get
+
+      - name: SDK format check
+        run: |
+          make installLinters
+          make checkFormatDart
+          make analyzeDart
+          make formatKotlin
+          make formatSwift
 
       - name: Test
         run: flutter test
