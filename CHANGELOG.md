@@ -1,6 +1,10 @@
 ## Next
 
+## 4.7.0
+
 - chore: flutter session replay (Android and iOS) ([#123](https://github.com/PostHog/posthog-flutter/pull/123))
+  - [Session replay docs](https://posthog.com/docs/session-replay/mobile), [PR pending review](https://github.com/PostHog/posthog.com/pull/10042)
+  - Thanks @thisames for the [PR](https://github.com/PostHog/posthog-flutter/pull/116)!
 
 ## 4.6.0
 
