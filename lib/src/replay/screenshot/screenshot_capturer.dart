@@ -38,13 +38,13 @@ class ScreenshotCapturer {
     required double srcWidth,
     required double srcHeight,
   }) {
-    if (width == null || height == null) {
+    if (width == null || height == null || srcWidth <= 0 || srcHeight <= 0) {
       return 1.0;
     }
     return min(width / srcWidth, height / srcHeight);
   }
 
-  void _updaeStatusView(bool shouldSendMetaEvent, RenderObject renderObject,
+  void _updateStatusView(bool shouldSendMetaEvent, RenderObject renderObject,
       ViewTreeSnapshotStatus statusView) {
     if (shouldSendMetaEvent) {
       statusView.sentMetaEvent = true;
@@ -66,17 +66,10 @@ class ScreenshotCapturer {
     final statusView = (_views[renderObject] as ViewTreeSnapshotStatus?) ??
         ViewTreeSnapshotStatus(false);
 
-    var shouldSendMetaEvent = false;
-    if (!statusView.sentMetaEvent) {
-      shouldSendMetaEvent = true;
-    }
+    final shouldSendMetaEvent = !statusView.sentMetaEvent;
 
-    var globalPosition = Offset.zero;
     // Get the global position of the widget
-    final box = renderObject as RenderBox?;
-    if (box != null) {
-      globalPosition = box.localToGlobal(Offset.zero);
-    }
+    final globalPosition = renderObject.localToGlobal(Offset.zero);
 
     final viewId = identityHashCode(renderObject);
 
@@ -105,7 +98,7 @@ class ScreenshotCapturer {
               srcWidth.toInt(),
               srcHeight.toInt(),
               shouldSendMetaEvent);
-          _updaeStatusView(shouldSendMetaEvent, renderObject, statusView);
+          _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
           return imageInfo;
         }
       }
@@ -118,7 +111,7 @@ class ScreenshotCapturer {
           srcWidth.toInt(),
           srcHeight.toInt(),
           shouldSendMetaEvent);
-      _updaeStatusView(shouldSendMetaEvent, renderObject, statusView);
+      _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
       return imageInfo;
     } catch (e) {
       printIfDebug('Error capturing image: $e');

@@ -179,7 +179,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                                result: @escaping FlutterResult)
     {
         #if os(iOS)
-            let timestamp = dateToMillis(Date())
+            let date = Date()
+            let timestamp = dateToMillis(date)
             if let args = call.arguments as? [String: Any] {
                 let width = args["width"] as? Int ?? 0
                 let height = args["height"] as? Int ?? 0
@@ -197,7 +198,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                     let snapshotData: [String: Any] = ["type": 4, "data": data, "timestamp": timestamp]
                     snapshotsData.append(snapshotData)
 
-                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
+                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
                 }
 
                 result(nil)
@@ -213,7 +214,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                                   result: @escaping FlutterResult)
     {
         #if os(iOS)
-            let timestamp = dateToMillis(Date())
+            let date = Date()
+            let timestamp = dateToMillis(date)
             if let args = call.arguments as? [String: Any] {
                 let id = args["id"] as? Int ?? 1
                 let x = args["x"] as? Int ?? 0
@@ -257,7 +259,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                     let snapshotData: [String: Any] = ["type": 2, "data": data, "timestamp": timestamp]
                     snapshotsData.append(snapshotData)
 
-                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
+                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
                 }
 
                 result(nil)

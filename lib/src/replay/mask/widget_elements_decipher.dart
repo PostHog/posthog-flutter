@@ -5,7 +5,7 @@ import 'package:posthog_flutter/src/replay/element_parsers/element_object_parser
 import 'package:posthog_flutter/src/replay/element_parsers/root_element_provider.dart';
 
 class WidgetElementsDecipher {
-  late ElementData rootElementData;
+  late ElementData _rootElementData;
 
   final ElementDataFactory _elementDataFactory;
   final ElementObjectParser _elementObjectParser;
@@ -29,14 +29,14 @@ class WidgetElementsDecipher {
         _elementDataFactory.createFromElement(rootElement, "Root");
     if (rootElementData == null) return null;
 
-    this.rootElementData = rootElementData;
+    _rootElementData = rootElementData;
 
     _parseAllElements(
-      this.rootElementData,
+      _rootElementData,
       rootElement,
     );
 
-    return this.rootElementData;
+    return _rootElementData;
   }
 
   void _parseAllElements(

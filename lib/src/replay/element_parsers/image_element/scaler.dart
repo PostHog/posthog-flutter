@@ -6,10 +6,17 @@ abstract class Scaler {
 }
 
 class ImageScaler implements Scaler {
+  double _getRatio(double originalWidth, double originalHeight) {
+    return originalWidth <= 0 || originalHeight <= 0
+        ? 1.0
+        : originalWidth / originalHeight;
+  }
+
   @override
   Size getScaledSize(double originalWidth, double originalHeight,
       Size targetSize, BoxFit fit) {
-    final double aspectRatio = originalWidth / originalHeight;
+    final double aspectRatio = _getRatio(originalWidth, originalHeight);
+
     switch (fit) {
       case BoxFit.fill:
         return Size(targetSize.width, targetSize.height);
