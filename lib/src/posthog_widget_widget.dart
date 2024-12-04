@@ -1,11 +1,8 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
-import 'package:posthog_flutter/src/replay/vendor/equality.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'replay/change_detector.dart';
@@ -27,7 +24,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
   NativeCommunicator? _nativeCommunicator;
 
   Timer? _debounceTimer;
-  Uint8List? _lastSnapshot;
   Duration _debounceDuration = const Duration(milliseconds: 1000);
 
   @override
@@ -77,33 +73,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
           screen: Posthog().currentScreen);
     }
 
-    // using png because its compressed, the native SDKs will decompress it
-    // and transform to jpeg if needed (soon webp)
-    // https://github.com/brendan-duncan/image does not have webp encoding
-    final ByteData? byteData =
-        await imageInfo.image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) {
-      printIfDebug('Error: Failed to convert image to byte data.');
-      imageInfo.image.dispose();
-      return;
-    }
-
-    Uint8List pngBytes = byteData.buffer.asUint8List();
-    imageInfo.image.dispose();
-
-    if (pngBytes.isEmpty) {
-      printIfDebug('Error: Failed to convert image byte data to Uint8List.');
-      return;
-    }
-
-    if (const PHListEquality().equals(pngBytes, _lastSnapshot)) {
-      printIfDebug('Error: Snapshot is the same as the last one.');
-      return;
-    }
-
-    _lastSnapshot = pngBytes;
-
-    await _nativeCommunicator?.sendFullSnapshot(pngBytes,
+    await _nativeCommunicator?.sendFullSnapshot(imageInfo.imageBytes,
         id: imageInfo.id, x: imageInfo.x, y: imageInfo.y);
   }
 
@@ -127,7 +97,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _changeDetector = null;
     _screenshotCapturer = null;
     _nativeCommunicator = null;
-    _lastSnapshot = null;
 
     super.dispose();
   }
