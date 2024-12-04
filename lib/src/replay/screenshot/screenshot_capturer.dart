@@ -16,7 +16,7 @@ class ImageInfo {
   final int width;
   final int height;
   final bool shouldSendMetaEvent;
-  Uint8List imageBytes;
+  final Uint8List imageBytes;
 
   ImageInfo(this.image, this.id, this.x, this.y, this.width, this.height,
       this.shouldSendMetaEvent, this.imageBytes);
