@@ -102,6 +102,18 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       // not supported on Web
       // analytics.callMethod('close');
       break;
+    case 'sendMetaEvent':
+      // not supported on Web
+      // Flutter Web uses the JS SDK for Session replay
+      break;
+    case 'sendFullSnapshot':
+      // not supported on Web
+      // Flutter Web uses the JS SDK for Session replay
+      break;
+    case 'isSessionReplayActive':
+      // not supported on Web
+      // Flutter Web uses the JS SDK for Session replay
+      break;
     default:
       throw PlatformException(
         code: 'Unimplemented',

@@ -1,5 +1,7 @@
 ## Next
 
+- chore: do not send repeated snapshots ([#126](https://github.com/PostHog/posthog-flutter/pull/126))
+
 ## 4.7.0
 
 - chore: flutter session replay (Android and iOS) ([#123](https://github.com/PostHog/posthog-flutter/pull/123))

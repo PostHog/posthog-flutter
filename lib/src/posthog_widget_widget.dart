@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
@@ -75,18 +73,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
           screen: Posthog().currentScreen);
     }
 
-    // TODO: package:image/image.dart to convert to jpeg instead
-    final ByteData? byteData =
-        await imageInfo.image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) {
-      printIfDebug('Error: Failed to convert image to byte data.');
-      return;
-    }
-
-    Uint8List pngBytes = byteData.buffer.asUint8List();
-    imageInfo.image.dispose();
-
-    await _nativeCommunicator?.sendFullSnapshot(pngBytes,
+    await _nativeCommunicator?.sendFullSnapshot(imageInfo.imageBytes,
         id: imageInfo.id, x: imageInfo.x, y: imageInfo.y);
   }
 

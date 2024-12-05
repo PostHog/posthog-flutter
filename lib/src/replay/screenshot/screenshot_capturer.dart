@@ -1,9 +1,11 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/vendor/equality.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 class ImageInfo {
@@ -14,13 +16,15 @@ class ImageInfo {
   final int width;
   final int height;
   final bool shouldSendMetaEvent;
+  final Uint8List imageBytes;
 
   ImageInfo(this.image, this.id, this.x, this.y, this.width, this.height,
-      this.shouldSendMetaEvent);
+      this.shouldSendMetaEvent, this.imageBytes);
 }
 
 class ViewTreeSnapshotStatus {
   bool sentMetaEvent = false;
+  Uint8List? imageBytes;
   ViewTreeSnapshotStatus(this.sentMetaEvent);
 }
 
@@ -48,8 +52,8 @@ class ScreenshotCapturer {
       ViewTreeSnapshotStatus statusView) {
     if (shouldSendMetaEvent) {
       statusView.sentMetaEvent = true;
-      _views[renderObject] = statusView;
     }
+    _views[renderObject] = statusView;
   }
 
   Future<ImageInfo?> captureScreenshot() async {
@@ -83,6 +87,32 @@ class ScreenshotCapturer {
 
       final replayConfig = _config.sessionReplayConfig;
 
+      // using png because its compressed, the native SDKs will decompress it
+      // and transform to jpeg if needed (soon webp)
+      // https://github.com/brendan-duncan/image does not have webp encoding
+      final ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) {
+        printIfDebug('Error: Failed to convert image to byte data.');
+        image.dispose();
+        return null;
+      }
+
+      Uint8List pngBytes = byteData.buffer.asUint8List();
+      image.dispose();
+
+      if (pngBytes.isEmpty) {
+        printIfDebug('Error: Failed to convert image byte data to Uint8List.');
+        return null;
+      }
+
+      if (const PHListEquality().equals(pngBytes, statusView.imageBytes)) {
+        printIfDebug('Snapshot is the same as the last one.');
+        return null;
+      }
+
+      statusView.imageBytes = pngBytes;
+
       if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
         final screenElementsRects =
             await PostHogMaskController.instance.getCurrentScreenRects();
@@ -97,7 +127,8 @@ class ScreenshotCapturer {
               globalPosition.dy.toInt(),
               srcWidth.toInt(),
               srcHeight.toInt(),
-              shouldSendMetaEvent);
+              shouldSendMetaEvent,
+              pngBytes);
           _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
           return imageInfo;
         }
@@ -110,7 +141,8 @@ class ScreenshotCapturer {
           globalPosition.dy.toInt(),
           srcWidth.toInt(),
           srcHeight.toInt(),
-          shouldSendMetaEvent);
+          shouldSendMetaEvent,
+          pngBytes);
       _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
       return imageInfo;
     } catch (e) {
