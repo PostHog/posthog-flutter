@@ -1,5 +1,7 @@
 ## Next
 
+## 4.7.1
+
 - chore: do not send repeated snapshots ([#126](https://github.com/PostHog/posthog-flutter/pull/126))
 
 ## 4.7.0
