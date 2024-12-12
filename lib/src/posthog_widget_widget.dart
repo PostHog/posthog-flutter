@@ -58,6 +58,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
     // Execute the snapshot generation
     _generateSnapshot();
 
+    _throttleTimer?.cancel();
     // Reset throttling after the duration
     _throttleTimer = Timer(_throttleDuration, () {
       _isThrottling = false;
