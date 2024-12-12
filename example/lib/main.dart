@@ -14,7 +14,7 @@ Future<void> main() async {
   config.sessionReplay = true;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
-  config.sessionReplayConfig.debouncerDelay =
+  config.sessionReplayConfig.throttleDelay =
       const Duration(milliseconds: 1000);
   config.flushAt = 1;
   await Posthog().setup(config);

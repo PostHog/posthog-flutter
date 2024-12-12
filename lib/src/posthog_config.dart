@@ -67,17 +67,25 @@ class PostHogSessionReplayConfig {
   /// Default: true.
   var maskAllImages = true;
 
+  /// Note: Deprecated in favor of [throttleDelay] from v4.8.0.
   /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
   /// This is used for capturing the view as a screenshot.
   /// The lower the number, the more snapshots will be captured but higher the performance impact.
   /// Defaults to 1s.
   var debouncerDelay = const Duration(seconds: 1);
 
+  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
+  /// This is used for capturing the view as a screenshot.
+  /// The lower the number, the more snapshots will be captured but higher the performance impact.
+  /// Experimental support.
+  /// Defaults to 1s.
+  var throttleDelay = const Duration(seconds: 1);
+
   Map<String, dynamic> toMap() {
     return {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
-      'debouncerDelayMs': debouncerDelay.inMilliseconds,
+      'throttleDelayMs': throttleDelay.inMilliseconds,
     };
   }
 }

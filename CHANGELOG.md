@@ -1,5 +1,10 @@
 ## Next
 
+## 4.8.0
+
+- chore: change screenshots debouncing approach to throttling ([#126](https://github.com/PostHog/posthog-flutter/pull/126))
+  - Added `throttleDelay` config and deprecated `debouncerDelay` config.
+
 ## 4.7.1
 
 - chore: do not send repeated snapshots ([#126](https://github.com/PostHog/posthog-flutter/pull/126))
