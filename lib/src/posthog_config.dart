@@ -68,11 +68,15 @@ class PostHogSessionReplayConfig {
   var maskAllImages = true;
 
   /// Note: Deprecated in favor of [throttleDelay] from v4.8.0.
+  /// The value assigned to this var will be forwarded to [throttleDelay]
+  ///
   /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
   /// This is used for capturing the view as a screenshot.
   /// The lower the number, the more snapshots will be captured but higher the performance impact.
   /// Defaults to 1s.
-  var debouncerDelay = const Duration(seconds: 1);
+  set debouncerDelay(Duration debouncerDelay) {
+    throttleDelay = debouncerDelay;
+  }
 
   /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
   /// This is used for capturing the view as a screenshot.
