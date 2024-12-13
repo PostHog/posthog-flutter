@@ -23,8 +23,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
   ScreenshotCapturer? _screenshotCapturer;
   NativeCommunicator? _nativeCommunicator;
 
-  Timer? _debounceTimer;
-  Duration _debounceDuration = const Duration(milliseconds: 1000);
+  Timer? _throttleTimer;
+  bool _isThrottling = false;
+  Duration _throttleDuration = const Duration(milliseconds: 1000);
 
   @override
   void initState() {
@@ -35,7 +36,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       return;
     }
 
-    _debounceDuration = config.sessionReplayConfig.debouncerDelay;
+    _throttleDuration = config.sessionReplayConfig.throttleDelay;
 
     _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
@@ -46,10 +47,21 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   // This works as onRootViewsChangedListeners
   void _onChangeDetected() {
-    _debounceTimer?.cancel();
+    if (_isThrottling) {
+      // If throttling is active, ignore this call
+      return;
+    }
 
-    _debounceTimer = Timer(_debounceDuration, () {
-      _generateSnapshot();
+    // Start throttling
+    _isThrottling = true;
+
+    // Execute the snapshot generation
+    _generateSnapshot();
+
+    _throttleTimer?.cancel();
+    // Reset throttling after the duration
+    _throttleTimer = Timer(_throttleDuration, () {
+      _isThrottling = false;
     });
   }
 
@@ -91,8 +103,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
-    _debounceTimer = null;
+    _throttleTimer?.cancel();
+    _throttleTimer = null;
     _changeDetector?.stop();
     _changeDetector = null;
     _screenshotCapturer = null;

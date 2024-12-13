@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
@@ -20,11 +22,13 @@ class PostHogConfig {
   /// Requires Record user sessions to be enabled in the PostHog Project Settings.
   /// Experimental support.
   /// Defaults to false.
+  @experimental
   var sessionReplay = false;
 
   /// Configurations for Session replay.
   /// [sessionReplay] has to be enabled for this to take effect.
   /// Experimental support
+  @experimental
   var sessionReplayConfig = PostHogSessionReplayConfig();
 
   /// iOS only
@@ -60,24 +64,39 @@ class PostHogSessionReplayConfig {
   /// Enable masking of all text and text input fields.
   /// Experimental support.
   /// Default: true.
+  @experimental
   var maskAllTexts = true;
 
   /// Enable masking of all images.
   /// Experimental support.
   /// Default: true.
+  @experimental
   var maskAllImages = true;
 
+  /// The value assigned to this var will be forwarded to [throttleDelay]
+  ///
   /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
   /// This is used for capturing the view as a screenshot.
   /// The lower the number, the more snapshots will be captured but higher the performance impact.
   /// Defaults to 1s.
-  var debouncerDelay = const Duration(seconds: 1);
+  @Deprecated('Deprecated in favor of [throttleDelay] from v4.8.0.')
+  set debouncerDelay(Duration debouncerDelay) {
+    throttleDelay = debouncerDelay;
+  }
+
+  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
+  /// This is used for capturing the view as a screenshot.
+  /// The lower the number, the more snapshots will be captured but higher the performance impact.
+  /// Experimental support.
+  /// Defaults to 1s.
+  @experimental
+  var throttleDelay = const Duration(seconds: 1);
 
   Map<String, dynamic> toMap() {
     return {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
-      'debouncerDelayMs': debouncerDelay.inMilliseconds,
+      'throttleDelayMs': throttleDelay.inMilliseconds,
     };
   }
 }
