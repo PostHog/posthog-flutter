@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_observer.dart';
@@ -25,10 +27,12 @@ class Posthog {
     return _posthog.setup(config);
   }
 
+  @internal
   PostHogConfig? get config => _config;
 
   /// Returns the current screen name (or route name)
   /// Only returns a value if [PosthogObserver] is used
+  @internal
   String? get currentScreen => _currentScreen;
 
   Future<void> identify({
