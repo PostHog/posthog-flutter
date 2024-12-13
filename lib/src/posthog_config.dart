@@ -84,7 +84,7 @@ class PostHogSessionReplayConfig {
     throttleDelay = debouncerDelay;
   }
 
-  /// Debouncer delay used to reduce the number of snapshots captured and reduce performance impact.
+  /// Throttling delay used to reduce the number of snapshots captured and reduce performance impact.
   /// This is used for capturing the view as a screenshot.
   /// The lower the number, the more snapshots will be captured but higher the performance impact.
   /// Experimental support.
