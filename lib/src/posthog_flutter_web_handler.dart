@@ -94,6 +94,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
         call.arguments['key'],
       ]);
       break;
+    case 'getSessionId':
+      final sessionId = analytics.callMethod('get_session_id');
+      return sessionId;
     case 'flush':
       // not supported on Web
       // analytics.callMethod('flush');

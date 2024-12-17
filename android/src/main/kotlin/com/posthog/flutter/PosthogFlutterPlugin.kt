@@ -156,6 +156,9 @@ class PosthogFlutterPlugin :
             "isSessionReplayActive" -> {
                 result.success(isSessionReplayActive())
             }
+            "getSessionId" -> {
+                getSessionId(result)
+            }
             else -> {
                 result.notImplemented()
             }
@@ -497,6 +500,15 @@ class PosthogFlutterPlugin :
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun getSessionId(result: Result) {
+        try {
+            val sessionId = PostHog.getSessionId()
+            result.success(sessionId.toString())
+        } catch (e: Exception) {
+            result.error("ERROR", "Error getting session id", e.message)
         }
     }
 
