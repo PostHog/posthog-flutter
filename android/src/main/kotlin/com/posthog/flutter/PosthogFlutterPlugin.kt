@@ -506,9 +506,9 @@ class PosthogFlutterPlugin :
     private fun getSessionId(result: Result) {
         try {
             val sessionId = PostHog.getSessionId()
-            result.success(sessionId.toString())
+            result.success(sessionId?.toString())
         } catch (e: Exception) {
-            result.error("ERROR", "Error getting session id", e.message)
+            result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 
