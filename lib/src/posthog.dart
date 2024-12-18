@@ -125,5 +125,7 @@ class Posthog {
     return _posthog.close();
   }
 
+  Future<String?> getSessionId() => _posthog.getSessionId();
+
   Posthog._internal();
 }
