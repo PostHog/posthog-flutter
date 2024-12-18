@@ -233,8 +233,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   @override
   Future<String?> getSessionId() async {
     try {
-      final sessionId =
-          await _methodChannel.invokeMethod('getSessionId');
+      final sessionId = await _methodChannel.invokeMethod('getSessionId');
       return sessionId;
     } on PlatformException catch (exception) {
       printIfDebug('Exception on getSessionId: $exception');
