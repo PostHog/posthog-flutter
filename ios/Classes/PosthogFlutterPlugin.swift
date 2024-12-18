@@ -170,6 +170,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendFullSnapshot(call, result: result)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
+        case "getSessionId":
+            getSessionId(result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -497,6 +499,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private func close(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.close()
         result(nil)
+    }
+
+    private func getSessionId(result: @escaping FlutterResult) {
+        result(PostHogSDK.shared.getSessionId())
     }
 
     // Return bad Arguments error

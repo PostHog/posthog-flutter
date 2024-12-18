@@ -43,6 +43,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       break;
     case 'distinctId':
       final distinctId = analytics.callMethod('get_distinct_id');
+
       return distinctId;
     case 'reset':
       analytics.callMethod('reset');
@@ -54,8 +55,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
       break;
     case 'isFeatureEnabled':
       final isFeatureEnabled = analytics.callMethod('isFeatureEnabled', [
-        call.arguments['key'],
-      ]);
+            call.arguments['key'],
+          ]) as bool? ??
+          false;
       return isFeatureEnabled;
     case 'group':
       analytics.callMethod('group', [
@@ -94,6 +96,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
         call.arguments['key'],
       ]);
       break;
+    case 'getSessionId':
+      final sessionId = analytics.callMethod('get_session_id') as String?;
+
+      if (sessionId?.isEmpty == true) return null;
+
+      return sessionId;
     case 'flush':
       // not supported on Web
       // analytics.callMethod('flush');

@@ -1,4 +1,5 @@
 ## Next
+  - feat: add getter for current session identifier ([#134](https://github.com/PostHog/posthog-flutter/pull/134))
 
 ## 4.8.0
 

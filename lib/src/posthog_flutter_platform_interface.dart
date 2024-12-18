@@ -120,5 +120,9 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('close() has not been implemented.');
   }
 
+  Future<String?> getSessionId() async {
+    throw UnimplementedError('getSessionId() not implemented');
+  }
+
   // TODO: missing capture with more parameters
 }
