@@ -9,7 +9,6 @@ import 'package:posthog_flutter/src/replay/vendor/equality.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 class ImageInfo {
-  final ui.Image image;
   final int id;
   final int x;
   final int y;
@@ -18,7 +17,7 @@ class ImageInfo {
   final bool shouldSendMetaEvent;
   final Uint8List imageBytes;
 
-  ImageInfo(this.image, this.id, this.x, this.y, this.width, this.height,
+  ImageInfo(this.id, this.x, this.y, this.width, this.height,
       this.shouldSendMetaEvent, this.imageBytes);
 }
 
@@ -56,6 +55,17 @@ class ScreenshotCapturer {
     _views[renderObject] = statusView;
   }
 
+  Future<Uint8List?> getImageBytes(ui.Image img) async {
+    final ByteData? byteData =
+    await img.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      printIfDebug('Error: Failed to convert image to byte data.');
+      return null;
+    }
+    return byteData.buffer.asUint8List();
+  }
+
+
   Future<ImageInfo?> captureScreenshot() async {
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {
@@ -90,19 +100,10 @@ class ScreenshotCapturer {
       // using png because its compressed, the native SDKs will decompress it
       // and transform to jpeg if needed (soon webp)
       // https://github.com/brendan-duncan/image does not have webp encoding
-      final ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) {
-        printIfDebug('Error: Failed to convert image to byte data.');
-        image.dispose();
-        return null;
-      }
-
-      Uint8List pngBytes = byteData.buffer.asUint8List();
-      image.dispose();
-
-      if (pngBytes.isEmpty) {
+      Uint8List? pngBytes = await getImageBytes(image);
+      if (pngBytes == null || pngBytes.isEmpty) {
         printIfDebug('Error: Failed to convert image byte data to Uint8List.');
+        image.dispose();
         return null;
       }
 
@@ -120,29 +121,38 @@ class ScreenshotCapturer {
         if (screenElementsRects != null) {
           final ui.Image maskedImage = await _imageMaskPainter.drawMaskedImage(
               image, screenElementsRects, pixelRatio);
+
+          // Dispose the original image after masking
+          image.dispose();
+
+          Uint8List? maskedImagePngBytes = await getImageBytes(maskedImage);
+          if (maskedImagePngBytes == null) {
+            maskedImage.dispose();
+            return null;
+          }
+
           final imageInfo = ImageInfo(
-              maskedImage,
-              viewId,
-              globalPosition.dx.toInt(),
-              globalPosition.dy.toInt(),
-              srcWidth.toInt(),
-              srcHeight.toInt(),
-              shouldSendMetaEvent,
-              pngBytes);
+            viewId,
+            globalPosition.dx.toInt(),
+            globalPosition.dy.toInt(),
+            srcWidth.toInt(),
+            srcHeight.toInt(),
+            shouldSendMetaEvent,
+            maskedImagePngBytes);
           _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
           return imageInfo;
         }
       }
 
       final imageInfo = ImageInfo(
-          image,
-          viewId,
-          globalPosition.dx.toInt(),
-          globalPosition.dy.toInt(),
-          srcWidth.toInt(),
-          srcHeight.toInt(),
-          shouldSendMetaEvent,
-          pngBytes);
+        viewId,
+        globalPosition.dx.toInt(),
+        globalPosition.dy.toInt(),
+        srcWidth.toInt(),
+        srcHeight.toInt(),
+        shouldSendMetaEvent,
+        pngBytes,
+      );
       _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
       return imageInfo;
     } catch (e) {
