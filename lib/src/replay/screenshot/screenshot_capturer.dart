@@ -57,14 +57,13 @@ class ScreenshotCapturer {
 
   Future<Uint8List?> getImageBytes(ui.Image img) async {
     final ByteData? byteData =
-    await img.toByteData(format: ui.ImageByteFormat.png);
+        await img.toByteData(format: ui.ImageByteFormat.png);
     if (byteData == null) {
       printIfDebug('Error: Failed to convert image to byte data.');
       return null;
     }
     return byteData.buffer.asUint8List();
   }
-
 
   Future<ImageInfo?> captureScreenshot() async {
     final context = PostHogMaskController.instance.containerKey.currentContext;
@@ -132,13 +131,13 @@ class ScreenshotCapturer {
           }
 
           final imageInfo = ImageInfo(
-            viewId,
-            globalPosition.dx.toInt(),
-            globalPosition.dy.toInt(),
-            srcWidth.toInt(),
-            srcHeight.toInt(),
-            shouldSendMetaEvent,
-            maskedImagePngBytes);
+              viewId,
+              globalPosition.dx.toInt(),
+              globalPosition.dy.toInt(),
+              srcWidth.toInt(),
+              srcHeight.toInt(),
+              shouldSendMetaEvent,
+              maskedImagePngBytes);
           _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
           return imageInfo;
         }
