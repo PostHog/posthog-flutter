@@ -30,7 +30,6 @@ class ImageMaskPainter {
       (image.width * pixelRatio).round(),
       (image.height * pixelRatio).round(),
     );
-    image.dispose();
     return maskedImage;
   }
 }
