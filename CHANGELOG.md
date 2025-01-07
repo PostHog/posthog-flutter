@@ -2,6 +2,10 @@
 
 ## 4.9.0
 
+- fix: blank screen when viewing session replay recordings ([#138](https://github.com/PostHog/posthog-flutter/pull/138))
+
+## 4.9.0
+
 - feat: add getter for current session identifier ([#134](https://github.com/PostHog/posthog-flutter/pull/134))
 
 ## 4.8.0
