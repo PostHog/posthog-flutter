@@ -58,7 +58,7 @@ class ScreenshotCapturer {
   Future<Uint8List?> getImageBytes(ui.Image img) async {
     final ByteData? byteData =
         await img.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) {
+    if (byteData == null || byteData.lengthInBytes == 0) {
       printIfDebug('Error: Failed to convert image to byte data.');
       return null;
     }
@@ -108,6 +108,7 @@ class ScreenshotCapturer {
 
       if (const PHListEquality().equals(pngBytes, statusView.imageBytes)) {
         printIfDebug('Snapshot is the same as the last one.');
+        image.dispose();
         return null;
       }
 
@@ -125,7 +126,7 @@ class ScreenshotCapturer {
           image.dispose();
 
           Uint8List? maskedImagePngBytes = await getImageBytes(maskedImage);
-          if (maskedImagePngBytes == null) {
+          if (maskedImagePngBytes == null || maskedImagePngBytes.isEmpty) {
             maskedImage.dispose();
             return null;
           }
