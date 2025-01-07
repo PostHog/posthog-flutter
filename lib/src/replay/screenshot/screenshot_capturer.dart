@@ -55,7 +55,7 @@ class ScreenshotCapturer {
     _views[renderObject] = statusView;
   }
 
-  Future<Uint8List?> getImageBytes(ui.Image img) async {
+  Future<Uint8List?> _getImageBytes(ui.Image img) async {
     final ByteData? byteData =
         await img.toByteData(format: ui.ImageByteFormat.png);
     if (byteData == null || byteData.lengthInBytes == 0) {
@@ -99,7 +99,7 @@ class ScreenshotCapturer {
       // using png because its compressed, the native SDKs will decompress it
       // and transform to jpeg if needed (soon webp)
       // https://github.com/brendan-duncan/image does not have webp encoding
-      Uint8List? pngBytes = await getImageBytes(image);
+      Uint8List? pngBytes = await _getImageBytes(image);
       if (pngBytes == null || pngBytes.isEmpty) {
         printIfDebug('Error: Failed to convert image byte data to Uint8List.');
         image.dispose();
@@ -125,7 +125,7 @@ class ScreenshotCapturer {
           // Dispose the original image after masking
           image.dispose();
 
-          Uint8List? maskedImagePngBytes = await getImageBytes(maskedImage);
+          Uint8List? maskedImagePngBytes = await _getImageBytes(maskedImage);
           if (maskedImagePngBytes == null || maskedImagePngBytes.isEmpty) {
             maskedImage.dispose();
             return null;
