@@ -1,8 +1,8 @@
 ## Next
 
-## 4.9.0
+## 4.9.1
 
-- fix: blank screen when viewing session replay recordings ([#138](https://github.com/PostHog/posthog-flutter/pull/138))
+- fix: blank screen when viewing session replay recordings ([#139](https://github.com/PostHog/posthog-flutter/pull/139))
 
 ## 4.9.0
 
