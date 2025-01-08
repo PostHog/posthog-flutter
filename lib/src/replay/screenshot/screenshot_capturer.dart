@@ -107,7 +107,8 @@ class ScreenshotCapturer {
       }
 
       if (const PHListEquality().equals(pngBytes, statusView.imageBytes)) {
-        printIfDebug('Snapshot is the same as the last one.');
+        printIfDebug(
+            'Debug: Snapshot is the same as the last one, nothing changed, do nothing.');
         image.dispose();
         return null;
       }
@@ -156,7 +157,7 @@ class ScreenshotCapturer {
       _updateStatusView(shouldSendMetaEvent, renderObject, statusView);
       return imageInfo;
     } catch (e) {
-      printIfDebug('Error capturing image: $e');
+      printIfDebug('Error: Capturing image: $e');
       return null;
     }
   }

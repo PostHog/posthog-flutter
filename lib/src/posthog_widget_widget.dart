@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
-import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
@@ -74,7 +73,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
     final imageInfo = await _screenshotCapturer?.captureScreenshot();
     if (imageInfo == null) {
-      printIfDebug('Error: Failed to capture screenshot.');
       return;
     }
 
