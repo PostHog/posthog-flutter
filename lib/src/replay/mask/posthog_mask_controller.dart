@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
@@ -10,6 +8,7 @@ import 'package:posthog_flutter/src/replay/element_parsers/element_data_factory.
 import 'package:posthog_flutter/src/replay/element_parsers/element_object_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/root_element_provider.dart';
 import 'package:posthog_flutter/src/replay/mask/widget_elements_decipher.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 class PostHogMaskController {
   late final Map<String, ElementParser> parsers;
@@ -32,15 +31,41 @@ class PostHogMaskController {
       PostHogMaskController._privateConstructor(
           Posthog().config?.sessionReplayConfig);
 
-  Future<List<Rect>?> getCurrentScreenRects() async {
+  /// Extracts a flattened list of [ElementData] objects representing the
+  /// renderable elements in the widget tree.
+  ///
+  /// This method traverses the tree of [ElementData] objects and returns a
+  /// list of elements that have no children or only one child.
+  ///
+  /// The method is designed to extract the elements that are directly
+  /// renderable on the screen.
+  ///
+  /// **Returns:**
+  ///   - `List<ElementData>`: A list of [ElementData] objects representing the
+  ///     renderable elements.
+  ///
+  List<ElementData>? getCurrentWidgetsElements() {
     final BuildContext? context = containerKey.currentContext;
 
     if (context == null) {
+      printIfDebug('Error: containerKey.currentContext is null.');
       return null;
     }
-    final ElementData? widgetElementsTree =
-        _widgetScraper.parseRenderTree(context);
 
-    return widgetElementsTree?.extractRects();
+    try {
+      final ElementData? widgetElementsTree =
+          _widgetScraper.parseRenderTree(context);
+
+      if (widgetElementsTree == null) {
+        printIfDebug('Error: widgetElementsTree is null after parsing.');
+        return null;
+      }
+
+      return widgetElementsTree.extractRects();
+    } catch (e) {
+      printIfDebug(
+          'Error during render tree parsing or rectangle extraction: $e');
+      return null;
+    }
   }
 }

@@ -16,24 +16,20 @@ class ElementData {
     children?.add(elementData);
   }
 
-  List<Rect> extractRects([bool isRoot = true]) {
-    List<Rect> rects = [];
-
-    if (!isRoot) {
-      rects.add(rect);
-    }
+  List<ElementData> extractRects([bool isRoot = true]) {
+    List<ElementData> rects = [];
 
     if (children != null) {
       for (var child in children ?? []) {
         if (child.children == null) {
-          rects.add(child.rect);
+          rects.add(child);
           continue;
         } else if ((child.children?.length ?? 0) > 1) {
           for (var grandChild in child.children ?? []) {
-            rects.add(grandChild.rect);
+            rects.add(grandChild);
           }
         } else {
-          rects.add(child.rect);
+          rects.add(child);
         }
       }
     }
