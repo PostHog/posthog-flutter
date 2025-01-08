@@ -1,6 +1,6 @@
 ## Next
 
-- chore: improve error logging when capturing snapshots ([#139](https://github.com/PostHog/posthog-flutter/pull/139))
+- chore: improve error logging when capturing snapshots ([#146](https://github.com/PostHog/posthog-flutter/pull/146))
 
 ## 4.9.1
 
