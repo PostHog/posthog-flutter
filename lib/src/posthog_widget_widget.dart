@@ -74,7 +74,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
     final imageInfo = await _screenshotCapturer?.captureScreenshot();
     if (imageInfo == null) {
-      printIfDebug('Error: Failed to capture screenshot.');
       return;
     }
 
