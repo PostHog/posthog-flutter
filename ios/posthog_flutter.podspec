@@ -22,7 +22,8 @@ Postog flutter plugin
   s.osx.dependency 'FlutterMacOS'
 
   # ~> Version 3.0 and the versions up to 4.0, not including 4.0 and higher
-  s.dependency 'PostHog', '~> 3.0'
+  # Pinned to 3.18.0 until https://posthog.com/questions/pods-suddenly-not-able-to-be-installed is resolved
+  s.dependency 'PostHog', '3.18.0'
 
   s.ios.deployment_target = '13.0'
   # PH iOS SDK 3.0.0 requires >= 10.15
