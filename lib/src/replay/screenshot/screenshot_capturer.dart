@@ -55,7 +55,7 @@ class ScreenshotCapturer {
     try {
       final ByteData? byteData =
           await img.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) {
+      if (byteData == null || byteData.lengthInBytes == 0) {
         printIfDebug('Error: Failed to convert image to byte data.');
         return null;
       }
