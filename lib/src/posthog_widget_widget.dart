@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
@@ -65,14 +66,11 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   Future<void> _generateSnapshot() async {
-    final isSessionReplayActive =
-        await _nativeCommunicator?.isSessionReplayActive() ?? false;
-    if (!isSessionReplayActive) {
-      return;
-    }
-
+    // Ensure no asynchronous calls occur before this function,
+    // as it relies on a consistent state.
     final imageInfo = await _screenshotCapturer?.captureScreenshot();
     if (imageInfo == null) {
+      printIfDebug('Error: Failed to capture screenshot.');
       return;
     }
 
