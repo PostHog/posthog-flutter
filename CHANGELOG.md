@@ -1,5 +1,9 @@
 ## Next
 
+## 4.9.3
+
+- fix: solve masks out of sync when moving too fast ([#147](https://github.com/PostHog/posthog-flutter/pull/147))
+
 ## 4.9.2
 
 - chore: improve error logging when capturing snapshots ([#146](https://github.com/PostHog/posthog-flutter/pull/146))
