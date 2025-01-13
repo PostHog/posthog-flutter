@@ -1,8 +1,12 @@
 ## Next
 
-## 4.9.3
+## 4.9.4
 
 - fix: solve masks out of sync when moving too fast ([#147](https://github.com/PostHog/posthog-flutter/pull/147))
+
+## 4.9.3
+
+- chore: pin the iOS SDK to 3.18.0 ([#149](https://github.com/PostHog/posthog-flutter/pull/149))
 
 ## 4.9.2
 
