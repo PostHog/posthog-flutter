@@ -82,7 +82,11 @@ class _InitialScreenState extends State<_InitialScreen> {
                           builder: (context) => const _FirstRoute()),
                     );
                   },
-                  child: const Text('Go to Second Route'),
+                  child: const PostHogNoMaskWidget(
+                    child: Text(
+                      'Go to Second Route',
+                    ),
+                  ),
                 ),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
@@ -204,14 +208,16 @@ class _InitialScreenState extends State<_InitialScreen> {
                   child: const Text("Flush"),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    final result = await _posthogFlutterPlugin.getDistinctId();
-                    setState(() {
-                      _result = result;
-                    });
-                  },
-                  child: const Text("distinctId"),
-                ),
+                    onPressed: () async {
+                      final result =
+                          await _posthogFlutterPlugin.getDistinctId();
+                      setState(() {
+                        _result = result;
+                      });
+                    },
+                    child: const PostHogNoMaskWidget(
+                      child: Text("distinctId"),
+                    )),
                 const Divider(),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
@@ -254,7 +260,8 @@ class _InitialScreenState extends State<_InitialScreen> {
                   onPressed: () async {
                     await _posthogFlutterPlugin.reloadFeatureFlags();
                   },
-                  child: const Text("reloadFeatureFlags"),
+                  child: const PostHogNoMaskWidget(
+                      child: Text("reloadFeatureFlags")),
                 ),
                 const Divider(),
                 const Padding(
@@ -291,7 +298,7 @@ class _FirstRouteState extends State<_FirstRoute> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('First Route'),
+        title: const PostHogNoMaskWidget(child: Text('First Route')),
       ),
       body: Center(
         child: RepaintBoundary(
@@ -299,7 +306,7 @@ class _FirstRouteState extends State<_FirstRoute> with WidgetsBindingObserver {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton(
-                child: const Text('Open route'),
+                child: const PostHogNoMaskWidget(child: Text('Open route')),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -310,18 +317,20 @@ class _FirstRouteState extends State<_FirstRoute> with WidgetsBindingObserver {
                 },
               ),
               const SizedBox(height: 20),
-              const TextField(
+              const PostHogNoMaskWidget(
+                  child: TextField(
                 decoration: InputDecoration(
                   labelText: 'Sensitive Text Input',
                   hintText: 'Enter sensitive data',
                   border: OutlineInputBorder(),
                 ),
-              ),
+              )),
               const SizedBox(height: 20),
-              Image.asset(
+              PostHogNoMaskWidget(
+                  child: Image.asset(
                 'assets/training_posthog.png',
                 height: 200,
-              ),
+              )),
               const SizedBox(height: 20),
             ],
           ),

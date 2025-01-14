@@ -67,4 +67,29 @@ class PostHogMaskController {
       return null;
     }
   }
+
+  List<Rect>? getPostHogWidgetWrapperElements() {
+    final BuildContext? context = containerKey.currentContext;
+
+    if (context == null) {
+      printIfDebug('Error: containerKey.currentContext is null.');
+      return null;
+    }
+
+    try {
+      final ElementData? widgetElementsTree =
+          _widgetScraper.parseRenderTree(context);
+
+      if (widgetElementsTree == null) {
+        printIfDebug('Error: widgetElementsTree is null after parsing.');
+        return null;
+      }
+
+      return widgetElementsTree.extractNoMaskWidgetRects();
+    } catch (e) {
+      printIfDebug(
+          'Error during render tree parsing or rectangle extraction: $e');
+      return null;
+    }
+  }
 }

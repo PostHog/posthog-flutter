@@ -16,6 +16,12 @@ class ElementData {
     children?.add(elementData);
   }
 
+  List<Rect> extractNoMaskWidgetRects() {
+    final rects = <Rect>[];
+    _collectNoMaskWidgetRects(rects);
+    return rects;
+  }
+
   List<ElementData> extractRects({bool isRoot = true}) {
     List<ElementData> rects = [];
 
@@ -34,5 +40,15 @@ class ElementData {
       }
     }
     return rects;
+  }
+
+  void _collectNoMaskWidgetRects(List<Rect> rects) {
+    if (type == 'PostHogNoMaskWidget' && !rects.contains(rect)) {
+      rects.add(rect);
+    }
+
+    for (final child in children!) {
+      child._collectNoMaskWidgetRects(rects);
+    }
   }
 }
