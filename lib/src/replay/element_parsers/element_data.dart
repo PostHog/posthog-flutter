@@ -18,7 +18,7 @@ class ElementData {
 
   List<Rect> extractNoMaskWidgetRects() {
     final rects = <Rect>[];
-    _collectNoMaskWidgetRects(rects);
+    _collectNoMaskWidgetRects(this, rects);
     return rects;
   }
 
@@ -42,13 +42,17 @@ class ElementData {
     return rects;
   }
 
-  void _collectNoMaskWidgetRects(List<Rect> rects) {
-    if (type == 'PostHogNoMaskWidget' && !rects.contains(rect)) {
-      rects.add(rect);
+  void _collectNoMaskWidgetRects(ElementData element, List<Rect> rectList) {
+    if (!rectList.contains(element.rect)) {
+      if (element.type == "PostHogNoMaskWidget") {
+        rectList.add(element.rect);
+      }
     }
 
-    for (final child in children!) {
-      child._collectNoMaskWidgetRects(rects);
+    if (element.children != null && element.children!.isNotEmpty) {
+      for (var child in element.children!) {
+        _collectNoMaskWidgetRects(child, rectList);
+      }
     }
   }
 }
