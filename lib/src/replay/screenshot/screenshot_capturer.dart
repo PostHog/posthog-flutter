@@ -182,7 +182,7 @@ class ScreenshotCapturer {
             picture.dispose();
           }
         } else {
-          if (postHogWidgetWrapperElements!.isNotEmpty) {
+          if (postHogWidgetWrapperElements != null && postHogWidgetWrapperElements.isNotEmpty) {
             _imageMaskPainter.drawMaskedImageWrapper(
                 canvas, postHogWidgetWrapperElements, pixelRatio);
           }
