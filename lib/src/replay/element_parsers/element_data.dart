@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_widget.dart';
 
 class ElementData {
-  List<ElementData>? children;
   Rect rect;
   String type;
+  List<ElementData>? children;
   Widget? widget;
 
   ElementData({
-    this.children,
     required this.rect,
     required this.type,
+    this.children,
     this.widget,
   });
 

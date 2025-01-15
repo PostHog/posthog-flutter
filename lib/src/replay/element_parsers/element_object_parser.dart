@@ -3,7 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
-import 'package:posthog_flutter/src/replay/mask/posthog_nomask_widget.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_widget.dart';
 
 class ElementObjectParser {
   final ElementParser _elementParser = ElementParser();

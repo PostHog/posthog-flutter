@@ -4,4 +4,4 @@ export 'src/posthog.dart';
 export 'src/posthog_config.dart';
 export 'src/posthog_observer.dart';
 export 'src/posthog_widget_widget.dart';
-export 'src/replay/mask/posthog_nomask_widget.dart';
+export 'src/replay/mask/posthog_mask_widget.dart';

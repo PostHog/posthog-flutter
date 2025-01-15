@@ -77,8 +77,7 @@ class PostHogMaskController {
     }
 
     try {
-      final ElementData? widgetElementsTree =
-          _widgetScraper.parseRenderTree(context);
+      final widgetElementsTree = _widgetScraper.parseRenderTree(context);
 
       if (widgetElementsTree == null) {
         printIfDebug('Error: widgetElementsTree is null after parsing.');
