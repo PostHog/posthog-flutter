@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
-class PostHogNoMaskWidget extends StatefulWidget {
+class PostHogMaskWidget extends StatefulWidget {
   final Widget child;
 
-  const PostHogNoMaskWidget({
+  const PostHogMaskWidget({
     Key? key,
     required this.child,
   }) : super(key: key);
 
   @override
-  _PostHogNoMaskWidgetState createState() => _PostHogNoMaskWidgetState();
+  _PostHogMaskWidgetState createState() => _PostHogMaskWidgetState();
 }
 
-class _PostHogNoMaskWidgetState extends State<PostHogNoMaskWidget> {
+class _PostHogMaskWidgetState extends State<PostHogMaskWidget> {
   final GlobalKey _widgetKey = GlobalKey();
 
   @override

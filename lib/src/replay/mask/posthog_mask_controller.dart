@@ -45,7 +45,7 @@ class PostHogMaskController {
   ///     renderable elements.
   ///
   List<ElementData>? getCurrentWidgetsElements() {
-    final BuildContext? context = containerKey.currentContext;
+    final context = containerKey.currentContext;
 
     if (context == null) {
       printIfDebug('Error: containerKey.currentContext is null.');
@@ -69,7 +69,7 @@ class PostHogMaskController {
   }
 
   List<Rect>? getPostHogWidgetWrapperElements() {
-    final BuildContext? context = containerKey.currentContext;
+    final context = containerKey.currentContext;
 
     if (context == null) {
       printIfDebug('Error: containerKey.currentContext is null.');

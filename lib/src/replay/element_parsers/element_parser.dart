@@ -15,9 +15,9 @@ class ElementParser {
     }
 
     final thisElementData = ElementData(
-      type: element.widget.runtimeType.toString(),
-      rect: elementRect,
-    );
+        type: element.widget.runtimeType.toString(),
+        rect: elementRect,
+        widget: element.widget);
 
     return thisElementData;
   }

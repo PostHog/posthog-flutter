@@ -6,12 +6,14 @@ import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_nomask_widget.dart';
 
 class ElementObjectParser {
+  final ElementParser _elementParser = ElementParser();
+
   ElementData? relateRenderObject(
     ElementData activeElementData,
     Element element,
   ) {
-    if (element.widget is PostHogNoMaskWidget) {
-      final elementData = ElementParser().relate(element, activeElementData);
+    if (element.widget is PostHogMaskWidget) {
+      final elementData = _elementParser.relate(element, activeElementData);
 
       if (elementData != null) {
         activeElementData.addChildren(elementData);
@@ -20,7 +22,7 @@ class ElementObjectParser {
     }
 
     if (element.widget is Text) {
-      final elementData = ElementParser().relate(element, activeElementData);
+      final elementData = _elementParser.relate(element, activeElementData);
 
       if (elementData != null) {
         activeElementData.addChildren(elementData);
@@ -29,7 +31,7 @@ class ElementObjectParser {
     }
 
     if (element.renderObject is RenderImage) {
-      final String dataType = element.renderObject.runtimeType.toString();
+      final dataType = element.renderObject.runtimeType.toString();
 
       final parser = PostHogMaskController.instance.parsers[dataType];
       if (parser != null) {
@@ -41,23 +43,6 @@ class ElementObjectParser {
         }
       }
     }
-
-    // THIS WAY IN THE FUTURE WE CAN MOUNTED FULL WIREFRAME MORE EASILY
-    /*
-    if (element.renderObject is RenderBox) {
-      final String dataType = element.renderObject.runtimeType.toString();
-
-      final parser = PostHogMaskController.instance.parsers[dataType];
-      if (parser != null) {
-        final elementData = parser.relate(element, activeElementData);
-
-        if (elementData != null) {
-          activeElementData.addChildren(elementData);
-          return elementData;
-        }
-      }
-    }
-     */
 
     return null;
   }
