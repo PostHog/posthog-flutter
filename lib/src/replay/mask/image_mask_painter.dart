@@ -9,7 +9,7 @@ class ImageMaskPainter {
     for (var elementData in items) {
       paint.color = Colors.black;
       if (elementData.widget is PostHogMaskWidget) {
-        paint.color = Colors.pinkAccent;
+        paint.color = Colors.black;
       }
       final scaled = Rect.fromLTRB(
           elementData.rect.left * pixelRatio,
@@ -24,7 +24,7 @@ class ImageMaskPainter {
       Canvas canvas, List<Rect> items, double pixelRatio) {
     final paint = Paint()..style = PaintingStyle.fill;
     for (var rect in items) {
-      paint.color = Colors.pinkAccent;
+      paint.color = Colors.black;
       final scaled = Rect.fromLTRB(
           rect.left * pixelRatio,
           rect.top * pixelRatio,
