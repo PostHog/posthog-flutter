@@ -4,15 +4,15 @@ class PostHogMaskWidget extends StatefulWidget {
   final Widget child;
 
   const PostHogMaskWidget({
-    Key? key,
+    super.key,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
-  _PostHogMaskWidgetState createState() => _PostHogMaskWidgetState();
+  PostHogMaskWidgetState createState() => PostHogMaskWidgetState();
 }
 
-class _PostHogMaskWidgetState extends State<PostHogMaskWidget> {
+class PostHogMaskWidgetState extends State<PostHogMaskWidget> {
   final GlobalKey _widgetKey = GlobalKey();
 
   @override

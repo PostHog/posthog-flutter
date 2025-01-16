@@ -84,7 +84,7 @@ class PostHogMaskController {
         return null;
       }
 
-      return widgetElementsTree.extractNoMaskWidgetRects();
+      return widgetElementsTree.extractMaskWidgetRects();
     } catch (e) {
       printIfDebug(
           'Error during render tree parsing or rectangle extraction: $e');

@@ -19,9 +19,9 @@ class ElementData {
     children?.add(elementData);
   }
 
-  List<Rect> extractNoMaskWidgetRects() {
+  List<Rect> extractMaskWidgetRects() {
     final rects = <Rect>[];
-    _collectNoMaskWidgetRects(this, rects);
+    _collectMaskWidgetRects(this, rects);
     return rects;
   }
 
@@ -45,7 +45,7 @@ class ElementData {
     return rects;
   }
 
-  void _collectNoMaskWidgetRects(ElementData element, List<Rect> rectList) {
+  void _collectMaskWidgetRects(ElementData element, List<Rect> rectList) {
     if (!rectList.contains(element.rect)) {
       if (element.widget is PostHogMaskWidget) {
         rectList.add(element.rect);
@@ -55,7 +55,7 @@ class ElementData {
     final children = element.children;
     if (children != null && children.isNotEmpty) {
       for (var child in children) {
-        _collectNoMaskWidgetRects(child, rectList);
+        _collectMaskWidgetRects(child, rectList);
       }
     }
   }
