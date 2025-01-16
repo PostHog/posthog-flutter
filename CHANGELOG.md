@@ -1,5 +1,7 @@
 ## Next
 
+## 4.10.0
+
 - chore: add support for session replay manual masking with the PostHogMaskWidget widget ([#153](https://github.com/PostHog/posthog-flutter/pull/153))
 
 ## 4.9.4
