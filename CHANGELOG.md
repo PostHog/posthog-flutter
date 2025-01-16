@@ -1,5 +1,7 @@
 ## Next
 
+- chore: add support for session replay manual masking with the PostHogMaskWidget widget ([#153](https://github.com/PostHog/posthog-flutter/pull/153))
+
 ## 4.9.4
 
 - fix: solve masks out of sync when moving too fast ([#147](https://github.com/PostHog/posthog-flutter/pull/147))

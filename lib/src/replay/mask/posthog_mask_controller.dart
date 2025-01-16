@@ -45,7 +45,7 @@ class PostHogMaskController {
   ///     renderable elements.
   ///
   List<ElementData>? getCurrentWidgetsElements() {
-    final BuildContext? context = containerKey.currentContext;
+    final context = containerKey.currentContext;
 
     if (context == null) {
       printIfDebug('Error: containerKey.currentContext is null.');
@@ -61,6 +61,30 @@ class PostHogMaskController {
       }
 
       return widgetElementsTree.extractRects();
+    } catch (e) {
+      printIfDebug(
+          'Error during render tree parsing or rectangle extraction: $e');
+      return null;
+    }
+  }
+
+  List<Rect>? getPostHogWidgetWrapperElements() {
+    final context = containerKey.currentContext;
+
+    if (context == null) {
+      printIfDebug('Error: containerKey.currentContext is null.');
+      return null;
+    }
+
+    try {
+      final widgetElementsTree = _widgetScraper.parseRenderTree(context);
+
+      if (widgetElementsTree == null) {
+        printIfDebug('Error: widgetElementsTree is null after parsing.');
+        return null;
+      }
+
+      return widgetElementsTree.extractMaskWidgetRects();
     } catch (e) {
       printIfDebug(
           'Error during render tree parsing or rectangle extraction: $e');

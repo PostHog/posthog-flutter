@@ -98,6 +98,9 @@ class ScreenshotCapturer {
 
       final replayConfig = _config.sessionReplayConfig;
 
+      final postHogWidgetWrapperElements =
+          PostHogMaskController.instance.getPostHogWidgetWrapperElements();
+
       // call getCurrentScreenRects if really necessary
       List<ElementData>? elementsDataWidgets;
       if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
@@ -179,6 +182,12 @@ class ScreenshotCapturer {
             picture.dispose();
           }
         } else {
+          if (postHogWidgetWrapperElements != null &&
+              postHogWidgetWrapperElements.isNotEmpty) {
+            _imageMaskPainter.drawMaskedImageWrapper(
+                canvas, postHogWidgetWrapperElements, pixelRatio);
+          }
+
           final picture = recorder.endRecording();
 
           final finalImage =

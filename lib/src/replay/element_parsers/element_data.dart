@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_widget.dart';
 
 class ElementData {
-  List<ElementData>? children;
   Rect rect;
   String type;
+  List<ElementData>? children;
+  Widget? widget;
 
   ElementData({
-    this.children,
     required this.rect,
     required this.type,
+    this.children,
+    this.widget,
   });
 
   void addChildren(ElementData elementData) {
     children ??= [];
     children?.add(elementData);
+  }
+
+  List<Rect> extractMaskWidgetRects() {
+    final rects = <Rect>[];
+    _collectMaskWidgetRects(this, rects);
+    return rects;
   }
 
   List<ElementData> extractRects({bool isRoot = true}) {
@@ -34,5 +43,20 @@ class ElementData {
       }
     }
     return rects;
+  }
+
+  void _collectMaskWidgetRects(ElementData element, List<Rect> rectList) {
+    if (!rectList.contains(element.rect)) {
+      if (element.widget is PostHogMaskWidget) {
+        rectList.add(element.rect);
+      }
+    }
+
+    final children = element.children;
+    if (children != null && children.isNotEmpty) {
+      for (var child in children) {
+        _collectMaskWidgetRects(child, rectList);
+      }
+    }
   }
 }
