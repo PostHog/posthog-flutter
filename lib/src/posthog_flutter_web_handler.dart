@@ -121,7 +121,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call, JsObject context) async {
     case 'isSessionReplayActive':
       // not supported on Web
       // Flutter Web uses the JS SDK for Session replay
-      break;
+      return false;
     default:
       throw PlatformException(
         code: 'Unimplemented',
