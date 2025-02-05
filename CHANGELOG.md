@@ -1,6 +1,6 @@
 ## Next
 
-## 4.11.0
+## 4.10.1
 
 - fix: isSessionReplayActive returns false by default for flutter web ([#158](https://github.com/PostHog/posthog-flutter/pull/158))
 
