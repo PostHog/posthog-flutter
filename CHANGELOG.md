@@ -1,5 +1,7 @@
 ## Next
 
+## 4.10.2
+
 - chore: pin the iOS SDK to 3.19.x ([#157](https://github.com/PostHog/posthog-flutter/pull/157))
 
 ## 4.10.1
