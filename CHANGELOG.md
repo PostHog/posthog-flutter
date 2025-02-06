@@ -2,6 +2,10 @@
 
 - chore: pin the iOS SDK to 3.19.x ([#157](https://github.com/PostHog/posthog-flutter/pull/157))
 
+## 4.10.1
+
+- fix: isSessionReplayActive returns false by default for flutter web ([#158](https://github.com/PostHog/posthog-flutter/pull/158))
+
 ## 4.10.0
 
 - chore: add support for session replay manual masking with the PostHogMaskWidget widget ([#153](https://github.com/PostHog/posthog-flutter/pull/153))
