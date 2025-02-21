@@ -1,6 +1,6 @@
 ## Next
 
-- fix: iOS SDK version ([#162](https://github.com/PostHog/posthog-flutter/pull/162))
+- chore: pin the iOS SDK to 3.x.x ([#162](https://github.com/PostHog/posthog-flutter/pull/162))
 
 ## 4.10.2
 
