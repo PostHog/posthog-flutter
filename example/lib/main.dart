@@ -79,7 +79,8 @@ class _InitialScreenState extends State<_InitialScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const _FirstRoute()),
+                          builder: (context) => const _SecondRoute(),
+                          settings: const RouteSettings(name: 'second_route')),
                     );
                   },
                   child: const PostHogMaskWidget(
@@ -281,14 +282,15 @@ class _InitialScreenState extends State<_InitialScreen> {
   }
 }
 
-class _FirstRoute extends StatefulWidget {
-  const _FirstRoute();
+class _SecondRoute extends StatefulWidget {
+  const _SecondRoute();
 
   @override
-  _FirstRouteState createState() => _FirstRouteState();
+  _SecondRouteState createState() => _SecondRouteState();
 }
 
-class _FirstRouteState extends State<_FirstRoute> with WidgetsBindingObserver {
+class _SecondRouteState extends State<_SecondRoute>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -312,6 +314,7 @@ class _FirstRouteState extends State<_FirstRoute> with WidgetsBindingObserver {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ThirdRoute(),
+                      settings: const RouteSettings(name: 'third_route'),
                     ),
                   ).then((_) {});
                 },
