@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
@@ -114,6 +115,9 @@ class ScreenshotCapturer {
       Future(() async {
         final isSessionReplayActive =
             await _nativeCommunicator.isSessionReplayActive();
+
+        // wait the UI to settle
+        await SchedulerBinding.instance.endOfFrame;
         final image = await syncImage;
         if (!isSessionReplayActive) {
           _snapshotManager.clear();
@@ -235,8 +239,6 @@ class ScreenshotCapturer {
             picture.dispose();
           }
         }
-
-        completer.complete(null);
       }).catchError((error) {
         printIfDebug('Error capturing image: $error');
         if (!completer.isCompleted) {
