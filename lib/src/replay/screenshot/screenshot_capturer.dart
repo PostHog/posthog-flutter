@@ -114,13 +114,16 @@ class ScreenshotCapturer {
       Future(() async {
         final isSessionReplayActive =
             await _nativeCommunicator.isSessionReplayActive();
+        final image = await syncImage;
         if (!isSessionReplayActive) {
+          _snapshotManager.clear();
+          image.dispose();
+          completer.complete(null);
           return;
         }
 
         final recorder = ui.PictureRecorder();
         final canvas = Canvas(recorder);
-        final image = await syncImage;
 
         // using png because its compressed, the native SDKs will decompress it
         // and transform to jpeg if needed (soon webp)
@@ -129,15 +132,19 @@ class ScreenshotCapturer {
         if (pngBytes == null || pngBytes.isEmpty) {
           printIfDebug(
               'Error: Failed to convert image byte data to Uint8List.');
+          recorder.endRecording().dispose();
           image.dispose();
-          return null;
+          completer.complete(null);
+          return;
         }
 
         if (const PHListEquality().equals(pngBytes, statusView.imageBytes)) {
           printIfDebug(
               'Debug: Snapshot is the same as the last one, nothing changed, do nothing.');
+          recorder.endRecording().dispose();
           image.dispose();
-          return null;
+          completer.complete(null);
+          return;
         }
 
         statusView.imageBytes = pngBytes;
@@ -162,6 +169,12 @@ class ScreenshotCapturer {
 
             try {
               final maskedImagePngBytes = await _getImageBytes(finalImage);
+              if (maskedImagePngBytes == null || maskedImagePngBytes.isEmpty) {
+                finalImage.dispose();
+                picture.dispose();
+                completer.complete(null);
+                return;
+              }
 
               final imageInfo = ImageInfo(
                 viewId,
@@ -170,7 +183,7 @@ class ScreenshotCapturer {
                 srcWidth.toInt(),
                 srcHeight.toInt(),
                 shouldSendMetaEvent,
-                maskedImagePngBytes!,
+                maskedImagePngBytes,
               );
               _snapshotManager.updateStatus(renderObject,
                   shouldSendMetaEvent: shouldSendMetaEvent);
@@ -194,29 +207,36 @@ class ScreenshotCapturer {
             final finalImage =
                 await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
 
-            final pngBytes = await _getImageBytes(finalImage);
-            if (pngBytes == null || pngBytes.isEmpty) {
-              finalImage.dispose();
-              completer.complete(null);
-              return;
-            }
+            try {
+              final pngBytes = await _getImageBytes(finalImage);
+              if (pngBytes == null || pngBytes.isEmpty) {
+                finalImage.dispose();
+                picture.dispose();
+                completer.complete(null);
+                return;
+              }
 
-            final imageInfo = ImageInfo(
-              viewId,
-              globalPosition.dx.toInt(),
-              globalPosition.dy.toInt(),
-              srcWidth.toInt(),
-              srcHeight.toInt(),
-              shouldSendMetaEvent,
-              pngBytes,
-            );
-            _snapshotManager.updateStatus(renderObject,
-                shouldSendMetaEvent: shouldSendMetaEvent);
-            completer.complete(imageInfo);
+              final imageInfo = ImageInfo(
+                viewId,
+                globalPosition.dx.toInt(),
+                globalPosition.dy.toInt(),
+                srcWidth.toInt(),
+                srcHeight.toInt(),
+                shouldSendMetaEvent,
+                pngBytes,
+              );
+              _snapshotManager.updateStatus(renderObject,
+                  shouldSendMetaEvent: shouldSendMetaEvent);
+              completer.complete(imageInfo);
+            } finally {
+              finalImage.dispose();
+            }
           } finally {
             picture.dispose();
           }
         }
+
+        completer.complete(null);
       }).catchError((error) {
         printIfDebug('Error capturing image: $error');
         if (!completer.isCompleted) {
