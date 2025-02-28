@@ -1,5 +1,7 @@
 ## Next
 
+- fix: dispose recorder if masking is disabled ([#163](https://github.com/PostHog/posthog-flutter/pull/163))
+
 ## 4.10.3
 
 - chore: pin the iOS SDK to 3.x.x ([#162](https://github.com/PostHog/posthog-flutter/pull/162))
