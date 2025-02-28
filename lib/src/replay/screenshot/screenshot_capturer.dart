@@ -190,28 +190,32 @@ class ScreenshotCapturer {
 
           final picture = recorder.endRecording();
 
-          final finalImage =
-              await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
+          try {
+            final finalImage =
+                await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
 
-          final pngBytes = await _getImageBytes(finalImage);
-          if (pngBytes == null || pngBytes.isEmpty) {
-            finalImage.dispose();
-            completer.complete(null);
-            return;
+            final pngBytes = await _getImageBytes(finalImage);
+            if (pngBytes == null || pngBytes.isEmpty) {
+              finalImage.dispose();
+              completer.complete(null);
+              return;
+            }
+
+            final imageInfo = ImageInfo(
+              viewId,
+              globalPosition.dx.toInt(),
+              globalPosition.dy.toInt(),
+              srcWidth.toInt(),
+              srcHeight.toInt(),
+              shouldSendMetaEvent,
+              pngBytes,
+            );
+            _snapshotManager.updateStatus(renderObject,
+                shouldSendMetaEvent: shouldSendMetaEvent);
+            completer.complete(imageInfo);
+          } finally {
+            picture.dispose();
           }
-
-          final imageInfo = ImageInfo(
-            viewId,
-            globalPosition.dx.toInt(),
-            globalPosition.dy.toInt(),
-            srcWidth.toInt(),
-            srcHeight.toInt(),
-            shouldSendMetaEvent,
-            pngBytes,
-          );
-          _snapshotManager.updateStatus(renderObject,
-              shouldSendMetaEvent: shouldSendMetaEvent);
-          completer.complete(imageInfo);
         }
       }).catchError((error) {
         printIfDebug('Error capturing image: $error');
