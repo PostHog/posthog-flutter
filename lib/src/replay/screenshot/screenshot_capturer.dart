@@ -130,7 +130,7 @@ class ScreenshotCapturer {
         final canvas = Canvas(recorder);
 
         // using png because its compressed, the native SDKs will decompress it
-        // and transform to jpeg if needed (soon webp)
+        // and transform to webp or jpeg if needed
         // https://github.com/brendan-duncan/image does not have webp encoding
         Uint8List? pngBytes = await _getImageBytes(image);
         if (pngBytes == null || pngBytes.isEmpty) {
