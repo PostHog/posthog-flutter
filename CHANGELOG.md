@@ -1,5 +1,7 @@
 ## Next
 
+## 4.10.4
+
 - fix: dispose recorder if masking is disabled ([#166](https://github.com/PostHog/posthog-flutter/pull/166))
 
 ## 4.10.3
