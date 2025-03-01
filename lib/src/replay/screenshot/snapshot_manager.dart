@@ -3,10 +3,14 @@ import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 class SnapshotManager {
   // Expando is the equivalent of weakref
-  final Expando<ViewTreeSnapshotStatus> _snapshotStatuses = Expando();
+  Expando<ViewTreeSnapshotStatus> _snapshotStatuses = Expando();
 
   ViewTreeSnapshotStatus getStatus(RenderObject renderObject) {
     return _snapshotStatuses[renderObject] ??= ViewTreeSnapshotStatus(false);
+  }
+
+  void clear() {
+    _snapshotStatuses = Expando();
   }
 
   void updateStatus(RenderObject renderObject,
