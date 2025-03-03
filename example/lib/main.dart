@@ -11,7 +11,7 @@ Future<void> main() async {
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
-  config.sessionReplay = true;
+  config.sessionReplay = false;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
   config.sessionReplayConfig.throttleDelay = const Duration(milliseconds: 1000);
