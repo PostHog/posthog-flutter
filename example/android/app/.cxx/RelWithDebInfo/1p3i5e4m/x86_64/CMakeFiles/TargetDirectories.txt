@@ -1,0 +1,2 @@
+/Users/manoel/Github/posthog-flutter/example/android/app/.cxx/RelWithDebInfo/1p3i5e4m/x86_64/CMakeFiles/edit_cache.dir
+/Users/manoel/Github/posthog-flutter/example/android/app/.cxx/RelWithDebInfo/1p3i5e4m/x86_64/CMakeFiles/rebuild_cache.dir

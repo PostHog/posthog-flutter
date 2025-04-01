@@ -1,0 +1,20 @@
+{
+  "buildFiles": [
+    "/Users/manoel/Github/flutter/packages/flutter_tools/gradle/src/main/groovy/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/manoel/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/manoel/Github/posthog-flutter/example/android/app/.cxx/RelWithDebInfo/1p3i5e4m/x86_64",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/manoel/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/manoel/Github/posthog-flutter/example/android/app/.cxx/RelWithDebInfo/1p3i5e4m/x86_64",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {}
+}
