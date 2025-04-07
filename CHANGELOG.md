@@ -2,7 +2,7 @@
 
 ## 4.10.5
 
-- chore: linux and windows NoOp support ([#166](https://github.com/PostHog/posthog-flutter/pull/166))
+- chore: linux and windows NoOp support ([#173](https://github.com/PostHog/posthog-flutter/pull/173))
 
 ## 4.10.4
 
