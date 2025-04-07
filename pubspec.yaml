@@ -51,6 +51,8 @@ flutter:
       web:
         pluginClass: PosthogFlutterWeb
         fileName: posthog_flutter_web.dart
+      linux:
+      windows:
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

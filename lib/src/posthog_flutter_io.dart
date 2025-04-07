@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
@@ -9,8 +11,16 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
+  bool _isSupportedPlatform() {
+    return !(Platform.isLinux || Platform.isWindows);
+  }
+
   @override
   Future<void> setup(PostHogConfig config) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());
     } on PlatformException catch (exception) {
@@ -24,6 +34,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('identify', {
         'userId': userId,
@@ -41,6 +55,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String eventName,
     Map<String, Object>? properties,
   }) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('capture', {
         'eventName': eventName,
@@ -56,6 +74,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String screenName,
     Map<String, Object>? properties,
   }) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('screen', {
         'screenName': screenName,
@@ -70,6 +92,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> alias({
     required String alias,
   }) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('alias', {
         'alias': alias,
@@ -81,6 +107,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<String> getDistinctId() async {
+    if (!_isSupportedPlatform()) {
+      return "";
+    }
+
     try {
       return await _methodChannel.invokeMethod('distinctId');
     } on PlatformException catch (exception) {
@@ -91,6 +121,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reset() async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('reset');
     } on PlatformException catch (exception) {
@@ -100,6 +134,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> disable() async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('disable');
     } on PlatformException catch (exception) {
@@ -109,6 +147,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> enable() async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('enable');
     } on PlatformException catch (exception) {
@@ -118,6 +160,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> debug(bool enabled) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('debug', {
         'debug': enabled,
@@ -129,6 +175,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key) async {
+    if (!_isSupportedPlatform()) {
+      return false;
+    }
+
     try {
       return await _methodChannel.invokeMethod('isFeatureEnabled', {
         'key': key,
@@ -141,6 +191,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reloadFeatureFlags() async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('reloadFeatureFlags');
     } on PlatformException catch (exception) {
@@ -154,6 +208,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String groupKey,
     Map<String, Object>? groupProperties,
   }) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('group', {
         'groupType': groupType,
@@ -169,6 +227,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<Object?> getFeatureFlag({
     required String key,
   }) async {
+    if (!_isSupportedPlatform()) {
+      return null;
+    }
+
     try {
       return await _methodChannel.invokeMethod('getFeatureFlag', {
         'key': key,
@@ -183,6 +245,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<Object?> getFeatureFlagPayload({
     required String key,
   }) async {
+    if (!_isSupportedPlatform()) {
+      return null;
+    }
+
     try {
       return await _methodChannel.invokeMethod('getFeatureFlagPayload', {
         'key': key,
@@ -195,6 +261,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> register(String key, Object value) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       return await _methodChannel
           .invokeMethod('register', {'key': key, 'value': value});
@@ -205,6 +275,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> unregister(String key) async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       return await _methodChannel.invokeMethod('unregister', {'key': key});
     } on PlatformException catch (exception) {
@@ -214,6 +288,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> flush() async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       return await _methodChannel.invokeMethod('flush');
     } on PlatformException catch (exception) {
@@ -223,6 +301,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> close() async {
+    if (!_isSupportedPlatform()) {
+      return;
+    }
+
     try {
       return await _methodChannel.invokeMethod('close');
     } on PlatformException catch (exception) {
@@ -232,6 +314,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<String?> getSessionId() async {
+    if (!_isSupportedPlatform()) {
+      return null;
+    }
+
     try {
       final sessionId = await _methodChannel.invokeMethod('getSessionId');
       return sessionId;
