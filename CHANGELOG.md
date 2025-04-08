@@ -1,5 +1,9 @@
 ## Next
 
+## 4.10.5
+
+- chore: linux and windows NoOp support ([#173](https://github.com/PostHog/posthog-flutter/pull/173))
+
 ## 4.10.4
 
 - fix: dispose recorder if masking is disabled ([#166](https://github.com/PostHog/posthog-flutter/pull/166))
