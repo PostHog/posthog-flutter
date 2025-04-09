@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
+import 'package:posthog_flutter/src/replay/size_extension.dart';
+import 'package:posthog_flutter/src/replay/image_extension.dart';
 
 import 'position_calculator.dart';
 import 'scaler.dart';
@@ -18,7 +20,11 @@ class RenderImageParser extends ElementParser {
   @override
   Rect? buildElementRect(Element element, Rect? parentRect) {
     final RenderImage renderImage = element.renderObject as RenderImage;
-    if (!renderImage.hasSize) {
+    final image = renderImage.image;
+    if (!renderImage.hasSize ||
+        !renderImage.size.isValidSize ||
+        image == null ||
+        !image.isValidSize) {
       return null;
     }
 
@@ -26,11 +32,15 @@ class RenderImageParser extends ElementParser {
     final BoxFit fit = renderImage.fit ?? BoxFit.scaleDown;
 
     final Size size = _scaler.getScaledSize(
-      renderImage.image?.width.toDouble() ?? 0,
-      renderImage.image?.height.toDouble() ?? 0,
+      image.width.toDouble(),
+      image.height.toDouble(),
       renderImage.size,
       fit,
     );
+
+    if (!size.isValidSize) {
+      return null;
+    }
 
     final AlignmentGeometry alignment = renderImage.alignment;
 

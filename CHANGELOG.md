@@ -1,5 +1,7 @@
 ## Next
 
+- fix: check if image size is valid before sending snapshot ([#174](https://github.com/PostHog/posthog-flutter/pull/174))
+
 ## 4.10.5
 
 - chore: linux and windows NoOp support ([#173](https://github.com/PostHog/posthog-flutter/pull/173))

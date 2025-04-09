@@ -6,10 +6,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
+import 'package:posthog_flutter/src/replay/image_extension.dart';
 import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/native_communicator.dart';
 import 'package:posthog_flutter/src/replay/screenshot/snapshot_manager.dart';
+import 'package:posthog_flutter/src/replay/size_extension.dart';
 import 'package:posthog_flutter/src/replay/vendor/equality.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
@@ -74,7 +76,9 @@ class ScreenshotCapturer {
     }
 
     final renderObject = context.findRenderObject() as RenderRepaintBoundary?;
-    if (renderObject == null) {
+    if (renderObject == null ||
+        !renderObject.hasSize ||
+        !renderObject.size.isValidSize) {
       return Future.value(null);
     }
 
@@ -119,7 +123,7 @@ class ScreenshotCapturer {
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
         final image = await syncImage;
-        if (!isSessionReplayActive) {
+        if (!isSessionReplayActive || !image.isValidSize) {
           _snapshotManager.clear();
           image.dispose();
           completer.complete(null);
@@ -171,6 +175,13 @@ class ScreenshotCapturer {
             final finalImage =
                 await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
 
+            if (!finalImage.isValidSize) {
+              finalImage.dispose();
+              picture.dispose();
+              completer.complete(null);
+              return;
+            }
+
             try {
               final maskedImagePngBytes = await _getImageBytes(finalImage);
               if (maskedImagePngBytes == null || maskedImagePngBytes.isEmpty) {
@@ -210,6 +221,13 @@ class ScreenshotCapturer {
           try {
             final finalImage =
                 await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
+
+            if (!finalImage.isValidSize) {
+              finalImage.dispose();
+              picture.dispose();
+              completer.complete(null);
+              return;
+            }
 
             try {
               final pngBytes = await _getImageBytes(finalImage);
