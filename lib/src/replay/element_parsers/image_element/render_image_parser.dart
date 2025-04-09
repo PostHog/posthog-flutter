@@ -24,7 +24,7 @@ class RenderImageParser extends ElementParser {
     if (!renderImage.hasSize ||
         !renderImage.size.isValidSize ||
         image == null ||
-        !image.isValidImageSize) {
+        !image.isValidSize) {
       return null;
     }
 

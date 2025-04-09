@@ -123,7 +123,7 @@ class ScreenshotCapturer {
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
         final image = await syncImage;
-        if (!isSessionReplayActive || !image.isValidImageSize) {
+        if (!isSessionReplayActive || !image.isValidSize) {
           _snapshotManager.clear();
           image.dispose();
           completer.complete(null);
@@ -175,7 +175,7 @@ class ScreenshotCapturer {
             final finalImage =
                 await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
 
-            if (!finalImage.isValidImageSize) {
+            if (!finalImage.isValidSize) {
               finalImage.dispose();
               picture.dispose();
               completer.complete(null);
@@ -222,7 +222,7 @@ class ScreenshotCapturer {
             final finalImage =
                 await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
 
-            if (!finalImage.isValidImageSize) {
+            if (!finalImage.isValidSize) {
               finalImage.dispose();
               picture.dispose();
               completer.complete(null);
