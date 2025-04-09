@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
+import 'package:posthog_flutter/src/replay/size_extension.dart';
 
 class ElementParser {
   ElementParser();
@@ -24,7 +25,9 @@ class ElementParser {
 
   Rect? buildElementRect(Element element, Rect? parentRect) {
     final renderObject = element.renderObject;
-    if (renderObject is RenderBox && renderObject.hasSize) {
+    if (renderObject is RenderBox &&
+        renderObject.hasSize &&
+        renderObject.size.isValidSize) {
       final Offset offset = renderObject.localToGlobal(Offset.zero);
       return Rect.fromLTWH(
         offset.dx,
