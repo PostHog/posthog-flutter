@@ -12,10 +12,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
-  // bool isSupportedPlatform() {
-  //   return !(Platform.isLinux || Platform.isWindows);
-  // }
-
   @override
   Future<void> setup(PostHogConfig config) async {
     if (!isSupportedPlatform()) {
