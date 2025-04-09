@@ -1,5 +1,9 @@
 ## Next
 
+## 4.10.7
+
+- fix: import dart io only on non-web platforms ([#176](https://github.com/PostHog/posthog-flutter/pull/176))
+
 ## 4.10.6
 
 - fix: check if image size is valid before sending snapshot ([#174](https://github.com/PostHog/posthog-flutter/pull/174))
