@@ -2,7 +2,7 @@
 
 ## 4.10.7
 
-- fix: import dart io only on non-web platforms ([#175](https://github.com/PostHog/posthog-flutter/pull/175))
+- fix: import dart io only on non-web platforms ([#176](https://github.com/PostHog/posthog-flutter/pull/176))
 
 ## 4.10.6
 
