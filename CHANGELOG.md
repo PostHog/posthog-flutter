@@ -1,6 +1,6 @@
 ## Next
 
-- chore: pin the iOS SDK to 3.x.x ([#177](https://github.com/PostHog/posthog-flutter/pull/177))
+- chore: pin the iOS SDK to 3.22.x ([#177](https://github.com/PostHog/posthog-flutter/pull/177))
 
 ## 4.10.7
 
