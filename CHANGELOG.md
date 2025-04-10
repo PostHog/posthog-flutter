@@ -1,5 +1,7 @@
 ## Next
 
+- chore: pin the iOS SDK to 3.x.x ([#177](https://github.com/PostHog/posthog-flutter/pull/177))
+
 ## 4.10.7
 
 - fix: import dart io only on non-web platforms ([#176](https://github.com/PostHog/posthog-flutter/pull/176))
