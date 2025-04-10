@@ -21,9 +21,8 @@ Postog flutter plugin
   s.ios.dependency 'Flutter'
   s.osx.dependency 'FlutterMacOS'
 
-  # ~> Version 3.19.0 up to, but not including, 4.0.0
-  # pin to 3.21.0 to avoid 'Unknown attribute 'Previewable''
-  s.dependency 'PostHog', '3.21.0'
+  # ~> Version 3.22.0 up to, but not including, 4.0.0
+  s.dependency 'PostHog', '~> 3.22'
 
   s.ios.deployment_target = '13.0'
   # PH iOS SDK 3.0.0 requires >= 10.15
