@@ -1,6 +1,6 @@
 ## Next
 
-- chore: Session Replay - GA
+- chore: Session Replay - GA ([#178](https://github.com/PostHog/posthog-flutter/pull/178))
 
 ## 4.10.8
 
