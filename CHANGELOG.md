@@ -1,5 +1,7 @@
 ## Next
 
+- chore: Session Replay - GA ([#178](https://github.com/PostHog/posthog-flutter/pull/178))
+
 ## 4.10.8
 
 - chore: pin the iOS SDK to 3.22.x ([#177](https://github.com/PostHog/posthog-flutter/pull/177))
