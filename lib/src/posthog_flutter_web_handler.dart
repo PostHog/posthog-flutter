@@ -29,7 +29,7 @@ extension PostHogExtension on PostHog {
 
 // Acessar o posthog a partir do window
 @JS('window.posthog')
-external PostHog get posthog;
+external PostHog? get posthog;
 
 // Funções de conversão
 JSAny stringToJSAny(String value) {
@@ -41,7 +41,7 @@ JSAny boolToJSAny(bool value) {
 }
 
 JSAny mapToJSAny(Map<dynamic, dynamic> map) {
-  return map.jsify()!;
+  return map.jsify() ?? JSObject();
 }
 
 // Função para converter mapas de forma segura
@@ -71,7 +71,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final userPropertiesSetOnce =
           safeMapConversion(args['userPropertiesSetOnce']);
 
-      posthog.identify(
+      posthog?.identify(
         stringToJSAny(userId),
         mapToJSAny(userProperties),
         mapToJSAny(userPropertiesSetOnce),
@@ -81,7 +81,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
 
-      posthog.capture(
+      posthog?.capture(
         stringToJSAny(eventName),
         mapToJSAny(properties),
       );
@@ -91,7 +91,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
 
-      posthog.capture(
+      posthog?.capture(
         stringToJSAny('\$screen'),
         mapToJSAny(properties),
       );
@@ -99,24 +99,24 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'alias':
       final alias = args['alias'] as String;
 
-      posthog.alias(
+      posthog?.alias(
         stringToJSAny(alias),
       );
       break;
     case 'distinctId':
-      final distinctId = posthog.get_distinct_id();
-      return distinctId?.dartify();
+      final distinctId = posthog?.get_distinct_id();
+      return distinctId?.dartify() as String?;
     case 'reset':
-      posthog.reset();
+      posthog?.reset();
       break;
     case 'debug':
       final enabled = args['debug'] as bool;
-      posthog.debug(boolToJSAny(enabled));
+      posthog?.debug(boolToJSAny(enabled));
       break;
     case 'isFeatureEnabled':
       final key = args['key'] as String;
       final isFeatureEnabled = posthog
-              .isFeatureEnabled(
+              ?.isFeatureEnabled(
                 stringToJSAny(key),
               )
               ?.dartify() as bool? ??
@@ -127,32 +127,32 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final groupKey = args['groupKey'] as String;
       final groupProperties = safeMapConversion(args['groupProperties']);
 
-      posthog.group(
+      posthog?.group(
         stringToJSAny(groupType),
         stringToJSAny(groupKey),
         mapToJSAny(groupProperties),
       );
       break;
     case 'reloadFeatureFlags':
-      posthog.reloadFeatureFlags();
+      posthog?.reloadFeatureFlags();
       break;
     case 'enable':
-      posthog.opt_in_capturing();
+      posthog?.opt_in_capturing();
       break;
     case 'disable':
-      posthog.opt_out_capturing();
+      posthog?.opt_out_capturing();
       break;
     case 'getFeatureFlag':
       final key = args['key'] as String;
 
-      final featureFlag = posthog.getFeatureFlag(
+      final featureFlag = posthog?.getFeatureFlag(
         stringToJSAny(key),
       );
       return featureFlag?.dartify();
     case 'getFeatureFlagPayload':
       final key = args['key'] as String;
 
-      final featureFlag = posthog.getFeatureFlagPayload(
+      final featureFlag = posthog?.getFeatureFlagPayload(
         stringToJSAny(key),
       );
       return featureFlag?.dartify();
@@ -161,19 +161,19 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final value = args['value'];
       final properties = {key: value};
 
-      posthog.register(
+      posthog?.register(
         mapToJSAny(properties),
       );
       break;
     case 'unregister':
       final key = args['key'] as String;
 
-      posthog.unregister(
+      posthog?.unregister(
         stringToJSAny(key),
       );
       break;
     case 'getSessionId':
-      final sessionId = posthog.get_session_id()?.dartify() as String?;
+      final sessionId = posthog?.get_session_id()?.dartify() as String?;
       if (sessionId?.isEmpty == true) return null;
       return sessionId;
     case 'flush':
