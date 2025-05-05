@@ -1,5 +1,14 @@
 ## Next
 
+## 5.0.0
+
+- chore: support flutter web wasm builds ([#112](https://github.com/PostHog/posthog-flutter/pull/112))
+
+### Breaking changes
+
+- Dart min version 3.3.0
+- Flutter min version 3.19.0
+
 ## 4.11.0
 
 - chore: Session Replay - GA ([#178](https://github.com/PostHog/posthog-flutter/pull/178))
