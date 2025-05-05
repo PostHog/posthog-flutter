@@ -2,7 +2,7 @@ import 'dart:js_interop';
 
 import 'package:flutter/services.dart';
 
-// Definição da interface JS para o PostHog
+// Definition of the JS interface for PostHog
 @JS()
 @staticInterop
 class PostHog {}
@@ -27,11 +27,11 @@ extension PostHogExtension on PostHog {
   external JSAny? get_session_id();
 }
 
-// Acessar o posthog a partir do window
+// Accessing PostHog from the window object
 @JS('window.posthog')
 external PostHog? get posthog;
 
-// Funções de conversão
+// Conversion functions
 JSAny stringToJSAny(String value) {
   return value.toJS;
 }
@@ -44,7 +44,7 @@ JSAny mapToJSAny(Map<dynamic, dynamic> map) {
   return map.jsify() ?? JSObject();
 }
 
-// Função para converter mapas de forma segura
+// Function for safely converting maps
 Map<String, dynamic> safeMapConversion(dynamic mapData) {
   if (mapData == null) {
     return {};
