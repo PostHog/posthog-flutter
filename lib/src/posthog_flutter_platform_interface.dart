@@ -91,6 +91,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
   }
 
+  Future<Map<String, dynamic>> showSurvey(Map<String, dynamic> survey) {
+    throw UnimplementedError('showSurvey() has not been implemented.');
+  }
+
   Future<void> group({
     required String groupType,
     required String groupKey,

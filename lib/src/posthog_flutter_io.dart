@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
@@ -6,11 +8,77 @@ import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'posthog_widget.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
+  PosthogFlutterIO() {
+    _methodChannel.setMethodCallHandler(_handleMethodCall);
+  }
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
+
+  Future<dynamic> _handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'showSurvey':
+        final Map<String, dynamic> survey = Map<String, dynamic>.from(call.arguments);
+        return showSurvey(survey);
+      default:
+        throw PlatformException(
+          code: 'Unimplemented',
+          details: 'The posthog_flutter plugin does not implement ${call.method}',
+        );
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> showSurvey(Map<String, dynamic> survey) async {
+    if (!isSupportedPlatform()) {
+      throw PlatformException(
+        code: 'Unsupported',
+        details: 'Platform is not supported',
+      );
+    }
+
+    final widget = PosthogFlutterPlatformInterface.instance;
+    if (widget is! PosthogFlutterIO) {
+      throw PlatformException(
+        code: 'InvalidInstance',
+        details: 'PosthogFlutterPlatformInterface instance is not PosthogFlutterIO',
+      );
+    }
+
+    try {
+      final completer = Completer<Map<String, dynamic>>();
+      final state = PostHogWidget.globalKey.currentState;
+      if (state == null) {
+        throw PlatformException(
+          code: 'NoWidgetState',
+          details: 'PostHogWidget is not mounted in the widget tree',
+        );
+      }
+
+      state.showSurvey(
+        PostHogDisplaySurvey(title: survey['title'] as String),
+        (survey) => completer.complete({'type': 'shown'}),
+        (survey, index, response) => completer.complete({
+          'type': 'response',
+          'index': index,
+          'response': response,
+        }),
+        (survey, completed) => completer.complete({
+          'type': 'closed',
+          'completed': completed,
+        }),
+      );
+      return completer.future;
+    } on Exception catch (e) {
+      throw PlatformException(
+        code: 'ShowSurveyError',
+        details: e.toString(),
+      );
+    }
+  }
 
   @override
   Future<void> setup(PostHogConfig config) async {

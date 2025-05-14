@@ -1,4 +1,4 @@
-import PostHog
+@_spi(Experimental) import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
@@ -8,19 +8,24 @@ import PostHog
 #endif
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
+    private static var instance: PosthogFlutterPlugin?
+    
+    public static func getInstance() -> PosthogFlutterPlugin? {
+        return instance
+    }
     public static func register(with registrar: FlutterPluginRegistrar) {
-        #if os(iOS)
-            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
-        #elseif os(macOS)
-            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
-        #endif
+        let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
         let instance = PosthogFlutterPlugin()
+        instance.channel = channel
+        PosthogFlutterPlugin.instance = instance
         initPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
                                               target: .global(qos: .utility))
+    
+    private var channel: FlutterMethodChannel?
 
     public static func initPlugin() {
         let autoInit = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.AUTO_INIT") as? Bool ?? true
@@ -44,6 +49,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     private static func setupPostHog(_ posthogConfig: [String: Any]) {
+        guard let instance = PosthogFlutterPlugin.instance else {
+            print("[PostHog] Plugin instance not found!")
+            return
+        }
         let apiKey = posthogConfig["apiKey"] as? String ?? ""
         if apiKey.isEmpty {
             print("[PostHog] apiKey is missing!")
@@ -84,6 +93,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         }
         if let optOut = posthogConfig["optOut"] as? Bool {
             config.optOut = optOut
+        }
+        if #available(iOS 15.0, *) {
+            if let surveys: Bool = posthogConfig["surveys"] as? Bool {
+                config.surveys = surveys
+                if surveys {
+                    config.surveysConfig.surveysDelegate = instance
+                }
+            }
         }
         if let personProfiles = posthogConfig["personProfiles"] as? String {
             switch personProfiles {
@@ -174,6 +191,49 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             getSessionId(result: result)
         default:
             result(FlutterMethodNotImplemented)
+        }
+    }
+    
+}
+
+// MARK: - PostHogSurveysDelegate
+extension PosthogFlutterPlugin: PostHogSurveysDelegate {
+    public func renderSurvey(
+        _ survey: PostHogDisplaySurvey,
+        onSurveyShown: @escaping OnSurveyDelegateShown,
+        onSurveyResponse: @escaping OnSurveyDelegateResponse,
+        onSurveyClosed: @escaping OnSurveyDelegateClosed
+    ) {
+        let surveyDict: [String: Any] = ["title": survey.title]
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.channel?.invokeMethod("showSurvey", arguments: surveyDict, result: { result in
+                if let error = result as? FlutterError {
+                    print("[PostHog] Error showing survey: \(error)")
+                    return
+                }
+                
+                // Handle the result based on the response type
+                if let response = result as? [String: Any] {
+                    if let type = response["type"] as? String {
+                        switch type {
+                        case "shown":
+                            onSurveyShown(survey)
+                        case "response":
+                            if let index = response["index"] as? Int,
+                               let responseText = response["response"] as? String {
+                                onSurveyResponse(survey, index, responseText)
+                            }
+                        case "closed":
+                            if let completed = response["completed"] as? Bool {
+                                onSurveyClosed(survey, completed)
+                            }
+                        default:
+                            break
+                        }
+                    }
+                }
+            })
         }
     }
 
