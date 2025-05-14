@@ -16,8 +16,18 @@ class PostHogDisplaySurvey {
   PostHogDisplaySurvey({required this.title});
 }
 
+class PostHogNextSurveyQuestion {
+  final int questionIndex;
+  final bool isSurveyCompleted;
+
+  PostHogNextSurveyQuestion({
+    required this.questionIndex,
+    required this.isSurveyCompleted,
+  });
+}
+
 typedef OnSurveyShown = void Function(PostHogDisplaySurvey survey);
-typedef OnSurveyResponse = void Function(
+typedef OnSurveyResponse = Future<PostHogNextSurveyQuestion> Function(
     PostHogDisplaySurvey survey, int index, String response);
 typedef OnSurveyClosed = void Function(PostHogDisplaySurvey survey);
 

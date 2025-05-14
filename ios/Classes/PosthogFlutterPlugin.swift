@@ -240,8 +240,11 @@ extension PosthogFlutterPlugin: PostHogSurveysDelegate {
             onSurveyShownCallback?(survey)
         case "response":
             if let index = args["index"] as? Int,
-               let responseText = args["response"] as? String {
-                onSurveyResponseCallback?(survey, index, responseText)
+               let responseText = args["response"] as? String,
+               let nextQuestion = onSurveyResponseCallback?(survey, index, responseText) {
+                result(["nextIndex": nextQuestion.questionIndex,
+                        "isSurveyCompleted": nextQuestion.isSurveyCompleted])
+                return
             }
         case "closed":
                 onSurveyClosedCallback?(survey)

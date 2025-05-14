@@ -66,12 +66,16 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         (survey) {
           _methodChannel.invokeMethod('surveyResponse', {'type': 'shown'});
         },
-        (survey, index, response) {
-          _methodChannel.invokeMethod('surveyResponse', {
+        (survey, index, response) async {
+          final result = await _methodChannel.invokeMethod('surveyResponse', {
             'type': 'response',
             'index': index,
             'response': response,
-          });
+          }) as Map;
+          return PostHogNextSurveyQuestion(
+            questionIndex: (result['nextIndex'] as num).toInt(),
+            isSurveyCompleted: result['isSurveyCompleted'] as bool,
+          );
         },
         (survey) {
           _methodChannel.invokeMethod('surveyResponse', {'type': 'closed'});

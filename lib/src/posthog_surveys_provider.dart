@@ -80,14 +80,13 @@ class SurveyBottomSheet extends StatefulWidget {
 }
 
 class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
+  int _currentIndex = 0;
+  bool _isCompleted = false;
+
   @override
   void initState() {
     super.initState();
     widget.onShown(widget.survey);
-  }
-
-  void _handleResponse(int index, String response) {
-    widget.onResponse(widget.survey, index, response);
   }
 
   void _handleClose() {
@@ -116,9 +115,14 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  survey.title,
-                  style: Theme.of(context).textTheme.titleLarge,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      survey.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
                 ),
               ),
               IconButton(
@@ -135,46 +139,44 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             ),
           ],
           const SizedBox(height: 16),
-          ...survey.questions.asMap().entries.map((entry) {
-            final index = entry.key;
-            final question = entry.value;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  question.text,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  'Current Index: $_currentIndex',
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 8),
-                if (question.type == 'open') ...[
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: question.placeholder ?? 'Enter your response',
-                      border: const OutlineInputBorder(),
-                    ),
-                    maxLines: 3,
-                    onChanged: (value) => _handleResponse(index, value),
-                  ),
-                ] else if (question.type == 'multiple_choice') ...[
-                  ...question.choices.asMap().entries.map((choice) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          _handleResponse(index, choice.value);
-                          if (index == survey.questions.length - 1) {
-                            _handleClose();
-                          }
-                        },
-                        child: Text(choice.value),
-                      ),
-                    );
-                  }).toList(),
-                ],
                 const SizedBox(height: 16),
+                if (!_isCompleted) ...[
+                  ElevatedButton(
+                    onPressed: () async {
+                      final nextQuestion = await widget.onResponse(
+                          widget.survey,
+                          _currentIndex,
+                          'Response for $_currentIndex');
+                      setState(() {
+                        _currentIndex = nextQuestion.questionIndex;
+                        _isCompleted = nextQuestion.isSurveyCompleted;
+                      });
+                    },
+                    child: const Text('Next Question'),
+                  ),
+                ] else ...[
+                  const Text(
+                    'Thank you for completing the survey!',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => _handleClose(),
+                    child: const Text('Close'),
+                  ),
+                ],
               ],
-            );
-          }).toList(),
+            ),
+          ),
         ],
       ),
     );
