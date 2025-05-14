@@ -244,14 +244,12 @@ extension PosthogFlutterPlugin: PostHogSurveysDelegate {
                 onSurveyResponseCallback?(survey, index, responseText)
             }
         case "closed":
-            if let completed = args["completed"] as? Bool {
-                onSurveyClosedCallback?(survey, completed)
+                onSurveyClosedCallback?(survey)
                 // Clear the callbacks after survey is closed
                 currentSurvey = nil
                 onSurveyShownCallback = nil
                 onSurveyResponseCallback = nil
                 onSurveyClosedCallback = nil
-            }
         default:
             break
         }

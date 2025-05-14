@@ -90,8 +90,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
     widget.onResponse(widget.survey, index, response);
   }
 
-  void _handleClose({bool completed = false}) {
-    widget.onClosed(widget.survey, completed);
+  void _handleClose() {
+    widget.onClosed(widget.survey);
     Navigator.of(context).pop();
   }
 
@@ -163,7 +163,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                         onPressed: () {
                           _handleResponse(index, choice.value);
                           if (index == survey.questions.length - 1) {
-                            _handleClose(completed: true);
+                            _handleClose();
                           }
                         },
                         child: Text(choice.value),

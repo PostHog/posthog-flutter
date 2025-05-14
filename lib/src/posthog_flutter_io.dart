@@ -73,11 +73,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
             'response': response,
           });
         },
-        (survey, completed) {
-          _methodChannel.invokeMethod('surveyResponse', {
-            'type': 'closed',
-            'completed': completed,
-          });
+        (survey) {
+          _methodChannel.invokeMethod('surveyResponse', {'type': 'closed'});
         },
       );
       return Future.value({});
