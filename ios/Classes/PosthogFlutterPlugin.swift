@@ -141,6 +141,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         PostHogSDK.shared.setup(config)
     }
 
+    private var currentSurvey: PostHogDisplaySurvey?
+    private var onSurveyShownCallback: OnSurveyDelegateShown?
+    private var onSurveyResponseCallback: OnSurveyDelegateResponse?
+    private var onSurveyClosedCallback: OnSurveyDelegateClosed?
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "setup":
@@ -189,6 +194,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             isSessionReplayActive(result: result)
         case "getSessionId":
             getSessionId(result: result)
+        case "surveyResponse":
+            handleSurveyResponse(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -206,35 +213,50 @@ extension PosthogFlutterPlugin: PostHogSurveysDelegate {
     ) {
         let surveyDict: [String: Any] = ["title": survey.title]
         
+        // Store the callbacks and survey for later use
+        currentSurvey = survey
+        onSurveyShownCallback = onSurveyShown
+        onSurveyResponseCallback = onSurveyResponse
+        onSurveyClosedCallback = onSurveyClosed
+        
         DispatchQueue.main.async { [weak self] in
-            self?.channel?.invokeMethod("showSurvey", arguments: surveyDict, result: { result in
-                if let error = result as? FlutterError {
-                    print("[PostHog] Error showing survey: \(error)")
-                    return
-                }
-                
-                // Handle the result based on the response type
-                if let response = result as? [String: Any] {
-                    if let type = response["type"] as? String {
-                        switch type {
-                        case "shown":
-                            onSurveyShown(survey)
-                        case "response":
-                            if let index = response["index"] as? Int,
-                               let responseText = response["response"] as? String {
-                                onSurveyResponse(survey, index, responseText)
-                            }
-                        case "closed":
-                            if let completed = response["completed"] as? Bool {
-                                onSurveyClosed(survey, completed)
-                            }
-                        default:
-                            break
-                        }
-                    }
-                }
-            })
+            self?.channel?.invokeMethod("showSurvey", arguments: surveyDict) { _ in
+                // We don't need to handle the result here anymore
+                // All responses will come through the surveyResponse method
+            }
         }
+    }
+
+    private func handleSurveyResponse(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let survey = currentSurvey,
+              let args = call.arguments as? [String: Any],
+              let type = args["type"] as? String else {
+            result(FlutterError(code: "InvalidArguments", message: "Invalid survey response arguments", details: nil))
+            return
+        }
+
+        switch type {
+        case "shown":
+            onSurveyShownCallback?(survey)
+        case "response":
+            if let index = args["index"] as? Int,
+               let responseText = args["response"] as? String {
+                onSurveyResponseCallback?(survey, index, responseText)
+            }
+        case "closed":
+            if let completed = args["completed"] as? Bool {
+                onSurveyClosedCallback?(survey, completed)
+                // Clear the callbacks after survey is closed
+                currentSurvey = nil
+                onSurveyShownCallback = nil
+                onSurveyResponseCallback = nil
+                onSurveyClosedCallback = nil
+            }
+        default:
+            break
+        }
+
+        result(nil)
     }
 
     private func sendMetaEvent(_ call: FlutterMethodCall,

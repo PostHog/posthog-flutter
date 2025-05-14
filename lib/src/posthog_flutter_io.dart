@@ -15,18 +15,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   PosthogFlutterIO() {
     _methodChannel.setMethodCallHandler(_handleMethodCall);
   }
+
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'showSurvey':
-        final Map<String, dynamic> survey = Map<String, dynamic>.from(call.arguments);
+        final Map<String, dynamic> survey =
+            Map<String, dynamic>.from(call.arguments);
         return showSurvey(survey);
       default:
         throw PlatformException(
           code: 'Unimplemented',
-          details: 'The posthog_flutter plugin does not implement ${call.method}',
+          details:
+              'The posthog_flutter plugin does not implement ${call.method}',
         );
     }
   }
@@ -44,12 +47,12 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (widget is! PosthogFlutterIO) {
       throw PlatformException(
         code: 'InvalidInstance',
-        details: 'PosthogFlutterPlatformInterface instance is not PosthogFlutterIO',
+        details:
+            'PosthogFlutterPlatformInterface instance is not PosthogFlutterIO',
       );
     }
 
     try {
-      final completer = Completer<Map<String, dynamic>>();
       final state = PostHogWidget.globalKey.currentState;
       if (state == null) {
         throw PlatformException(
@@ -60,18 +63,24 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
       state.showSurvey(
         PostHogDisplaySurvey(title: survey['title'] as String),
-        (survey) => completer.complete({'type': 'shown'}),
-        (survey, index, response) => completer.complete({
-          'type': 'response',
-          'index': index,
-          'response': response,
-        }),
-        (survey, completed) => completer.complete({
-          'type': 'closed',
-          'completed': completed,
-        }),
+        (survey) {
+          _methodChannel.invokeMethod('surveyResponse', {'type': 'shown'});
+        },
+        (survey, index, response) {
+          _methodChannel.invokeMethod('surveyResponse', {
+            'type': 'response',
+            'index': index,
+            'response': response,
+          });
+        },
+        (survey, completed) {
+          _methodChannel.invokeMethod('surveyResponse', {
+            'type': 'closed',
+            'completed': completed,
+          });
+        },
       );
-      return completer.future;
+      return Future.value({});
     } on Exception catch (e) {
       throw PlatformException(
         code: 'ShowSurveyError',

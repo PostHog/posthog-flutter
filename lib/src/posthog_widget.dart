@@ -16,10 +16,10 @@ class PostHogDisplaySurvey {
   PostHogDisplaySurvey({required this.title});
 }
 
-typedef OnSurveyShown = Function(PostHogDisplaySurvey survey);
-typedef OnSurveyResponse = Function(
+typedef OnSurveyShown = void Function(PostHogDisplaySurvey survey);
+typedef OnSurveyResponse = void Function(
     PostHogDisplaySurvey survey, int index, String response);
-typedef OnSurveyClosed = Function(PostHogDisplaySurvey survey, bool completed);
+typedef OnSurveyClosed = void Function(PostHogDisplaySurvey survey, bool completed);
 
 @immutable
 class PostHogWidget extends StatefulWidget {
