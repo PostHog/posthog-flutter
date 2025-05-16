@@ -4,19 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
-import 'package:posthog_flutter/src/posthog_surveys_provider.dart';
+import 'package:posthog_flutter/src/surveys/posthog_surveys_provider.dart';
 
 import 'posthog.dart';
 import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
 import 'replay/screenshot/screenshot_capturer.dart';
 
-import 'models/posthog_display_survey.dart';
-
-typedef OnSurveyShown = void Function(PostHogDisplaySurvey survey);
-typedef OnSurveyResponse = Future<PostHogNextSurveyQuestion> Function(
-    PostHogDisplaySurvey survey, int index, String response);
-typedef OnSurveyClosed = void Function(PostHogDisplaySurvey survey);
+import 'surveys/models/posthog_display_survey.dart';
+import 'surveys/models/survey_callbacks.dart';
 
 @immutable
 class PostHogWidget extends StatefulWidget {

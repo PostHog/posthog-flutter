@@ -5,8 +5,8 @@ import 'util/platform_io_stub.dart'
 
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
-import 'package:posthog_flutter/src/models/posthog_display_survey.dart'
-    as models;
+import 'surveys/models/posthog_display_survey.dart' as models;
+import 'surveys/models/survey_next_question.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
@@ -75,7 +75,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
             'index': index,
             'response': response,
           }) as Map;
-          final nextQuestion = models.PostHogNextSurveyQuestion(
+          final nextQuestion = PostHogSurveyNextQuestion(
             questionIndex: (result['nextIndex'] as num).toInt(),
             isSurveyCompleted: result['isSurveyCompleted'] as bool,
           );

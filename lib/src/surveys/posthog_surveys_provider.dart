@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'models/posthog_display_survey.dart';
-import 'posthog_widget.dart';
-import 'package:posthog_flutter/posthog_flutter.dart';
 import 'models/question_type.dart';
+import 'models/survey_appearance.dart';
+import 'models/survey_callbacks.dart';
 import 'widgets/open_text_question.dart';
 import 'widgets/unimplemented_question.dart';
 
@@ -95,6 +95,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           key: ValueKey('open_text_question_$_currentIndex'),
           question: currentQuestion.question,
           description: currentQuestion.description,
+          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
               widget.survey,
