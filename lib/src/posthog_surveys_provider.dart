@@ -1,24 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
+
+import 'models/posthog_display_survey.dart';
+import 'posthog_widget.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 extension PostHogDisplaySurveyExtension on PostHogDisplaySurvey {
-  String? get description => null;
-  List<PostHogDisplayQuestion> get questions => [];
-}
-
-class PostHogDisplayQuestion {
-  final String text;
-  final String type;
-  final String? placeholder;
-  final List<String> choices;
-
-  PostHogDisplayQuestion({
-    required this.text,
-    required this.type,
-    this.placeholder,
-    this.choices = const [],
-  });
+  String get title => name;
+  String? get description => questions.firstOrNull?.questionDescription;
 }
 
 class PostHogSurveysProvider extends StatefulWidget {
@@ -68,12 +56,12 @@ class SurveyBottomSheet extends StatefulWidget {
   final OnSurveyClosed onClosed;
 
   const SurveyBottomSheet({
-    Key? key,
+    super.key,
     required this.survey,
     required this.onShown,
     required this.onResponse,
     required this.onClosed,
-  }) : super(key: key);
+  });
 
   @override
   State<SurveyBottomSheet> createState() => _SurveyBottomSheetState();

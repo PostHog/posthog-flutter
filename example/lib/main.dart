@@ -284,7 +284,7 @@ class _InitialScreenState extends State<InitialScreen> {
 }
 
 class SecondRoute extends StatefulWidget {
-  const SecondRoute();
+  const SecondRoute({super.key});
 
   @override
   _SecondRouteState createState() => _SecondRouteState();

@@ -9,10 +9,11 @@
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private static var instance: PosthogFlutterPlugin?
-    
+
     public static func getInstance() -> PosthogFlutterPlugin? {
         return instance
     }
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
         let instance = PosthogFlutterPlugin()
@@ -24,7 +25,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
                                               target: .global(qos: .utility))
-    
+
     private var channel: FlutterMethodChannel?
 
     public static func initPlugin() {
@@ -94,14 +95,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         if let optOut = posthogConfig["optOut"] as? Bool {
             config.optOut = optOut
         }
-        if #available(iOS 15.0, *) {
-            if let surveys: Bool = posthogConfig["surveys"] as? Bool {
-                config.surveys = surveys
-                if surveys {
-                    config.surveysConfig.surveysDelegate = instance
-                }
-            }
-        }
+        
         if let personProfiles = posthogConfig["personProfiles"] as? String {
             switch personProfiles {
             case "never":
@@ -127,11 +121,22 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
         #if os(iOS)
+            // configure session replay
             if let sessionReplay = posthogConfig["sessionReplay"] as? Bool {
                 config.sessionReplay = sessionReplay
             }
             // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
             config.sessionReplayConfig.captureNetworkTelemetry = false
+
+            // configure surveys
+            if #available(iOS 15.0, *) {
+            if let surveys: Bool = posthogConfig["surveys"] as? Bool {
+                config.surveys = surveys
+                if surveys {
+                    config.surveysConfig.surveysDelegate = instance
+                }
+            }
+        }
         #endif
 
         // Update SDK name and version
@@ -200,66 +205,69 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             result(FlutterMethodNotImplemented)
         }
     }
-    
 }
 
-// MARK: - PostHogSurveysDelegate
-extension PosthogFlutterPlugin: PostHogSurveysDelegate {
-    public func renderSurvey(
-        _ survey: PostHogDisplaySurvey,
-        onSurveyShown: @escaping OnSurveyDelegateShown,
-        onSurveyResponse: @escaping OnSurveyDelegateResponse,
-        onSurveyClosed: @escaping OnSurveyDelegateClosed
-    ) {
-        let surveyDict: [String: Any] = ["title": survey.title]
-        
-        // Store the callbacks and survey for later use
-        currentSurvey = survey
-        onSurveyShownCallback = onSurveyShown
-        onSurveyResponseCallback = onSurveyResponse
-        onSurveyClosedCallback = onSurveyClosed
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.channel?.invokeMethod("showSurvey", arguments: surveyDict) { _ in
+#if os(iOS)
+
+    // MARK: - PostHogSurveysDelegate
+    extension PosthogFlutterPlugin: PostHogSurveysDelegate {
+        public func renderSurvey(
+            _ survey: PostHogDisplaySurvey,
+            onSurveyShown: @escaping OnSurveyDelegateShown,
+            onSurveyResponse: @escaping OnSurveyDelegateResponse,
+            onSurveyClosed: @escaping OnSurveyDelegateClosed
+        ) {
+            // Store the callbacks and survey for later use
+            currentSurvey = survey
+            onSurveyShownCallback = onSurveyShown
+            onSurveyResponseCallback = onSurveyResponse
+            onSurveyClosedCallback = onSurveyClosed
+
+            DispatchQueue.main.async { [weak self] in
                 // We don't need to handle the result here anymore
                 // All responses will come through the surveyResponse method
+                self?.channel?.invokeMethod("showSurvey", arguments: survey.toDict())
             }
         }
-    }
 
-    private func handleSurveyResponse(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let survey = currentSurvey,
-              let args = call.arguments as? [String: Any],
-              let type = args["type"] as? String else {
-            result(FlutterError(code: "InvalidArguments", message: "Invalid survey response arguments", details: nil))
-            return
-        }
-
-        switch type {
-        case "shown":
-            onSurveyShownCallback?(survey)
-        case "response":
-            if let index = args["index"] as? Int,
-               let responseText = args["response"] as? String,
-               let nextQuestion = onSurveyResponseCallback?(survey, index, responseText) {
-                result(["nextIndex": nextQuestion.questionIndex,
-                        "isSurveyCompleted": nextQuestion.isSurveyCompleted])
+        private func handleSurveyResponse(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+            guard let survey = currentSurvey,
+                  let args = call.arguments as? [String: Any],
+                  let type = args["type"] as? String
+            else {
+                result(FlutterError(code: "InvalidArguments", message: "Invalid survey response arguments", details: nil))
                 return
             }
-        case "closed":
+
+            switch type {
+            case "shown":
+                onSurveyShownCallback?(survey)
+            case "response":
+                if let index = args["index"] as? Int,
+                   let responseText = args["response"] as? String,
+                   let nextQuestion = onSurveyResponseCallback?(survey, index, responseText)
+                {
+                    result(["nextIndex": nextQuestion.questionIndex,
+                            "isSurveyCompleted": nextQuestion.isSurveyCompleted])
+                    return
+                }
+            case "closed":
                 onSurveyClosedCallback?(survey)
                 // Clear the callbacks after survey is closed
                 currentSurvey = nil
                 onSurveyShownCallback = nil
                 onSurveyResponseCallback = nil
                 onSurveyClosedCallback = nil
-        default:
-            break
+            default:
+                break
+            }
+
+            result(nil)
         }
-
-        result(nil)
     }
+#endif
 
+extension PosthogFlutterPlugin {
     private func sendMetaEvent(_ call: FlutterMethodCall,
                                result: @escaping FlutterResult)
     {

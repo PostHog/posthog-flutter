@@ -19,6 +19,7 @@ Postog flutter plugin
   s.resource_bundles = { "PostHogFlutter" => "Resources/PrivacyInfo.xcprivacy" }
   
   s.ios.dependency 'Flutter'
+  s.ios.dependency 'PostHog'
   s.osx.dependency 'FlutterMacOS'
 
   # ~> Version 3.22.0 up to, but not including, 4.0.0

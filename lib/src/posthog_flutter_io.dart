@@ -5,6 +5,8 @@ import 'util/platform_io_stub.dart'
 
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
+import 'package:posthog_flutter/src/models/posthog_display_survey.dart'
+    as models;
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
@@ -35,7 +37,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Map<String, dynamic>> showSurvey(Map<String, dynamic> survey) async {
+  Future<void> showSurvey(Map<String, dynamic> survey) async {
     if (!isSupportedPlatform()) {
       throw PlatformException(
         code: 'Unsupported',
@@ -61,10 +63,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         );
       }
 
-      state.showSurvey(
-        PostHogDisplaySurvey(title: survey['title'] as String),
-        (survey) {
-          _methodChannel.invokeMethod('surveyResponse', {'type': 'shown'});
+      await state.showSurvey(
+        models.PostHogDisplaySurvey.fromDict(survey),
+        (survey) async {
+          await _methodChannel
+              .invokeMethod('surveyResponse', {'type': 'shown'});
         },
         (survey, index, response) async {
           final result = await _methodChannel.invokeMethod('surveyResponse', {
@@ -72,16 +75,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
             'index': index,
             'response': response,
           }) as Map;
-          return PostHogNextSurveyQuestion(
+          final nextQuestion = models.PostHogNextSurveyQuestion(
             questionIndex: (result['nextIndex'] as num).toInt(),
             isSurveyCompleted: result['isSurveyCompleted'] as bool,
           );
+          return nextQuestion;
         },
-        (survey) {
-          _methodChannel.invokeMethod('surveyResponse', {'type': 'closed'});
+        (survey) async {
+          await _methodChannel
+              .invokeMethod('surveyResponse', {'type': 'closed'});
         },
       );
-      return Future.value({});
     } on Exception catch (e) {
       throw PlatformException(
         code: 'ShowSurveyError',

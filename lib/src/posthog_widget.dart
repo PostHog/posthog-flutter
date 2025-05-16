@@ -11,20 +11,7 @@ import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
 import 'replay/screenshot/screenshot_capturer.dart';
 
-class PostHogDisplaySurvey {
-  final String title;
-  PostHogDisplaySurvey({required this.title});
-}
-
-class PostHogNextSurveyQuestion {
-  final int questionIndex;
-  final bool isSurveyCompleted;
-
-  PostHogNextSurveyQuestion({
-    required this.questionIndex,
-    required this.isSurveyCompleted,
-  });
-}
+import 'models/posthog_display_survey.dart';
 
 typedef OnSurveyShown = void Function(PostHogDisplaySurvey survey);
 typedef OnSurveyResponse = Future<PostHogNextSurveyQuestion> Function(
