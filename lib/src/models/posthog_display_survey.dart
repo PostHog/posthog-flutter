@@ -1,23 +1,39 @@
 import 'package:flutter/foundation.dart';
+import 'question_type.dart';
 
 /// Rating type for survey questions
 enum PostHogDisplaySurveyRatingType {
-  number,
-  emoji,
+  number('number'),
+  stars('stars');
+
+  const PostHogDisplaySurveyRatingType(this.value);
+  final String value;
+
+  static PostHogDisplaySurveyRatingType fromString(String type) {
+    return PostHogDisplaySurveyRatingType.values.firstWhere(
+      (e) => e.value == type.toLowerCase(),
+      orElse: () => PostHogDisplaySurveyRatingType.number,
+    );
+  }
+
+  @override
+  String toString() => value;
 }
 
 /// Base class for all survey questions
 @immutable
 abstract class PostHogDisplaySurveyQuestion {
   const PostHogDisplaySurveyQuestion({
+    required this.type,
     required this.question,
-    this.questionDescription,
+    this.description,
     this.optional = false,
     this.buttonText,
   });
 
+  final PostHogSurveyQuestionType type;
   final String question;
-  final String? questionDescription;
+  final String? description;
   final bool optional;
   final String? buttonText;
 }
@@ -26,23 +42,35 @@ abstract class PostHogDisplaySurveyQuestion {
 @immutable
 class PostHogDisplayOpenQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayOpenQuestion({
-    required super.question,
-    super.questionDescription,
-    super.optional,
-    super.buttonText,
-  });
+    required String question,
+    String? description,
+    bool optional = false,
+    String? buttonText,
+  }) : super(
+          type: PostHogSurveyQuestionType.open,
+          question: question,
+          description: description,
+          optional: optional,
+          buttonText: buttonText,
+        );
 }
 
 /// Link question type
 @immutable
 class PostHogDisplayLinkQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayLinkQuestion({
-    required super.question,
+    required String question,
     required this.link,
-    super.questionDescription,
-    super.optional,
-    super.buttonText,
-  });
+    String? description,
+    bool optional = false,
+    String? buttonText,
+  }) : super(
+          type: PostHogSurveyQuestionType.link,
+          question: question,
+          description: description,
+          optional: optional,
+          buttonText: buttonText,
+        );
 
   final String link;
 }
@@ -51,40 +79,54 @@ class PostHogDisplayLinkQuestion extends PostHogDisplaySurveyQuestion {
 @immutable
 class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayRatingQuestion({
-    required super.question,
+    required String question,
     required this.ratingType,
-    required this.ratingScale,
+    required this.lowerBound,
+    required this.upperBound,
     required this.lowerBoundLabel,
     required this.upperBoundLabel,
-    super.questionDescription,
-    super.optional,
-    super.buttonText,
-  });
+    String? description,
+    bool optional = false,
+    String? buttonText,
+  }) : super(
+          type: PostHogSurveyQuestionType.rating,
+          question: question,
+          description: description,
+          optional: optional,
+          buttonText: buttonText,
+        );
 
   final PostHogDisplaySurveyRatingType ratingType;
-  final int ratingScale;
+  final int lowerBound;
+  final int upperBound;
   final String lowerBoundLabel;
   final String upperBoundLabel;
 }
 
-/// Choice question type (single or multiple choice)
+/// Multiple choice question type
 @immutable
 class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayChoiceQuestion({
-    required super.question,
+    required String question,
     required this.choices,
     required this.isMultipleChoice,
     this.hasOpenChoice = false,
     this.shuffleOptions = false,
-    super.questionDescription,
-    super.optional,
-    super.buttonText,
-  });
+    String? description,
+    bool optional = false,
+    String? buttonText,
+  }) : super(
+          type: PostHogSurveyQuestionType.multipleChoice,
+          question: question,
+          description: description,
+          optional: optional,
+          buttonText: buttonText,
+        );
 
   final List<String> choices;
+  final bool isMultipleChoice;
   final bool hasOpenChoice;
   final bool shuffleOptions;
-  final bool isMultipleChoice;
 }
 
 /// Appearance configuration for surveys
@@ -141,19 +183,19 @@ class PostHogDisplaySurvey {
           return PostHogDisplayLinkQuestion(
             question: question,
             link: q['link'] as String,
-            questionDescription: questionDescription,
+            description: questionDescription,
             optional: optional,
             buttonText: buttonText,
           );
         case 'rating':
           return PostHogDisplayRatingQuestion(
             question: question,
-            ratingType:
-                PostHogDisplaySurveyRatingType.values[q['ratingType'] as int],
-            ratingScale: q['ratingScale'] as int,
+            ratingType: PostHogDisplaySurveyRatingType.fromString(q['ratingType'] as String),
+            lowerBound: q['lowerBound'] as int,
+            upperBound: q['upperBound'] as int,
             lowerBoundLabel: q['lowerBoundLabel'] as String,
             upperBoundLabel: q['upperBoundLabel'] as String,
-            questionDescription: questionDescription,
+            description: questionDescription,
             optional: optional,
             buttonText: buttonText,
           );
@@ -165,7 +207,7 @@ class PostHogDisplaySurvey {
             isMultipleChoice: type == 'multiple_choice',
             hasOpenChoice: q['hasOpenChoice'] as bool,
             shuffleOptions: q['shuffleOptions'] as bool,
-            questionDescription: questionDescription,
+            description: questionDescription,
             optional: optional,
             buttonText: buttonText,
           );
@@ -173,7 +215,7 @@ class PostHogDisplaySurvey {
         default:
           return PostHogDisplayOpenQuestion(
             question: question,
-            questionDescription: questionDescription,
+            description: questionDescription,
             optional: optional,
             buttonText: buttonText,
           );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 Future<void> main() async {

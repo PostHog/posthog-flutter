@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'models/posthog_display_survey.dart';
 import 'posthog_widget.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'models/question_type.dart';
+import 'widgets/open_text_question.dart';
+import 'widgets/unimplemented_question.dart';
 
 extension PostHogDisplaySurveyExtension on PostHogDisplaySurvey {
   String get title => name;
-  String? get description => questions.firstOrNull?.questionDescription;
+  String? get description => questions.firstOrNull?.description;
 }
 
 class PostHogSurveysProvider extends StatefulWidget {
@@ -82,9 +85,39 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
     Navigator.of(context).pop();
   }
 
+  Widget _buildQuestion(BuildContext context) {
+    final survey = widget.survey;
+    final currentQuestion = survey.questions[_currentIndex];
+
+    switch (currentQuestion.type) {
+      case PostHogSurveyQuestionType.open:
+        return OpenTextQuestion(
+          key: ValueKey('open_text_question_$_currentIndex'),
+          question: currentQuestion.question,
+          description: currentQuestion.description,
+          onSubmit: (response) async {
+            final nextQuestion = await widget.onResponse(
+              widget.survey,
+              _currentIndex,
+              response,
+            );
+            setState(() {
+              _currentIndex = nextQuestion.questionIndex;
+              _isCompleted = nextQuestion.isSurveyCompleted;
+            });
+          },
+        );
+      default:
+        return UnimplementedQuestion(
+          question: currentQuestion.question,
+          description: currentQuestion.description,
+          type: currentQuestion.type.toString(),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final survey = widget.survey;
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding =
         mediaQuery.viewInsets.bottom + mediaQuery.padding.bottom;
@@ -100,71 +133,35 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      survey.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
-                ),
-              ),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => _handleClose(),
               ),
             ],
           ),
-          if (survey.description?.isNotEmpty == true) ...[
-            const SizedBox(height: 8),
-            Text(
-              survey.description!,
-              style: Theme.of(context).textTheme.bodyMedium,
+          const SizedBox(height: 8),
+          if (!_isCompleted) ...[
+            _buildQuestion(context),
+          ] else ...[
+            const Text(
+              'Thank you for completing the survey!',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _handleClose(),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Close'),
             ),
           ],
-          const SizedBox(height: 16),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Current Index: $_currentIndex',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 16),
-                if (!_isCompleted) ...[
-                  ElevatedButton(
-                    onPressed: () async {
-                      final nextQuestion = await widget.onResponse(
-                          widget.survey,
-                          _currentIndex,
-                          'Response for $_currentIndex');
-                      setState(() {
-                        _currentIndex = nextQuestion.questionIndex;
-                        _isCompleted = nextQuestion.isSurveyCompleted;
-                      });
-                    },
-                    child: const Text('Next Question'),
-                  ),
-                ] else ...[
-                  const Text(
-                    'Thank you for completing the survey!',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => _handleClose(),
-                    child: const Text('Close'),
-                  ),
-                ],
-              ],
-            ),
-          ),
         ],
       ),
     );
