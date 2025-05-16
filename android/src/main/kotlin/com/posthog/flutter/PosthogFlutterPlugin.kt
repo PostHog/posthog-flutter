@@ -1,6 +1,8 @@
 package com.posthog.flutter
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import com.posthog.PersonProfiles
@@ -72,21 +74,42 @@ class PosthogFlutterPlugin :
         }
     }
 
-    override fun onMethodCall(
-        call: MethodCall,
-        result: Result,
-    ) {
-        when (call.method) {
-            "setup" -> {
-                setup(call, result)
-            }
-            "identify" -> {
-                identify(call, result)
-            }
+    override fun onMethodCall(call: MethodCall, result: Result) {
+        try {
+            when (call.method) {
+                "openUrl" -> {
+                    val url = call.arguments as? String
+                    if (url != null) {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            applicationContext.startActivity(intent)
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error(
+                                "InvalidURL",
+                                "Cannot open URL",
+                                "The URL $url cannot be opened: ${e.message}"
+                            )
+                        }
+                    } else {
+                        result.error(
+                            "InvalidArguments",
+                            "Invalid URL",
+                            "The URL provided is invalid"
+                        )
+                    }
+                }
+                "setup" -> {
+                    setup(call, result)
+                }
+                "identify" -> {
+                    identify(call, result)
+                }
 
-            "capture" -> {
-                capture(call, result)
-            }
+                "capture" -> {
+                    capture(call, result)
+                }
 
             "screen" -> {
                 screen(call, result)

@@ -27,7 +27,8 @@ class SurveyButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         disabledBackgroundColor: appearance.submitButtonColor.withOpacity(0.5),
-        disabledForegroundColor: appearance.submitButtonTextColor.withOpacity(0.5),
+        disabledForegroundColor:
+            appearance.submitButtonTextColor.withOpacity(0.5),
       ),
       child: Text(text),
     );

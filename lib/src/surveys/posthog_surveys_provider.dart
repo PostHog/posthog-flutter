@@ -4,8 +4,11 @@ import 'models/posthog_display_survey.dart';
 import 'models/question_type.dart';
 import 'models/survey_appearance.dart';
 import 'models/survey_callbacks.dart';
+import 'widgets/link_question.dart';
 import 'widgets/open_text_question.dart';
 import 'widgets/unimplemented_question.dart';
+import '../posthog_flutter_io.dart';
+import '../posthog_flutter_platform_interface.dart';
 
 extension PostHogDisplaySurveyExtension on PostHogDisplaySurvey {
   String get title => name;
@@ -96,6 +99,30 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           question: currentQuestion.question,
           description: currentQuestion.description,
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          onSubmit: (response) async {
+            final nextQuestion = await widget.onResponse(
+              widget.survey,
+              _currentIndex,
+              response,
+            );
+            setState(() {
+              _currentIndex = nextQuestion.questionIndex;
+              _isCompleted = nextQuestion.isSurveyCompleted;
+            });
+          },
+        );
+      case PostHogSurveyQuestionType.link:
+        final linkQuestion = currentQuestion as PostHogDisplayLinkQuestion;
+        return LinkQuestion(
+          key: ValueKey('link_question_$_currentIndex'),
+          question: linkQuestion.question,
+          description: linkQuestion.description,
+          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          buttonText: linkQuestion.buttonText,
+          link: linkQuestion.link,
+          onLinkClick: (url) async {
+            await (PosthogFlutterPlatformInterface.instance as PosthogFlutterIO).openUrl(url);
+          },
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
               widget.survey,

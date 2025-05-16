@@ -27,6 +27,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         final Map<String, dynamic> survey =
             Map<String, dynamic>.from(call.arguments);
         return showSurvey(survey);
+      case 'openUrl':
+        final String url = call.arguments as String;
+        return openUrl(url);
       default:
         throw PlatformException(
           code: 'Unimplemented',
@@ -34,6 +37,18 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
               'The posthog_flutter plugin does not implement ${call.method}',
         );
     }
+  }
+
+  /// Opens a URL using the platform's default browser
+  Future<void> openUrl(String url) async {
+    if (!isSupportedPlatform()) {
+      throw PlatformException(
+        code: 'Unsupported',
+        details: 'Platform is not supported',
+      );
+    }
+
+    await _methodChannel.invokeMethod('openUrl', url);
   }
 
   @override

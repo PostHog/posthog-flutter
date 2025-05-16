@@ -20,21 +20,22 @@
                     }
 
                     // Add type-specific properties
-                    if let linkQuestion = question as? PostHogDisplayLinkQuestion {
+                    switch question {
+                    case let linkQuestion as PostHogDisplayLinkQuestion:
                         questionDict["type"] = "link"
                         questionDict["link"] = linkQuestion.link
-                    } else if let ratingQuestion = question as? PostHogDisplayRatingQuestion {
+                    case let ratingQuestion as PostHogDisplayRatingQuestion:
                         questionDict["type"] = "rating"
                         questionDict["ratingType"] = ratingQuestion.ratingType.rawValue
                         questionDict["ratingScale"] = ratingQuestion.ratingScale
                         questionDict["lowerBoundLabel"] = ratingQuestion.lowerBoundLabel
                         questionDict["upperBoundLabel"] = ratingQuestion.upperBoundLabel
-                    } else if let choiceQuestion = question as? PostHogDisplayChoiceQuestion {
+                    case let choiceQuestion as PostHogDisplayChoiceQuestion:
                         questionDict["type"] = choiceQuestion.isMultipleChoice ? "multiple_choice" : "single_choice"
                         questionDict["choices"] = choiceQuestion.choices
                         questionDict["hasOpenChoice"] = choiceQuestion.hasOpenChoice
                         questionDict["shuffleOptions"] = choiceQuestion.shuffleOptions
-                    } else {
+                    default:
                         questionDict["type"] = "open"
                     }
 

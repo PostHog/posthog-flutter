@@ -49,6 +49,11 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('screen() has not been implemented.');
   }
 
+  /// Opens a URL using the platform's default browser
+  Future<void> openUrl(String url) {
+    throw UnimplementedError('openUrl() has not been implemented.');
+  }
+
   Future<void> alias({
     required String alias,
   }) {

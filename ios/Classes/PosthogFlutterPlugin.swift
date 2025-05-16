@@ -153,6 +153,32 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "openUrl":
+            if let url = call.arguments as? String,
+               let urlObject = URL(string: url) {
+                #if os(iOS)
+                    if UIApplication.shared.canOpenURL(urlObject) {
+                        UIApplication.shared.open(urlObject)
+                        result(nil)
+                    } else {
+                        result(FlutterError(code: "InvalidURL",
+                                           message: "Cannot open URL",
+                                           details: "The URL \(url) cannot be opened"))
+                    }
+                #else
+                    if NSWorkspace.shared.open(urlObject) {
+                        result(nil)
+                    } else {
+                        result(FlutterError(code: "InvalidURL",
+                                           message: "Cannot open URL",
+                                           details: "The URL \(url) cannot be opened"))
+                    }
+                #endif
+            } else {
+                result(FlutterError(code: "InvalidArguments",
+                                   message: "Invalid URL",
+                                   details: "The URL provided is invalid"))
+            }
         case "setup":
             setup(call, result: result)
         case "getFeatureFlag":
