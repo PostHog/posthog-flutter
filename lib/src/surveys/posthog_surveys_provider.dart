@@ -7,6 +7,7 @@ import 'models/survey_callbacks.dart';
 import 'widgets/link_question.dart';
 import 'widgets/open_text_question.dart';
 import 'widgets/unimplemented_question.dart';
+import 'widgets/confirmation_message.dart';
 import '../posthog_flutter_io.dart';
 import '../posthog_flutter_platform_interface.dart';
 
@@ -45,6 +46,7 @@ class PostHogSurveysProviderState extends State<PostHogSurveysProvider> {
         onShown: onShown,
         onResponse: onResponse,
         onClosed: onClosed,
+        appearance: SurveyAppearance.fromPostHog(survey.appearance),
       ),
     );
   }
@@ -60,6 +62,7 @@ class SurveyBottomSheet extends StatefulWidget {
   final OnSurveyShown onShown;
   final OnSurveyResponse onResponse;
   final OnSurveyClosed onClosed;
+  final SurveyAppearance appearance;
 
   const SurveyBottomSheet({
     super.key,
@@ -67,6 +70,7 @@ class SurveyBottomSheet extends StatefulWidget {
     required this.onShown,
     required this.onResponse,
     required this.onClosed,
+    required this.appearance,
   });
 
   @override
@@ -121,7 +125,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           buttonText: linkQuestion.buttonText,
           link: linkQuestion.link,
           onLinkClick: (url) async {
-            await (PosthogFlutterPlatformInterface.instance as PosthogFlutterIO).openUrl(url);
+            await (PosthogFlutterPlatformInterface.instance as PosthogFlutterIO)
+                .openUrl(url);
           },
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
@@ -173,21 +178,9 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           if (!_isCompleted) ...[
             _buildQuestion(context),
           ] else ...[
-            const Text(
-              'Thank you for completing the survey!',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _handleClose(),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Close'),
+            ConfirmationMessage(
+              onClose: _handleClose,
+              appearance: widget.appearance,
             ),
           ],
         ],
