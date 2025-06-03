@@ -6,8 +6,10 @@ import 'models/survey_appearance.dart';
 import 'models/survey_callbacks.dart';
 import 'widgets/link_question.dart';
 import 'widgets/open_text_question.dart';
+import 'widgets/rating_question.dart';
 import 'widgets/unimplemented_question.dart';
 import 'widgets/confirmation_message.dart';
+import 'models/rating_question.dart';
 import '../posthog_flutter_io.dart';
 import '../posthog_flutter_platform_interface.dart';
 
@@ -97,7 +99,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
     final currentQuestion = survey.questions[_currentIndex];
 
     switch (currentQuestion.type) {
-      case PostHogSurveyQuestionType.open:
+      case PostHogSurveyQuestionType.openText:
         return OpenTextQuestion(
           key: ValueKey('open_text_question_$_currentIndex'),
           question: currentQuestion.question,
@@ -133,6 +135,55 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
               widget.survey,
               _currentIndex,
               response,
+            );
+            setState(() {
+              _currentIndex = nextQuestion.questionIndex;
+              _isCompleted = nextQuestion.isSurveyCompleted;
+            });
+          },
+        );
+      case PostHogSurveyQuestionType.rating:
+        final ratingQuestion = currentQuestion as PostHogDisplayRatingQuestion;
+        // Map PostHog rating type to Flutter rating scale
+        RatingScale scale;
+        RatingDisplay display;
+        
+        // Determine scale based on bounds
+        if (ratingQuestion.lowerBound == 1 && ratingQuestion.upperBound == 3) {
+          scale = RatingScale.threePoint;
+        } else if (ratingQuestion.lowerBound == 1 && ratingQuestion.upperBound == 5) {
+          scale = RatingScale.fivePoint;
+        } else if (ratingQuestion.lowerBound == 1 && ratingQuestion.upperBound == 7) {
+          scale = RatingScale.sevenPoint;
+        } else if (ratingQuestion.lowerBound == 0 && ratingQuestion.upperBound == 10) {
+          scale = RatingScale.tenPoint;
+        } else {
+          // Default to five point scale
+          scale = RatingScale.fivePoint;
+        }
+        
+        // Determine display type based on PostHog rating type
+        // Use emojis for stars rating type since it's more visual
+        display = ratingQuestion.ratingType == PostHogDisplaySurveyRatingType.emoji 
+            ? RatingDisplay.emoji 
+            : RatingDisplay.number;
+
+        return RatingQuestion(
+          key: ValueKey('rating_question_$_currentIndex'),
+          question: ratingQuestion.question,
+          description: ratingQuestion.description,
+          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          buttonText: ratingQuestion.buttonText,
+          optional: ratingQuestion.optional,
+          scale: scale,
+          display: display,
+          lowerBoundLabel: ratingQuestion.lowerBoundLabel,
+          upperBoundLabel: ratingQuestion.upperBoundLabel,
+          onSubmit: (response) async {
+            final nextQuestion = await widget.onResponse(
+              widget.survey,
+              _currentIndex,
+              response.toString(),
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;

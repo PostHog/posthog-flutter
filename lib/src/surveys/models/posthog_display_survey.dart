@@ -3,21 +3,21 @@ import 'question_type.dart';
 
 /// Rating type for survey questions
 enum PostHogDisplaySurveyRatingType {
-  number('number'),
-  stars('stars');
+  number(0),
+  emoji(1);
 
   const PostHogDisplaySurveyRatingType(this.value);
-  final String value;
+  final int value;
 
-  static PostHogDisplaySurveyRatingType fromString(String type) {
+  static PostHogDisplaySurveyRatingType fromInt(int type) {
     return PostHogDisplaySurveyRatingType.values.firstWhere(
-      (e) => e.value == type.toLowerCase(),
+      (e) => e.value == type,
       orElse: () => PostHogDisplaySurveyRatingType.number,
     );
   }
 
   @override
-  String toString() => value;
+  String toString() => name;
 }
 
 /// Base class for all survey questions
@@ -47,7 +47,7 @@ class PostHogDisplayOpenQuestion extends PostHogDisplaySurveyQuestion {
     bool optional = false,
     String? buttonText,
   }) : super(
-          type: PostHogSurveyQuestionType.open,
+          type: PostHogSurveyQuestionType.openText,
           question: question,
           description: description,
           optional: optional,
@@ -190,9 +190,12 @@ class PostHogDisplaySurvey {
         case 'rating':
           return PostHogDisplayRatingQuestion(
             question: question,
-            ratingType: PostHogDisplaySurveyRatingType.fromString(q['ratingType'] as String),
-            lowerBound: q['lowerBound'] as int,
-            upperBound: q['upperBound'] as int,
+            ratingType:
+                PostHogDisplaySurveyRatingType.fromInt(q['ratingType'] as int),
+            lowerBound: (q['ratingScale'] as int) == 10
+                ? 0
+                : 1, // 10-point scale starts at 0, others at 1
+            upperBound: q['ratingScale'] as int, // Scale can be 3, 5, 7, or 10
             lowerBoundLabel: q['lowerBoundLabel'] as String,
             upperBoundLabel: q['upperBoundLabel'] as String,
             description: questionDescription,

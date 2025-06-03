@@ -1,10 +1,11 @@
 /// The type of survey question
 enum PostHogSurveyQuestionType {
-  open('open'),
+  openText('open_text'),
   multipleChoice('multiple_choice'),
   singleChoice('single_choice'),
   rating('rating'),
-  link('link');
+  link('link'),
+  unimplemented('unimplemented');
 
   const PostHogSurveyQuestionType(this.value);
   final String value;
@@ -12,7 +13,7 @@ enum PostHogSurveyQuestionType {
   static PostHogSurveyQuestionType fromString(String type) {
     return PostHogSurveyQuestionType.values.firstWhere(
       (e) => e.value == type.toLowerCase(),
-      orElse: () => PostHogSurveyQuestionType.open,
+      orElse: () => PostHogSurveyQuestionType.unimplemented,
     );
   }
 
