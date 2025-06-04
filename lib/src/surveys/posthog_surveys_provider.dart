@@ -196,6 +196,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           question: currentQuestion.question,
           description: currentQuestion.description,
           type: currentQuestion.type.toString(),
+          appearance: const SurveyAppearance(),
         );
     }
   }

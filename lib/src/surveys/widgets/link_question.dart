@@ -33,6 +33,7 @@ class LinkQuestion extends StatelessWidget {
         QuestionHeader(
           question: question,
           description: description,
+          appearance: appearance,
         ),
         const SizedBox(height: 16),
         ElevatedButton(

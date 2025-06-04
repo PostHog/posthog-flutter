@@ -53,6 +53,7 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
             QuestionHeader(
               question: widget.question,
               description: widget.description,
+              appearance: widget.appearance,
             ),
             const SizedBox(height: 16),
             Container(

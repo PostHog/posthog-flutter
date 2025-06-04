@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/survey_appearance.dart';
 import 'question_header.dart';
 
 class UnimplementedQuestion extends StatelessWidget {
@@ -7,11 +8,13 @@ class UnimplementedQuestion extends StatelessWidget {
     required this.question,
     this.description,
     required this.type,
+    required this.appearance,
   });
 
   final String? question;
   final String? description;
   final String type;
+  final SurveyAppearance appearance;
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +25,7 @@ class UnimplementedQuestion extends StatelessWidget {
         QuestionHeader(
           question: question,
           description: description,
+          appearance: appearance,
         ),
         const SizedBox(height: 16),
         Container(

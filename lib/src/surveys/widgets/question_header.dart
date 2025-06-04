@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import '../models/survey_appearance.dart';
 
 class QuestionHeader extends StatelessWidget {
   const QuestionHeader({
     super.key,
     required this.question,
     this.description,
+    required this.appearance,
   });
 
   final String? question;
   final String? description;
+  final SurveyAppearance appearance;
 
   @override
   Widget build(BuildContext context) {
@@ -18,18 +21,22 @@ class QuestionHeader extends StatelessWidget {
         if (question != null) ...[          
           Text(
             question!,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
           ),
         ],
         if (description?.isNotEmpty == true) ...[
           const SizedBox(height: 8),
+          if (description != null)
           Text(
             description!,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.black87,
-                ),
+            style: TextStyle(
+              fontSize: 14,
+              color: appearance.descriptionTextColor ?? Colors.grey.shade600,
+            ),
           ),
         ],
       ],

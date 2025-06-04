@@ -42,16 +42,12 @@ abstract class PostHogDisplaySurveyQuestion {
 @immutable
 class PostHogDisplayOpenQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayOpenQuestion({
-    required String question,
-    String? description,
-    bool optional = false,
-    String? buttonText,
+    required super.question,
+    super.description,
+    super.optional,
+    super.buttonText,
   }) : super(
           type: PostHogSurveyQuestionType.openText,
-          question: question,
-          description: description,
-          optional: optional,
-          buttonText: buttonText,
         );
 }
 
@@ -59,17 +55,13 @@ class PostHogDisplayOpenQuestion extends PostHogDisplaySurveyQuestion {
 @immutable
 class PostHogDisplayLinkQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayLinkQuestion({
-    required String question,
+    required super.question,
     required this.link,
-    String? description,
-    bool optional = false,
-    String? buttonText,
+    super.description,
+    super.optional,
+    super.buttonText,
   }) : super(
           type: PostHogSurveyQuestionType.link,
-          question: question,
-          description: description,
-          optional: optional,
-          buttonText: buttonText,
         );
 
   final String link;
@@ -79,21 +71,17 @@ class PostHogDisplayLinkQuestion extends PostHogDisplaySurveyQuestion {
 @immutable
 class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayRatingQuestion({
-    required String question,
+    required super.question,
     required this.ratingType,
     required this.lowerBound,
     required this.upperBound,
     required this.lowerBoundLabel,
     required this.upperBoundLabel,
-    String? description,
-    bool optional = false,
-    String? buttonText,
+    super.description,
+    super.optional,
+    super.buttonText,
   }) : super(
           type: PostHogSurveyQuestionType.rating,
-          question: question,
-          description: description,
-          optional: optional,
-          buttonText: buttonText,
         );
 
   final PostHogDisplaySurveyRatingType ratingType;
@@ -107,20 +95,16 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
 @immutable
 class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayChoiceQuestion({
-    required String question,
+    required super.question,
     required this.choices,
     required this.isMultipleChoice,
     this.hasOpenChoice = false,
     this.shuffleOptions = false,
-    String? description,
-    bool optional = false,
-    String? buttonText,
+    super.description,
+    super.optional,
+    super.buttonText,
   }) : super(
           type: PostHogSurveyQuestionType.multipleChoice,
-          question: question,
-          description: description,
-          optional: optional,
-          buttonText: buttonText,
         );
 
   final List<String> choices;

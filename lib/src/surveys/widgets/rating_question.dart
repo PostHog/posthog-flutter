@@ -4,6 +4,7 @@ import '../models/survey_appearance.dart';
 import 'question_header.dart';
 import 'survey_button.dart';
 import 'rating_icons.dart';
+import 'number_rating_button.dart';
 
 class RatingQuestion extends StatefulWidget {
   const RatingQuestion({
@@ -107,8 +108,8 @@ class _RatingQuestionState extends State<RatingQuestion> {
     }
 
     if (widget.display == RatingDisplay.emoji &&
-        (widget.scale == RatingScale.threePoint ||
-            widget.scale == RatingScale.fivePoint)) {
+        [RatingScale.threePoint, RatingScale.fivePoint]
+            .contains(widget.scale)) {
       // Convert value to 0-based index
       final index = value - 1;
       final isThreePoint = widget.scale == RatingScale.threePoint;
@@ -126,21 +127,13 @@ class _RatingQuestionState extends State<RatingQuestion> {
       );
     }
 
-    return ElevatedButton(
-      onPressed: () => setState(() => _rating = value),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: buttonColor,
-        shape: const CircleBorder(),
-        padding: const EdgeInsets.all(16),
-      ),
-      child: Text(
-        value.toString(),
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    return NumberRatingButton(
+      value: value,
+      isSelected: isSelected,
+      onTap: onTap,
+      appearance: widget.appearance,
+      isLastItem: value == _ratingRange.last,
+      isFirstItem: value == _ratingRange.first,
     );
   }
 
@@ -153,49 +146,57 @@ class _RatingQuestionState extends State<RatingQuestion> {
         QuestionHeader(
           question: widget.question,
           description: widget.description,
+          appearance: widget.appearance,
         ),
         const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  for (final value in _ratingRange) _buildRatingButton(value),
-                ],
+        if (widget.display == RatingDisplay.emoji)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children:
+                _ratingRange.map((value) => _buildRatingButton(value)).toList(),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: widget.appearance.borderColor ?? Colors.grey.shade400,
+                width: 2,
               ),
-              if (widget.lowerBoundLabel != null ||
-                  widget.upperBoundLabel != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      if (widget.lowerBoundLabel != null)
-                        Text(
-                          widget.lowerBoundLabel!,
-                          style: TextStyle(
-                            color: widget.appearance.descriptionTextColor,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.start,
-                        ),
-                      if (widget.upperBoundLabel != null)
-                        Text(
-                          widget.upperBoundLabel!,
-                          style: TextStyle(
-                            color: widget.appearance.descriptionTextColor,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.end,
-                        ),
-                    ],
-                  ),
-                ),
-            ],
+            ),
+            child: Row(
+              children:
+                  _ratingRange.map((value) => _buildRatingButton(value)).toList(),
+            ),
           ),
-        ),
+        if (widget.lowerBoundLabel != null || widget.upperBoundLabel != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (widget.lowerBoundLabel != null)
+                  Text(
+                    widget.lowerBoundLabel!,
+                    style: TextStyle(
+                      color: widget.appearance.descriptionTextColor,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.start,
+                  ),
+                if (widget.upperBoundLabel != null)
+                  Text(
+                    widget.upperBoundLabel!,
+                    style: TextStyle(
+                      color: widget.appearance.descriptionTextColor,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.end,
+                  ),
+              ],
+            ),
+          ),
         const SizedBox(height: 24),
         SurveyButton(
           onPressed: _canSubmit ? () => widget.onSubmit(_rating!) : null,

@@ -40,6 +40,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   /// Opens a URL using the platform's default browser
+  @override
   Future<void> openUrl(String url) async {
     if (!isSupportedPlatform()) {
       throw PlatformException(
