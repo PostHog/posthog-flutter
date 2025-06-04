@@ -4,9 +4,11 @@ import 'models/posthog_display_survey.dart';
 import 'models/question_type.dart';
 import 'models/survey_appearance.dart';
 import 'models/survey_callbacks.dart';
+
 import 'widgets/link_question.dart';
 import 'widgets/open_text_question.dart';
 import 'widgets/rating_question.dart';
+import 'widgets/single_choice_question.dart';
 import 'widgets/unimplemented_question.dart';
 import 'widgets/confirmation_message.dart';
 import 'models/rating_question.dart';
@@ -109,7 +111,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
-              response,
+              response ?? '',
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;
@@ -134,7 +136,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
-              response,
+              response ?? '',
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;
@@ -143,30 +145,19 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           },
         );
       case PostHogSurveyQuestionType.rating:
-        final ratingQuestion = currentQuestion as PostHogDisplayRatingQuestion;
-        // Map PostHog rating type to Flutter rating scale
+        final ratingQuestion = currentQuestion;
         RatingScale scale;
         RatingDisplay display;
-        
-        // Determine scale based on bounds
-        if (ratingQuestion.lowerBound == 1 && ratingQuestion.upperBound == 3) {
-          scale = RatingScale.threePoint;
-        } else if (ratingQuestion.lowerBound == 1 && ratingQuestion.upperBound == 5) {
-          scale = RatingScale.fivePoint;
-        } else if (ratingQuestion.lowerBound == 1 && ratingQuestion.upperBound == 7) {
-          scale = RatingScale.sevenPoint;
-        } else if (ratingQuestion.lowerBound == 0 && ratingQuestion.upperBound == 10) {
-          scale = RatingScale.tenPoint;
-        } else {
-          // Default to five point scale
-          scale = RatingScale.fivePoint;
+
+        switch (ratingQuestion.type) {
+          case PostHogSurveyQuestionType.rating:
+            scale = RatingScale.fivePoint;
+            display = RatingDisplay.number;
+            break;
+          default:
+            scale = RatingScale.fivePoint;
+            display = RatingDisplay.number;
         }
-        
-        // Determine display type based on PostHog rating type
-        // Use emojis for stars rating type since it's more visual
-        display = ratingQuestion.ratingType == PostHogDisplaySurveyRatingType.emoji 
-            ? RatingDisplay.emoji 
-            : RatingDisplay.number;
 
         return RatingQuestion(
           key: ValueKey('rating_question_$_currentIndex'),
@@ -177,13 +168,37 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           optional: ratingQuestion.optional,
           scale: scale,
           display: display,
-          lowerBoundLabel: ratingQuestion.lowerBoundLabel,
-          upperBoundLabel: ratingQuestion.upperBoundLabel,
+          lowerBoundLabel: null,
+          upperBoundLabel: null,
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
               response.toString(),
+            );
+            setState(() {
+              _currentIndex = nextQuestion.questionIndex;
+              _isCompleted = nextQuestion.isSurveyCompleted;
+            });
+          },
+        );
+      case PostHogSurveyQuestionType.singleChoice:
+      case PostHogSurveyQuestionType.multipleChoice:
+        final choiceQuestion = currentQuestion as PostHogDisplayChoiceQuestion;
+        return SingleChoiceQuestionWidget(
+          key: ValueKey('choice_question_$_currentIndex'),
+          question: choiceQuestion.question,
+          description: choiceQuestion.description,
+          choices: choiceQuestion.choices,
+          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          buttonText: choiceQuestion.buttonText,
+          optional: choiceQuestion.optional,
+          hasOpenChoice: choiceQuestion.hasOpenChoice,
+          onSubmit: (response) async {
+            final nextQuestion = await widget.onResponse(
+              widget.survey,
+              _currentIndex,
+              response ?? '',
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;

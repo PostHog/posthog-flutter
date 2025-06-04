@@ -23,7 +23,7 @@ class NumberRatingButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final buttonColor = isSelected
         ? appearance.ratingButtonActiveColor ?? Colors.black
-        : Colors.white;
+        : appearance.ratingButtonColor ?? Colors.grey.shade200;
 
     return Expanded(
       child: Row(
@@ -47,8 +47,12 @@ class NumberRatingButton extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: buttonColor,
                               borderRadius: BorderRadius.horizontal(
-                                left: isFirstItem ? const Radius.circular(4) : Radius.zero,
-                                right: isLastItem ? const Radius.circular(4) : Radius.zero,
+                                left: isFirstItem
+                                    ? const Radius.circular(4)
+                                    : Radius.zero,
+                                right: isLastItem
+                                    ? const Radius.circular(4)
+                                    : Radius.zero,
                               ),
                             ),
                           ),

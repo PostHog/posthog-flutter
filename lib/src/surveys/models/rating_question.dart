@@ -2,8 +2,8 @@
 enum RatingScale {
   threePoint,
   fivePoint,
-  sevenPoint,
-  tenPoint,
+  oneToFive,
+  oneToTen,
 }
 
 /// Display options for rating questions
@@ -14,16 +14,16 @@ enum RatingDisplay {
 
 /// Helper to convert rating scale to bounds
 extension RatingScaleBounds on RatingScale {
-  List<int> get bounds {
+  List<int> get ratingRange {
     switch (this) {
       case RatingScale.threePoint:
-        return [1, 3];
-      case RatingScale.sevenPoint:
-        return [1, 7];
-      case RatingScale.tenPoint:
-        return [0, 10];
+        return [1, 2, 3];
       case RatingScale.fivePoint:
-        return [1, 5];
+        return [1, 2, 3, 4, 5];
+      case RatingScale.oneToFive:
+        return [1, 2, 3, 4, 5];
+      case RatingScale.oneToTen:
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     }
   }
 }

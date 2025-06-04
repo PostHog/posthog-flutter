@@ -47,14 +47,13 @@ class _RatingQuestionState extends State<RatingQuestion> {
   List<int> get _ratingRange {
     switch (widget.scale) {
       case RatingScale.threePoint:
-        return List.generate(3, (i) => i + 1);
-      case RatingScale.sevenPoint:
-        return List.generate(7, (i) => i + 1);
-      case RatingScale.tenPoint:
-        return List.generate(11, (i) => i);
+        return [1, 2, 3];
       case RatingScale.fivePoint:
-      default:
-        return List.generate(5, (i) => i + 1);
+        return [1, 2, 3, 4, 5];
+      case RatingScale.oneToFive:
+        return [1, 2, 3, 4, 5];
+      case RatingScale.oneToTen:
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     }
   }
 
