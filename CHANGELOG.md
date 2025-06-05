@@ -1,5 +1,7 @@
 ## Next
 
+- feat: Add `onFeatureFlags` callback to `Posthog()` to listen for feature flag load events. On Web, this callback provides all flags and variants. On mobile (Android/iOS), it serves as a signal that flags have been loaded by the native SDK; the `flags` and `flagVariants` parameters will be empty in the callback, and developers should use `Posthog.getFeatureFlag()` or `Posthog.isFeatureEnabled()` to retrieve specific flag values. This allows developers to ensure flags are loaded before checking them, especially on the first app run. ([#YOUR_PR_NUMBER_HERE])
+
 ## 5.0.0
 
 - chore: support flutter web wasm builds ([#112](https://github.com/PostHog/posthog-flutter/pull/112))

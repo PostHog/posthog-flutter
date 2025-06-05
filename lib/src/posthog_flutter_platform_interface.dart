@@ -3,6 +3,14 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
+/// Defines the callback signature for when feature flags are loaded.
+/// [flags] is a list of active feature flag keys.
+/// [flagVariants] is a map of feature flag keys to their variant values (String or bool).
+/// [errorsLoading] is true if there was an error loading flags, otherwise false or null.
+typedef OnFeatureFlagsCallback = void Function(
+    List<String> flags, Map<String, dynamic> flagVariants,
+    {bool? errorsLoading});
+
 abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PosthogFlutterPlatform.
   PosthogFlutterPlatformInterface() : super(token: _token);
@@ -122,6 +130,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
 
   Future<String?> getSessionId() async {
     throw UnimplementedError('getSessionId() not implemented');
+  }
+
+  void onFeatureFlags(OnFeatureFlagsCallback callback) {
+    throw UnimplementedError('onFeatureFlags() has not been implemented.');
   }
 
   // TODO: missing capture with more parameters
