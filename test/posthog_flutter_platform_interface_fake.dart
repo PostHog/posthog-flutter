@@ -15,6 +15,7 @@ class CapturedExceptionCall {
 
 class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   String? screenName;
+  OnFeatureFlagsCallback? registeredOnFeatureFlagsCallback;
   final List<CapturedExceptionCall> capturedExceptions = [];
 
   @override
@@ -23,6 +24,11 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
   }) async {
     this.screenName = screenName;
+  }
+
+  @override
+  void onFeatureFlags(OnFeatureFlagsCallback callback) {
+    registeredOnFeatureFlagsCallback = callback;
   }
 
   @override
