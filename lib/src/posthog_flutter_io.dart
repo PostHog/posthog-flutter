@@ -29,22 +29,24 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           try {
             final args = call.arguments as Map<dynamic, dynamic>;
             // Ensure correct types from native
-            // For mobile, args will be an empty map. Callback expects optional params.
             final flags =
                 (args['flags'] as List<dynamic>?)?.cast<String>() ?? [];
             final flagVariants =
                 (args['flagVariants'] as Map<dynamic, dynamic>?)
                         ?.map((k, v) => MapEntry(k.toString(), v)) ??
                     <String, dynamic>{};
-            // For mobile, errorsLoading is not explicitly sent, so it will be null here.
             final errorsLoading = args['errorsLoading'] as bool?;
 
             _onFeatureFlagsCallback!(flags, flagVariants,
                 errorsLoading: errorsLoading);
           } catch (e, s) {
             printIfDebug('Error processing onFeatureFlagsCallback: $e\n$s');
-            _onFeatureFlagsCallback!([], <String, dynamic>{},
-                errorsLoading: true);
+            // Invoke callback with empty/default values and errorsLoading: true
+            // to signal that an attempt was made but failed due to data issues.
+            if (_onFeatureFlagsCallback != null) {
+              _onFeatureFlagsCallback!([], <String, dynamic>{},
+                  errorsLoading: true);
+            }
           }
         }
         break;
@@ -54,14 +56,18 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> setup(PostHogConfig config) async {
+  void onFeatureFlags(OnFeatureFlagsCallback callback) {
     if (!isSupportedPlatform()) {
       return;
     }
+    _ensureMethodCallHandlerInitialized();
+    _onFeatureFlagsCallback = callback;
+  }
 
-    _onFeatureFlagsCallback = config.onFeatureFlags;
-    if (_onFeatureFlagsCallback != null) {
-      _ensureMethodCallHandlerInitialized();
+  @override
+  Future<void> setup(PostHogConfig config) async {
+    if (!isSupportedPlatform()) {
+      return;
     }
 
     try {

@@ -25,7 +25,6 @@ extension PostHogExtension on PostHog {
   external void register(JSAny properties);
   external void unregister(JSAny key);
   external JSAny? get_session_id();
-  external void onFeatureFlags(JSFunction callback);
 }
 
 // Accessing PostHog from the window object

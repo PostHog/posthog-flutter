@@ -18,48 +18,10 @@ class Posthog {
 
   String? _currentScreen;
 
-  /// Initializes the PostHog SDK.
-  ///
-  /// This method sets up the connection to your PostHog instance and prepares the SDK for tracking events and feature flags.
-  ///
-  /// - [config]: The [PostHogConfig] object containing your API key, host, and other settings.
-  ///   To listen for feature flag load events, provide an `onFeatureFlags` callback in the [PostHogConfig].
-  ///
-  /// **Behavior of `onFeatureFlags` callback (when provided in `PostHogConfig`):**
-  ///
-  /// **Web:**
-  /// The callback will receive:
-  /// - `flags`: A list of active feature flag keys (List<String>).
-  /// - `flagVariants`: A map of feature flag keys to their variant values (Map<String, dynamic>).
-  /// - `errorsLoading`: Will be `false` as the callback firing implies success.
-  ///
-  /// **Mobile (Android/iOS):**
-  /// The callback serves primarily as a notification that the native PostHog SDK
-  /// has finished loading feature flags. In this case:
-  /// - `flags`: Will be an empty list.
-  /// - `flagVariants`: Will be an empty map.
-  /// - `errorsLoading`: Will be `null` if the native call was successful but contained no error info, or `true` if an error occurred during Dart-side processing of the callback.
-  /// After this callback is invoked, you can reliably use `Posthog().getFeatureFlag('your-flag-key')`
-  /// or `Posthog().isFeatureEnabled('your-flag-key')` to get the values of specific flags.
-  ///
-  /// **Example with `onFeatureFlags` in `PostHogConfig`:**
-  /// ```dart
-  /// final config = PostHogConfig(
-  ///   apiKey: 'YOUR_API_KEY',
-  ///   host: 'YOUR_POSTHOG_HOST',
-  ///   onFeatureFlags: (flags, flagVariants, {errorsLoading}) {
-  ///     if (errorsLoading == true) {
-  ///       print('Error loading feature flags!');
-  ///       return;
-  ///     }
-  ///     // ... process flags ...
-  ///   },
-  /// );
-  /// await Posthog().setup(config);
-  /// ```
-  ///
-  /// For Android and iOS, if you are performing a manual setup,
-  /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native configuration.
+  /// Android and iOS only
+  /// Only used for the manual setup
+  /// Requires disabling the automatic init on Android and iOS:
+  /// com.posthog.posthog.AUTO_INIT: false
   Future<void> setup(PostHogConfig config) {
     _config = config; // Store the config
     return _posthog.setup(config);
@@ -164,6 +126,53 @@ class Posthog {
   }
 
   Future<String?> getSessionId() => _posthog.getSessionId();
+
+  /// Sets a callback to be invoked when feature flags are loaded from the PostHog server.
+  ///
+  /// The behavior of this callback differs slightly between platforms:
+  ///
+  /// **Web:**
+  /// The callback will receive:
+  /// - `flags`: A list of active feature flag keys (List<String>).
+  /// - `flagVariants`: A map of feature flag keys to their variant values (Map<String, dynamic>).
+  ///
+  /// **Mobile (Android/iOS):**
+  /// The callback serves primarily as a notification that the native PostHog SDK
+  /// has finished loading feature flags. In this case:
+  /// - `flags`: Will be an empty list.
+  /// - `flagVariants`: Will be an empty map.
+  /// After this callback is invoked, you can reliably use `Posthog().getFeatureFlag('your-flag-key')`
+  /// or `Posthog().isFeatureEnabled('your-flag-key')` to get the values of specific flags.
+  ///
+  /// **Common Parameters:**
+  /// - `errorsLoading` (optional named parameter): A boolean indicating if an error occurred during the request to load the feature flags.
+  ///   This is `true` if the request timed out or if there was an error. It will be `false` if the request was successful.
+  ///
+  /// This is particularly useful on the first app load to ensure flags are available before you try to access them.
+  ///
+  /// Example:
+  /// ```dart
+  /// Posthog().onFeatureFlags((flags, flagVariants, {errorsLoading}) {
+  ///   if (errorsLoading == true) {
+  ///     // Handle error, e.g. flags might be stale or unavailable
+  ///     print('Error loading feature flags!');
+  ///     return;
+  ///   }
+  ///   // On Web, you can iterate through flags and flagVariants directly.
+  ///   // On Mobile, flags and flagVariants will be empty here.
+  ///   // After this callback, you can safely query specific flags:
+  ///   final isNewFeatureEnabled = await Posthog().isFeatureEnabled('new-feature');
+  ///   if (isNewFeatureEnabled) {
+  ///     // Implement logic for 'new-feature'
+  ///   }
+  ///   final variantValue = await Posthog().getFeatureFlag('multivariate-flag');
+  ///   if (variantValue == 'test-variant') {
+  ///     // Implement logic for 'test-variant' of 'multivariate-flag'
+  ///   }
+  /// });
+  /// ```
+  void onFeatureFlags(OnFeatureFlagsCallback callback) =>
+      _posthog.onFeatureFlags(callback);
 
   Posthog._internal();
 }
