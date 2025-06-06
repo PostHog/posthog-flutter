@@ -132,9 +132,5 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('getSessionId() not implemented');
   }
 
-  void onFeatureFlags(OnFeatureFlagsCallback callback) {
-    throw UnimplementedError('onFeatureFlags() has not been implemented.');
-  }
-
   // TODO: missing capture with more parameters
 }

@@ -15,13 +15,19 @@ void main() {
       PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
     });
 
-    test('onFeatureFlags registers callback with platform interface', () {
+    test('setup passes config and onFeatureFlags callback to platform interface', () async {
       // ignore: prefer_function_declarations_over_variables
       final OnFeatureFlagsCallback testCallback =
           (flags, flagVariants, {errorsLoading}) {};
+      
+      final config = PostHogConfig(
+        'test_api_key',
+        onFeatureFlags: testCallback,
+      );
 
-      Posthog().onFeatureFlags(testCallback);
+      await Posthog().setup(config);
 
+      expect(fakePlatformInterface.receivedConfig, equals(config));
       expect(fakePlatformInterface.registeredOnFeatureFlagsCallback,
           equals(testCallback));
     });
