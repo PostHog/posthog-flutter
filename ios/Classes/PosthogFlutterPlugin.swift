@@ -8,15 +8,46 @@ import PostHog
 #endif
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
+    private var channel: FlutterMethodChannel?
+
+    override init() {
+        super.init()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(featureFlagsDidUpdate),
+            name: PostHogSDK.didReceiveFeatureFlags,
+            object: nil
+        )
+    }
+
     public static func register(with registrar: FlutterPluginRegistrar) {
+        let methodChannel: FlutterMethodChannel
         #if os(iOS)
-            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
+            methodChannel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
         #elseif os(macOS)
-            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
+            methodChannel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
         #endif
         let instance = PosthogFlutterPlugin()
+        instance.channel = methodChannel
+
         initPlugin()
-        registrar.addMethodCallDelegate(instance, channel: channel)
+        registrar.addMethodCallDelegate(instance, channel: methodChannel)
+    }
+
+    @objc func featureFlagsDidUpdate() {
+        let flags: [String] = []
+        let flagVariants: [String: Any] = [:]
+
+        guard let channel = self.channel else {
+            print("PosthogFlutterPlugin: FlutterMethodChannel is nil in featureFlagsDidUpdate.")
+            return
+        }
+
+        channel.invokeMethod("onFeatureFlagsCallback", arguments: [
+            "flags": flags,
+            "flagVariants": flagVariants,
+            "errorsLoading": false
+        ])
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",

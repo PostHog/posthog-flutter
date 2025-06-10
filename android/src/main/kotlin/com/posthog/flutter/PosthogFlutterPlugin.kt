@@ -2,6 +2,8 @@ package com.posthog.flutter
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
@@ -9,6 +11,7 @@ import com.posthog.PostHogConfig
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
+import com.posthog.PostHogOnFeatureFlags
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -262,7 +265,20 @@ class PosthogFlutterPlugin :
 
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
+
+                onFeatureFlags = PostHogOnFeatureFlags {
+                    try {
+                        Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
+                        val arguments = emptyMap<String, Any?>()
+                        channel.invokeMethod("onFeatureFlagsCallback", arguments)
+                    } catch (e: Exception) {
+                        Log.e("PostHogFlutter", "Error in onFeatureFlags signalling: ${e.message}", e)
+                        val errorArguments = emptyMap<String, Any?>()
+                        channel.invokeMethod("onFeatureFlagsCallback", errorArguments)
+                    }
+                }
             }
+
         PostHogAndroid.setup(applicationContext, config)
     }
 
