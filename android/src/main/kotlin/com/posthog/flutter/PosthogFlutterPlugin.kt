@@ -30,8 +30,6 @@ class PosthogFlutterPlugin :
 
     private lateinit var applicationContext: Context
 
-    private val mainHandler = Handler(Looper.getMainLooper())
-
     private val snapshotSender = SnapshotSender()
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -272,11 +270,11 @@ class PosthogFlutterPlugin :
                     try {
                         Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
                         val arguments = emptyMap<String, Any?>()
-                        mainHandler.post { channel.invokeMethod("onFeatureFlagsCallback", arguments) }
+                        channel.invokeMethod("onFeatureFlagsCallback", arguments)
                     } catch (e: Exception) {
                         Log.e("PostHogFlutter", "Error in onFeatureFlags signalling: ${e.message}", e)
                         val errorArguments = emptyMap<String, Any?>()
-                        mainHandler.post { channel.invokeMethod("onFeatureFlagsCallback", errorArguments) }
+                        channel.invokeMethod("onFeatureFlagsCallback", errorArguments)
                     }
                 }
             }
