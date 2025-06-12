@@ -8,7 +8,7 @@ import 'models/survey_callbacks.dart';
 import 'widgets/link_question.dart';
 import 'widgets/open_text_question.dart';
 import 'widgets/rating_question.dart';
-import 'widgets/single_choice_question.dart';
+import 'widgets/choice_question.dart';
 import 'widgets/unimplemented_question.dart';
 import 'widgets/confirmation_message.dart';
 import 'models/rating_question.dart';
@@ -185,7 +185,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
       case PostHogSurveyQuestionType.singleChoice:
       case PostHogSurveyQuestionType.multipleChoice:
         final choiceQuestion = currentQuestion as PostHogDisplayChoiceQuestion;
-        return SingleChoiceQuestionWidget(
+        return ChoiceQuestionWidget(
           key: ValueKey('choice_question_$_currentIndex'),
           question: choiceQuestion.question,
           description: choiceQuestion.description,
@@ -194,11 +194,12 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           buttonText: choiceQuestion.buttonText,
           optional: choiceQuestion.optional,
           hasOpenChoice: choiceQuestion.hasOpenChoice,
+          isMultipleChoice: currentQuestion.type == PostHogSurveyQuestionType.multipleChoice,
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
-              response ?? '',
+              response is List ? response.join(',') : (response ?? ''),
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;

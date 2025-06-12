@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../models/survey_appearance.dart';
@@ -7,8 +5,8 @@ import 'question_header.dart';
 import 'survey_button.dart';
 import 'survey_choice_button.dart';
 
-class SingleChoiceQuestionWidget extends StatefulWidget {
-  const SingleChoiceQuestionWidget({
+class ChoiceQuestionWidget extends StatefulWidget {
+  const ChoiceQuestionWidget({
     super.key,
     required this.question,
     required this.description,
@@ -32,17 +30,14 @@ class SingleChoiceQuestionWidget extends StatefulWidget {
   final bool isMultipleChoice;
 
   @override
-  State<SingleChoiceQuestionWidget> createState() =>
-      _SingleChoiceQuestionWidgetState();
+  State<ChoiceQuestionWidget> createState() => _ChoiceQuestionWidgetState();
 }
 
-class _SingleChoiceQuestionWidgetState
-    extends State<SingleChoiceQuestionWidget> {
+class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
   Set<String> _selectedChoices = {};
   String _openChoiceInput = '';
   final TextEditingController _openChoiceController = TextEditingController();
   double _headerHeight = 0;
-  double _contentHeight = 0;
   double _buttonHeight = 0;
 
   void _handleOpenChoiceInput(String value) {
@@ -80,8 +75,7 @@ class _SingleChoiceQuestionWidgetState
       }
       widget.onSubmit(result);
     } else {
-      final selectedChoice =
-          _selectedChoices.isEmpty ? null : _selectedChoices.first;
+      final selectedChoice = _selectedChoices.isEmpty ? null : _selectedChoices.first;
       if (selectedChoice == null) {
         widget.onSubmit(null);
         return;
@@ -96,14 +90,6 @@ class _SingleChoiceQuestionWidgetState
   }
 
   @override
-  void initState() {
-    super.initState();
-    _openChoiceController.addListener(() {
-      _openChoiceInput = _openChoiceController.text;
-    });
-  }
-
-  @override
   void dispose() {
     _openChoiceController.dispose();
     super.dispose();
@@ -111,7 +97,6 @@ class _SingleChoiceQuestionWidgetState
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         return Column(
@@ -122,7 +107,6 @@ class _SingleChoiceQuestionWidgetState
             LayoutBuilder(
               builder: (context, headerConstraints) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  print("Header height is ${headerConstraints.maxHeight}");
                   if (mounted && _headerHeight != headerConstraints.maxHeight) {
                     setState(() {
                       _headerHeight = headerConstraints.maxHeight;
@@ -145,21 +129,11 @@ class _SingleChoiceQuestionWidgetState
             // Scrollable choices
             LayoutBuilder(
               builder: (context, contentConstraints) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  print("Content height is ${contentConstraints.maxHeight}");
-                  if (mounted &&
-                      _contentHeight != contentConstraints.maxHeight) {
-                    setState(() {
-                      _contentHeight = contentConstraints.maxHeight;
-                    });
-                  }
-                });
-
                 return Flexible(
                   flex: 0,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxHeight: math.max(0, 400),
+                      maxHeight: 400,
                       minHeight: 0,
                     ),
                     child: SingleChildScrollView(
@@ -168,41 +142,39 @@ class _SingleChoiceQuestionWidgetState
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ...widget.choices.map((choice) {
-                            final isSelected =
-                                _selectedChoices.contains(choice);
-                            final isOpenChoice = _isOpenChoice(choice);
+                          final isSelected = _selectedChoices.contains(choice);
+                          final isOpenChoice = _isOpenChoice(choice);
 
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: SurveyChoiceButton(
-                                label: choice,
-                                isSelected: isSelected,
-                                onTap: () {
-                                  setState(() {
-                                    if (widget.isMultipleChoice) {
-                                      if (_selectedChoices.contains(choice)) {
-                                        _selectedChoices.remove(choice);
-                                      } else {
-                                        _selectedChoices.add(choice);
-                                      }
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: SurveyChoiceButton(
+                              label: choice,
+                              isSelected: isSelected,
+                              onTap: () {
+                                setState(() {
+                                  if (widget.isMultipleChoice) {
+                                    if (_selectedChoices.contains(choice)) {
+                                      _selectedChoices.remove(choice);
                                     } else {
-                                      if (_selectedChoices.contains(choice)) {
-                                        _selectedChoices.clear();
-                                      } else {
-                                        _selectedChoices = {choice};
-                                      }
+                                      _selectedChoices.add(choice);
                                     }
-                                  });
-                                },
-                                appearance: widget.appearance,
-                                isOpenChoice: isOpenChoice,
-                                openChoiceInput: _openChoiceInput,
-                                onOpenChoiceChanged: isOpenChoice
-                                    ? _handleOpenChoiceInput
-                                    : null,
-                              ),
-                            );
+                                  } else {
+                                    if (_selectedChoices.contains(choice)) {
+                                      _selectedChoices.clear();
+                                    } else {
+                                      _selectedChoices = {choice};
+                                    }
+                                  }
+                                });
+                              },
+                              appearance: widget.appearance,
+                              isOpenChoice: isOpenChoice,
+                              openChoiceInput: _openChoiceInput,
+                              onOpenChoiceChanged: isOpenChoice ? _handleOpenChoiceInput : null,
+                            ),
+                          );
                           }).toList(),
+
                         ],
                       ),
                     ),
@@ -210,11 +182,10 @@ class _SingleChoiceQuestionWidgetState
                 );
               },
             ),
-            // Fixed footer
+            // Fixed submit button
             LayoutBuilder(
               builder: (context, buttonConstraints) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  print("button height is ${buttonConstraints.maxHeight}");
                   if (mounted && _buttonHeight != buttonConstraints.maxHeight) {
                     setState(() {
                       _buttonHeight = buttonConstraints.maxHeight;
@@ -224,8 +195,8 @@ class _SingleChoiceQuestionWidgetState
 
                 return SurveyButton(
                   onPressed: _canSubmit ? _onSubmit : null,
-                  appearance: widget.appearance,
                   text: widget.buttonText ?? 'Submit',
+                  appearance: widget.appearance,
                 );
               },
             ),
