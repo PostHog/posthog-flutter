@@ -50,41 +50,49 @@ class _RatingQuestionState extends State<RatingQuestion> {
         return [1, 2, 3];
       case RatingScale.fivePoint:
         return [1, 2, 3, 4, 5];
-      case RatingScale.oneToFive:
-        return [1, 2, 3, 4, 5];
-      case RatingScale.oneToTen:
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      case RatingScale.sevenPoint:
+        return [1, 2, 3, 4, 5, 6, 7];
+      case RatingScale.tenPoint:
+        return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      default:
+        return [1, 2, 3, 4, 5]; // Default to 5-point scale
     }
   }
 
-  RatingIconType _getRatingIconType(int index, bool isThreePoint) {
-    if (isThreePoint) {
-      switch (index) {
-        case 0:
-          return RatingIconType.dissatisfied;
-        case 1:
-          return RatingIconType.neutral;
-        case 2:
-          return RatingIconType.satisfied;
-        default:
-          return RatingIconType.neutral;
-      }
-    } else {
-      // 5-point scale
-      switch (index) {
-        case 0:
-          return RatingIconType.veryDissatisfied;
-        case 1:
-          return RatingIconType.dissatisfied;
-        case 2:
-          return RatingIconType.neutral;
-        case 3:
-          return RatingIconType.satisfied;
-        case 4:
-          return RatingIconType.verySatisfied;
-        default:
-          return RatingIconType.neutral;
-      }
+  RatingIconType _getRatingIconType(int index, RatingScale scale) {
+    switch (scale) {
+      case RatingScale.threePoint:
+        switch (index) {
+          case 0:
+            return RatingIconType.dissatisfied;
+          case 1:
+            return RatingIconType.neutral;
+          case 2:
+            return RatingIconType.satisfied;
+          default:
+            return RatingIconType.neutral;
+        }
+      case RatingScale.fivePoint:
+        switch (index) {
+          case 0:
+            return RatingIconType.veryDissatisfied;
+          case 1:
+            return RatingIconType.dissatisfied;
+          case 2:
+            return RatingIconType.neutral;
+          case 3:
+            return RatingIconType.satisfied;
+          case 4:
+            return RatingIconType.verySatisfied;
+          default:
+            return RatingIconType.neutral;
+        }
+      case RatingScale.sevenPoint:
+        // Use number display for 7-point scale
+        return RatingIconType.neutral;
+      case RatingScale.tenPoint:
+        // Use number display for 10-point scale
+        return RatingIconType.neutral;
     }
   }
 
@@ -106,19 +114,18 @@ class _RatingQuestionState extends State<RatingQuestion> {
       });
     }
 
+    // Show emoji ratings only for 3-point and 5-point scales
     if (widget.display == RatingDisplay.emoji &&
-        [RatingScale.threePoint, RatingScale.fivePoint]
-            .contains(widget.scale)) {
+        (widget.scale == RatingScale.threePoint || widget.scale == RatingScale.fivePoint)) {
       // Convert value to 0-based index
       final index = value - 1;
-      final isThreePoint = widget.scale == RatingScale.threePoint;
       return Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
           child: RatingIcon(
-            type: _getRatingIconType(index, isThreePoint),
+            type: _getRatingIconType(index, widget.scale),
             selected: isSelected,
             color: buttonColor,
           ),

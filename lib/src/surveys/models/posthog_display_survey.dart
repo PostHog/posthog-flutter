@@ -73,8 +73,7 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayRatingQuestion({
     required super.question,
     required this.ratingType,
-    required this.lowerBound,
-    required this.upperBound,
+    required this.ratingScale,
     required this.lowerBoundLabel,
     required this.upperBoundLabel,
     super.description,
@@ -85,8 +84,7 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
         );
 
   final PostHogDisplaySurveyRatingType ratingType;
-  final int lowerBound;
-  final int upperBound;
+  final int ratingScale;
   final String lowerBoundLabel;
   final String upperBoundLabel;
 }
@@ -178,10 +176,7 @@ class PostHogDisplaySurvey {
             question: question,
             ratingType:
                 PostHogDisplaySurveyRatingType.fromInt(q['ratingType'] as int),
-            lowerBound: (q['ratingScale'] as int) == 10
-                ? 0
-                : 1, // 10-point scale starts at 0, others at 1
-            upperBound: q['ratingScale'] as int, // Scale can be 3, 5, 7, or 10
+            ratingScale: q['ratingScale'] as int, // Scale can be 3, 5, 7, or 10
             lowerBoundLabel: q['lowerBoundLabel'] as String,
             upperBoundLabel: q['upperBoundLabel'] as String,
             description: questionDescription,

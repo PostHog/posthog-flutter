@@ -1,9 +1,10 @@
 /// Rating scale options for survey questions
+/// Each scale represents the number of options (3, 5, 7, or 10)
 enum RatingScale {
-  threePoint,
-  fivePoint,
-  oneToFive,
-  oneToTen,
+  threePoint, // 1-3
+  fivePoint, // 1-5
+  sevenPoint, // 1-7
+  tenPoint, // 0-10
 }
 
 /// Display options for rating questions
@@ -20,10 +21,10 @@ extension RatingScaleBounds on RatingScale {
         return [1, 2, 3];
       case RatingScale.fivePoint:
         return [1, 2, 3, 4, 5];
-      case RatingScale.oneToFive:
-        return [1, 2, 3, 4, 5];
-      case RatingScale.oneToTen:
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      case RatingScale.sevenPoint:
+        return [1, 2, 3, 4, 5, 6, 7];
+      case RatingScale.tenPoint:
+        return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     }
   }
 }

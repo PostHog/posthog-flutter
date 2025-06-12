@@ -145,18 +145,30 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           },
         );
       case PostHogSurveyQuestionType.rating:
-        final ratingQuestion = currentQuestion;
-        RatingScale scale;
-        RatingDisplay display;
+        final ratingQuestion = currentQuestion as PostHogDisplayRatingQuestion;
 
-        switch (ratingQuestion.type) {
-          case PostHogSurveyQuestionType.rating:
+        // Map rating type to display
+        final display = ratingQuestion.ratingType == PostHogDisplaySurveyRatingType.emoji
+            ? RatingDisplay.emoji
+            : RatingDisplay.number;
+
+        // Map rating scale to enum
+        final RatingScale scale;
+        switch (ratingQuestion.ratingScale) {
+          case 3:
+            scale = RatingScale.threePoint;
+            break;
+          case 5:
             scale = RatingScale.fivePoint;
-            display = RatingDisplay.number;
+            break;
+          case 7:
+            scale = RatingScale.sevenPoint;
+            break;
+          case 10:
+            scale = RatingScale.tenPoint;
             break;
           default:
             scale = RatingScale.fivePoint;
-            display = RatingDisplay.number;
         }
 
         return RatingQuestion(
@@ -168,8 +180,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           optional: ratingQuestion.optional,
           scale: scale,
           display: display,
-          lowerBoundLabel: null,
-          upperBoundLabel: null,
+          lowerBoundLabel: ratingQuestion.lowerBoundLabel,
+          upperBoundLabel: ratingQuestion.upperBoundLabel,
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
               widget.survey,
