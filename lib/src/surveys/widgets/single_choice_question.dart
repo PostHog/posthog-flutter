@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../models/survey_appearance.dart';
@@ -32,10 +34,14 @@ class SingleChoiceQuestionWidget extends StatefulWidget {
       _SingleChoiceQuestionWidgetState();
 }
 
-class _SingleChoiceQuestionWidgetState extends State<SingleChoiceQuestionWidget> {
+class _SingleChoiceQuestionWidgetState
+    extends State<SingleChoiceQuestionWidget> {
   String? _selectedChoice;
   String _openChoiceInput = '';
   final TextEditingController _openChoiceController = TextEditingController();
+  double _headerHeight = 0;
+  double _contentHeight = 0;
+  double _buttonHeight = 0;
 
   void _handleOpenChoiceInput(String value) {
     setState(() {
@@ -88,47 +94,114 @@ class _SingleChoiceQuestionWidgetState extends State<SingleChoiceQuestionWidget>
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          QuestionHeader(
-            question: widget.question,
-            description: widget.description,
-            appearance: widget.appearance,
-          ),
-          const SizedBox(height: 24),
-          ...widget.choices.map((choice) {
-            final isSelected = _selectedChoice == choice;
-            final isOpenChoice = _isOpenChoice(choice);
+    final mediaQuery = MediaQuery.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Fixed header
+            LayoutBuilder(
+              builder: (context, headerConstraints) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  print("Header height is ${headerConstraints.maxHeight}");
+                  if (mounted && _headerHeight != headerConstraints.maxHeight) {
+                    setState(() {
+                      _headerHeight = headerConstraints.maxHeight;
+                    });
+                  }
+                });
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: SurveyChoiceButton(
-                label: choice,
-                isSelected: isSelected,
-                onTap: () {
-                  setState(() {
-                    _selectedChoice = choice;
-                  });
-                },
-                appearance: widget.appearance,
-                isOpenChoice: isOpenChoice,
-                openChoiceInput: _openChoiceInput,
-                onOpenChoiceChanged: isOpenChoice
-                    ? _handleOpenChoiceInput
-                    : null,
-              ),
-            );
-          }).toList(),
-          const SizedBox(height: 16),
-          SurveyButton(
-            onPressed: _canSubmit ? _onSubmit : null,
-            appearance: widget.appearance,
-            text: widget.buttonText ?? 'Submit',
-          ),
-        ],
-      ),
+                return Column(
+                  children: [
+                    QuestionHeader(
+                      question: widget.question,
+                      description: widget.description,
+                      appearance: widget.appearance,
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                );
+              },
+            ),
+            // Scrollable choices
+            LayoutBuilder(
+              builder: (context, contentConstraints) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  print("Content height is ${contentConstraints.maxHeight}");
+                  if (mounted &&
+                      _contentHeight != contentConstraints.maxHeight) {
+                    setState(() {
+                      _contentHeight = contentConstraints.maxHeight;
+                    });
+                  }
+                });
+
+                return Flexible(
+                  flex: 0,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: math.max(0, 400),
+                      minHeight: 0,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.max,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ...widget.choices.map((choice) {
+                            final isSelected = _selectedChoice == choice;
+                            final isOpenChoice = _isOpenChoice(choice);
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: SurveyChoiceButton(
+                                label: choice,
+                                isSelected: isSelected,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedChoice = choice;
+                                  });
+                                },
+                                appearance: widget.appearance,
+                                isOpenChoice: isOpenChoice,
+                                openChoiceInput: _openChoiceInput,
+                                onOpenChoiceChanged: isOpenChoice
+                                    ? _handleOpenChoiceInput
+                                    : null,
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            // Fixed footer
+            LayoutBuilder(
+              builder: (context, buttonConstraints) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  print("button height is ${buttonConstraints.maxHeight}");
+                  if (mounted && _buttonHeight != buttonConstraints.maxHeight) {
+                    setState(() {
+                      _buttonHeight = buttonConstraints.maxHeight;
+                    });
+                  }
+                });
+
+                return SurveyButton(
+                  onPressed: _canSubmit ? _onSubmit : null,
+                  appearance: widget.appearance,
+                  text: widget.buttonText ?? 'Submit',
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

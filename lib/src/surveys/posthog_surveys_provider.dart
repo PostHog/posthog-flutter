@@ -219,38 +219,59 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final bottomPadding =
-        mediaQuery.viewInsets.bottom + mediaQuery.padding.bottom;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomPadding),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: mediaQuery.viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => _handleClose(),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => _handleClose(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (!_isCompleted)
+                          _buildQuestion(context)
+                        else
+                          ConfirmationMessage(
+                            onClose: _handleClose,
+                            appearance: widget.appearance,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          if (!_isCompleted) ...[
-            _buildQuestion(context),
-          ] else ...[
-            ConfirmationMessage(
-              onClose: _handleClose,
-              appearance: widget.appearance,
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
