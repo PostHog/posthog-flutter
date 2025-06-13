@@ -234,9 +234,9 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
     final mediaQuery = MediaQuery.of(context);
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: widget.appearance.backgroundColor ?? Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(
         child: Padding(
