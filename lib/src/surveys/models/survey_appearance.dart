@@ -13,6 +13,7 @@ class SurveyAppearance {
     this.ratingButtonActiveColor,
     this.displayThankYouMessage = true,
     this.thankYouMessageHeader = 'Thank you for your feedback!',
+    this.thankYouMessageDescription,
     this.thankYouMessageCloseButtonText = 'Close',
     this.borderColor,
   });
@@ -26,6 +27,7 @@ class SurveyAppearance {
   final Color? ratingButtonActiveColor;
   final bool displayThankYouMessage;
   final String thankYouMessageHeader;
+  final String? thankYouMessageDescription;
   final String thankYouMessageCloseButtonText;
   final Color? borderColor;
 
@@ -41,6 +43,7 @@ class SurveyAppearance {
       ratingButtonActiveColor: _colorFromHex(appearance?.ratingButtonActiveColor),
       displayThankYouMessage: appearance?.displayThankYouMessage ?? true,
       thankYouMessageHeader: appearance?.thankYouMessageHeader ?? 'Thank you for your feedback!',
+      thankYouMessageDescription: appearance?.thankYouMessageDescription,
       thankYouMessageCloseButtonText: appearance?.thankYouMessageCloseButtonText ?? 'Close',
       borderColor: _colorFromHex(appearance?.borderColor),
     );

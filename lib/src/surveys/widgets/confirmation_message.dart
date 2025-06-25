@@ -27,7 +27,18 @@ class ConfirmationMessage extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 16),
+        if (appearance.thankYouMessageDescription != null) ...[
+          const SizedBox(height: 16),
+          Text(
+            appearance.thankYouMessageDescription!,
+            style: TextStyle(
+              fontSize: 14,
+              color: appearance.descriptionTextColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        const SizedBox(height: 20),
         SurveyButton(
           onPressed: onClose,
           text: appearance.thankYouMessageCloseButtonText,

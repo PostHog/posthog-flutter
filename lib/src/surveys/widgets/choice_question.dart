@@ -64,29 +64,19 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
   void _onSubmit() {
     if (!_canSubmit) return;
 
-    if (widget.isMultipleChoice) {
-      final List<String> result = [];
-      for (final choice in _selectedChoices) {
-        if (_isOpenChoice(choice)) {
-          result.add(_openChoiceInput.trim());
-        } else {
-          result.add(choice);
-        }
-      }
-      widget.onSubmit(result);
-    } else {
-      final selectedChoice = _selectedChoices.isEmpty ? null : _selectedChoices.first;
-      if (selectedChoice == null) {
-        widget.onSubmit(null);
-        return;
-      }
+    final List<String> result = [];
 
-      if (_isOpenChoice(selectedChoice)) {
-        widget.onSubmit(_openChoiceInput.trim());
+    // For both single and multiple choice, create a list of selected choices
+    for (final choice in _selectedChoices) {
+      if (_isOpenChoice(choice)) {
+        result.add(_openChoiceInput.trim());
       } else {
-        widget.onSubmit(selectedChoice);
+        result.add(choice);
       }
     }
+
+    // Always submit a List<String>, even for single choice (will be a list with one element)
+    widget.onSubmit(result);
   }
 
   @override
@@ -115,13 +105,14 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
                 });
 
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     QuestionHeader(
                       question: widget.question,
                       description: widget.description,
                       appearance: widget.appearance,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                   ],
                 );
               },
@@ -142,39 +133,42 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ...widget.choices.map((choice) {
-                          final isSelected = _selectedChoices.contains(choice);
-                          final isOpenChoice = _isOpenChoice(choice);
+                            final isSelected =
+                                _selectedChoices.contains(choice);
+                            final isOpenChoice = _isOpenChoice(choice);
 
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: SurveyChoiceButton(
-                              label: choice,
-                              isSelected: isSelected,
-                              onTap: () {
-                                setState(() {
-                                  if (widget.isMultipleChoice) {
-                                    if (_selectedChoices.contains(choice)) {
-                                      _selectedChoices.remove(choice);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: SurveyChoiceButton(
+                                label: choice,
+                                isSelected: isSelected,
+                                onTap: () {
+                                  setState(() {
+                                    if (widget.isMultipleChoice) {
+                                      if (_selectedChoices.contains(choice)) {
+                                        _selectedChoices.remove(choice);
+                                      } else {
+                                        _selectedChoices.add(choice);
+                                      }
                                     } else {
-                                      _selectedChoices.add(choice);
+                                      if (_selectedChoices.contains(choice)) {
+                                        _selectedChoices.clear();
+                                      } else {
+                                        _selectedChoices = {choice};
+                                      }
                                     }
-                                  } else {
-                                    if (_selectedChoices.contains(choice)) {
-                                      _selectedChoices.clear();
-                                    } else {
-                                      _selectedChoices = {choice};
-                                    }
-                                  }
-                                });
-                              },
-                              appearance: widget.appearance,
-                              isOpenChoice: isOpenChoice,
-                              openChoiceInput: _openChoiceInput,
-                              onOpenChoiceChanged: isOpenChoice ? _handleOpenChoiceInput : null,
-                            ),
-                          );
+                                  });
+                                },
+                                appearance: widget.appearance,
+                                isOpenChoice: isOpenChoice,
+                                openChoiceInput: _openChoiceInput,
+                                onOpenChoiceChanged: isOpenChoice
+                                    ? _handleOpenChoiceInput
+                                    : null,
+                              ),
+                            );
                           }).toList(),
-
+                          const SizedBox(height: 16),
                         ],
                       ),
                     ),

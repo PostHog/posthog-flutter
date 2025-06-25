@@ -30,7 +30,10 @@ class SurveyButton extends StatelessWidget {
         disabledForegroundColor:
             appearance.submitButtonTextColor.withOpacity(0.5),
       ),
-      child: Text(text),
+      child: Text(
+        text,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 }

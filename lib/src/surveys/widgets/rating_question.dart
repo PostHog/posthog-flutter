@@ -14,7 +14,8 @@ class RatingQuestion extends StatefulWidget {
     required this.onSubmit,
     this.buttonText,
     this.optional = false,
-    this.scale = RatingScale.fivePoint,
+    this.scaleLowerBound = 1,
+    this.scaleUpperBound = 5,
     this.display = RatingDisplay.number,
     this.lowerBoundLabel,
     this.upperBoundLabel,
@@ -25,7 +26,8 @@ class RatingQuestion extends StatefulWidget {
   final String? description;
   final String? buttonText;
   final bool optional;
-  final RatingScale scale;
+  final int scaleLowerBound;
+  final int scaleUpperBound;
   final RatingDisplay display;
   final String? lowerBoundLabel;
   final String? upperBoundLabel;
@@ -45,55 +47,48 @@ class _RatingQuestionState extends State<RatingQuestion> {
   }
 
   List<int> get _ratingRange {
-    switch (widget.scale) {
-      case RatingScale.threePoint:
-        return [1, 2, 3];
-      case RatingScale.fivePoint:
-        return [1, 2, 3, 4, 5];
-      case RatingScale.sevenPoint:
-        return [1, 2, 3, 4, 5, 6, 7];
-      case RatingScale.tenPoint:
-        return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-      default:
-        return [1, 2, 3, 4, 5]; // Default to 5-point scale
-    }
+    // Generate a list of integers from scaleLowerBound to scaleUpperBound (inclusive)
+    return List<int>.generate(
+      widget.scaleUpperBound - widget.scaleLowerBound + 1,
+      (i) => widget.scaleLowerBound + i,
+    );
   }
 
-  RatingIconType _getRatingIconType(int index, RatingScale scale) {
-    switch (scale) {
-      case RatingScale.threePoint:
-        switch (index) {
-          case 0:
-            return RatingIconType.dissatisfied;
-          case 1:
-            return RatingIconType.neutral;
-          case 2:
-            return RatingIconType.satisfied;
-          default:
-            return RatingIconType.neutral;
-        }
-      case RatingScale.fivePoint:
-        switch (index) {
-          case 0:
-            return RatingIconType.veryDissatisfied;
-          case 1:
-            return RatingIconType.dissatisfied;
-          case 2:
-            return RatingIconType.neutral;
-          case 3:
-            return RatingIconType.satisfied;
-          case 4:
-            return RatingIconType.verySatisfied;
-          default:
-            return RatingIconType.neutral;
-        }
-      case RatingScale.sevenPoint:
-        // Use number display for 7-point scale
-        return RatingIconType.neutral;
-      case RatingScale.tenPoint:
-        // Use number display for 10-point scale
-        return RatingIconType.neutral;
+  RatingIconType _getRatingIconType(int index) {
+    final range = widget.scaleUpperBound - widget.scaleLowerBound + 1;
+
+    if (range == 3) {
+      // 3-point scale
+      switch (index) {
+        case 0:
+          return RatingIconType.dissatisfied;
+        case 1:
+          return RatingIconType.neutral;
+        case 2:
+          return RatingIconType.satisfied;
+        default:
+          return RatingIconType.neutral;
+      }
+    } else if (range == 5) {
+      // 5-point scale
+      switch (index) {
+        case 0:
+          return RatingIconType.veryDissatisfied;
+        case 1:
+          return RatingIconType.dissatisfied;
+        case 2:
+          return RatingIconType.neutral;
+        case 3:
+          return RatingIconType.satisfied;
+        case 4:
+          return RatingIconType.verySatisfied;
+        default:
+          return RatingIconType.neutral;
+      }
     }
+
+    // Use number display for other scales
+    return RatingIconType.neutral;
   }
 
   Widget _buildRatingButton(int value) {
@@ -114,18 +109,19 @@ class _RatingQuestionState extends State<RatingQuestion> {
       });
     }
 
-    // Show emoji ratings only for 3-point and 5-point scales
-    if (widget.display == RatingDisplay.emoji &&
-        (widget.scale == RatingScale.threePoint || widget.scale == RatingScale.fivePoint)) {
-      // Convert value to 0-based index
-      final index = value - 1;
+    // Show emoji ratings when display == .emoji and scale is 3-point or 5-point
+    final range = widget.scaleUpperBound - widget.scaleLowerBound + 1;
+    if (widget.display == RatingDisplay.emoji && (range == 3 || range == 5)) {
+      // Convert value to 0-based index.
+      // When scaleLowerBound is zero (NPS), the index is the same as the value.
+      final index = value - widget.scaleLowerBound;
       return Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
           child: RatingIcon(
-            type: _getRatingIconType(index, widget.scale),
+            type: _getRatingIconType(index),
             selected: isSelected,
             color: buttonColor,
           ),
@@ -172,8 +168,9 @@ class _RatingQuestionState extends State<RatingQuestion> {
               ),
             ),
             child: Row(
-              children:
-                  _ratingRange.map((value) => _buildRatingButton(value)).toList(),
+              children: _ratingRange
+                  .map((value) => _buildRatingButton(value))
+                  .toList(),
             ),
           ),
         if (widget.lowerBoundLabel != null || widget.upperBoundLabel != null)

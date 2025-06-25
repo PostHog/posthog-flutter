@@ -41,22 +41,21 @@ class NumberRatingButton extends StatelessWidget {
                   ),
                   child: Stack(
                     children: [
-                      if (isSelected)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: buttonColor,
-                              borderRadius: BorderRadius.horizontal(
-                                left: isFirstItem
-                                    ? const Radius.circular(4)
-                                    : Radius.zero,
-                                right: isLastItem
-                                    ? const Radius.circular(4)
-                                    : Radius.zero,
-                              ),
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: buttonColor,
+                            borderRadius: BorderRadius.horizontal(
+                              left: isFirstItem
+                                  ? const Radius.circular(4)
+                                  : Radius.zero,
+                              right: isLastItem
+                                  ? const Radius.circular(4)
+                                  : Radius.zero,
                             ),
                           ),
                         ),
+                      ),
                       Center(
                         child: Text(
                           value.toString(),

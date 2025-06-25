@@ -55,6 +55,16 @@ class PostHogSurveysProviderState extends State<PostHogSurveysProvider> {
     );
   }
 
+  /// Dismisses any active survey when the survey feature is stopped
+  void hideSurvey() {
+    if (!mounted) return;
+
+    // Pop any active bottom sheets
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return widget.child;
@@ -111,7 +121,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
-              response ?? '',
+              response,
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;
@@ -128,16 +138,23 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           buttonText: linkQuestion.buttonText,
           link: linkQuestion.link,
-          onLinkClick: (url) async {
-            await (PosthogFlutterPlatformInterface.instance as PosthogFlutterIO)
-                .openUrl(url);
-          },
-          onSubmit: (response) async {
+          onPressed: () async {
+            // Send survey response (true for link questions)
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
-              response ?? '',
+              true, // Boolean response for link questions
             );
+
+            // Open the URL if provided
+            final link = linkQuestion.link;
+            if (link.isNotEmpty) {
+              await (PosthogFlutterPlatformInterface.instance
+                      as PosthogFlutterIO)
+                  .openUrl(link);
+            }
+
+            // Update state
             setState(() {
               _currentIndex = nextQuestion.questionIndex;
               _isCompleted = nextQuestion.isSurveyCompleted;
@@ -148,28 +165,12 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
         final ratingQuestion = currentQuestion as PostHogDisplayRatingQuestion;
 
         // Map rating type to display
-        final display = ratingQuestion.ratingType == PostHogDisplaySurveyRatingType.emoji
-            ? RatingDisplay.emoji
-            : RatingDisplay.number;
+        final display =
+            ratingQuestion.ratingType == PostHogDisplaySurveyRatingType.emoji
+                ? RatingDisplay.emoji
+                : RatingDisplay.number;
 
-        // Map rating scale to enum
-        final RatingScale scale;
-        switch (ratingQuestion.ratingScale) {
-          case 3:
-            scale = RatingScale.threePoint;
-            break;
-          case 5:
-            scale = RatingScale.fivePoint;
-            break;
-          case 7:
-            scale = RatingScale.sevenPoint;
-            break;
-          case 10:
-            scale = RatingScale.tenPoint;
-            break;
-          default:
-            scale = RatingScale.fivePoint;
-        }
+        // Use scaleLowerBound and scaleUpperBound directly
 
         return RatingQuestion(
           key: ValueKey('rating_question_$_currentIndex'),
@@ -178,7 +179,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           buttonText: ratingQuestion.buttonText,
           optional: ratingQuestion.optional,
-          scale: scale,
+          scaleLowerBound: ratingQuestion.scaleLowerBound,
+          scaleUpperBound: ratingQuestion.scaleUpperBound,
           display: display,
           lowerBoundLabel: ratingQuestion.lowerBoundLabel,
           upperBoundLabel: ratingQuestion.upperBoundLabel,
@@ -186,7 +188,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
-              response.toString(),
+              response, // Pass integer directly
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;
@@ -206,12 +208,15 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           buttonText: choiceQuestion.buttonText,
           optional: choiceQuestion.optional,
           hasOpenChoice: choiceQuestion.hasOpenChoice,
-          isMultipleChoice: currentQuestion.type == PostHogSurveyQuestionType.multipleChoice,
+          isMultipleChoice:
+              currentQuestion.type == PostHogSurveyQuestionType.multipleChoice,
           onSubmit: (response) async {
+            // Both single and multiple choice questions return List<String>
+            // Single choice will be a list with one element
             final nextQuestion = await widget.onResponse(
               widget.survey,
               _currentIndex,
-              response is List ? response.join(',') : (response ?? ''),
+              response,
             );
             setState(() {
               _currentIndex = nextQuestion.questionIndex;
@@ -249,7 +254,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             children: [
               // Header
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -260,12 +265,11 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
               // Content
               Flexible(
                 child: SingleChildScrollView(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,

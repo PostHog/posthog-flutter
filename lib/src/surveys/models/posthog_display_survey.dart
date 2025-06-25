@@ -73,7 +73,8 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayRatingQuestion({
     required super.question,
     required this.ratingType,
-    required this.ratingScale,
+    required this.scaleLowerBound,
+    required this.scaleUpperBound,
     required this.lowerBoundLabel,
     required this.upperBoundLabel,
     super.description,
@@ -84,7 +85,8 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
         );
 
   final PostHogDisplaySurveyRatingType ratingType;
-  final int ratingScale;
+  final int scaleLowerBound;
+  final int scaleUpperBound;
   final String lowerBoundLabel;
   final String upperBoundLabel;
 }
@@ -126,7 +128,6 @@ class PostHogDisplaySurveyAppearance {
     this.descriptionTextColor,
     this.ratingButtonColor,
     this.ratingButtonActiveColor,
-    this.ratingButtonHoverColor,
     this.placeholder,
     this.displayThankYouMessage = true,
     this.thankYouMessageHeader,
@@ -143,7 +144,6 @@ class PostHogDisplaySurveyAppearance {
   final String? descriptionTextColor;
   final String? ratingButtonColor;
   final String? ratingButtonActiveColor;
-  final String? ratingButtonHoverColor;
   final String? placeholder;
   final bool displayThankYouMessage;
   final String? thankYouMessageHeader;
@@ -158,7 +158,7 @@ class PostHogDisplaySurvey {
     final questions = (dict['questions'] as List).map((q) {
       final type = q['type'] as String;
       final question = q['question'] as String;
-      final optional = q['optional'] as bool;
+      final optional = q['isOptional'] as bool;
       final questionDescription = q['questionDescription'] as String?;
       final buttonText = q['buttonText'] as String?;
 
@@ -176,7 +176,8 @@ class PostHogDisplaySurvey {
             question: question,
             ratingType:
                 PostHogDisplaySurveyRatingType.fromInt(q['ratingType'] as int),
-            ratingScale: q['ratingScale'] as int, // Scale can be 3, 5, 7, or 10
+            scaleLowerBound: q['scaleLowerBound'] as int,
+            scaleUpperBound: q['scaleUpperBound'] as int,
             lowerBoundLabel: q['lowerBoundLabel'] as String,
             upperBoundLabel: q['upperBoundLabel'] as String,
             description: questionDescription,
@@ -219,7 +220,6 @@ class PostHogDisplaySurvey {
         descriptionTextColor: a['descriptionTextColor'] as String?,
         ratingButtonColor: a['ratingButtonColor'] as String?,
         ratingButtonActiveColor: a['ratingButtonActiveColor'] as String?,
-        ratingButtonHoverColor: a['ratingButtonHoverColor'] as String?,
         placeholder: a['placeholder'] as String?,
         displayThankYouMessage: a['displayThankYouMessage'] as bool? ?? true,
         thankYouMessageHeader: a['thankYouMessageHeader'] as String?,

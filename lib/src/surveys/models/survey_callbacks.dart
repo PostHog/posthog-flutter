@@ -8,7 +8,7 @@ typedef OnSurveyShown = void Function(PostHogDisplaySurvey survey);
 typedef OnSurveyResponse = Future<PostHogSurveyNextQuestion> Function(
   PostHogDisplaySurvey survey,
   int questionIndex,
-  String response,
+  Object? response,
 );
 
 /// Called when a survey is closed

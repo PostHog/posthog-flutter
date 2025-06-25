@@ -27,6 +27,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         final Map<String, dynamic> survey =
             Map<String, dynamic>.from(call.arguments);
         return showSurvey(survey);
+      case 'hideSurveys':
+        await cleanupSurveys();
+        return null;
       case 'openUrl':
         final String url = call.arguments as String;
         return openUrl(url);
@@ -50,6 +53,43 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     await _methodChannel.invokeMethod('openUrl', url);
+  }
+
+  /// Cleans up any active surveys when the survey feature is stopped
+  Future<void> cleanupSurveys() async {
+    if (!isSupportedPlatform()) {
+      throw PlatformException(
+        code: 'Unsupported',
+        details: 'Platform is not supported',
+      );
+    }
+
+    final widget = PosthogFlutterPlatformInterface.instance;
+    if (widget is! PosthogFlutterIO) {
+      throw PlatformException(
+        code: 'InvalidInstance',
+        details:
+            'PosthogFlutterPlatformInterface instance is not PosthogFlutterIO',
+      );
+    }
+
+    try {
+      final state = PostHogWidget.globalKey.currentState;
+      if (state == null) {
+        throw PlatformException(
+          code: 'NoWidgetState',
+          details: 'PostHogWidget is not mounted in the widget tree',
+        );
+      }
+
+      // Call the cleanup method on the PostHogWidget state
+      await state.cleanupSurveys();
+    } on Exception catch (e) {
+      throw PlatformException(
+        code: 'CleanupSurveysError',
+        details: e.toString(),
+      );
+    }
   }
 
   @override
@@ -79,14 +119,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         );
       }
 
+      final displaySurvey = models.PostHogDisplaySurvey.fromDict(survey);
+
       await state.showSurvey(
-        models.PostHogDisplaySurvey.fromDict(survey),
+        displaySurvey,
         (survey) async {
-          await _methodChannel
-              .invokeMethod('surveyResponse', {'type': 'shown'});
+          await _methodChannel.invokeMethod('surveyAction', {'type': 'shown'});
         },
         (survey, index, response) async {
-          final result = await _methodChannel.invokeMethod('surveyResponse', {
+          final result = await _methodChannel.invokeMethod('surveyAction', {
             'type': 'response',
             'index': index,
             'response': response,
@@ -98,8 +139,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           return nextQuestion;
         },
         (survey) async {
-          await _methodChannel
-              .invokeMethod('surveyResponse', {'type': 'closed'});
+          await _methodChannel.invokeMethod('surveyAction', {'type': 'closed'});
         },
       );
     } on Exception catch (e) {

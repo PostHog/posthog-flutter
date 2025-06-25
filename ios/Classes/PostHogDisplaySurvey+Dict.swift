@@ -10,7 +10,7 @@
                 "questions": questions.map { question -> [String: Any] in
                     var questionDict: [String: Any] = [
                         "question": question.question,
-                        "optional": question.optional,
+                        "isOptional": question.isOptional,
                     ]
                     if let desc = question.questionDescription {
                         questionDict["questionDescription"] = desc
@@ -27,7 +27,8 @@
                     case let ratingQuestion as PostHogDisplayRatingQuestion:
                         questionDict["type"] = "rating"
                         questionDict["ratingType"] = ratingQuestion.ratingType.rawValue
-                        questionDict["ratingScale"] = ratingQuestion.ratingScale
+                        questionDict["scaleLowerBound"] = ratingQuestion.scaleLowerBound
+                        questionDict["scaleUpperBound"] = ratingQuestion.scaleUpperBound
                         questionDict["lowerBoundLabel"] = ratingQuestion.lowerBoundLabel
                         questionDict["upperBoundLabel"] = ratingQuestion.upperBoundLabel
                     case let choiceQuestion as PostHogDisplayChoiceQuestion:
@@ -71,9 +72,6 @@
                 }
                 if let ratingButtonActiveColor = appearance.ratingButtonActiveColor {
                     appearanceDict["ratingButtonActiveColor"] = ratingButtonActiveColor
-                }
-                if let ratingButtonHoverColor = appearance.ratingButtonHoverColor {
-                    appearanceDict["ratingButtonHoverColor"] = ratingButtonHoverColor
                 }
                 if let placeholder = appearance.placeholder {
                     appearanceDict["placeholder"] = placeholder

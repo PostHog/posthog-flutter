@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/survey_appearance.dart';
 import 'question_header.dart';
+import 'survey_button.dart';
 
 /// A widget that displays a link question in a survey.
 class LinkQuestion extends StatelessWidget {
@@ -10,8 +11,7 @@ class LinkQuestion extends StatelessWidget {
     required this.question,
     required this.description,
     required this.appearance,
-    required this.onSubmit,
-    required this.onLinkClick,
+    required this.onPressed,
     this.buttonText,
     this.link,
   });
@@ -19,8 +19,7 @@ class LinkQuestion extends StatelessWidget {
   final String question;
   final String? description;
   final SurveyAppearance appearance;
-  final Future<void> Function(String response) onSubmit;
-  final void Function(String url) onLinkClick;
+  final Future<void> Function() onPressed;
   final String? buttonText;
   final String? link;
 
@@ -36,22 +35,10 @@ class LinkQuestion extends StatelessWidget {
           appearance: appearance,
         ),
         const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: () async {
-            await onSubmit('link clicked');
-            if (link != null) {
-              onLinkClick(link!);
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: appearance.submitButtonColor,
-            foregroundColor: appearance.submitButtonTextColor,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: Text(buttonText ?? appearance.submitButtonText),
+        SurveyButton(
+          onPressed: onPressed,
+          text: buttonText ?? appearance.submitButtonText,
+          appearance: appearance,
         ),
       ],
     );

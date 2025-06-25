@@ -143,7 +143,16 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _changeDetector = null;
     _screenshotCapturer = null;
     _nativeCommunicator = null;
-
     super.dispose();
+  }
+
+  /// Cleans up any active surveys
+  Future<void> cleanupSurveys() async {
+    final surveysProvider = PostHogSurveysProvider.globalKey.currentState;
+    if (surveysProvider != null) {
+      surveysProvider!.hideSurvey();
+    } else {
+      print('[PostHog] Error: PostHogSurveysProvider not found in widget tree');
+    }
   }
 }
