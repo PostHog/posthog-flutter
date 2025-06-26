@@ -33,7 +33,7 @@ class RatingIconPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+      ..strokeWidth = 3.0;
 
     // // Draw face features based on type
     switch (type) {
@@ -56,7 +56,6 @@ class RatingIconPainter extends CustomPainter {
   }
 
   void _drawVeryDissatisfied(Canvas canvas, Size size, Paint paint) {
-
     // Create fill paint for features
     final fillPaint = Paint()
       ..color = paint.color
@@ -135,7 +134,6 @@ class RatingIconPainter extends CustomPainter {
   }
 
   void _drawDissatisfied(Canvas canvas, Size size, Paint paint) {
-
     // Create filled paint style for features
     final fillPaint = Paint()
       ..color = paint.color
@@ -210,7 +208,6 @@ class RatingIconPainter extends CustomPainter {
   }
 
   void _drawSatisfied(Canvas canvas, Size size, Paint paint) {
-
     // Create filled paint style for features
     final fillPaint = Paint()
       ..color = paint.color
@@ -369,7 +366,6 @@ class RatingIconPainter extends CustomPainter {
   }
 
   void _drawNeutral(Canvas canvas, Size size, Paint paint) {
-
     // Create filled paint style for features
     final fillPaint = Paint()
       ..color = paint.color

@@ -45,11 +45,11 @@ class SurveyChoiceButton extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '$label:', 
+                            '$label:',
                             style: TextStyle(
                               color: isSelected
                                   ? Colors.black
-                                  : Colors.black.withOpacity(0.5),
+                                  : Colors.black.withAlpha(128),
                               fontWeight: isSelected ? FontWeight.bold : null,
                             ),
                           ),
@@ -65,7 +65,9 @@ class SurveyChoiceButton extends StatelessWidget {
                               contentPadding: EdgeInsets.zero,
                             ),
                             style: TextStyle(
-                              color: isSelected ? Colors.black : Colors.black.withOpacity(0.5),
+                              color: isSelected
+                                  ? Colors.black
+                                  : Colors.black.withAlpha(128),
                               fontSize: 14,
                             ),
                           ),
@@ -76,7 +78,7 @@ class SurveyChoiceButton extends StatelessWidget {
                         style: TextStyle(
                           color: isSelected
                               ? Colors.black
-                              : Colors.black.withOpacity(0.5),
+                              : Colors.black.withAlpha(128),
                           fontWeight: isSelected ? FontWeight.bold : null,
                         ),
                       ),

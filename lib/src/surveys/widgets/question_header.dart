@@ -18,7 +18,7 @@ class QuestionHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (question != null) ...[          
+        if (question != null) ...[
           Text(
             question!,
             style: TextStyle(
@@ -30,12 +30,11 @@ class QuestionHeader extends StatelessWidget {
         ],
         if (description?.isNotEmpty == true) ...[
           const SizedBox(height: 8),
-          if (description != null)
           Text(
             description!,
             style: TextStyle(
-              fontSize: 14,
-              color: appearance.descriptionTextColor ?? Colors.grey.shade600,
+              fontSize: 16,
+              color: appearance.descriptionTextColor ?? Colors.black,
             ),
           ),
         ],

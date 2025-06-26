@@ -27,12 +27,12 @@ class ConfirmationMessage extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        if (appearance.thankYouMessageDescription != null) ...[
+        if (appearance.thankYouMessageDescription?.isNotEmpty == true) ...[
           const SizedBox(height: 16),
           Text(
             appearance.thankYouMessageDescription!,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               color: appearance.descriptionTextColor,
             ),
             textAlign: TextAlign.center,

@@ -93,10 +93,6 @@ class _RatingQuestionState extends State<RatingQuestion> {
 
   Widget _buildRatingButton(int value) {
     final isSelected = _rating == value;
-    final buttonColor = isSelected
-        ? widget.appearance.ratingButtonActiveColor ??
-            widget.appearance.submitButtonColor
-        : widget.appearance.ratingButtonColor ?? Colors.grey.shade200;
 
     void onTap() {
       setState(() {
@@ -112,6 +108,8 @@ class _RatingQuestionState extends State<RatingQuestion> {
     // Show emoji ratings when display == .emoji and scale is 3-point or 5-point
     final range = widget.scaleUpperBound - widget.scaleLowerBound + 1;
     if (widget.display == RatingDisplay.emoji && (range == 3 || range == 5)) {
+      final buttonColor =
+          isSelected ? Colors.black : Colors.black.withAlpha(128);
       // Convert value to 0-based index.
       // When scaleLowerBound is zero (NPS), the index is the same as the value.
       final index = value - widget.scaleLowerBound;
@@ -175,7 +173,7 @@ class _RatingQuestionState extends State<RatingQuestion> {
           ),
         if (widget.lowerBoundLabel != null || widget.upperBoundLabel != null)
           Padding(
-            padding: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.only(top: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
