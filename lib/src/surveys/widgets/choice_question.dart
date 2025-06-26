@@ -37,8 +37,6 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
   Set<String> _selectedChoices = {};
   String _openChoiceInput = '';
   final TextEditingController _openChoiceController = TextEditingController();
-  double _headerHeight = 0;
-  double _buttonHeight = 0;
 
   void _handleOpenChoiceInput(String value) {
     setState(() {
@@ -76,6 +74,7 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
     }
 
     // Always submit a List<String>, even for single choice (will be a list with one element)
+    // This will be handled by native SDK code to send the correct response format upstream
     widget.onSubmit(result);
   }
 
@@ -87,116 +86,86 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final headerFooterHeight = 350; //estimated
+    final availableHeight =
+        screenHeight - headerFooterHeight - keyboardHeight - bottomPadding;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Fixed header
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Fixed header
-            LayoutBuilder(
-              builder: (context, headerConstraints) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && _headerHeight != headerConstraints.maxHeight) {
-                    setState(() {
-                      _headerHeight = headerConstraints.maxHeight;
-                    });
-                  }
-                });
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    QuestionHeader(
-                      question: widget.question,
-                      description: widget.description,
-                      appearance: widget.appearance,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                );
-              },
+            QuestionHeader(
+              question: widget.question,
+              description: widget.description,
+              appearance: widget.appearance,
             ),
-            // Scrollable choices
-            LayoutBuilder(
-              builder: (context, contentConstraints) {
-                return Flexible(
-                  flex: 0,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: 400,
-                      minHeight: 0,
-                    ),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ...widget.choices.map((choice) {
-                            final isSelected =
-                                _selectedChoices.contains(choice);
-                            final isOpenChoice = _isOpenChoice(choice);
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: SurveyChoiceButton(
-                                label: choice,
-                                isSelected: isSelected,
-                                onTap: () {
-                                  setState(() {
-                                    if (widget.isMultipleChoice) {
-                                      if (_selectedChoices.contains(choice)) {
-                                        _selectedChoices.remove(choice);
-                                      } else {
-                                        _selectedChoices.add(choice);
-                                      }
-                                    } else {
-                                      if (_selectedChoices.contains(choice)) {
-                                        _selectedChoices.clear();
-                                      } else {
-                                        _selectedChoices = {choice};
-                                      }
-                                    }
-                                  });
-                                },
-                                appearance: widget.appearance,
-                                isOpenChoice: isOpenChoice,
-                                openChoiceInput: _openChoiceInput,
-                                onOpenChoiceChanged: isOpenChoice
-                                    ? _handleOpenChoiceInput
-                                    : null,
-                              ),
-                            );
-                          }).toList(),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            // Fixed submit button
-            LayoutBuilder(
-              builder: (context, buttonConstraints) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && _buttonHeight != buttonConstraints.maxHeight) {
-                    setState(() {
-                      _buttonHeight = buttonConstraints.maxHeight;
-                    });
-                  }
-                });
-
-                return SurveyButton(
-                  onPressed: _canSubmit ? _onSubmit : null,
-                  text: widget.buttonText ?? 'Submit',
-                  appearance: widget.appearance,
-                );
-              },
-            ),
+            const SizedBox(height: 16),
           ],
-        );
-      },
+        ),
+        // Scrollable choices - use full screen height minus insets
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: availableHeight,
+            minHeight: 0,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...widget.choices.map((choice) {
+                  final isSelected = _selectedChoices.contains(choice);
+                  final isOpenChoice = _isOpenChoice(choice);
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SurveyChoiceButton(
+                      label: choice,
+                      isSelected: isSelected,
+                      onTap: () {
+                        setState(() {
+                          if (widget.isMultipleChoice) {
+                            if (_selectedChoices.contains(choice)) {
+                              _selectedChoices.remove(choice);
+                            } else {
+                              _selectedChoices.add(choice);
+                            }
+                          } else {
+                            if (_selectedChoices.contains(choice)) {
+                              _selectedChoices.clear();
+                            } else {
+                              _selectedChoices = {choice};
+                            }
+                          }
+                        });
+                      },
+                      appearance: widget.appearance,
+                      isOpenChoice: isOpenChoice,
+                      openChoiceInput: _openChoiceInput,
+                      onOpenChoiceChanged:
+                          isOpenChoice ? _handleOpenChoiceInput : null,
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Fixed submit button
+        SurveyButton(
+          onPressed: _canSubmit ? _onSubmit : null,
+          text: widget.buttonText ?? widget.appearance.submitButtonText,
+          appearance: widget.appearance,
+        ),
+      ],
     );
   }
 }
