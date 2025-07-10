@@ -480,7 +480,7 @@ class MyPainter extends CustomPainter {
 
     // Path number 1
 
-    paint.color = Color(0xffffffff).withOpacity(0);
+    paint.color = Color(0xffffffff).withValues(alpha: 0);
     path = Path();
     path.lineTo(size.width * 0.6, -0.33);
     path.cubicTo(size.width * 0.65, -0.33, size.width * 0.69, -0.34,

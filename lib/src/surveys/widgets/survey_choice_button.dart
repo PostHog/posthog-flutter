@@ -31,7 +31,9 @@ class SurveyChoiceButton extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 48),
           decoration: BoxDecoration(
             border: Border.all(
-              color: isSelected ? Colors.black : Colors.black.withOpacity(0.5),
+              color: isSelected
+                  ? Colors.black
+                  : Colors.black.withValues(alpha: 0.5),
               width: 1,
             ),
             borderRadius: BorderRadius.circular(4),

@@ -153,7 +153,7 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
                           isOpenChoice ? _handleOpenChoiceInput : null,
                     ),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),

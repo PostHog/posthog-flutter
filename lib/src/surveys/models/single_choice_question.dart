@@ -1,5 +1,3 @@
-
-
 class SingleChoiceQuestion {
   const SingleChoiceQuestion({
     required this.question,

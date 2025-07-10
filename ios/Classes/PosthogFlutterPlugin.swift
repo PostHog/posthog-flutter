@@ -11,7 +11,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private static var instance: PosthogFlutterPlugin?
 
     public static func getInstance() -> PosthogFlutterPlugin? {
-        return instance
+        instance
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -95,7 +95,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         if let optOut = posthogConfig["optOut"] as? Bool {
             config.optOut = optOut
         }
-        
+
         if let personProfiles = posthogConfig["personProfiles"] as? String {
             switch personProfiles {
             case "never":
@@ -155,29 +155,30 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         switch call.method {
         case "openUrl":
             if let url = call.arguments as? String,
-               let urlObject = URL(string: url) {
+               let urlObject = URL(string: url)
+            {
                 #if os(iOS)
                     if UIApplication.shared.canOpenURL(urlObject) {
                         UIApplication.shared.open(urlObject)
                         result(nil)
                     } else {
                         result(FlutterError(code: "InvalidURL",
-                                           message: "Cannot open URL",
-                                           details: "The URL \(url) cannot be opened"))
+                                            message: "Cannot open URL",
+                                            details: "The URL \(url) cannot be opened"))
                     }
                 #else
                     if NSWorkspace.shared.open(urlObject) {
                         result(nil)
                     } else {
                         result(FlutterError(code: "InvalidURL",
-                                           message: "Cannot open URL",
-                                           details: "The URL \(url) cannot be opened"))
+                                            message: "Cannot open URL",
+                                            details: "The URL \(url) cannot be opened"))
                     }
                 #endif
             } else {
                 result(FlutterError(code: "InvalidArguments",
-                                   message: "Invalid URL",
-                                   details: "The URL provided is invalid"))
+                                    message: "Invalid URL",
+                                    details: "The URL provided is invalid"))
             }
         case "setup":
             setup(call, result: result)
@@ -240,6 +241,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 #if os(iOS)
 
     // MARK: - PostHogSurveysDelegate
+
     extension PosthogFlutterPlugin: PostHogSurveysDelegate {
         public func renderSurvey(
             _ survey: PostHogDisplaySurvey,
@@ -266,7 +268,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             onSurveyShownCallback = nil
             onSurveyResponseCallback = nil
             onSurveyClosedCallback = nil
-            
+
             // Notify Flutter side that surveys have been cleaned up
             DispatchQueue.main.async { [weak self] in
                 self?.channel?.invokeMethod("hideSurveys", arguments: nil)
@@ -291,10 +293,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 {
                     let question = survey.questions[index]
                     let responsePayload = args["response"]
-                    
+
                     // Create PostHogSurveyResponse based on question type
                     var surveyResponse: PostHogSurveyResponse
-                    
+
                     switch question {
                     case is PostHogDisplayLinkQuestion:
                         // For link questions
@@ -306,27 +308,27 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                         let ratingString = responsePayload as? String
                         let ratingValue = ratingString.flatMap { Int($0) } // No fallback to 0
                         surveyResponse = .rating(ratingValue)
-                        
+
                     case let choiceQuestion as PostHogDisplayChoiceQuestion:
                         // For single/multiple choice questions
                         var selectedOptions: [String]? = nil
-                        
+
                         if choiceQuestion.isMultipleChoice {
                             // Multiple choice: accept array directly from Flutter
                             selectedOptions = responsePayload as? [String]
                             surveyResponse = .multipleChoice(selectedOptions)
                         } else {
                             let singleOption = responsePayload as? String ?? ""
-                            // Single choice: use as single item                            
+                            // Single choice: use as single item
                             surveyResponse = .singleChoice(singleOption)
                         }
-                        
+
                     default:
                         // Default to open text question
                         let textValue = responsePayload as? String
                         surveyResponse = .openEnded(textValue)
                     }
-                    
+
                     // Call the callback with the constructed response
                     if let nextQuestion = onSurveyResponseCallback?(survey, index, surveyResponse) {
                         result(["nextIndex": nextQuestion.questionIndex,
@@ -347,8 +349,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
             result(nil)
         }
-    }   
-    
+    }
+
 #endif
 
 extension PosthogFlutterPlugin {

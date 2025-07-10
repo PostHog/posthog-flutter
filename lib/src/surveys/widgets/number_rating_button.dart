@@ -29,7 +29,7 @@ class NumberRatingButton extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Container(
+            child: SizedBox(
               height: 45,
               child: Material(
                 color: Colors.transparent,
@@ -62,7 +62,7 @@ class NumberRatingButton extends StatelessWidget {
                           style: TextStyle(
                             color: isSelected
                                 ? Colors.white
-                                : Colors.black.withOpacity(0.5),
+                                : Colors.black.withValues(alpha: 0.5),
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),

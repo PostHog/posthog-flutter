@@ -50,10 +50,10 @@ class InitialScreen extends StatefulWidget {
   const InitialScreen({Key? key}) : super(key: key);
 
   @override
-  _InitialScreenState createState() => _InitialScreenState();
+  InitialScreenState createState() => InitialScreenState();
 }
 
-class _InitialScreenState extends State<InitialScreen> {
+class InitialScreenState extends State<InitialScreen> {
   final _posthogFlutterPlugin = Posthog();
   dynamic _result = "";
 
@@ -286,10 +286,10 @@ class SecondRoute extends StatefulWidget {
   const SecondRoute({super.key});
 
   @override
-  _SecondRouteState createState() => _SecondRouteState();
+  SecondRouteState createState() => SecondRouteState();
 }
 
-class _SecondRouteState extends State<SecondRoute> with WidgetsBindingObserver {
+class SecondRouteState extends State<SecondRoute> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();

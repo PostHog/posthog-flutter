@@ -17,7 +17,8 @@ import '../posthog_flutter_platform_interface.dart';
 
 extension PostHogDisplaySurveyExtension on PostHogDisplaySurvey {
   String get title => name;
-  String? get description => questions.firstOrNull?.description;
+  String? get description =>
+      questions.isNotEmpty ? questions.first.description : null;
 }
 
 class PostHogSurveysProvider extends StatefulWidget {

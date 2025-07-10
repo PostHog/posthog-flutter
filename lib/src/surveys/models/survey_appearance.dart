@@ -32,19 +32,25 @@ class SurveyAppearance {
   final Color? borderColor;
 
   /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance]
-  static SurveyAppearance fromPostHog(PostHogDisplaySurveyAppearance? appearance) {
+  static SurveyAppearance fromPostHog(
+      PostHogDisplaySurveyAppearance? appearance) {
     return SurveyAppearance(
       backgroundColor: _colorFromHex(appearance?.backgroundColor),
-      submitButtonColor: _colorFromHex(appearance?.submitButtonColor) ?? Colors.black,
+      submitButtonColor:
+          _colorFromHex(appearance?.submitButtonColor) ?? Colors.black,
       submitButtonText: appearance?.submitButtonText ?? 'Submit',
-      submitButtonTextColor: _colorFromHex(appearance?.submitButtonTextColor) ?? Colors.white,
+      submitButtonTextColor:
+          _colorFromHex(appearance?.submitButtonTextColor) ?? Colors.white,
       descriptionTextColor: _colorFromHex(appearance?.descriptionTextColor),
       ratingButtonColor: _colorFromHex(appearance?.ratingButtonColor),
-      ratingButtonActiveColor: _colorFromHex(appearance?.ratingButtonActiveColor),
+      ratingButtonActiveColor:
+          _colorFromHex(appearance?.ratingButtonActiveColor),
       displayThankYouMessage: appearance?.displayThankYouMessage ?? true,
-      thankYouMessageHeader: appearance?.thankYouMessageHeader ?? 'Thank you for your feedback!',
+      thankYouMessageHeader:
+          appearance?.thankYouMessageHeader ?? 'Thank you for your feedback!',
       thankYouMessageDescription: appearance?.thankYouMessageDescription,
-      thankYouMessageCloseButtonText: appearance?.thankYouMessageCloseButtonText ?? 'Close',
+      thankYouMessageCloseButtonText:
+          appearance?.thankYouMessageCloseButtonText ?? 'Close',
       borderColor: _colorFromHex(appearance?.borderColor),
     );
   }
@@ -60,7 +66,7 @@ class SurveyAppearance {
 
     // Then try to parse it as a hex color
     var hex = colorString.replaceFirst('#', '').toUpperCase();
-    
+
     // Handle different hex formats
     if (hex.length == 3) {
       // Convert #RGB to #RRGGBB

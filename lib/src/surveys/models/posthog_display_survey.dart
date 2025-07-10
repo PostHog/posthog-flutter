@@ -94,7 +94,7 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
 /// Multiple choice question type
 @immutable
 class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
-  PostHogDisplayChoiceQuestion({
+  const PostHogDisplayChoiceQuestion({
     required super.question,
     required this.choices,
     required this.isMultipleChoice,

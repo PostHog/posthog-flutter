@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/surveys/posthog_surveys_provider.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'posthog.dart';
 import 'replay/change_detector.dart';
@@ -131,7 +132,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
     if (surveysProvider != null) {
       await surveysProvider.showSurvey(survey, onShown, onResponse, onClosed);
     } else {
-      print('[PostHog] Error: PostHogSurveysProvider not found in widget tree');
+      printIfDebug(
+          '[PostHog] Error: PostHogSurveysProvider not found in widget tree');
     }
   }
 
@@ -150,9 +152,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
   Future<void> cleanupSurveys() async {
     final surveysProvider = PostHogSurveysProvider.globalKey.currentState;
     if (surveysProvider != null) {
-      surveysProvider!.hideSurvey();
+      surveysProvider.hideSurvey();
     } else {
-      print('[PostHog] Error: PostHogSurveysProvider not found in widget tree');
+      printIfDebug(
+          '[PostHog] Error: PostHogSurveysProvider not found in widget tree');
     }
   }
 }

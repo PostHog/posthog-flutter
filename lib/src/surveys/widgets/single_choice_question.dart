@@ -41,9 +41,6 @@ class _SingleChoiceQuestionWidgetState
   Set<String> _selectedChoices = {};
   String _openChoiceInput = '';
   final TextEditingController _openChoiceController = TextEditingController();
-  double _headerHeight = 0;
-  double _contentHeight = 0;
-  double _buttonHeight = 0;
 
   void _handleOpenChoiceInput(String value) {
     setState(() {
@@ -111,7 +108,6 @@ class _SingleChoiceQuestionWidgetState
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         return Column(
@@ -121,15 +117,6 @@ class _SingleChoiceQuestionWidgetState
             // Fixed header
             LayoutBuilder(
               builder: (context, headerConstraints) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  print("Header height is ${headerConstraints.maxHeight}");
-                  if (mounted && _headerHeight != headerConstraints.maxHeight) {
-                    setState(() {
-                      _headerHeight = headerConstraints.maxHeight;
-                    });
-                  }
-                });
-
                 return Column(
                   children: [
                     QuestionHeader(
@@ -145,16 +132,6 @@ class _SingleChoiceQuestionWidgetState
             // Scrollable choices
             LayoutBuilder(
               builder: (context, contentConstraints) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  print("Content height is ${contentConstraints.maxHeight}");
-                  if (mounted &&
-                      _contentHeight != contentConstraints.maxHeight) {
-                    setState(() {
-                      _contentHeight = contentConstraints.maxHeight;
-                    });
-                  }
-                });
-
                 return Flexible(
                   flex: 0,
                   child: ConstrainedBox(
@@ -202,7 +179,7 @@ class _SingleChoiceQuestionWidgetState
                                     : null,
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       ),
                     ),
@@ -213,15 +190,6 @@ class _SingleChoiceQuestionWidgetState
             // Fixed footer
             LayoutBuilder(
               builder: (context, buttonConstraints) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  print("button height is ${buttonConstraints.maxHeight}");
-                  if (mounted && _buttonHeight != buttonConstraints.maxHeight) {
-                    setState(() {
-                      _buttonHeight = buttonConstraints.maxHeight;
-                    });
-                  }
-                });
-
                 return SurveyButton(
                   onPressed: _canSubmit ? _onSubmit : null,
                   appearance: widget.appearance,
