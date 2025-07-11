@@ -9,7 +9,7 @@ import 'widgets/link_question.dart';
 import 'widgets/open_text_question.dart';
 import 'widgets/rating_question.dart';
 import 'widgets/choice_question.dart';
-import 'widgets/unimplemented_question.dart';
+
 import 'widgets/confirmation_message.dart';
 import 'models/rating_question.dart';
 import '../posthog_flutter_io.dart';
@@ -226,12 +226,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           },
         );
       default:
-        return UnimplementedQuestion(
-          question: currentQuestion.question,
-          description: currentQuestion.description,
-          type: currentQuestion.type.toString(),
-          appearance: const SurveyAppearance(),
-        );
+        // Return an empty view for unimplemented question types
+        return const SizedBox.shrink();
     }
   }
 
