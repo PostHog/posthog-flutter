@@ -58,14 +58,12 @@ class SurveyAppearance {
   static Color? _colorFromHex(String? colorString) {
     if (colorString == null || colorString.isEmpty) return null;
 
-    // First check if it's a CSS color name
-    final cssHex = _cssToHexDictionary[colorString.toUpperCase()];
-    if (cssHex != null) {
-      return Color(int.parse('0xFF$cssHex'));
-    }
+    // First check if we can map from CSS color
+    final cssHexString =
+        _cssToHexDictionary[colorString.toUpperCase()] ?? colorString;
 
-    // Then try to parse it as a hex color
-    var hex = colorString.replaceFirst('#', '').toUpperCase();
+    // Sanitize by removing any leading '#' character and uppercase for consistency
+    var hex = cssHexString.replaceFirst('#', '').toUpperCase();
 
     // Handle different hex formats
     if (hex.length == 3) {
@@ -76,14 +74,12 @@ class SurveyAppearance {
       // Add full opacity if no alpha
       hex = 'FF$hex';
     }
-    if (hex.length == 8) {
-      try {
-        return Color(int.parse('0x$hex'));
-      } catch (e) {
-        return null;
-      }
+
+    try {
+      return Color(int.parse('0x$hex'));
+    } catch (e) {
+      return null;
     }
-    return null;
   }
 
   /// CSS color names to hex values mapping
