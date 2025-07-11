@@ -15,7 +15,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
+        #if os(iOS)
+            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
+        #elseif os(macOS)
+            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
+        #endif
         let instance = PosthogFlutterPlugin()
         instance.channel = channel
         PosthogFlutterPlugin.instance = instance
