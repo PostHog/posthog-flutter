@@ -3,6 +3,8 @@
     import PostHog
 
     extension PostHogDisplaySurvey {
+        // Convert the survey object to a dictionary for communication with the Dart layer
+        // Native platform model -> Dictionary -> Dart model
         func toDict() -> [String: Any] {
             var dict: [String: Any] = [
                 "id": id,
@@ -19,7 +21,7 @@
                         questionDict["buttonText"] = buttonText
                     }
 
-                    // Add type-specific properties
+                    // Add question type-specific properties
                     switch question {
                     case let linkQuestion as PostHogDisplayLinkQuestion:
                         questionDict["type"] = "link"
@@ -90,10 +92,10 @@
             }
 
             if let startDate = startDate {
-                dict["startDate"] = Int64(startDate.timeIntervalSince1970 * 1000)
+                dict["startDate"] = Int64(startDate.timeIntervalSince1970 * 1000) // to milliseconds since epoch
             }
             if let endDate = endDate {
-                dict["endDate"] = Int64(endDate.timeIntervalSince1970 * 1000)
+                dict["endDate"] = Int64(endDate.timeIntervalSince1970 * 1000) // to milliseconds since epoch
             }
 
             return dict

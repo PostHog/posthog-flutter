@@ -137,6 +137,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 if let surveys: Bool = posthogConfig["surveys"] as? Bool {
                     config.surveys = surveys
                     if surveys {
+                        // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
                         config.surveysConfig.surveysDelegate = instance
                     }
                 }

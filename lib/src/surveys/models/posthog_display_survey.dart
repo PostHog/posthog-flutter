@@ -154,6 +154,8 @@ class PostHogDisplaySurveyAppearance {
 /// Main survey model containing metadata and questions
 @immutable
 class PostHogDisplaySurvey {
+  // Convert back from survey dictionary to a Dart object
+  // Native platform model -> Dictionary -> Dart model
   factory PostHogDisplaySurvey.fromDict(Map<String, dynamic> dict) {
     final questions = (dict['questions'] as List).map((q) {
       final type = q['type'] as String;

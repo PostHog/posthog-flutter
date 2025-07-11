@@ -46,10 +46,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   @override
   Future<void> openUrl(String url) async {
     if (!isSupportedPlatform()) {
-      throw PlatformException(
-        code: 'Unsupported',
-        details: 'Platform is not supported',
-      );
+      printIfDebug('Cannot open url $url: Platform is not supported');
+      return;
     }
 
     await _methodChannel.invokeMethod('openUrl', url);
@@ -58,96 +56,93 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// Cleans up any active surveys when the survey feature is stopped
   Future<void> cleanupSurveys() async {
     if (!isSupportedPlatform()) {
-      throw PlatformException(
-        code: 'Unsupported',
-        details: 'Platform is not supported',
-      );
+      printIfDebug('Cannot cleanup surveys: Platform is not supported');
+      return;
     }
 
     final widget = PosthogFlutterPlatformInterface.instance;
     if (widget is! PosthogFlutterIO) {
-      throw PlatformException(
-        code: 'InvalidInstance',
-        details:
-            'PosthogFlutterPlatformInterface instance is not PosthogFlutterIO',
-      );
+      printIfDebug(
+          'Cannot cleanup surveys: PosthogFlutterPlatformInterface instance is not PosthogFlutterIO');
+      return;
     }
 
-    try {
-      final state = PostHogWidget.globalKey.currentState;
-      if (state == null) {
-        throw PlatformException(
-          code: 'NoWidgetState',
-          details: 'PostHogWidget is not mounted in the widget tree',
-        );
-      }
-
-      // Call the cleanup method on the PostHogWidget state
-      await state.cleanupSurveys();
-    } on Exception catch (e) {
-      throw PlatformException(
-        code: 'CleanupSurveysError',
-        details: e.toString(),
-      );
+    final state = PostHogWidget.globalKey.currentState;
+    if (state == null) {
+      printIfDebug(
+          'Cannot cleanup surveys: PostHogWidget is not mounted in the widget tree');
+      return;
     }
+
+    // Call the cleanup method on the PostHogWidget state
+    await state.cleanupSurveys();
   }
 
   @override
   Future<void> showSurvey(Map<String, dynamic> survey) async {
     if (!isSupportedPlatform()) {
-      throw PlatformException(
-        code: 'Unsupported',
-        details: 'Platform is not supported',
-      );
+      printIfDebug('Cannot show survey: Platform is not supported');
+      return;
     }
 
     final widget = PosthogFlutterPlatformInterface.instance;
     if (widget is! PosthogFlutterIO) {
-      throw PlatformException(
-        code: 'InvalidInstance',
-        details:
-            'PosthogFlutterPlatformInterface instance is not PosthogFlutterIO',
-      );
+      printIfDebug(
+          'Cannot show survey: PosthogFlutterPlatformInterface instance is not PosthogFlutterIO');
+      return;
     }
 
-    try {
-      final state = PostHogWidget.globalKey.currentState;
-      if (state == null) {
-        throw PlatformException(
-          code: 'NoWidgetState',
-          details: 'PostHogWidget is not mounted in the widget tree',
-        );
-      }
+    final state = PostHogWidget.globalKey.currentState;
+    if (state == null) {
+      printIfDebug(
+          'Cannot show survey: PostHogWidget is not mounted in the widget tree');
+      return;
+    }
 
-      final displaySurvey = models.PostHogDisplaySurvey.fromDict(survey);
+    final displaySurvey = models.PostHogDisplaySurvey.fromDict(survey);
 
-      await state.showSurvey(
-        displaySurvey,
-        (survey) async {
+    await state.showSurvey(
+      displaySurvey,
+      (survey) async {
+        // onShown
+        try {
           await _methodChannel.invokeMethod('surveyAction', {'type': 'shown'});
-        },
-        (survey, index, response) async {
+        } on PlatformException catch (exception) {
+          printIfDebug('Exception on surveyAction(shown): $exception');
+        }
+      },
+      (survey, index, response) async {
+        // onResponse
+        int nextIndex = index;
+        bool isSurveyCompleted = false;
+
+        try {
           final result = await _methodChannel.invokeMethod('surveyAction', {
             'type': 'response',
             'index': index,
             'response': response,
           }) as Map;
-          final nextQuestion = PostHogSurveyNextQuestion(
-            questionIndex: (result['nextIndex'] as num).toInt(),
-            isSurveyCompleted: result['isSurveyCompleted'] as bool,
-          );
-          return nextQuestion;
-        },
-        (survey) async {
+          nextIndex = (result['nextIndex'] as num).toInt();
+          isSurveyCompleted = result['isSurveyCompleted'] as bool;
+        } on PlatformException catch (exception) {
+          printIfDebug('Exception on surveyAction(response): $exception');
+        }
+
+        final nextQuestion = PostHogSurveyNextQuestion(
+          questionIndex: nextIndex,
+          isSurveyCompleted: isSurveyCompleted,
+        );
+        return nextQuestion;
+      },
+      (survey) async {
+        // onClose
+        try {
           await _methodChannel.invokeMethod('surveyAction', {'type': 'closed'});
-        },
-      );
-    } on Exception catch (e) {
-      throw PlatformException(
-        code: 'ShowSurveyError',
-        details: e.toString(),
-      );
-    }
+        } on PlatformException catch (exception) {
+          printIfDebug('Exception on surveyAction(closed): $exception');
+        }
+      },
+    );
   }
 
   @override

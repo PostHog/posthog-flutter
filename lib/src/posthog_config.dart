@@ -29,7 +29,7 @@ class PostHogConfig {
   /// iOS only
   var dataMode = PostHogDataMode.any;
 
-  /// Enable Surveys
+  /// Enable Surveys (Currently for iOS only)
   /// Experimental. Defaults to false.
   var surveys = false;
 
