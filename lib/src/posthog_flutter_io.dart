@@ -95,7 +95,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     final state = PostHogWidget.globalKey.currentState;
     if (state == null) {
       printIfDebug(
-          'Cannot show survey: PostHogWidget is not mounted in the widget tree');
+          'Cannot show survey: PostHogWidget is not mounted in the widget tree. Make sure to wrap your app with the PostHogWidget widget.');
       return;
     }
 
