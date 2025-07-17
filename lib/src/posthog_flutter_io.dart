@@ -4,13 +4,14 @@ import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
 import 'package:flutter/services.dart';
+
+import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
 import 'surveys/models/survey_next_question.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
-import 'posthog_widget.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
@@ -60,22 +61,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
-    final widget = PosthogFlutterPlatformInterface.instance;
-    if (widget is! PosthogFlutterIO) {
-      printIfDebug(
-          'Cannot cleanup surveys: PosthogFlutterPlatformInterface instance is not PosthogFlutterIO');
-      return;
-    }
-
-    final state = PostHogWidget.globalKey.currentState;
-    if (state == null) {
-      printIfDebug(
-          'Cannot cleanup surveys: PostHogWidget is not mounted in the widget tree');
-      return;
-    }
-
-    // Call the cleanup method on the PostHogWidget state
-    await state.cleanupSurveys();
+    SurveyService().hideSurvey();
   }
 
   @override
@@ -92,21 +78,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
-    final state = PostHogWidget.globalKey.currentState;
-    if (state == null) {
-      printIfDebug(
-          'Cannot show survey: PostHogWidget is not mounted in the widget tree. Make sure to wrap your app with the PostHogWidget widget.');
-      return;
-    }
-
     final displaySurvey = models.PostHogDisplaySurvey.fromDict(survey);
 
-    await state.showSurvey(
+    // Try to show using SurveyService
+    // This will work if the user has set up the PosthogObserver correctly in their app
+    await SurveyService().showSurvey(
       displaySurvey,
       (survey) async {
         // onShown
         try {
-          await _methodChannel.invokeMethod('surveyAction', {'type': 'shown'});
+          await _methodChannel
+              .invokeMethod('surveyAction', {'type': 'shown'});
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(shown): $exception');
         }
@@ -137,7 +119,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       (survey) async {
         // onClose
         try {
-          await _methodChannel.invokeMethod('surveyAction', {'type': 'closed'});
+          await _methodChannel
+              .invokeMethod('surveyAction', {'type': 'closed'});
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(closed): $exception');
         }

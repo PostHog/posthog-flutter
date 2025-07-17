@@ -1,27 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
-import 'package:posthog_flutter/src/surveys/posthog_surveys_provider.dart';
-import 'package:posthog_flutter/src/util/logging.dart';
 
-import 'posthog.dart';
 import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
 import 'replay/screenshot/screenshot_capturer.dart';
 
-import 'surveys/models/posthog_display_survey.dart';
-import 'surveys/models/survey_callbacks.dart';
-
-@immutable
 class PostHogWidget extends StatefulWidget {
   final Widget child;
-  static final GlobalKey<PostHogWidgetState> globalKey =
-      GlobalKey<PostHogWidgetState>();
 
-  PostHogWidget({Key? key, required this.child}) : super(key: globalKey);
+  const PostHogWidget({super.key, required this.child});
 
   @override
   PostHogWidgetState createState() => PostHogWidgetState();
@@ -95,46 +85,14 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Localizations(
-      locale: const Locale('en', 'US'),
-      delegates: [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      child: RepaintBoundary(
-        key: PostHogMaskController.instance.containerKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: MaterialApp(
-                navigatorObservers: [],
-                home: PostHogSurveysProvider(
-                  child: Container(child: widget.child),
-                ),
-              ),
-            )
-          ],
-        ),
+    return RepaintBoundary(
+      key: PostHogMaskController.instance.containerKey,
+      child: Column(
+        children: [
+          Expanded(child: Container(child: widget.child)),
+        ],
       ),
     );
-  }
-
-  Future<void> showSurvey(
-    PostHogDisplaySurvey survey,
-    OnSurveyShown onShown,
-    OnSurveyResponse onResponse,
-    OnSurveyClosed onClosed,
-  ) async {
-    if (!mounted) return;
-
-    final surveysProvider = PostHogSurveysProvider.globalKey.currentState;
-    if (surveysProvider != null) {
-      await surveysProvider.showSurvey(survey, onShown, onResponse, onClosed);
-    } else {
-      printIfDebug(
-          '[PostHog] Error: PostHogSurveysProvider not found in widget tree');
-    }
   }
 
   @override
@@ -145,17 +103,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _changeDetector = null;
     _screenshotCapturer = null;
     _nativeCommunicator = null;
-    super.dispose();
-  }
 
-  /// Cleans up any active surveys
-  Future<void> cleanupSurveys() async {
-    final surveysProvider = PostHogSurveysProvider.globalKey.currentState;
-    if (surveysProvider != null) {
-      surveysProvider.hideSurvey();
-    } else {
-      printIfDebug(
-          '[PostHog] Error: PostHogSurveysProvider not found in widget tree');
-    }
+    super.dispose();
   }
 }

@@ -1,77 +1,20 @@
 import 'package:flutter/material.dart';
 
-import 'models/posthog_display_survey.dart';
-import 'models/question_type.dart';
-import 'models/survey_appearance.dart';
-import 'models/survey_callbacks.dart';
+import '../models/posthog_display_survey.dart';
+import '../models/question_type.dart';
+import '../models/survey_appearance.dart';
+import '../models/survey_callbacks.dart';
+import '../models/rating_question.dart';
+import '../../posthog_flutter_io.dart';
+import '../../posthog_flutter_platform_interface.dart';
 
-import 'widgets/link_question.dart';
-import 'widgets/open_text_question.dart';
-import 'widgets/rating_question.dart';
-import 'widgets/choice_question.dart';
+import 'link_question.dart';
+import 'open_text_question.dart';
+import 'rating_question.dart';
+import 'choice_question.dart';
+import 'confirmation_message.dart';
 
-import 'widgets/confirmation_message.dart';
-import 'models/rating_question.dart';
-import '../posthog_flutter_io.dart';
-import '../posthog_flutter_platform_interface.dart';
-
-extension PostHogDisplaySurveyExtension on PostHogDisplaySurvey {
-  String get title => name;
-  String? get description =>
-      questions.isNotEmpty ? questions.first.description : null;
-}
-
-class PostHogSurveysProvider extends StatefulWidget {
-  final Widget child;
-  static final GlobalKey<PostHogSurveysProviderState> globalKey =
-      GlobalKey<PostHogSurveysProviderState>();
-
-  PostHogSurveysProvider({Key? key, required this.child})
-      : super(key: globalKey);
-
-  @override
-  PostHogSurveysProviderState createState() => PostHogSurveysProviderState();
-}
-
-class PostHogSurveysProviderState extends State<PostHogSurveysProvider> {
-  Future<void> showSurvey(
-    PostHogDisplaySurvey survey,
-    OnSurveyShown onShown,
-    OnSurveyResponse onResponse,
-    OnSurveyClosed onClosed,
-  ) async {
-    if (!mounted) return;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      builder: (context) => SurveyBottomSheet(
-        survey: survey,
-        onShown: onShown,
-        onResponse: onResponse,
-        onClosed: onClosed,
-        appearance: SurveyAppearance.fromPostHog(survey.appearance),
-      ),
-    );
-  }
-
-  /// Dismisses any active survey when the survey feature is stopped
-  void hideSurvey() {
-    if (!mounted) return;
-
-    // Pop any active bottom sheets
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return widget.child;
-  }
-}
-
+/// A bottom sheet that displays a survey to the user.
 class SurveyBottomSheet extends StatefulWidget {
   final PostHogDisplaySurvey survey;
   final OnSurveyShown onShown;

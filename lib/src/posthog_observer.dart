@@ -20,12 +20,23 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
       : _nameExtractor = nameExtractor,
         _routeFilter = routeFilter;
 
+  /// The current navigation context, which can be used for showing modals
+  /// This is updated whenever routes change (push, pop, replace)
+  static BuildContext? currentContext;
+
   final ScreenNameExtractor _nameExtractor;
 
   final PostHogRouteFilter _routeFilter;
 
   bool _isTrackeableRoute(String? name) {
     return name != null && name.trim().isNotEmpty;
+  }
+  
+  /// Updates the current context from a route if available
+  void _updateCurrentContext(Route<dynamic>? route) {
+    if (route?.navigator?.context != null) {
+      currentContext = route!.navigator!.context;
+    }
   }
 
   void _sendScreenView(Route<dynamic>? route) {
@@ -52,6 +63,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
 
+    // Store the current context for use in showing surveys
+    _updateCurrentContext(route);
+
     if (!_routeFilter(route)) {
       return;
     }
@@ -62,6 +76,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    
+    // Update the current context when routes are replaced
+    _updateCurrentContext(newRoute);
 
     if (!_routeFilter(newRoute)) {
       return;
@@ -73,6 +90,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
+    
+    // Update the current context when returning to a previous route
+    _updateCurrentContext(previousRoute);
 
     if (!_routeFilter(previousRoute)) {
       return;
