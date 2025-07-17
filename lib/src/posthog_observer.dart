@@ -34,8 +34,10 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
 
   /// Updates the current context from a route if available
   void _updateCurrentContext(Route<dynamic>? route) {
-    if (route?.navigator?.context != null) {
-      currentContext = route!.navigator!.context;
+    final context = route?.navigator?.context;
+    // don't clear current context if it's null
+    if (context != null) {
+      currentContext = context;
     }
   }
 
