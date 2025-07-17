@@ -162,9 +162,6 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             });
           },
         );
-      default:
-        // Return an empty view for unimplemented question types
-        return const SizedBox.shrink();
     }
   }
 
