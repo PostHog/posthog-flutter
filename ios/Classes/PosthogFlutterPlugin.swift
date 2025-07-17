@@ -310,8 +310,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
                     case is PostHogDisplayRatingQuestion:
                         // For rating questions
-                        let ratingString = responsePayload as? String
-                        let ratingValue = ratingString.flatMap { Int($0) } // No fallback to 0
+                        let ratingValue = responsePayload as? Int
                         surveyResponse = .rating(ratingValue)
 
                     case let choiceQuestion as PostHogDisplayChoiceQuestion:
@@ -323,9 +322,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                             selectedOptions = responsePayload as? [String]
                             surveyResponse = .multipleChoice(selectedOptions)
                         } else {
-                            let singleOption = responsePayload as? String ?? ""
-                            // Single choice: use as single item
-                            surveyResponse = .singleChoice(singleOption)
+                            // Single choice: Flutter sends as a list with one element
+                            selectedOptions = responsePayload as? [String]
+                            surveyResponse = .singleChoice(selectedOptions?.first)
                         }
 
                     default:
