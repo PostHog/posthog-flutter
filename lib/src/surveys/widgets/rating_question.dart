@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/rating_question.dart';
+import '../models/posthog_display_survey_rating_type.dart';
 import '../models/survey_appearance.dart';
 import 'question_header.dart';
 import 'survey_button.dart';
@@ -16,7 +16,7 @@ class RatingQuestion extends StatefulWidget {
     this.optional = false,
     this.scaleLowerBound = 1,
     this.scaleUpperBound = 5,
-    this.display = RatingDisplay.number,
+    this.type = PostHogDisplaySurveyRatingType.number,
     this.lowerBoundLabel,
     this.upperBoundLabel,
     this.appearance = SurveyAppearance.defaultAppearance,
@@ -28,7 +28,7 @@ class RatingQuestion extends StatefulWidget {
   final bool optional;
   final int scaleLowerBound;
   final int scaleUpperBound;
-  final RatingDisplay display;
+  final PostHogDisplaySurveyRatingType type;
   final String? lowerBoundLabel;
   final String? upperBoundLabel;
   final SurveyAppearance appearance;
@@ -107,7 +107,8 @@ class _RatingQuestionState extends State<RatingQuestion> {
 
     // Show emoji ratings when display == .emoji and scale is 3-point or 5-point
     final range = widget.scaleUpperBound - widget.scaleLowerBound + 1;
-    if (widget.display == RatingDisplay.emoji && (range == 3 || range == 5)) {
+    if (widget.type == PostHogDisplaySurveyRatingType.emoji &&
+        (range == 3 || range == 5)) {
       final buttonColor =
           isSelected ? Colors.black : Colors.black.withAlpha(128);
       // Convert value to 0-based index.
@@ -149,7 +150,7 @@ class _RatingQuestionState extends State<RatingQuestion> {
           appearance: widget.appearance,
         ),
         const SizedBox(height: 24),
-        if (widget.display == RatingDisplay.emoji)
+        if (widget.type == PostHogDisplaySurveyRatingType.emoji)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children:

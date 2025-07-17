@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
-import 'surveys/models/survey_next_question.dart';
+import 'surveys/models/survey_callbacks.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
@@ -87,8 +87,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       (survey) async {
         // onShown
         try {
-          await _methodChannel
-              .invokeMethod('surveyAction', {'type': 'shown'});
+          await _methodChannel.invokeMethod('surveyAction', {'type': 'shown'});
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(shown): $exception');
         }
@@ -119,8 +118,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       (survey) async {
         // onClose
         try {
-          await _methodChannel
-              .invokeMethod('surveyAction', {'type': 'closed'});
+          await _methodChannel.invokeMethod('surveyAction', {'type': 'closed'});
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(closed): $exception');
         }

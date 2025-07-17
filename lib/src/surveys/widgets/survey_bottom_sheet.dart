@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../models/posthog_display_survey.dart';
-import '../models/question_type.dart';
+import '../models/posthog_survey_question_type.dart';
 import '../models/survey_appearance.dart';
 import '../models/survey_callbacks.dart';
-import '../models/rating_question.dart';
+import '../models/posthog_display_link_question.dart';
+import '../models/posthog_display_rating_question.dart';
+import '../models/posthog_display_choice_question.dart';
 import '../../posthog_flutter_io.dart';
 import '../../posthog_flutter_platform_interface.dart';
 
@@ -108,14 +110,6 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
       case PostHogSurveyQuestionType.rating:
         final ratingQuestion = currentQuestion as PostHogDisplayRatingQuestion;
 
-        // Map rating type to display
-        final display =
-            ratingQuestion.ratingType == PostHogDisplaySurveyRatingType.emoji
-                ? RatingDisplay.emoji
-                : RatingDisplay.number;
-
-        // Use scaleLowerBound and scaleUpperBound directly
-
         return RatingQuestion(
           key: ValueKey('rating_question_$_currentIndex'),
           question: ratingQuestion.question,
@@ -125,7 +119,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           optional: ratingQuestion.optional,
           scaleLowerBound: ratingQuestion.scaleLowerBound,
           scaleUpperBound: ratingQuestion.scaleUpperBound,
-          display: display,
+          type: ratingQuestion.ratingType,
           lowerBoundLabel: ratingQuestion.lowerBoundLabel,
           upperBoundLabel: ratingQuestion.upperBoundLabel,
           onSubmit: (response) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'posthog_display_survey.dart';
+import 'posthog_display_survey_appearance.dart';
 
+/// Appearance configuration for survey widgets
 @immutable
 class SurveyAppearance {
   const SurveyAppearance({

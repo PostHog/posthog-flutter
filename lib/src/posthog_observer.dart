@@ -31,7 +31,7 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   bool _isTrackeableRoute(String? name) {
     return name != null && name.trim().isNotEmpty;
   }
-  
+
   /// Updates the current context from a route if available
   void _updateCurrentContext(Route<dynamic>? route) {
     if (route?.navigator?.context != null) {
@@ -76,7 +76,7 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    
+
     // Update the current context when routes are replaced
     _updateCurrentContext(newRoute);
 
@@ -90,7 +90,7 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
-    
+
     // Update the current context when returning to a previous route
     _updateCurrentContext(previousRoute);
 
