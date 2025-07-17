@@ -6,7 +6,7 @@ Future<void> main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   final config =
-      PostHogConfig('phc_WKfvDfedaJEDCoUmt9pVa3OWtbbUP1W2ctxwXkt3A3n');
+      PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
