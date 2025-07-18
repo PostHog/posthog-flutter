@@ -207,7 +207,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         case "openUrl":
             openUrl(call, result: result)
         case "surveyAction":
-            handleSurveyAction(call, result: result)
+            #if os(iOS)
+                handleSurveyAction(call, result: result)
+            #else
+                // surveys only supported on iOS
+                result(nil)
+            #endif
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -248,77 +253,75 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         }
 
         private func handleSurveyAction(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-            #if os(iOS)
-                guard let survey = currentSurvey,
-                      let args = call.arguments as? [String: Any],
-                      let type = args["type"] as? String
-                else {
-                    result(FlutterError(code: "InvalidArguments", message: "Invalid survey action arguments", details: nil))
-                    return
-                }
+            guard let survey = currentSurvey,
+                  let args = call.arguments as? [String: Any],
+                  let type = args["type"] as? String
+            else {
+                result(FlutterError(code: "InvalidArguments", message: "Invalid survey action arguments", details: nil))
+                return
+            }
 
-                switch type {
-                case "shown":
-                    onSurveyShownCallback?(survey)
-                case "response":
-                    if let index = args["index"] as? Int,
-                       index < survey.questions.count
-                    {
-                        let question = survey.questions[index]
-                        let responsePayload = args["response"]
+            switch type {
+            case "shown":
+                onSurveyShownCallback?(survey)
+            case "response":
+                if let index = args["index"] as? Int,
+                   index < survey.questions.count
+                {
+                    let question = survey.questions[index]
+                    let responsePayload = args["response"]
 
-                        // Create PostHogSurveyResponse based on question type
-                        var surveyResponse: PostHogSurveyResponse
+                    // Create PostHogSurveyResponse based on question type
+                    var surveyResponse: PostHogSurveyResponse
 
-                        switch question {
-                        case is PostHogDisplayLinkQuestion:
-                            // For link questions
-                            let boolValue = responsePayload as? Bool ?? false
-                            surveyResponse = .link(boolValue)
+                    switch question {
+                    case is PostHogDisplayLinkQuestion:
+                        // For link questions
+                        let boolValue = responsePayload as? Bool ?? false
+                        surveyResponse = .link(boolValue)
 
-                        case is PostHogDisplayRatingQuestion:
-                            // For rating questions
-                            let ratingValue = responsePayload as? Int
-                            surveyResponse = .rating(ratingValue)
+                    case is PostHogDisplayRatingQuestion:
+                        // For rating questions
+                        let ratingValue = responsePayload as? Int
+                        surveyResponse = .rating(ratingValue)
 
-                        case let choiceQuestion as PostHogDisplayChoiceQuestion:
-                            // For single/multiple choice questions
-                            var selectedOptions: [String]? = nil
+                    case let choiceQuestion as PostHogDisplayChoiceQuestion:
+                        // For single/multiple choice questions
+                        var selectedOptions: [String]? = nil
 
-                            if choiceQuestion.isMultipleChoice {
-                                // Multiple choice: accept array directly from Flutter
-                                selectedOptions = responsePayload as? [String]
-                                surveyResponse = .multipleChoice(selectedOptions)
-                            } else {
-                                // Single choice: Flutter sends as a list with one element
-                                selectedOptions = responsePayload as? [String]
-                                surveyResponse = .singleChoice(selectedOptions?.first)
-                            }
-
-                        default:
-                            // Default to open text question
-                            let textValue = responsePayload as? String
-                            surveyResponse = .openEnded(textValue)
+                        if choiceQuestion.isMultipleChoice {
+                            // Multiple choice: accept array directly from Flutter
+                            selectedOptions = responsePayload as? [String]
+                            surveyResponse = .multipleChoice(selectedOptions)
+                        } else {
+                            // Single choice: Flutter sends as a list with one element
+                            selectedOptions = responsePayload as? [String]
+                            surveyResponse = .singleChoice(selectedOptions?.first)
                         }
 
-                        // Call the callback with the constructed response
-                        if let nextQuestion = onSurveyResponseCallback?(survey, index, surveyResponse) {
-                            result(["nextIndex": nextQuestion.questionIndex,
-                                    "isSurveyCompleted": nextQuestion.isSurveyCompleted])
-                            return
-                        }
+                    default:
+                        // Default to open text question
+                        let textValue = responsePayload as? String
+                        surveyResponse = .openEnded(textValue)
                     }
-                case "closed":
-                    onSurveyClosedCallback?(survey)
-                    // Clear the callbacks after survey is closed
-                    currentSurvey = nil
-                    onSurveyShownCallback = nil
-                    onSurveyResponseCallback = nil
-                    onSurveyClosedCallback = nil
-                default:
-                    break
+
+                    // Call the callback with the constructed response
+                    if let nextQuestion = onSurveyResponseCallback?(survey, index, surveyResponse) {
+                        result(["nextIndex": nextQuestion.questionIndex,
+                                "isSurveyCompleted": nextQuestion.isSurveyCompleted])
+                        return
+                    }
                 }
-            #endif
+            case "closed":
+                onSurveyClosedCallback?(survey)
+                // Clear the callbacks after survey is closed
+                currentSurvey = nil
+                onSurveyShownCallback = nil
+                onSurveyResponseCallback = nil
+                onSurveyClosedCallback = nil
+            default:
+                break
+            }
 
             result(nil)
         }
@@ -435,7 +438,6 @@ extension PosthogFlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ) {
-        print(call.arguments)
         if let url = call.arguments as? String,
            let urlObject = URL(string: url)
         {
