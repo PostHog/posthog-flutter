@@ -534,7 +534,7 @@ class PosthogFlutterPlugin :
         result: Result,
     ) {
         // TODO: Not implemented
-       result(nil)
+        result.success(null)
     }
 
     private fun handleSurveyAction(
@@ -542,6 +542,6 @@ class PosthogFlutterPlugin :
         result: Result,
     ) {
         // TODO: Not implemented
-        result(nil)
+        result.success(null)
     }
 }
