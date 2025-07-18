@@ -22,6 +22,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
+  /// Native plugin calls to Flutter
+  ///
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'showSurvey':
@@ -31,37 +33,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       case 'hideSurveys':
         await cleanupSurveys();
         return null;
-      case 'openUrl':
-        final String url = call.arguments as String;
-        return openUrl(url);
       default:
-        throw PlatformException(
-          code: 'Unimplemented',
-          details:
-              'The posthog_flutter plugin does not implement ${call.method}',
-        );
+        printIfDebug(
+            '[PostHog] ${call.method} not implemented in PosthogFlutterPlatformInterface');
+        return null;
     }
-  }
-
-  /// Opens a URL using the platform's default browser
-  @override
-  Future<void> openUrl(String url) async {
-    if (!isSupportedPlatform()) {
-      printIfDebug('Cannot open url $url: Platform is not supported');
-      return;
-    }
-
-    await _methodChannel.invokeMethod('openUrl', url);
-  }
-
-  /// Cleans up any active surveys when the survey feature is stopped
-  Future<void> cleanupSurveys() async {
-    if (!isSupportedPlatform()) {
-      printIfDebug('Cannot cleanup surveys: Platform is not supported');
-      return;
-    }
-
-    SurveyService().hideSurvey();
   }
 
   @override
@@ -126,6 +102,18 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     );
   }
 
+  /// Cleans up any active surveys when the survey feature is stopped
+  Future<void> cleanupSurveys() async {
+    if (!isSupportedPlatform()) {
+      printIfDebug('Cannot cleanup surveys: Platform is not supported');
+      return;
+    }
+
+    SurveyService().hideSurvey();
+  }
+
+  /// Flutter to Native Calls
+  ///
   @override
   Future<void> setup(PostHogConfig config) async {
     if (!isSupportedPlatform()) {
@@ -435,6 +423,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     } on PlatformException catch (exception) {
       printIfDebug('Exception on getSessionId: $exception');
       return null;
+    }
+  }
+
+  // For internal use
+  @override
+  Future<void> openUrl(String url) async {
+    if (!isSupportedPlatform()) {
+      printIfDebug('Cannot open url $url: Platform is not supported');
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('openUrl', url);
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on openUrl: $exception');
     }
   }
 }

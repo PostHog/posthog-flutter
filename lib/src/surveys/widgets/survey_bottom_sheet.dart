@@ -7,7 +7,6 @@ import '../models/survey_callbacks.dart';
 import '../models/posthog_display_link_question.dart';
 import '../models/posthog_display_rating_question.dart';
 import '../models/posthog_display_choice_question.dart';
-import '../../posthog_flutter_io.dart';
 import '../../posthog_flutter_platform_interface.dart';
 
 import 'link_question.dart';
@@ -95,9 +94,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             // Open the URL if provided
             final link = linkQuestion.link;
             if (link.isNotEmpty) {
-              await (PosthogFlutterPlatformInterface.instance
-                      as PosthogFlutterIO)
-                  .openUrl(link);
+              await PosthogFlutterPlatformInterface.instance.openUrl(link);
             }
 
             // Update state

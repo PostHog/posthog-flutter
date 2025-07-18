@@ -200,6 +200,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       // not supported on Web
       // Flutter Web uses the JS SDK for Session replay
       return false;
+    case 'openUrl':
+      // not supported on Web
+      break;
+    case 'surveyAction':
+      // not supported on Web
+      break;
     default:
       throw PlatformException(
         code: 'Unimplemented',

@@ -158,33 +158,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
-        case "openUrl":
-            if let url = call.arguments as? String,
-               let urlObject = URL(string: url)
-            {
-                #if os(iOS)
-                    if UIApplication.shared.canOpenURL(urlObject) {
-                        UIApplication.shared.open(urlObject)
-                        result(nil)
-                    } else {
-                        result(FlutterError(code: "InvalidURL",
-                                            message: "Cannot open URL",
-                                            details: "The URL \(url) cannot be opened"))
-                    }
-                #else
-                    if NSWorkspace.shared.open(urlObject) {
-                        result(nil)
-                    } else {
-                        result(FlutterError(code: "InvalidURL",
-                                            message: "Cannot open URL",
-                                            details: "The URL \(url) cannot be opened"))
-                    }
-                #endif
-            } else {
-                result(FlutterError(code: "InvalidArguments",
-                                    message: "Invalid URL",
-                                    details: "The URL provided is invalid"))
-            }
         case "setup":
             setup(call, result: result)
         case "getFeatureFlag":
@@ -231,12 +204,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             isSessionReplayActive(result: result)
         case "getSessionId":
             getSessionId(result: result)
+        case "openUrl":
+            openUrl(call, result: result)
         case "surveyAction":
-            #if os(iOS)
-                handleSurveyAction(call, result: result)
-            #else
-                result(FlutterMethodNotImplemented)
-            #endif
+            handleSurveyAction(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -260,11 +231,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             onSurveyResponseCallback = onSurveyResponse
             onSurveyClosedCallback = onSurveyClosed
 
-            DispatchQueue.main.async { [weak self] in
-                // We don't need to handle the result here
-                // All responses will come through the surveyResponse method
-                self?.channel?.invokeMethod("showSurvey", arguments: survey.toDict())
-            }
+            // We don't need to handle the result here
+            // All responses will come through the surveyResponse method
+            invokeFlutterMethod("showSurvey", arguments: survey.toDict())
         }
 
         public func cleanupSurveys() {
@@ -275,81 +244,81 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             onSurveyClosedCallback = nil
 
             // Notify Flutter side that surveys have been cleaned up
-            DispatchQueue.main.async { [weak self] in
-                self?.channel?.invokeMethod("hideSurveys", arguments: nil)
-            }
+            invokeFlutterMethod("hideSurveys", arguments: nil)
         }
 
         private func handleSurveyAction(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-            guard let survey = currentSurvey,
-                  let args = call.arguments as? [String: Any],
-                  let type = args["type"] as? String
-            else {
-                result(FlutterError(code: "InvalidArguments", message: "Invalid survey action arguments", details: nil))
-                return
-            }
+            #if os(iOS)
+                guard let survey = currentSurvey,
+                      let args = call.arguments as? [String: Any],
+                      let type = args["type"] as? String
+                else {
+                    result(FlutterError(code: "InvalidArguments", message: "Invalid survey action arguments", details: nil))
+                    return
+                }
 
-            switch type {
-            case "shown":
-                onSurveyShownCallback?(survey)
-            case "response":
-                if let index = args["index"] as? Int,
-                   index < survey.questions.count
-                {
-                    let question = survey.questions[index]
-                    let responsePayload = args["response"]
+                switch type {
+                case "shown":
+                    onSurveyShownCallback?(survey)
+                case "response":
+                    if let index = args["index"] as? Int,
+                       index < survey.questions.count
+                    {
+                        let question = survey.questions[index]
+                        let responsePayload = args["response"]
 
-                    // Create PostHogSurveyResponse based on question type
-                    var surveyResponse: PostHogSurveyResponse
+                        // Create PostHogSurveyResponse based on question type
+                        var surveyResponse: PostHogSurveyResponse
 
-                    switch question {
-                    case is PostHogDisplayLinkQuestion:
-                        // For link questions
-                        let boolValue = responsePayload as? Bool ?? false
-                        surveyResponse = .link(boolValue)
+                        switch question {
+                        case is PostHogDisplayLinkQuestion:
+                            // For link questions
+                            let boolValue = responsePayload as? Bool ?? false
+                            surveyResponse = .link(boolValue)
 
-                    case is PostHogDisplayRatingQuestion:
-                        // For rating questions
-                        let ratingValue = responsePayload as? Int
-                        surveyResponse = .rating(ratingValue)
+                        case is PostHogDisplayRatingQuestion:
+                            // For rating questions
+                            let ratingValue = responsePayload as? Int
+                            surveyResponse = .rating(ratingValue)
 
-                    case let choiceQuestion as PostHogDisplayChoiceQuestion:
-                        // For single/multiple choice questions
-                        var selectedOptions: [String]? = nil
+                        case let choiceQuestion as PostHogDisplayChoiceQuestion:
+                            // For single/multiple choice questions
+                            var selectedOptions: [String]? = nil
 
-                        if choiceQuestion.isMultipleChoice {
-                            // Multiple choice: accept array directly from Flutter
-                            selectedOptions = responsePayload as? [String]
-                            surveyResponse = .multipleChoice(selectedOptions)
-                        } else {
-                            // Single choice: Flutter sends as a list with one element
-                            selectedOptions = responsePayload as? [String]
-                            surveyResponse = .singleChoice(selectedOptions?.first)
+                            if choiceQuestion.isMultipleChoice {
+                                // Multiple choice: accept array directly from Flutter
+                                selectedOptions = responsePayload as? [String]
+                                surveyResponse = .multipleChoice(selectedOptions)
+                            } else {
+                                // Single choice: Flutter sends as a list with one element
+                                selectedOptions = responsePayload as? [String]
+                                surveyResponse = .singleChoice(selectedOptions?.first)
+                            }
+
+                        default:
+                            // Default to open text question
+                            let textValue = responsePayload as? String
+                            surveyResponse = .openEnded(textValue)
                         }
 
-                    default:
-                        // Default to open text question
-                        let textValue = responsePayload as? String
-                        surveyResponse = .openEnded(textValue)
+                        // Call the callback with the constructed response
+                        if let nextQuestion = onSurveyResponseCallback?(survey, index, surveyResponse) {
+                            result(["nextIndex": nextQuestion.questionIndex,
+                                    "isSurveyCompleted": nextQuestion.isSurveyCompleted])
+                            return
+                        }
                     }
-
-                    // Call the callback with the constructed response
-                    if let nextQuestion = onSurveyResponseCallback?(survey, index, surveyResponse) {
-                        result(["nextIndex": nextQuestion.questionIndex,
-                                "isSurveyCompleted": nextQuestion.isSurveyCompleted])
-                        return
-                    }
+                case "closed":
+                    onSurveyClosedCallback?(survey)
+                    // Clear the callbacks after survey is closed
+                    currentSurvey = nil
+                    onSurveyShownCallback = nil
+                    onSurveyResponseCallback = nil
+                    onSurveyClosedCallback = nil
+                default:
+                    break
                 }
-            case "closed":
-                onSurveyClosedCallback?(survey)
-                // Clear the callbacks after survey is closed
-                currentSurvey = nil
-                onSurveyShownCallback = nil
-                onSurveyResponseCallback = nil
-                onSurveyClosedCallback = nil
-            default:
-                break
-            }
+            #endif
 
             result(nil)
         }
@@ -460,6 +429,29 @@ extension PosthogFlutterPlugin {
         #else
             result(false)
         #endif
+    }
+
+    private func openUrl(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        print(call.arguments)
+        if let url = call.arguments as? String,
+           let urlObject = URL(string: url)
+        {
+            #if os(iOS)
+                if UIApplication.shared.canOpenURL(urlObject) {
+                    UIApplication.shared.open(urlObject)
+                }
+            #else
+                NSWorkspace.shared.open(urlObject)
+            #endif
+            result(nil)
+        } else {
+            result(FlutterError(code: "InvalidArguments",
+                                message: "Invalid URL",
+                                details: "The URL provided is invalid"))
+        }
     }
 
     private func setup(
@@ -691,5 +683,11 @@ extension PosthogFlutterPlugin {
         result(FlutterError(
             code: "PosthogFlutterException", message: "Missing arguments!", details: nil
         ))
+    }
+
+    private func invokeFlutterMethod(_ method: String, arguments: Any? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            self?.channel?.invokeMethod(method, arguments: arguments)
+        }
     }
 }
