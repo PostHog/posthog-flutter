@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
@@ -31,6 +33,7 @@ class PostHogConfig {
 
   /// Enable Surveys (Currently for iOS only)
   /// Experimental. Defaults to false.
+  @experimental
   var surveys = false;
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
