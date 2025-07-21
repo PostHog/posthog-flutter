@@ -25,9 +25,33 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   /// This is updated whenever routes change (push, pop, replace)
   static BuildContext? _currentContext;
 
-  /// @nodoc For internal use only. Should not be used by app developers
+  /// For internal use only. Should not be used by app developers
+  ///
+  /// Returns the current context if it exists and is still mounted,
+  /// otherwise returns null and clears the stored context.
   @internal
-  static BuildContext? get currentContext => _currentContext;
+  static BuildContext? get currentContext {
+    // From flutter docs: if a [BuildContext] is used across an asynchronous gap (i.e. after performing
+    // an asynchronous operation), consider checking [mounted] to determine whether
+    // the context is still valid before interacting with it:
+    if (_currentContext?.mounted == false) {
+      clearCurrentContext();
+      return null;
+    }
+    return _currentContext;
+  }
+
+  /// Clears the current navigation context. Called when Posthog().close() is called.
+  ///
+  /// For internal use only. Should not be used by app developers.
+  ///
+  /// Note: Current limitation - After calling this method, PostHog will not have a valid BuildContext until
+  /// the next navigation event occurs. This means if one calls `close()` followed by
+  /// `setup()` on the same screen, surveys cannot be rendered until a navigation event occurs.
+  @internal
+  static void clearCurrentContext() {
+    _currentContext = null;
+  }
 
   final ScreenNameExtractor _nameExtractor;
 

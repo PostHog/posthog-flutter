@@ -122,6 +122,7 @@ class Posthog {
   Future<void> close() {
     _config = null;
     _currentScreen = null;
+    PosthogObserver.clearCurrentContext();
     return _posthog.close();
   }
 
