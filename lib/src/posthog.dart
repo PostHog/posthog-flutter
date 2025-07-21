@@ -119,6 +119,9 @@ class Posthog {
 
   Future<void> flush() => _posthog.flush();
 
+  /// Closes the PostHog SDK and cleans up resources.
+  ///
+  /// Note: Please note that after calling close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
   Future<void> close() {
     _config = null;
     _currentScreen = null;

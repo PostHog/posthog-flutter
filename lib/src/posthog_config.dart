@@ -32,6 +32,9 @@ class PostHogConfig {
   var dataMode = PostHogDataMode.any;
 
   /// Enable Surveys (Currently for iOS only)
+  ///
+  /// Note: Please note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  ///
   /// Experimental. Defaults to false.
   @experimental
   var surveys = false;
