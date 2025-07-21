@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:meta/meta.dart';
 
 import 'posthog.dart';
 
@@ -22,7 +23,11 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
 
   /// The current navigation context, which can be used for showing modals
   /// This is updated whenever routes change (push, pop, replace)
-  static BuildContext? currentContext;
+  static BuildContext? _currentContext;
+
+  /// @nodoc For internal use only. Should not be used by app developers
+  @internal
+  static BuildContext? get currentContext => _currentContext;
 
   final ScreenNameExtractor _nameExtractor;
 
@@ -37,7 +42,7 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
     final context = route?.navigator?.context;
     // don't clear current context if it's null
     if (context != null) {
-      currentContext = context;
+      _currentContext = context;
     }
   }
 
