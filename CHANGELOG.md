@@ -1,5 +1,7 @@
 ## Next
 
+- feat: surveys for iOS ([#188](https://github.com/PostHog/posthog-flutter/pull/188))
+
 ## 5.0.0
 
 - chore: support flutter web wasm builds ([#112](https://github.com/PostHog/posthog-flutter/pull/112))

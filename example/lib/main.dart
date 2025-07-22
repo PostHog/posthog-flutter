@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 Future<void> main() async {
@@ -11,6 +10,7 @@ Future<void> main() async {
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
+  config.surveys = true;
   config.sessionReplay = true;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
@@ -40,20 +40,20 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp(
         navigatorObservers: [PosthogObserver()],
         title: 'Flutter App',
-        home: const _InitialScreen(),
+        home: const InitialScreen(),
       ),
     );
   }
 }
 
-class _InitialScreen extends StatefulWidget {
-  const _InitialScreen({Key? key}) : super(key: key);
+class InitialScreen extends StatefulWidget {
+  const InitialScreen({Key? key}) : super(key: key);
 
   @override
-  _InitialScreenState createState() => _InitialScreenState();
+  InitialScreenState createState() => InitialScreenState();
 }
 
-class _InitialScreenState extends State<_InitialScreen> {
+class InitialScreenState extends State<InitialScreen> {
   final _posthogFlutterPlugin = Posthog();
   dynamic _result = "";
 
@@ -79,7 +79,7 @@ class _InitialScreenState extends State<_InitialScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const _SecondRoute(),
+                          builder: (context) => const SecondRoute(),
                           settings: const RouteSettings(name: 'second_route')),
                     );
                   },
@@ -282,15 +282,14 @@ class _InitialScreenState extends State<_InitialScreen> {
   }
 }
 
-class _SecondRoute extends StatefulWidget {
-  const _SecondRoute();
+class SecondRoute extends StatefulWidget {
+  const SecondRoute({super.key});
 
   @override
-  _SecondRouteState createState() => _SecondRouteState();
+  SecondRouteState createState() => SecondRouteState();
 }
 
-class _SecondRouteState extends State<_SecondRoute>
-    with WidgetsBindingObserver {
+class SecondRouteState extends State<SecondRoute> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();

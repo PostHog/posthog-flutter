@@ -12,18 +12,22 @@ extension PostHogExtension on PostHog {
       JSAny userId, JSAny properties, JSAny propertiesSetOnce);
   external JSAny? capture(JSAny eventName, JSAny properties);
   external JSAny? alias(JSAny alias);
+  // ignore: non_constant_identifier_names
   external JSAny? get_distinct_id();
   external void reset();
   external void debug(JSAny debug);
   external JSAny? isFeatureEnabled(JSAny key);
   external void group(JSAny type, JSAny key, JSAny properties);
   external void reloadFeatureFlags();
+  // ignore: non_constant_identifier_names
   external void opt_in_capturing();
+  // ignore: non_constant_identifier_names
   external void opt_out_capturing();
   external JSAny? getFeatureFlag(JSAny key);
   external JSAny? getFeatureFlagPayload(JSAny key);
   external void register(JSAny properties);
   external void unregister(JSAny key);
+  // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
 }
 
@@ -196,6 +200,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       // not supported on Web
       // Flutter Web uses the JS SDK for Session replay
       return false;
+    case 'openUrl':
+      // not supported on Web
+      break;
+    case 'surveyAction':
+      // not supported on Web
+      break;
     default:
       throw PlatformException(
         code: 'Unimplemented',

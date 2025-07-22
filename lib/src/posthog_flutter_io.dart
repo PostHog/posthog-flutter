@@ -1,17 +1,119 @@
+import 'dart:async';
+
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
 import 'package:flutter/services.dart';
+
+import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
+import 'surveys/models/posthog_display_survey.dart' as models;
+import 'surveys/models/survey_callbacks.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
+  PosthogFlutterIO() {
+    _methodChannel.setMethodCallHandler(_handleMethodCall);
+  }
+
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
+  /// Native plugin calls to Flutter
+  ///
+  Future<dynamic> _handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'showSurvey':
+        final Map<String, dynamic> survey =
+            Map<String, dynamic>.from(call.arguments);
+        return showSurvey(survey);
+      case 'hideSurveys':
+        await cleanupSurveys();
+        return null;
+      default:
+        printIfDebug(
+            '[PostHog] ${call.method} not implemented in PosthogFlutterPlatformInterface');
+        return null;
+    }
+  }
+
+  @override
+  Future<void> showSurvey(Map<String, dynamic> survey) async {
+    if (!isSupportedPlatform()) {
+      printIfDebug('Cannot show survey: Platform is not supported');
+      return;
+    }
+
+    final widget = PosthogFlutterPlatformInterface.instance;
+    if (widget is! PosthogFlutterIO) {
+      printIfDebug(
+          'Cannot show survey: PosthogFlutterPlatformInterface instance is not PosthogFlutterIO');
+      return;
+    }
+
+    final displaySurvey = models.PostHogDisplaySurvey.fromDict(survey);
+
+    // Try to show using SurveyService
+    // This will work if the user has set up the PosthogObserver correctly in their app
+    await SurveyService().showSurvey(
+      displaySurvey,
+      (survey) async {
+        // onShown
+        try {
+          await _methodChannel.invokeMethod('surveyAction', {'type': 'shown'});
+        } on PlatformException catch (exception) {
+          printIfDebug('Exception on surveyAction(shown): $exception');
+        }
+      },
+      (survey, index, response) async {
+        // onResponse
+        int nextIndex = index;
+        bool isSurveyCompleted = false;
+
+        try {
+          final result = await _methodChannel.invokeMethod('surveyAction', {
+            'type': 'response',
+            'index': index,
+            'response': response,
+          }) as Map;
+          nextIndex = (result['nextIndex'] as num).toInt();
+          isSurveyCompleted = result['isSurveyCompleted'] as bool;
+        } on PlatformException catch (exception) {
+          printIfDebug('Exception on surveyAction(response): $exception');
+        }
+
+        final nextQuestion = PostHogSurveyNextQuestion(
+          questionIndex: nextIndex,
+          isSurveyCompleted: isSurveyCompleted,
+        );
+        return nextQuestion;
+      },
+      (survey) async {
+        // onClose
+        try {
+          await _methodChannel.invokeMethod('surveyAction', {'type': 'closed'});
+        } on PlatformException catch (exception) {
+          printIfDebug('Exception on surveyAction(closed): $exception');
+        }
+      },
+    );
+  }
+
+  /// Cleans up any active surveys when the survey feature is stopped
+  Future<void> cleanupSurveys() async {
+    if (!isSupportedPlatform()) {
+      printIfDebug('Cannot cleanup surveys: Platform is not supported');
+      return;
+    }
+
+    SurveyService().hideSurvey();
+  }
+
+  /// Flutter to Native Calls
+  ///
   @override
   Future<void> setup(PostHogConfig config) async {
     if (!isSupportedPlatform()) {
@@ -321,6 +423,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     } on PlatformException catch (exception) {
       printIfDebug('Exception on getSessionId: $exception');
       return null;
+    }
+  }
+
+  // For internal use
+  @override
+  Future<void> openUrl(String url) async {
+    if (!isSupportedPlatform()) {
+      printIfDebug('Cannot open url $url: Platform is not supported');
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('openUrl', url);
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on openUrl: $exception');
     }
   }
 }

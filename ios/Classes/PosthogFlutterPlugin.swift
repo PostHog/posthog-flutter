@@ -1,4 +1,4 @@
-import PostHog
+@_spi(Experimental) import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
@@ -8,6 +8,12 @@ import PostHog
 #endif
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
+    private static var instance: PosthogFlutterPlugin?
+
+    public static func getInstance() -> PosthogFlutterPlugin? {
+        instance
+    }
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         #if os(iOS)
             let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
@@ -15,12 +21,16 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
         #endif
         let instance = PosthogFlutterPlugin()
+        instance.channel = channel
+        PosthogFlutterPlugin.instance = instance
         initPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
                                               target: .global(qos: .utility))
+
+    private var channel: FlutterMethodChannel?
 
     public static func initPlugin() {
         let autoInit = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.AUTO_INIT") as? Bool ?? true
@@ -44,6 +54,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     private static func setupPostHog(_ posthogConfig: [String: Any]) {
+        guard let instance = PosthogFlutterPlugin.instance else {
+            print("[PostHog] Plugin instance not found!")
+            return
+        }
         let apiKey = posthogConfig["apiKey"] as? String ?? ""
         if apiKey.isEmpty {
             print("[PostHog] apiKey is missing!")
@@ -85,6 +99,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         if let optOut = posthogConfig["optOut"] as? Bool {
             config.optOut = optOut
         }
+
         if let personProfiles = posthogConfig["personProfiles"] as? String {
             switch personProfiles {
             case "never":
@@ -110,11 +125,23 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
         #if os(iOS)
+            // configure session replay
             if let sessionReplay = posthogConfig["sessionReplay"] as? Bool {
                 config.sessionReplay = sessionReplay
             }
             // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
             config.sessionReplayConfig.captureNetworkTelemetry = false
+
+            // configure surveys
+            if #available(iOS 15.0, *) {
+                if let surveys: Bool = posthogConfig["surveys"] as? Bool {
+                    config.surveys = surveys
+                    if surveys {
+                        // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
+                        config.surveysConfig.surveysDelegate = instance
+                    }
+                }
+            }
         #endif
 
         // Update SDK name and version
@@ -123,6 +150,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
         PostHogSDK.shared.setup(config)
     }
+
+    private var currentSurvey: PostHogDisplaySurvey?
+    private var onSurveyShownCallback: OnPostHogSurveyShown?
+    private var onSurveyResponseCallback: OnPostHogSurveyResponse?
+    private var onSurveyClosedCallback: OnPostHogSurveyClosed?
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
@@ -172,11 +204,132 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             isSessionReplayActive(result: result)
         case "getSessionId":
             getSessionId(result: result)
+        case "openUrl":
+            openUrl(call, result: result)
+        case "surveyAction":
+            #if os(iOS)
+                handleSurveyAction(call, result: result)
+            #else
+                // surveys only supported on iOS
+                result(nil)
+            #endif
         default:
             result(FlutterMethodNotImplemented)
         }
     }
+}
 
+#if os(iOS)
+
+    // MARK: - PostHogSurveysDelegate
+
+    extension PosthogFlutterPlugin: PostHogSurveysDelegate {
+        public func renderSurvey(
+            _ survey: PostHogDisplaySurvey,
+            onSurveyShown: @escaping OnPostHogSurveyShown,
+            onSurveyResponse: @escaping OnPostHogSurveyResponse,
+            onSurveyClosed: @escaping OnPostHogSurveyClosed
+        ) {
+            // Store the callbacks and survey for later use
+            currentSurvey = survey
+            onSurveyShownCallback = onSurveyShown
+            onSurveyResponseCallback = onSurveyResponse
+            onSurveyClosedCallback = onSurveyClosed
+
+            // We don't need to handle the result here
+            // All responses will come through the surveyResponse method
+            invokeFlutterMethod("showSurvey", arguments: survey.toDict())
+        }
+
+        public func cleanupSurveys() {
+            // Reset all survey-related state when the survey feature is stopped
+            currentSurvey = nil
+            onSurveyShownCallback = nil
+            onSurveyResponseCallback = nil
+            onSurveyClosedCallback = nil
+
+            // Notify Flutter side that surveys have been cleaned up
+            invokeFlutterMethod("hideSurveys", arguments: nil)
+        }
+
+        private func handleSurveyAction(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+            guard let survey = currentSurvey,
+                  let args = call.arguments as? [String: Any],
+                  let type = args["type"] as? String
+            else {
+                result(FlutterError(code: "InvalidArguments", message: "Invalid survey action arguments", details: nil))
+                return
+            }
+
+            switch type {
+            case "shown":
+                onSurveyShownCallback?(survey)
+            case "response":
+                if let index = args["index"] as? Int,
+                   index < survey.questions.count
+                {
+                    let question = survey.questions[index]
+                    let responsePayload = args["response"]
+
+                    // Create PostHogSurveyResponse based on question type
+                    var surveyResponse: PostHogSurveyResponse
+
+                    switch question {
+                    case is PostHogDisplayLinkQuestion:
+                        // For link questions
+                        let boolValue = responsePayload as? Bool ?? false
+                        surveyResponse = .link(boolValue)
+
+                    case is PostHogDisplayRatingQuestion:
+                        // For rating questions
+                        let ratingValue = responsePayload as? Int
+                        surveyResponse = .rating(ratingValue)
+
+                    case let choiceQuestion as PostHogDisplayChoiceQuestion:
+                        // For single/multiple choice questions
+                        var selectedOptions: [String]? = nil
+
+                        if choiceQuestion.isMultipleChoice {
+                            // Multiple choice: accept array directly from Flutter
+                            selectedOptions = responsePayload as? [String]
+                            surveyResponse = .multipleChoice(selectedOptions)
+                        } else {
+                            // Single choice: Flutter sends as a list with one element
+                            selectedOptions = responsePayload as? [String]
+                            surveyResponse = .singleChoice(selectedOptions?.first)
+                        }
+
+                    default:
+                        // Default to open text question
+                        let textValue = responsePayload as? String
+                        surveyResponse = .openEnded(textValue)
+                    }
+
+                    // Call the callback with the constructed response
+                    if let nextQuestion = onSurveyResponseCallback?(survey, index, surveyResponse) {
+                        result(["nextIndex": nextQuestion.questionIndex,
+                                "isSurveyCompleted": nextQuestion.isSurveyCompleted])
+                        return
+                    }
+                }
+            case "closed":
+                onSurveyClosedCallback?(survey)
+                // Clear the callbacks after survey is closed
+                currentSurvey = nil
+                onSurveyShownCallback = nil
+                onSurveyResponseCallback = nil
+                onSurveyClosedCallback = nil
+            default:
+                break
+            }
+
+            result(nil)
+        }
+    }
+
+#endif
+
+extension PosthogFlutterPlugin {
     private func sendMetaEvent(_ call: FlutterMethodCall,
                                result: @escaping FlutterResult)
     {
@@ -279,6 +432,28 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         #else
             result(false)
         #endif
+    }
+
+    private func openUrl(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let url = call.arguments as? String,
+           let urlObject = URL(string: url)
+        {
+            #if os(iOS)
+                if UIApplication.shared.canOpenURL(urlObject) {
+                    UIApplication.shared.open(urlObject)
+                }
+            #else
+                NSWorkspace.shared.open(urlObject)
+            #endif
+            result(nil)
+        } else {
+            result(FlutterError(code: "InvalidArguments",
+                                message: "Invalid URL",
+                                details: "The URL provided is invalid"))
+        }
     }
 
     private func setup(
@@ -510,5 +685,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         result(FlutterError(
             code: "PosthogFlutterException", message: "Missing arguments!", details: nil
         ))
+    }
+
+    private func invokeFlutterMethod(_ method: String, arguments: Any? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            self?.channel?.invokeMethod(method, arguments: arguments)
+        }
     }
 }

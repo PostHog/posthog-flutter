@@ -159,6 +159,12 @@ class PosthogFlutterPlugin :
             "getSessionId" -> {
                 getSessionId(result)
             }
+            "openUrl" -> {
+                openUrl(call, result)
+            }
+            "surveyAction" -> {
+                handleSurveyAction(call, result)
+            }
             else -> {
                 result.notImplemented()
             }
@@ -521,5 +527,21 @@ class PosthogFlutterPlugin :
         (get(key) as? T)?.let {
             callback(it)
         }
+    }
+
+    private fun openUrl(
+        call: MethodCall,
+        result: Result,
+    ) {
+        // TODO: Not implemented
+        result.success(null)
+    }
+
+    private fun handleSurveyAction(
+        call: MethodCall,
+        result: Result,
+    ) {
+        // TODO: Not implemented
+        result.success(null)
     }
 }

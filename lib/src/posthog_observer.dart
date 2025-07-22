@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:meta/meta.dart';
 
 import 'posthog.dart';
 
@@ -20,12 +21,53 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
       : _nameExtractor = nameExtractor,
         _routeFilter = routeFilter;
 
+  /// The current navigation context, which can be used for showing modals
+  /// This is updated whenever routes change (push, pop, replace)
+  static BuildContext? _currentContext;
+
+  /// For internal use only. Should not be used by app developers
+  ///
+  /// Returns the current context if it exists and is still mounted,
+  /// otherwise returns null and clears the stored context.
+  @internal
+  static BuildContext? get currentContext {
+    // From flutter docs: if a [BuildContext] is used across an asynchronous gap (i.e. after performing
+    // an asynchronous operation), consider checking [mounted] to determine whether
+    // the context is still valid before interacting with it:
+    if (_currentContext?.mounted == false) {
+      clearCurrentContext();
+      return null;
+    }
+    return _currentContext;
+  }
+
+  /// Clears the current navigation context. Called when Posthog().close() is called.
+  ///
+  /// For internal use only. Should not be used by app developers.
+  ///
+  /// Note: Current limitation - After calling this method, PostHog will not have a valid BuildContext until
+  /// the next navigation event occurs. This means if one calls `close()` followed by
+  /// `setup()` on the same screen, surveys cannot be rendered until a navigation event occurs.
+  @internal
+  static void clearCurrentContext() {
+    _currentContext = null;
+  }
+
   final ScreenNameExtractor _nameExtractor;
 
   final PostHogRouteFilter _routeFilter;
 
   bool _isTrackeableRoute(String? name) {
     return name != null && name.trim().isNotEmpty;
+  }
+
+  /// Updates the current context from a route if available
+  void _updateCurrentContext(Route<dynamic>? route) {
+    final context = route?.navigator?.context;
+    // don't clear current context if it's null
+    if (context != null) {
+      _currentContext = context;
+    }
   }
 
   void _sendScreenView(Route<dynamic>? route) {
@@ -52,6 +94,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
 
+    // Store the current context for use in showing surveys
+    _updateCurrentContext(route);
+
     if (!_routeFilter(route)) {
       return;
     }
@@ -63,6 +108,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
 
+    // Update the current context when routes are replaced
+    _updateCurrentContext(newRoute);
+
     if (!_routeFilter(newRoute)) {
       return;
     }
@@ -73,6 +121,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
+
+    // Update the current context when returning to a previous route
+    _updateCurrentContext(previousRoute);
 
     if (!_routeFilter(previousRoute)) {
       return;

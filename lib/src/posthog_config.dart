@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
@@ -12,6 +14,7 @@ class PostHogConfig {
   var sendFeatureFlagEvents = true;
   var preloadFeatureFlags = true;
   var captureApplicationLifecycleEvents = false;
+
   var debug = false;
   var optOut = false;
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
@@ -27,6 +30,14 @@ class PostHogConfig {
 
   /// iOS only
   var dataMode = PostHogDataMode.any;
+
+  /// Enable Surveys (Currently for iOS only)
+  ///
+  /// Note: Please note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  ///
+  /// Experimental. Defaults to false.
+  @experimental
+  var surveys = false;
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
@@ -46,6 +57,7 @@ class PostHogConfig {
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
       'debug': debug,
       'optOut': optOut,
+      'surveys': surveys,
       'personProfiles': personProfiles.name,
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
