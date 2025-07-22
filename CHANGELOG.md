@@ -3,6 +3,7 @@
 ## 5.1.0
 
 - feat: surveys for iOS ([#188](https://github.com/PostHog/posthog-flutter/pull/188))
+  - See how to setup in [Surveys docs](https://posthog.com/docs/surveys/installation?tab=Flutter)
 
 ## 5.0.0
 
