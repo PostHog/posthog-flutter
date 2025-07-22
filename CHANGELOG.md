@@ -1,5 +1,7 @@
 ## Next
 
+## 5.1.0
+
 - feat: surveys for iOS ([#188](https://github.com/PostHog/posthog-flutter/pull/188))
 
 ## 5.0.0
