@@ -89,6 +89,8 @@ class Posthog {
 
   Future<void> enable() => _posthog.enable();
 
+  Future<bool> isOptOut() => _posthog.isOptOut();
+
   Future<void> debug(bool enabled) => _posthog.debug(enabled);
 
   Future<void> register(String key, Object value) =>

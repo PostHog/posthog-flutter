@@ -1,5 +1,7 @@
 ## Next
 
+- feat: add `isOptOut` method to check if the current user is opted out of data capture. ([#190](https://github.com/PostHog/posthog-flutter/pull/190))
+
 ## 5.1.0
 
 - feat: surveys for iOS ([#188](https://github.com/PostHog/posthog-flutter/pull/188))
