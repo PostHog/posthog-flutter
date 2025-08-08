@@ -148,6 +148,24 @@ class InitialScreenState extends State<InitialScreen> {
                       },
                       child: const Text("Enable Capture"),
                     ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                      ),
+                      onPressed: () async {
+                        final isOptedOut =
+                            await _posthogFlutterPlugin.isOptOut();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Opted out: $isOptedOut'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text("Check Opt-Out Status"),
+                    ),
                   ],
                 ),
                 ElevatedButton(

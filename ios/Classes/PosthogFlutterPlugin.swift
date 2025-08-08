@@ -182,6 +182,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             enable(result)
         case "disable":
             disable(result)
+        case "isOptOut":
+            isOptOut(result)
         case "debug":
             debug(call, result: result)
         case "reloadFeatureFlags":
@@ -599,6 +601,11 @@ extension PosthogFlutterPlugin {
     private func disable(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.optOut()
         result(nil)
+    }
+
+    private func isOptOut(_ result: @escaping FlutterResult) {
+        let isOptedOut = PostHogSDK.shared.isOptOut()
+        result(isOptedOut)
     }
 
     private func debug(

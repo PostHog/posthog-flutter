@@ -258,6 +258,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<bool> isOptOut() async {
+    if (!isSupportedPlatform()) {
+      return true;
+    }
+
+    try {
+      final result = await _methodChannel.invokeMethod('isOptOut');
+      return result as bool? ?? true;
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on isOptOut: $exception');
+      return true;
+    }
+  }
+
+  @override
   Future<void> debug(bool enabled) async {
     if (!isSupportedPlatform()) {
       return;

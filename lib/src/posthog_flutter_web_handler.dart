@@ -23,6 +23,8 @@ extension PostHogExtension on PostHog {
   external void opt_in_capturing();
   // ignore: non_constant_identifier_names
   external void opt_out_capturing();
+  // ignore: non_constant_identifier_names
+  external bool has_opted_out_capturing();
   external JSAny? getFeatureFlag(JSAny key);
   external JSAny? getFeatureFlagPayload(JSAny key);
   external void register(JSAny properties);
@@ -146,6 +148,8 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'disable':
       posthog?.opt_out_capturing();
       break;
+    case 'isOptOut':
+      return posthog?.has_opted_out_capturing() ?? true;
     case 'getFeatureFlag':
       final key = args['key'] as String;
 

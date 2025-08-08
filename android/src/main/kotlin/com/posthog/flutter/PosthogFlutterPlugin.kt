@@ -112,6 +112,10 @@ class PosthogFlutterPlugin :
                 enable(result)
             }
 
+            "isOptOut" -> {
+                isOptOut(result)
+            }
+
             "isFeatureEnabled" -> {
                 isFeatureEnabled(call, result)
             }
@@ -422,6 +426,15 @@ class PosthogFlutterPlugin :
         try {
             PostHog.optOut()
             result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun isOptOut(result: Result) {
+        try {
+            val isOptedOut = PostHog.isOptOut()
+            result.success(isOptedOut)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
