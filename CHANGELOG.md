@@ -1,5 +1,7 @@
 ## Next
 
+## 5.3.1
+
 - fix: don't render HTML content ([#196](https://github.com/PostHog/posthog-flutter/pull/196))
 
 ## 5.3.0
