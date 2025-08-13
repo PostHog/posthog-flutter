@@ -19,9 +19,12 @@ class PostHogDisplaySurvey {
       final question = q['question'] as String;
       final optional = q['isOptional'] as bool;
       final questionDescription = q['questionDescription'] as String?;
-      final contentTypeValue = q['questionDescriptionContentType'] as int? ?? 1;
+      // Extract content type values with fallback to text (1)
+      final questionContentTypeRaw =
+          q['questionDescriptionContentType'] as int? ?? 1;
       final questionDescriptionContentType =
-          PostHogDisplaySurveyTextContentType.fromInt(contentTypeValue);
+          PostHogDisplaySurveyTextContentType.fromInt(questionContentTypeRaw);
+
       final buttonText = q['buttonText'] as String?;
 
       switch (type) {
@@ -76,6 +79,13 @@ class PostHogDisplaySurvey {
     PostHogDisplaySurveyAppearance? appearance;
     if (dict['appearance'] != null) {
       final a = Map<String, dynamic>.from(dict['appearance'] as Map);
+
+      // Extract thank you message content type with fallback to text (1)
+      final thankYouContentTypeRaw =
+          a['thankYouMessageDescriptionContentType'] as int? ?? 1;
+      final thankYouMessageDescriptionContentType =
+          PostHogDisplaySurveyTextContentType.fromInt(thankYouContentTypeRaw);
+
       appearance = PostHogDisplaySurveyAppearance(
         fontFamily: a['fontFamily'] as String?,
         backgroundColor: a['backgroundColor'] as String?,
@@ -91,10 +101,7 @@ class PostHogDisplaySurvey {
         thankYouMessageHeader: a['thankYouMessageHeader'] as String?,
         thankYouMessageDescription: a['thankYouMessageDescription'] as String?,
         thankYouMessageDescriptionContentType:
-            a['thankYouMessageDescriptionContentType'] != null
-                ? PostHogDisplaySurveyTextContentType.fromInt(
-                    a['thankYouMessageDescriptionContentType'] as int)
-                : PostHogDisplaySurveyTextContentType.text,
+            thankYouMessageDescriptionContentType,
         thankYouMessageCloseButtonText:
             a['thankYouMessageCloseButtonText'] as String?,
       );
