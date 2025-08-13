@@ -14,6 +14,7 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
     required this.lowerBoundLabel,
     required this.upperBoundLabel,
     super.description,
+    super.descriptionContentType,
     super.optional,
     super.buttonText,
   }) : super(

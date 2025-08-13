@@ -7,6 +7,7 @@ import '../models/survey_callbacks.dart';
 import '../models/posthog_display_link_question.dart';
 import '../models/posthog_display_rating_question.dart';
 import '../models/posthog_display_choice_question.dart';
+import '../models/posthog_display_survey_text_content_type.dart';
 import '../../posthog_flutter_platform_interface.dart';
 
 import 'link_question.dart';
@@ -61,6 +62,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           key: ValueKey('open_text_question_$_currentIndex'),
           question: currentQuestion.question,
           description: currentQuestion.description,
+          descriptionContentType: currentQuestion.descriptionContentType,
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
@@ -80,6 +82,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           key: ValueKey('link_question_$_currentIndex'),
           question: linkQuestion.question,
           description: linkQuestion.description,
+          descriptionContentType: linkQuestion.descriptionContentType,
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           buttonText: linkQuestion.buttonText,
           link: linkQuestion.link,
@@ -111,6 +114,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           key: ValueKey('rating_question_$_currentIndex'),
           question: ratingQuestion.question,
           description: ratingQuestion.description,
+          descriptionContentType: ratingQuestion.descriptionContentType,
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           buttonText: ratingQuestion.buttonText,
           optional: ratingQuestion.optional,
@@ -138,6 +142,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           key: ValueKey('choice_question_$_currentIndex'),
           question: choiceQuestion.question,
           description: choiceQuestion.description,
+          descriptionContentType: choiceQuestion.descriptionContentType,
           choices: choiceQuestion.choices,
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           buttonText: choiceQuestion.buttonText,
@@ -208,6 +213,11 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                           ConfirmationMessage(
                             onClose: _handleClose,
                             appearance: widget.appearance,
+                            thankYouMessageDescriptionContentType: widget
+                                    .survey
+                                    .appearance
+                                    ?.thankYouMessageDescriptionContentType ??
+                                PostHogDisplaySurveyTextContentType.text,
                           ),
                       ],
                     ),

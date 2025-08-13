@@ -6,6 +6,7 @@ import 'posthog_display_link_question.dart';
 import 'posthog_display_rating_question.dart';
 import 'posthog_display_choice_question.dart';
 import 'posthog_display_survey_appearance.dart';
+import 'posthog_display_survey_text_content_type.dart';
 
 /// Main survey model containing metadata and questions
 @immutable
@@ -18,6 +19,9 @@ class PostHogDisplaySurvey {
       final question = q['question'] as String;
       final optional = q['isOptional'] as bool;
       final questionDescription = q['questionDescription'] as String?;
+      final contentTypeValue = q['questionDescriptionContentType'] as int? ?? 1;
+      final questionDescriptionContentType =
+          PostHogDisplaySurveyTextContentType.fromInt(contentTypeValue);
       final buttonText = q['buttonText'] as String?;
 
       switch (type) {
@@ -26,6 +30,7 @@ class PostHogDisplaySurvey {
             question: question,
             link: q['link'] as String,
             description: questionDescription,
+            descriptionContentType: questionDescriptionContentType,
             optional: optional,
             buttonText: buttonText,
           );
@@ -39,6 +44,7 @@ class PostHogDisplaySurvey {
             lowerBoundLabel: q['lowerBoundLabel'] as String,
             upperBoundLabel: q['upperBoundLabel'] as String,
             description: questionDescription,
+            descriptionContentType: questionDescriptionContentType,
             optional: optional,
             buttonText: buttonText,
           );
@@ -51,6 +57,7 @@ class PostHogDisplaySurvey {
             hasOpenChoice: q['hasOpenChoice'] as bool,
             shuffleOptions: q['shuffleOptions'] as bool,
             description: questionDescription,
+            descriptionContentType: questionDescriptionContentType,
             optional: optional,
             buttonText: buttonText,
           );
@@ -59,6 +66,7 @@ class PostHogDisplaySurvey {
           return PostHogDisplayOpenQuestion(
             question: question,
             description: questionDescription,
+            descriptionContentType: questionDescriptionContentType,
             optional: optional,
             buttonText: buttonText,
           );
@@ -82,6 +90,11 @@ class PostHogDisplaySurvey {
         displayThankYouMessage: a['displayThankYouMessage'] as bool? ?? true,
         thankYouMessageHeader: a['thankYouMessageHeader'] as String?,
         thankYouMessageDescription: a['thankYouMessageDescription'] as String?,
+        thankYouMessageDescriptionContentType:
+            a['thankYouMessageDescriptionContentType'] != null
+                ? PostHogDisplaySurveyTextContentType.fromInt(
+                    a['thankYouMessageDescriptionContentType'] as int)
+                : PostHogDisplaySurveyTextContentType.text,
         thankYouMessageCloseButtonText:
             a['thankYouMessageCloseButtonText'] as String?,
       );

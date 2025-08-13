@@ -9,6 +9,7 @@ class PostHogDisplayLinkQuestion extends PostHogDisplaySurveyQuestion {
     required super.question,
     required this.link,
     super.description,
+    super.descriptionContentType,
     super.optional,
     super.buttonText,
   }) : super(
