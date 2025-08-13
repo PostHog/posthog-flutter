@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/survey_appearance.dart';
+import '../models/posthog_display_survey_text_content_type.dart';
 import 'question_header.dart';
 import 'survey_button.dart';
 
@@ -10,6 +11,7 @@ class LinkQuestion extends StatelessWidget {
     super.key,
     required this.question,
     required this.description,
+    this.descriptionContentType,
     required this.appearance,
     required this.onPressed,
     this.buttonText,
@@ -18,6 +20,7 @@ class LinkQuestion extends StatelessWidget {
 
   final String question;
   final String? description;
+  final PostHogDisplaySurveyTextContentType? descriptionContentType;
   final SurveyAppearance appearance;
   final Future<void> Function() onPressed;
   final String? buttonText;
@@ -32,6 +35,7 @@ class LinkQuestion extends StatelessWidget {
         QuestionHeader(
           question: question,
           description: description,
+          descriptionContentType: descriptionContentType,
           appearance: appearance,
         ),
         const SizedBox(height: 16),

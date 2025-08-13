@@ -12,6 +12,7 @@ class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
     this.hasOpenChoice = false,
     this.shuffleOptions = false,
     super.description,
+    super.descriptionContentType,
     super.optional,
     super.buttonText,
   }) : super(

@@ -14,8 +14,10 @@
                         "question": question.question,
                         "isOptional": question.isOptional,
                     ]
+
                     if let desc = question.questionDescription {
                         questionDict["questionDescription"] = desc
+                        questionDict["questionDescriptionContentType"] = question.questionDescriptionContentType.rawValue
                     }
                     if let buttonText = question.buttonText {
                         questionDict["buttonText"] = buttonText
@@ -84,6 +86,7 @@
                 }
                 if let thankYouMessageDescription = appearance.thankYouMessageDescription {
                     appearanceDict["thankYouMessageDescription"] = thankYouMessageDescription
+                    appearanceDict["thankYouMessageDescriptionContentType"] = appearance.thankYouMessageDescriptionContentType?.rawValue
                 }
                 if let thankYouMessageCloseButtonText = appearance.thankYouMessageCloseButtonText {
                     appearanceDict["thankYouMessageCloseButtonText"] = thankYouMessageCloseButtonText

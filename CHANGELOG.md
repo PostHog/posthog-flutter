@@ -1,5 +1,7 @@
 ## Next
 
+- fix: don't render HTML content ([#196](https://github.com/PostHog/posthog-flutter/pull/196))
+
 ## 5.3.0
 
 - chore: update languageVersion and apiVersion from 1.6 to 1.8 on Android to be compatible with Kotlin 2.2 ([#193](https://github.com/PostHog/posthog-flutter/pull/193))

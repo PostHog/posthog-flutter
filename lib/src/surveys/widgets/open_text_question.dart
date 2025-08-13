@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/survey_appearance.dart';
+import '../models/posthog_display_survey_text_content_type.dart';
 import 'question_header.dart';
 import 'survey_button.dart';
 
@@ -8,6 +9,7 @@ class OpenTextQuestion extends StatefulWidget {
     super.key,
     required this.question,
     required this.description,
+    this.descriptionContentType,
     required this.onSubmit,
     this.buttonText = 'Submit',
     this.optional = false,
@@ -16,6 +18,7 @@ class OpenTextQuestion extends StatefulWidget {
 
   final String? question;
   final String? description;
+  final PostHogDisplaySurveyTextContentType? descriptionContentType;
   final String buttonText;
   final bool optional;
   final SurveyAppearance appearance;
@@ -53,6 +56,7 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
             QuestionHeader(
               question: widget.question,
               description: widget.description,
+              descriptionContentType: widget.descriptionContentType,
               appearance: widget.appearance,
             ),
             const SizedBox(height: 16),

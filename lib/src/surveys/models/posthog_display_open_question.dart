@@ -8,6 +8,7 @@ class PostHogDisplayOpenQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayOpenQuestion({
     required super.question,
     super.description,
+    super.descriptionContentType,
     super.optional,
     super.buttonText,
   }) : super(
