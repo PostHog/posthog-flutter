@@ -23,6 +23,7 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                         )
 
                     questionMap["questionDescription"] = question.questionDescription
+                    questionMap["questionDescriptionContentType"] = question.questionDescriptionContentType?.value
                     questionMap["buttonText"] = question.buttonText
 
                     // Add question type-specific properties
@@ -44,9 +45,6 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                             questionMap["choices"] = question.choices
                             questionMap["hasOpenChoice"] = question.hasOpenChoice
                             questionMap["shuffleOptions"] = question.shuffleOptions
-                        }
-                        is PostHogDisplayOpenQuestion -> {
-                            questionMap["type"] = "open"
                         }
                         else -> {
                             questionMap["type"] = "open"
@@ -73,7 +71,7 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                 "displayThankYouMessage" to app.displayThankYouMessage,
                 "thankYouMessageHeader" to app.thankYouMessageHeader,
                 "thankYouMessageDescription" to app.thankYouMessageDescription,
-                "thankYouMessageDescriptionContentType" to app.thankYouMessageDescriptionContentType?.name,
+                "thankYouMessageDescriptionContentType" to app.thankYouMessageDescriptionContentType?.value,
             )
     }
 

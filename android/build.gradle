@@ -57,7 +57,7 @@ android {
         testImplementation 'org.jetbrains.kotlin:kotlin-test'
         testImplementation 'org.mockito:mockito-core:5.0.0'
         // + Version 3.+ and the versions up to 4.0, not including 4.0 and higher
-        implementation 'com.posthog:posthog-android:3.18.0'
+        implementation 'com.posthog:posthog-android:4.0.0'
     }
 
     testOptions {

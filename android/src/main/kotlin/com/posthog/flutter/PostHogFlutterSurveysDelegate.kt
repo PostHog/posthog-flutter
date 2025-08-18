@@ -40,9 +40,6 @@ class PostHogFlutterSurveysDelegate(
 
         // Convert survey to map and send to Flutter
         invokeFlutterMethod("showSurvey", survey.toMap())
-
-        // Call the shown callback immediately
-        // onSurveyShown(survey)
     }
 
     override fun cleanupSurveys() {
@@ -118,6 +115,8 @@ class PostHogFlutterSurveysDelegate(
                         )
                         return
                     }
+                    result.success(null)
+                    return
                 }
             }
             "closed" -> {

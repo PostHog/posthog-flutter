@@ -1,6 +1,9 @@
 package com.posthog.flutter
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -562,8 +565,39 @@ class PosthogFlutterPlugin :
         call: MethodCall,
         result: Result,
     ) {
-        // TODO: Not implemented
-        result.success(null)
+        try {
+            val raw = (call.arguments as? String)?.trim()
+            if (raw.isNullOrEmpty()) {
+                result.error("InvalidArguments", "URL is null or empty", null)
+                return
+            }
+
+            var uri = try {
+                Uri.parse(raw)
+            } catch (e: Throwable) {
+                result.error("InvalidArguments", "Malformed URL: $raw", null)
+                return
+            }
+
+            // If no scheme provided (e.g., "example.com"), default to https://
+            if (uri.scheme.isNullOrEmpty()) {
+                uri = Uri.parse("https://$raw")
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            try {
+                applicationContext.startActivity(intent)
+                result.success(null)
+            } catch (e: ActivityNotFoundException) {
+                result.error("ActivityNotFound", "No application can handle ACTION_VIEW for the given URL", null)
+            }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
     }
 
     private fun invokeFlutterMethod(
