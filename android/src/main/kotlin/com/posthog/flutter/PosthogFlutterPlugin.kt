@@ -1,7 +1,12 @@
 package com.posthog.flutter
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
@@ -28,6 +33,9 @@ class PosthogFlutterPlugin :
     private lateinit var applicationContext: Context
 
     private val snapshotSender = SnapshotSender()
+
+    // The surveys delegate
+    private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
@@ -269,6 +277,17 @@ class PosthogFlutterPlugin :
                 }
 
                 this.sessionReplayConfig.captureLogcat = false
+
+                // Configure surveys
+                posthogConfig.getIfNotNull<Boolean>("surveys") {
+                    surveys = it
+                    if (surveys) {
+                        // If surveys are enabled, create and assign the surveys delegate
+                        val delegate = PostHogFlutterSurveysDelegate(channel)
+                        surveysConfig.surveysDelegate = delegate
+                        flutterSurveysDelegate = delegate
+                    }
+                }
 
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
@@ -546,15 +565,74 @@ class PosthogFlutterPlugin :
         call: MethodCall,
         result: Result,
     ) {
-        // TODO: Not implemented
-        result.success(null)
+        try {
+            val raw = (call.arguments as? String)?.trim()
+            if (raw.isNullOrEmpty()) {
+                result.error("InvalidArguments", "URL is null or empty", null)
+                return
+            }
+
+            var uri = try {
+                Uri.parse(raw)
+            } catch (e: Throwable) {
+                result.error("InvalidArguments", "Malformed URL: $raw", null)
+                return
+            }
+
+            // If no scheme provided (e.g., "example.com"), default to https://
+            if (uri.scheme.isNullOrEmpty()) {
+                uri = Uri.parse("https://$raw")
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            try {
+                applicationContext.startActivity(intent)
+                result.success(null)
+            } catch (e: ActivityNotFoundException) {
+                result.error("ActivityNotFound", "No application can handle ACTION_VIEW for the given URL", null)
+            }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
     }
+
+    private fun invokeFlutterMethod(
+        method: String,
+        arguments: Any? = null,
+    ) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            channel.invokeMethod(method, arguments)
+        } else {
+            Handler(Looper.getMainLooper()).post {
+                channel.invokeMethod(method, arguments)
+            }
+        }
+    }
+
+    // MARK: - Survey Action Handling
 
     private fun handleSurveyAction(
         call: MethodCall,
         result: Result,
     ) {
-        // TODO: Not implemented
-        result.success(null)
+        val args = call.arguments as? Map<String, Any>
+        val type = args?.get("type") as? String
+
+        // Check for invalid arguments
+        if (args == null || type == null) {
+            result.error("InvalidArguments", "Invalid survey action arguments", null)
+            return
+        }
+
+        if (flutterSurveysDelegate == null) {
+            result.error("InvalidArguments", "Survey delegate not available", null)
+            return
+        }
+
+        flutterSurveysDelegate?.handleSurveyAction(type, args, result)
     }
 }

@@ -1,5 +1,7 @@
 ## Next
 
+- feat: surveys for Android ([#198](https://github.com/PostHog/posthog-flutter/pull/198))
+
 ## 5.3.1
 
 - fix: don't render HTML content ([#196](https://github.com/PostHog/posthog-flutter/pull/196))
