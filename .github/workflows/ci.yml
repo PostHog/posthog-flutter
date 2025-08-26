@@ -44,7 +44,7 @@ jobs:
 
       - name: Build iOS
         working-directory: ./example
-        run: flutter build ios --simulator --no-codesign
+        run: flutter build ios --no-codesign
 
       - name: Build macOS
         working-directory: ./example
