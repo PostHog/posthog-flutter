@@ -1,6 +1,9 @@
 ## Next
 
+## 5.4.0
+
 - feat: surveys for Android ([#198](https://github.com/PostHog/posthog-flutter/pull/198))
+  - See how to setup in [Surveys docs](https://posthog.com/docs/surveys/installation?tab=Flutter)
 
 ## 5.3.1
 
