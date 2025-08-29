@@ -1,5 +1,9 @@
 ## Next
 
+## 5.4.1
+
+- chore: update posthog-ios dependency to min. 3.31.0 (([#202](https://github.com/PostHog/posthog-flutter/pull/202)))
+
 ## 5.4.0
 
 - feat: surveys for Android ([#198](https://github.com/PostHog/posthog-flutter/pull/198))

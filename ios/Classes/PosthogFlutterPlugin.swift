@@ -1,4 +1,4 @@
-@_spi(Experimental) import PostHog
+import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
@@ -134,12 +134,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
             // configure surveys
             if #available(iOS 15.0, *) {
-                if let surveys: Bool = posthogConfig["surveys"] as? Bool {
-                    config.surveys = surveys
-                    if surveys {
-                        // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
-                        config.surveysConfig.surveysDelegate = instance
-                    }
+                let surveys: Bool = posthogConfig["surveys"] as? Bool ?? false
+                config.surveys = surveys
+                if surveys {
+                    // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
+                    config.surveysConfig.surveysDelegate = instance
                 }
             }
         #endif

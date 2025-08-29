@@ -572,22 +572,24 @@ class PosthogFlutterPlugin :
                 return
             }
 
-            var uri = try {
-                Uri.parse(raw)
-            } catch (e: Throwable) {
-                result.error("InvalidArguments", "Malformed URL: $raw", null)
-                return
-            }
+            var uri =
+                try {
+                    Uri.parse(raw)
+                } catch (e: Throwable) {
+                    result.error("InvalidArguments", "Malformed URL: $raw", null)
+                    return
+                }
 
             // If no scheme provided (e.g., "example.com"), default to https://
             if (uri.scheme.isNullOrEmpty()) {
                 uri = Uri.parse("https://$raw")
             }
 
-            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                addCategory(Intent.CATEGORY_BROWSABLE)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            val intent =
+                Intent(Intent.ACTION_VIEW, uri).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
 
             try {
                 applicationContext.startActivity(intent)
