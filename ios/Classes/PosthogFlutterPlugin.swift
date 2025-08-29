@@ -1,4 +1,4 @@
-@_spi(Experimental) import PostHog
+import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
