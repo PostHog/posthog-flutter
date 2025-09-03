@@ -337,14 +337,14 @@ class SecondRouteState extends State<SecondRoute> with WidgetsBindingObserver {
                 },
               ),
               const SizedBox(height: 20),
-              const PostHogMaskWidget(
-                  child: TextField(
+              const TextField(
                 decoration: InputDecoration(
                   labelText: 'Sensitive Text Input',
                   hintText: 'Enter sensitive data',
                   border: OutlineInputBorder(),
                 ),
-              )),
+                obscureText: true,
+              ),
               const SizedBox(height: 20),
               PostHogMaskWidget(
                   child: Image.asset(
