@@ -1,5 +1,7 @@
 ## Next
 
+- chore: mask TextField widgets automatically if obscureText is enabled (([#204](https://github.com/PostHog/posthog-flutter/pull/204)))
+
 ## 5.4.1
 
 - chore: update posthog-ios dependency to min. 3.31.0 (([#202](https://github.com/PostHog/posthog-flutter/pull/202)))
