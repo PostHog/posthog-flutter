@@ -1,6 +1,8 @@
 ## Next
 
-- chore: mask TextField widgets automatically if obscureText is enabled (([#204](https://github.com/PostHog/posthog-flutter/pull/204)))
+## 5.4.2
+
+- fix: mask TextField widgets automatically if obscureText is enabled (([#204](https://github.com/PostHog/posthog-flutter/pull/204)))
 
 ## 5.4.1
 
