@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
@@ -27,6 +27,18 @@ class ElementObjectParser {
       if (elementData != null) {
         activeElementData.addChildren(elementData);
         return elementData;
+      }
+    }
+
+    if (element.widget is TextField) {
+      final textField = element.widget as TextField;
+      if (textField.obscureText) {
+        final elementData = _elementParser.relate(element, activeElementData);
+
+        if (elementData != null) {
+          activeElementData.addChildren(elementData);
+          return elementData;
+        }
       }
     }
 
