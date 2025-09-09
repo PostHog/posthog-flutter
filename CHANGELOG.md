@@ -1,6 +1,6 @@
 ## Next
 
-- fix: Android back button wasn't cleaning up the Survey resources ([#204](https://github.com/PostHog/posthog-flutter/pull/204))
+- fix: Android back button wasn't cleaning up the Survey resources ([#205](https://github.com/PostHog/posthog-flutter/pull/205))
 
 ## 5.4.2
 
