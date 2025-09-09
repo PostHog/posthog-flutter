@@ -127,8 +127,10 @@ class InitialScreenState extends State<InitialScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  spacing: 8.0,
+                  runSpacing: 8.0,
                   children: [
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(

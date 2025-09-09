@@ -171,60 +171,70 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: widget.appearance.backgroundColor ?? Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            bottom: mediaQuery.viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => _handleClose(),
-                    ),
-                  ],
+    return PopScope(
+      canPop: false,
+      // TODO: replace with onPopInvokedWithResult once set bump the min Flutter version to 3.24
+      // ignore: deprecated_member_use
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          _handleClose();
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: widget.appearance.backgroundColor ?? Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: mediaQuery.viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => _handleClose(),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              // Content
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (!_isCompleted)
-                          _buildQuestion(context)
-                        else
-                          ConfirmationMessage(
-                            onClose: _handleClose,
-                            appearance: widget.appearance,
-                            thankYouMessageDescriptionContentType: widget
-                                    .survey
-                                    .appearance
-                                    ?.thankYouMessageDescriptionContentType ??
-                                PostHogDisplaySurveyTextContentType.text,
-                          ),
-                      ],
+                // Content
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (!_isCompleted)
+                            _buildQuestion(context)
+                          else
+                            ConfirmationMessage(
+                              onClose: _handleClose,
+                              appearance: widget.appearance,
+                              thankYouMessageDescriptionContentType: widget
+                                      .survey
+                                      .appearance
+                                      ?.thankYouMessageDescriptionContentType ??
+                                  PostHogDisplaySurveyTextContentType.text,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
