@@ -1,5 +1,7 @@
 ## Next
 
+- fix: Android back button wasn't cleaning up the Survey resources ([#204](https://github.com/PostHog/posthog-flutter/pull/204))
+
 ## 5.4.2
 
 - fix: mask TextField widgets automatically if obscureText is enabled ([#204](https://github.com/PostHog/posthog-flutter/pull/204))
