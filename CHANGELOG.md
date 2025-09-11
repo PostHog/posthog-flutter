@@ -1,6 +1,6 @@
 ## Next
 
-- chore: Android plugin sets compileSdkVersion to flutter.compileSdkVersion instead of hardcoded ([#205](https://github.com/PostHog/posthog-flutter/pull/205))
+- chore: Android plugin sets compileSdkVersion to flutter.compileSdkVersion instead of hardcoded ([#207](https://github.com/PostHog/posthog-flutter/pull/207))
 
 ## 5.4.3
 
