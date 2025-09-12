@@ -1,5 +1,7 @@
 ## Next
 
+- chore: Android plugin sets compileSdkVersion to flutter.compileSdkVersion instead of hardcoded ([#207](https://github.com/PostHog/posthog-flutter/pull/207))
+
 ## 5.4.3
 
 - fix: Android back button wasn't cleaning up the Survey resources ([#205](https://github.com/PostHog/posthog-flutter/pull/205))
