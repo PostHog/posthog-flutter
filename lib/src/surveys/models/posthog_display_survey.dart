@@ -15,6 +15,7 @@ class PostHogDisplaySurvey {
   // Native platform model -> Dictionary -> Dart model
   factory PostHogDisplaySurvey.fromDict(Map<String, dynamic> dict) {
     final questions = (dict['questions'] as List).map((q) {
+      final id = q['type'] as String? ?? '';
       final type = q['type'] as String;
       final question = q['question'] as String;
       final optional = q['isOptional'] as bool;
@@ -30,6 +31,7 @@ class PostHogDisplaySurvey {
       switch (type) {
         case 'link':
           return PostHogDisplayLinkQuestion(
+            id: id,
             question: question,
             link: q['link'] as String,
             description: questionDescription,
@@ -39,6 +41,7 @@ class PostHogDisplaySurvey {
           );
         case 'rating':
           return PostHogDisplayRatingQuestion(
+            id: id,
             question: question,
             ratingType:
                 PostHogDisplaySurveyRatingType.fromInt(q['ratingType'] as int),
@@ -54,6 +57,7 @@ class PostHogDisplaySurvey {
         case 'multiple_choice':
         case 'single_choice':
           return PostHogDisplayChoiceQuestion(
+            id: id,
             question: question,
             choices: (q['choices'] as List).cast<String>(),
             isMultipleChoice: type == 'multiple_choice',
@@ -67,6 +71,7 @@ class PostHogDisplaySurvey {
         case 'open':
         default:
           return PostHogDisplayOpenQuestion(
+            id: id,
             question: question,
             description: questionDescription,
             descriptionContentType: questionDescriptionContentType,

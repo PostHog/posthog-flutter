@@ -1,5 +1,7 @@
 ## Next
 
+- feat: iOS surveys use the new response question id format ([#207](https://github.com/PostHog/posthog-flutter/pull/207))
+
 ## 5.5.0
 
 - chore: Android plugin sets compileSdkVersion to flutter.compileSdkVersion instead of hardcoded ([#207](https://github.com/PostHog/posthog-flutter/pull/207))

@@ -20,6 +20,7 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                         mutableMapOf<String, Any?>(
                             "question" to question.question,
                             "isOptional" to question.isOptional,
+                            "id" to question.id,
                         )
 
                     questionMap["questionDescription"] = question.questionDescription

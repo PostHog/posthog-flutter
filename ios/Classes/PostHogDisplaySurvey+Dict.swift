@@ -13,6 +13,7 @@
                     var questionDict: [String: Any] = [
                         "question": question.question,
                         "isOptional": question.isOptional,
+                        "id": question.id,
                     ]
 
                     if let desc = question.questionDescription {

@@ -7,6 +7,7 @@ import 'posthog_display_survey_rating_type.dart';
 @immutable
 class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayRatingQuestion({
+    required super.id,
     required super.question,
     required this.ratingType,
     required this.scaleLowerBound,
