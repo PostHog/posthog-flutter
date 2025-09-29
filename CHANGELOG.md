@@ -1,6 +1,6 @@
 ## Next
 
-- feat: iOS surveys use the new response question id format ([#210](https://github.com/PostHog/posthog-flutter/pull/210))
+- feat: surveys use the new response question id format ([#210](https://github.com/PostHog/posthog-flutter/pull/210))
 
 ## 5.5.0
 
