@@ -6,6 +6,7 @@ import 'posthog_display_survey_text_content_type.dart';
 @immutable
 abstract class PostHogDisplaySurveyQuestion {
   const PostHogDisplaySurveyQuestion({
+    required this.id,
     required this.type,
     required this.question,
     this.description,
@@ -14,6 +15,7 @@ abstract class PostHogDisplaySurveyQuestion {
     this.buttonText,
   });
 
+  final String id;
   final PostHogSurveyQuestionType type;
   final String question;
   final String? description;
