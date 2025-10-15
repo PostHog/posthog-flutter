@@ -21,10 +21,10 @@ class DartExceptionProcessor {
     );
 
     final exceptionData = <String, dynamic>{
-      'type': error.runtimeType.toString(),
+      'type': _getExceptionType(error),
       'mechanism': {
         'handled': handled,
-        'synthetic': false,
+        'synthetic': _isPrimitive(error), // we consider primitives as synthetic
         'type': 'generic',
       },
       'thread_id': _getCurrentThreadId(),
@@ -233,5 +233,23 @@ class DartExceptionProcessor {
       // Graceful fallback if isolate detection fails
       return 1;
     }
+  }
+
+  static String _getExceptionType(dynamic error) {
+    // For primitives (String, int, bool, double, null, etc.), just use "Error"
+    if (_isPrimitive(error)) {
+      return 'Error';
+    }
+
+    return error.runtimeType.toString();
+  }
+
+  /// Checks if a value is a primitive type
+  static bool _isPrimitive(dynamic value) {
+    return value is bool ||
+        value is int ||
+        value is double ||
+        value is num ||
+        value is String;
   }
 }

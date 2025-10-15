@@ -199,27 +199,59 @@ void main() {
 
     test('processes exception types correctly', () {
       final testCases = [
+        // Real Exception/Error objects
         {
           'exception': Exception('Exception test'),
-          'expectedType': '_Exception'
+          'expectedType': '_Exception',
+          'expectedSynthetic': false,
         },
         {
           'exception': StateError('StateError test'),
-          'expectedType': 'StateError'
+          'expectedType': 'StateError',
+          'expectedSynthetic': false,
         },
         {
           'exception': ArgumentError('ArgumentError test'),
-          'expectedType': 'ArgumentError'
+          'expectedType': 'ArgumentError',
+          'expectedSynthetic': false,
         },
         {
           'exception': FormatException('FormatException test'),
-          'expectedType': 'FormatException'
+          'expectedType': 'FormatException',
+          'expectedSynthetic': false,
+        },
+        // Primitive types
+        {
+          'exception': 'Plain string error',
+          'expectedType': 'Error',
+          'expectedSynthetic': true,
+        },
+        {
+          'exception': 42,
+          'expectedType': 'Error',
+          'expectedSynthetic': true,
+        },
+        {
+          'exception': true,
+          'expectedType': 'Error',
+          'expectedSynthetic': true,
+        },
+        {
+          'exception': 3.14,
+          'expectedType': 'Error',
+          'expectedSynthetic': true,
+        },
+        {
+          'exception': null,
+          'expectedType': 'Error',
+          'expectedSynthetic': true,
         },
       ];
 
       for (final testCase in testCases) {
-        final exception = testCase['exception'] as Object;
+        final exception = testCase['exception'];
         final expectedType = testCase['expectedType'] as String;
+        final expectedSynthetic = testCase['expectedSynthetic'] as bool;
 
         final result = DartExceptionProcessor.processException(
           error: exception,
@@ -231,8 +263,13 @@ void main() {
             result['\$exception_list'] as List<Map<String, dynamic>>;
         final exceptionData = exceptionList.first;
 
-        expect(exceptionData['type'], equals(expectedType));
-        // Just verify the exception message is not empty and is a string
+        expect(exceptionData['type'], equals(expectedType),
+            reason: 'Exception type mismatch for: $exception');
+        expect(
+            exceptionData['mechanism']['synthetic'], equals(expectedSynthetic),
+            reason: 'Synthetic flag mismatch for: $exception');
+
+        // Verify the exception value is present and is a string
         expect(exceptionData['value'], isA<String>());
         expect(exceptionData['value'], isNotEmpty);
       }
