@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
@@ -19,6 +20,28 @@ Future<void> main() async {
   await Posthog().setup(config);
 
   runApp(const MyApp());
+}
+
+/// This function runs in a separate isolate with its own sandboxed thread, meant to demonstate capturing exceptions from background "threads"
+void _backgroundIsolateEntryPoint(SendPort sendPort) async {
+  await Future.delayed(const Duration(milliseconds: 500));
+
+  try {
+    // Simulate an exception in the background isolate
+    throw StateError('Background isolate processing failed!');
+  } catch (e, stack) {
+    // Send exception data back to main isolate for capture
+    sendPort.send({
+      'error': e.toString(),
+      'errorType': e.runtimeType.toString(),
+      'stackTrace': stack.toString(),
+      'properties': {
+        'test_type': 'background_isolate_exception',
+        'isolate_name': 'exception-demo-worker',
+        'button_pressed': 'capture_exception_background',
+      },
+    });
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -243,6 +266,64 @@ class InitialScreenState extends State<InitialScreen> {
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
+                    "Error Tracking",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      // Simulate an exception in main isolate
+                      // throw 'a custom error string';
+                      // throw 333;
+                      throw CustomException(
+                        'This is a custom exception with additional context',
+                        code: 'DEMO_ERROR_001',
+                        additionalData: {
+                          'user_action': 'button_press',
+                          'timestamp': DateTime.now().millisecondsSinceEpoch,
+                          'feature_enabled': true,
+                        },
+                      );
+                    } catch (e, stack) {
+                      await Posthog().captureException(
+                        error: e,
+                        stackTrace: stack,
+                        properties: {
+                          'test_type': 'main_isolate_exception',
+                          'button_pressed': 'capture_exception_main',
+                          'exception_category': 'custom',
+                        },
+                      );
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Background isolate exception captured successfully! Check PostHog.'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Capture Exception (Main)"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  onPressed: () async {
+                    // Capture exception from background isolate
+                    await _captureExceptionFromBackgroundIsolate();
+                  },
+                  child: const Text("Capture Exception (Background)"),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
                     "Feature flags",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -299,6 +380,53 @@ class InitialScreenState extends State<InitialScreen> {
         ),
       ),
     );
+  }
+
+  /// Demonstrates exception capture from a background isolate
+  /// This should show a different thread_id than the main isolate
+  Future<void> _captureExceptionFromBackgroundIsolate() async {
+    final receivePort = ReceivePort();
+
+    // Spawn a background isolate with a custom name for demonstration
+    await Isolate.spawn(
+      _backgroundIsolateEntryPoint,
+      receivePort.sendPort,
+      debugName: 'custom-isolate-name-will-be-hashed-as-thread_id',
+    );
+
+    // Wait for the isolate to complete (or timeout after 5 seconds)
+    final result = await receivePort.first.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => {'type': 'timeout'},
+    );
+
+    if (result is Map<String, dynamic>) {
+      // Reconstruct the stack trace from the string
+      final stackTrace = StackTrace.fromString(result['stackTrace']);
+
+      // Create a synthetic error with the original error message and type
+      final syntheticError =
+          Exception('${result['errorType']}: ${result['error']}');
+
+      await Posthog().captureException(
+        error: syntheticError,
+        stackTrace: stackTrace,
+        properties: Map<String, Object>.from(result['properties'] ?? {}),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Background isolate exception captured successfully! Check PostHog.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+
+    receivePort.close();
   }
 }
 
@@ -389,5 +517,26 @@ class ThirdRoute extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Custom exception class for demonstration purposes
+class CustomException implements Exception {
+  final String message;
+  final String? code;
+  final Map<String, dynamic>? additionalData;
+
+  const CustomException(
+    this.message, {
+    this.code,
+    this.additionalData,
+  });
+
+  @override
+  String toString() {
+    if (code != null) {
+      return 'CustomException($code): $message $additionalData';
+    }
+    return 'CustomException: $message $additionalData';
   }
 }
