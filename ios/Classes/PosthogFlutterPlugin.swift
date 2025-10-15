@@ -195,6 +195,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             unregister(call, result: result)
         case "flush":
             flush(result)
+        case "captureException":
+            captureException(call, result: result)
         case "close":
             close(result)
         case "sendMetaEvent":
@@ -674,6 +676,16 @@ extension PosthogFlutterPlugin {
 
     private func flush(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.flush()
+        result(nil)
+    }
+
+    private func captureException(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let arguments = call.arguments as? [String: Any] else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments for captureException", details: nil))
+            return
+        }
+        
+        PostHogSDK.shared.capture("$exception", properties: arguments)
         result(nil)
     }
 

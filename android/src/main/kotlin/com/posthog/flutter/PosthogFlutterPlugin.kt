@@ -156,6 +156,9 @@ class PosthogFlutterPlugin :
             "flush" -> {
                 flush(result)
             }
+            "captureException" -> {
+                captureException(call, result)
+            }
             "close" -> {
                 close(result)
             }
@@ -529,6 +532,20 @@ class PosthogFlutterPlugin :
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureException(call: MethodCall, result: Result) {
+        try {
+            val arguments = call.arguments as? Map<String, Any> ?: run {
+                result.error("INVALID_ARGUMENTS", "Invalid arguments for captureException", null)
+                return
+            }
+            
+            PostHog.capture("\$exception", properties = arguments)
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)
         }
     }
 
