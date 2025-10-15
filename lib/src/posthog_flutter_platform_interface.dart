@@ -133,6 +133,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     required dynamic error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    bool handled = true,
   }) {
     throw UnimplementedError('captureException() has not been implemented.');
   }

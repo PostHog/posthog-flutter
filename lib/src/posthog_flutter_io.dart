@@ -9,6 +9,7 @@ import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
 import 'surveys/models/survey_callbacks.dart';
+import 'exceptions/dart_exception_processor.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
@@ -21,6 +22,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
+  
+  /// Stored configuration for accessing inAppIncludes and other settings
+  PostHogConfig? _config;
 
   /// Native plugin calls to Flutter
   ///
@@ -116,6 +120,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   ///
   @override
   Future<void> setup(PostHogConfig config) async {
+    // Store config for later use in exception processing
+    _config = config;
+    
     if (!isSupportedPlatform()) {
       return;
     }
@@ -410,6 +417,34 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return await _methodChannel.invokeMethod('flush');
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on flush: $exception');
+    }
+  }
+
+  @override
+  Future<void> captureException({
+    required dynamic error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+    bool handled = true,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      final exceptionData = DartExceptionProcessor.processException(
+        error: error,
+        stackTrace: stackTrace ?? StackTrace.current,
+        properties: properties,
+        handled: handled,
+        inAppIncludes: _config?.errorTrackingConfig.inAppIncludes,
+        inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
+        inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
+      );
+      
+      await _methodChannel.invokeMethod('captureException', exceptionData);
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception in captureException: $exception');
     }
   }
 

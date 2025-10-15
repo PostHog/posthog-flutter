@@ -126,14 +126,18 @@ class Posthog {
   /// [error] - The error/exception to capture
   /// [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
   /// [properties] - Optional custom properties to attach to the exception event
+  /// [handled] - Whether the exception was handled (true by default for manual captures)
   Future<void> captureException({
     required dynamic error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
-  }) => _posthog.captureException(
+    bool handled = true,
+  }) =>
+      _posthog.captureException(
         error: error,
         stackTrace: stackTrace ?? StackTrace.current,
         properties: properties,
+        handled: handled,
       );
 
   /// Closes the PostHog SDK and cleans up resources.

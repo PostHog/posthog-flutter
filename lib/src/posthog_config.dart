@@ -39,6 +39,9 @@ class PostHogConfig {
   @experimental
   var surveys = false;
 
+  /// Configuration for error tracking and exception capture
+  var errorTrackingConfig = PostHogErrorTrackingConfig();
+
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
 
@@ -62,6 +65,7 @@ class PostHogConfig {
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
       'sessionReplayConfig': sessionReplayConfig.toMap(),
+      'errorTrackingConfig': errorTrackingConfig.toMap(),
     };
   }
 }
@@ -97,6 +101,53 @@ class PostHogSessionReplayConfig {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
+    };
+  }
+}
+
+class PostHogErrorTrackingConfig {
+  /// List of package names to be considered inApp frames for exception tracking
+  ///
+  /// inApp Example:
+  /// inAppIncludes = ["package:your_app", "package:your_company_utils"]
+  /// All exception stacktrace frames from these packages will be considered inApp
+  ///
+  /// This option takes precedence over inAppExcludes.
+  /// For Flutter/Dart, this typically includes:
+  /// - Your app's main package (e.g., "package:your_app")
+  /// - Any internal packages you own (e.g., "package:your_company_utils")
+  var inAppIncludes = <String>[];
+
+  /// List of package names to be excluded from inApp frames for exception tracking
+  ///
+  /// inAppExcludes Example:
+  /// inAppExcludes = ["package:third_party_lib", "package:analytics_package"]
+  /// All exception stacktrace frames from these packages will be considered external
+  ///
+  /// Note: inAppIncludes takes precedence over this setting.
+  /// Common packages to exclude:
+  /// - Third-party analytics packages
+  /// - External utility libraries
+  /// - Packages you don't control
+  var inAppExcludes = <String>[];
+
+  /// Configures whether stack trace frames are considered inApp by default
+  /// when the origin cannot be determined or no explicit includes/excludes match.
+  ///
+  /// - If true: Frames are inApp unless explicitly excluded (allowlist approach)
+  /// - If false: Frames are external unless explicitly included (denylist approach)
+  ///
+  /// Default behavior when true:
+  /// - Local files (no package prefix) are inApp
+  /// - dart and flutter packages are excluded
+  /// - All other packages are inApp unless in inAppExcludes
+  var inAppByDefault = true;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'inAppIncludes': inAppIncludes,
+      'inAppExcludes': inAppExcludes,
+      'inAppByDefault': inAppByDefault,
     };
   }
 }
