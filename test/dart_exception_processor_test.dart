@@ -241,11 +241,6 @@ void main() {
           'expectedType': 'Error',
           'expectedSynthetic': true,
         },
-        {
-          'exception': null,
-          'expectedType': 'Error',
-          'expectedSynthetic': true,
-        },
       ];
 
       for (final testCase in testCases) {

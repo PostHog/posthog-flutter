@@ -300,7 +300,7 @@ class InitialScreenState extends State<InitialScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                                'Background isolate exception captured successfully! Check PostHog.'),
+                                'Main isolate exception captured successfully! Check PostHog.'),
                             backgroundColor: Colors.green,
                             duration: Duration(seconds: 3),
                           ),
