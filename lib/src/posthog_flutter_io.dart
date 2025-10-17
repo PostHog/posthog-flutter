@@ -431,6 +431,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
+    // Check if exception should be captured based on config
+    if (_config?.errorTrackingConfig.shouldCaptureException?.call(error) == false) {
+      return; // bail out
+    }
+
     try {
       final exceptionData = DartExceptionProcessor.processException(
         error: error,
