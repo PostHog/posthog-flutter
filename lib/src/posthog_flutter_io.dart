@@ -22,7 +22,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
-  
+
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
 
@@ -122,7 +122,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> setup(PostHogConfig config) async {
     // Store config for later use in exception processing
     _config = config;
-    
+
     if (!isSupportedPlatform()) {
       return;
     }
@@ -432,7 +432,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     // Check if exception should be captured based on config
-    if (_config?.errorTrackingConfig.shouldCaptureException?.call(error) == false) {
+    if (_config?.errorTrackingConfig.shouldCaptureException?.call(error) ==
+        false) {
       return; // bail out
     }
 
@@ -446,7 +447,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
-      
+
       await _methodChannel.invokeMethod('captureException', exceptionData);
     } on PlatformException catch (exception) {
       printIfDebug('Exception in captureException: $exception');
