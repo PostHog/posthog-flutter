@@ -684,7 +684,7 @@ extension PosthogFlutterPlugin {
             result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments for captureException", details: nil))
             return
         }
-        
+
         PostHogSDK.shared.capture("$exception", properties: arguments)
         result(nil)
     }

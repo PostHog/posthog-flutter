@@ -535,13 +535,17 @@ class PosthogFlutterPlugin :
         }
     }
 
-    private fun captureException(call: MethodCall, result: Result) {
+    private fun captureException(
+        call: MethodCall,
+        result: Result,
+    ) {
         try {
-            val arguments = call.arguments as? Map<String, Any> ?: run {
-                result.error("INVALID_ARGUMENTS", "Invalid arguments for captureException", null)
-                return
-            }
-            
+            val arguments =
+                call.arguments as? Map<String, Any> ?: run {
+                    result.error("INVALID_ARGUMENTS", "Invalid arguments for captureException", null)
+                    return
+                }
+
             PostHog.capture("\$exception", properties = arguments)
             result.success(null)
         } catch (e: Exception) {
