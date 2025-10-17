@@ -5,16 +5,18 @@ class DartExceptionProcessor {
   /// Converts Dart error/exception and stack trace to PostHog exception format
   static Map<String, dynamic> processException({
     required Object error,
-    required StackTrace stackTrace,
+    StackTrace? stackTrace,
     Map<String, Object>? properties,
     bool handled = true,
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
   }) {
+    final effectiveStackTrace = stackTrace ?? StackTrace.current;
+    
     // Process single exception (Dart doesn't provide standard exception chaining afaik)
     final frames = _parseStackTrace(
-      stackTrace,
+      effectiveStackTrace,
       inAppIncludes: inAppIncludes,
       inAppExcludes: inAppExcludes,
       inAppByDefault: inAppByDefault,
@@ -37,13 +39,13 @@ class DartExceptionProcessor {
     }
 
     // Add module from first stack frame (where exception was thrown)
-    final exceptionModule = _getExceptionModule(stackTrace);
+    final exceptionModule = _getExceptionModule(effectiveStackTrace);
     if (exceptionModule != null && exceptionModule.isNotEmpty) {
       exceptionData['module'] = exceptionModule;
     }
 
     // Add package from first stack frame (where exception was thrown)
-    final exceptionPackage = _getExceptionPackage(stackTrace);
+    final exceptionPackage = _getExceptionPackage(effectiveStackTrace);
     if (exceptionPackage != null && exceptionPackage.isNotEmpty) {
       exceptionData['package'] = exceptionPackage;
     }
