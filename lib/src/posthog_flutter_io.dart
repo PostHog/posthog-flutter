@@ -422,7 +422,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> captureException({
-    required dynamic error,
+    required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
     bool handled = true,

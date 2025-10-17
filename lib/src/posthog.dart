@@ -128,7 +128,7 @@ class Posthog {
   /// [properties] - Optional custom properties to attach to the exception event
   /// [handled] - Whether the exception was handled (true by default for manual captures)
   Future<void> captureException({
-    required dynamic error,
+    required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
     bool handled = true,

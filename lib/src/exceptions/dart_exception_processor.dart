@@ -4,7 +4,7 @@ import 'utils/isolate_utils.dart' as isolate_utils;
 class DartExceptionProcessor {
   /// Converts Dart error/exception and stack trace to PostHog exception format
   static Map<String, dynamic> processException({
-    required dynamic error,
+    required Object error,
     required StackTrace stackTrace,
     Map<String, Object>? properties,
     bool handled = true,

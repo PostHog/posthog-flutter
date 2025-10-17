@@ -130,7 +130,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   }
 
   Future<void> captureException({
-    required dynamic error,
+    required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
     bool handled = true,

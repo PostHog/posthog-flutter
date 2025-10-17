@@ -548,7 +548,7 @@ class PosthogFlutterPlugin :
 
             PostHog.capture("\$exception", properties = arguments)
             result.success(null)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)
         }
     }
