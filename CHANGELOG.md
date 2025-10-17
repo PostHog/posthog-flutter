@@ -1,6 +1,7 @@
 ## Next
 
 - feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
+- feat: add autocapture of Flutter and Dart exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
 
 ## 5.6.0
 
