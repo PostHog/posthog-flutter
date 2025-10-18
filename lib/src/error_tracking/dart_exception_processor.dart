@@ -142,13 +142,8 @@ class DartExceptionProcessor {
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
   }) {
-    final member = frame.member;
-    final fileName = _extractFileName(frame);
-
     final frameData = <String, dynamic>{
-      'function': member ?? 'unknown',
       'module': _extractModule(frame),
-      'package': _extractPackage(frame),
       'platform': 'dart',
       'abs_path': _extractAbsolutePath(frame),
       'in_app': _isInAppFrame(
@@ -159,7 +154,20 @@ class DartExceptionProcessor {
       ),
     };
 
+    // add package, if available
+    final package = _extractPackage(frame);
+    if (package != null && package.isNotEmpty) {
+      frameData['package'] = package;
+    }
+
+    // add function, if available
+    final member = frame.member;
+    if (member != null && member.isNotEmpty) {
+      frameData['function'] = member;
+    }
+
     // Add filename, if available
+    final fileName = _extractFileName(frame);
     if (fileName != null && fileName.isNotEmpty) {
       frameData['filename'] = fileName;
     }
