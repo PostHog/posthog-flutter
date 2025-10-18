@@ -1,5 +1,7 @@
 ## Next
 
+- feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
+
 ## 5.6.0
 
 - feat: surveys use the new response question id format ([#210](https://github.com/PostHog/posthog-flutter/pull/210))

@@ -129,6 +129,15 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('flush() has not been implemented.');
   }
 
+  Future<void> captureException({
+    required Object error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+    bool handled = true,
+  }) {
+    throw UnimplementedError('captureException() has not been implemented.');
+  }
+
   Future<void> close() {
     throw UnimplementedError('close() has not been implemented.');
   }

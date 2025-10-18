@@ -121,6 +121,25 @@ class Posthog {
 
   Future<void> flush() => _posthog.flush();
 
+  /// Captures exceptions with optional custom properties
+  ///
+  /// [error] - The error/exception to capture
+  /// [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
+  /// [properties] - Optional custom properties to attach to the exception event
+  /// [handled] - Whether the exception was handled (true by default for manual captures)
+  Future<void> captureException({
+    required Object error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+    bool handled = true,
+  }) =>
+      _posthog.captureException(
+        error: error,
+        stackTrace: stackTrace,
+        properties: properties,
+        handled: handled,
+      );
+
   /// Closes the PostHog SDK and cleans up resources.
   ///
   /// Note: Please note that after calling close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
