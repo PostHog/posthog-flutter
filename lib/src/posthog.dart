@@ -135,7 +135,7 @@ class Posthog {
   }) =>
       _posthog.captureException(
         error: error,
-        stackTrace: stackTrace ?? StackTrace.current,
+        stackTrace: stackTrace,
         properties: properties,
         handled: handled,
       );

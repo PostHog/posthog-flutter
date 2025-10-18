@@ -12,21 +12,36 @@ class DartExceptionProcessor {
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
   }) {
-    final effectiveStackTrace = stackTrace ?? StackTrace.current;
-    
+    StackTrace? effectiveStackTrace = stackTrace;
+    bool isGeneratedStackTrace = false;
+
+    // If it's an Error, try to use its built-in stackTrace
+    if (error is Error) {
+      effectiveStackTrace ??= error.stackTrace;
+    }
+
+    // If still null or empty, get current stack trace
+    if (effectiveStackTrace == null ||
+        effectiveStackTrace == StackTrace.empty) {
+      effectiveStackTrace = StackTrace.current;
+      isGeneratedStackTrace = true; // Flag to remove top PostHog frames
+    }
+
     // Process single exception (Dart doesn't provide standard exception chaining afaik)
     final frames = _parseStackTrace(
       effectiveStackTrace,
       inAppIncludes: inAppIncludes,
       inAppExcludes: inAppExcludes,
       inAppByDefault: inAppByDefault,
+      removeTopPostHogFrames: isGeneratedStackTrace,
     );
 
+    // we consider primitives and generated Strack traces as synthetic
     final exceptionData = <String, dynamic>{
       'type': _getExceptionType(error),
       'mechanism': {
         'handled': handled,
-        'synthetic': _isPrimitive(error), // we consider primitives as synthetic
+        'synthetic': _isPrimitive(error) || isGeneratedStackTrace,
         'type': 'generic',
       },
       'thread_id': _getCurrentThreadId(),
@@ -76,18 +91,34 @@ class DartExceptionProcessor {
     return result;
   }
 
+  /// Determines if a stack frame belongs to PostHog SDK (just check package for now)
+  static bool _isPostHogFrame(Frame frame) {
+    return frame.package == 'posthog_flutter';
+  }
+
   /// Parses stack trace into PostHog format
   static List<Map<String, dynamic>> _parseStackTrace(
     StackTrace stackTrace, {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
+    bool removeTopPostHogFrames = false,
   }) {
     final chain = Chain.forTrace(stackTrace);
     final frames = <Map<String, dynamic>>[];
 
     for (final trace in chain.traces) {
+      bool skipNextPostHogFrame = removeTopPostHogFrames;
+
       for (final frame in trace.frames) {
+        // Skip top PostHog frames?
+        if (skipNextPostHogFrame) {
+          if (_isPostHogFrame(frame)) {
+            continue;
+          }
+          skipNextPostHogFrame = false;
+        }
+
         final processedFrame = _convertFrameToPostHog(
           frame,
           inAppIncludes: inAppIncludes,

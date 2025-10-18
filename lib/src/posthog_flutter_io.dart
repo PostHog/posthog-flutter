@@ -9,7 +9,7 @@ import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
 import 'surveys/models/survey_callbacks.dart';
-import 'exceptions/dart_exception_processor.dart';
+import 'error_tracking/dart_exception_processor.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
@@ -434,7 +434,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       final exceptionData = DartExceptionProcessor.processException(
         error: error,
-        stackTrace: stackTrace ?? StackTrace.current,
+        stackTrace: stackTrace,
         properties: properties,
         handled: handled,
         inAppIncludes: _config?.errorTrackingConfig.inAppIncludes,

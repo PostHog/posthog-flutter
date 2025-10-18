@@ -1,4 +1,6 @@
-.PHONY: formatKotlin formatSwift formatDart checkDart installLinters
+.PHONY: format formatKotlin formatSwift formatDart checkDart installLinters
+
+format: formatSwift formatKotlin formatDart
 
 installLinters:
 	brew install ktlint
