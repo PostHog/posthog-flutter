@@ -320,6 +320,19 @@ class InitialScreenState extends State<InitialScreen> {
                   },
                   child: const Text("Capture Exception (Background)"),
                 ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  onPressed: () async {
+                    // Capture exception from background isolate
+                    await Posthog().captureException(
+                      error: 'No Stack Trace Error',
+                      properties: {'test_type': 'no_stack_trace'},
+                    );
+                  },
+                  child: const Text("Capture Exception (No Stack)"),
+                ),
                 const Divider(),
                 const Padding(
                   padding: EdgeInsets.all(8.0),

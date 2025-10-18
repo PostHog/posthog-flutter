@@ -11,6 +11,7 @@ class DartExceptionProcessor {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
+    StackTrace Function()? stackTraceProvider, //for testing
   }) {
     StackTrace? effectiveStackTrace = stackTrace;
     bool isGeneratedStackTrace = false;
@@ -23,7 +24,7 @@ class DartExceptionProcessor {
     // If still null or empty, get current stack trace
     if (effectiveStackTrace == null ||
         effectiveStackTrace == StackTrace.empty) {
-      effectiveStackTrace = StackTrace.current;
+      effectiveStackTrace = stackTraceProvider?.call() ?? StackTrace.current;
       isGeneratedStackTrace = true; // Flag to remove top PostHog frames
     }
 

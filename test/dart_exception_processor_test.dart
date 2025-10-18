@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:posthog_flutter/src/exceptions/dart_exception_processor.dart';
+import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 
 void main() {
   group('DartExceptionProcessor', () {
@@ -244,7 +244,7 @@ void main() {
       ];
 
       for (final testCase in testCases) {
-        final exception = testCase['exception'];
+        final exception = testCase['exception']!;
         final expectedType = testCase['expectedType'] as String;
         final expectedSynthetic = testCase['expectedSynthetic'] as bool;
 
@@ -294,6 +294,135 @@ void main() {
       final threadId2 = exceptionData2.first['thread_id'];
 
       expect(threadId, equals(threadId2)); // Should be consistent
+    });
+
+    test('generates stack trace when none provided', () {
+      final exception = Exception('Test exception'); // will have no stack trace
+
+      final result = DartExceptionProcessor.processException(
+        error: exception,
+        // No stackTrace provided - should generate one
+      );
+
+      final exceptionData =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+      final stackTraceData = exceptionData.first['stacktrace'];
+
+      // Should have generated a stack trace
+      expect(stackTraceData, isNotNull);
+      expect(stackTraceData['frames'], isA<List>());
+      expect((stackTraceData['frames'] as List).isNotEmpty, isTrue);
+
+      // Should be marked as synthetic since we generated it
+      expect(exceptionData.first['mechanism']['synthetic'], isTrue);
+    });
+
+    test('uses error.stackTrace when available', () {
+      try {
+        throw StateError('Test error');
+      } catch (error) {
+        final result = DartExceptionProcessor.processException(
+          error: error,
+          // No stackTrace provided - should generate one from error.stackTrace
+        );
+
+        final exceptionData =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+        final stackTraceData = exceptionData.first['stacktrace'];
+
+        // Should have a stack trace from the Error object
+        expect(stackTraceData, isNotNull);
+        expect(stackTraceData['frames'], isA<List>());
+
+        // Should not be marked as synthetic since we did not generate a stack trace
+        expect(exceptionData.first['mechanism']['synthetic'], isFalse);
+      }
+    });
+
+    test('removes PostHog frames when stack trace is generated', () {
+      final exception = Exception('Test exception');
+
+      // Create a mock stack trace that includes PostHog frames
+      final mockStackTrace = StackTrace.fromString('''
+#0      DartExceptionProcessor.processException (package:posthog_flutter/src/error_tracking/dart_exception_processor.dart:28:7)
+#1      PosthogFlutterIO.captureException (package:posthog_flutter/src/posthog_flutter_io.dart:435:29)
+#2      Posthog.captureException (package:posthog_flutter/src/posthog.dart:136:7)
+#3      userFunction (package:my_app/main.dart:100:5)
+#4      PosthogFlutterIO.setup (package:posthog_flutter/src/posthog.dart:136:7)
+#5      main (package:some_lib/lib.dart:50:3)
+''');
+
+      final result = DartExceptionProcessor.processException(
+        error: exception,
+        stackTraceProvider: () {
+          return mockStackTrace;
+        },
+      );
+
+      final exceptionData =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames'] as List;
+
+      // Should include frames since we provided the stack trace
+      expect(frames[0]['package'], 'my_app');
+      expect(frames[0]['filename'], 'main.dart');
+      // earlier PH frames should be untouched
+      expect(frames[1]['package'], 'posthog_flutter');
+      expect(frames[1]['filename'], 'posthog.dart');
+      expect(frames[2]['package'], 'some_lib');
+      expect(frames[2]['filename'], 'lib.dart');
+    });
+
+    test('marks primitives as synthetic', () {
+      final primitives = ['String error', 42, 3.14, true];
+
+      for (final primitive in primitives) {
+        final result = DartExceptionProcessor.processException(
+          error: primitive,
+        );
+
+        final exceptionData =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(exceptionData.first['type'], equals('Error'));
+        expect(exceptionData.first['mechanism']['synthetic'], isTrue);
+      }
+    });
+
+    test('marks generated stack frames as synthetic', () {
+      final exception = Exception('Test exception'); // will have no stack trace
+
+      final result = DartExceptionProcessor.processException(
+        error: exception,
+        // No stackTrace provided - should generate one
+      );
+
+      final exceptionData =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+
+      // Should be marked as synthetic since we generated it
+      expect(exceptionData.first['mechanism']['synthetic'], isTrue);
+    });
+
+    test('does not mark exceptions as synthetic when stack trace is provided',
+        () {
+      final realExceptions = [
+        Exception('Real exception'),
+        StateError('Real error'),
+        ArgumentError('Real argument error'),
+      ];
+
+      for (final exception in realExceptions) {
+        final result = DartExceptionProcessor.processException(
+          error: exception,
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+        );
+
+        final exceptionData =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(exceptionData.first['mechanism']['synthetic'], isFalse);
+      }
     });
   });
 }
