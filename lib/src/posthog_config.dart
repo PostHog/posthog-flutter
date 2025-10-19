@@ -116,7 +116,7 @@ class PostHogErrorTrackingConfig {
   /// For Flutter/Dart, this typically includes:
   /// - Your app's main package (e.g., "package:your_app")
   /// - Any internal packages you own (e.g., "package:your_company_utils")
-  var inAppIncludes = <String>[];
+  final inAppIncludes = <String>[];
 
   /// List of package names to be excluded from inApp frames for exception tracking
   ///
@@ -129,7 +129,7 @@ class PostHogErrorTrackingConfig {
   /// - Third-party analytics packages
   /// - External utility libraries
   /// - Packages you don't control
-  var inAppExcludes = <String>[];
+  final inAppExcludes = <String>[];
 
   /// Configures whether stack trace frames are considered inApp by default
   /// when the origin cannot be determined or no explicit includes/excludes match.
