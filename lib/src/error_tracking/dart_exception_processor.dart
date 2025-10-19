@@ -54,12 +54,6 @@ class DartExceptionProcessor {
       exceptionData['value'] = errorMessage;
     }
 
-    // Add module from first stack frame (where exception was thrown)
-    final exceptionModule = _getExceptionModule(effectiveStackTrace);
-    if (exceptionModule != null && exceptionModule.isNotEmpty) {
-      exceptionData['module'] = exceptionModule;
-    }
-
     // Add package from first stack frame (where exception was thrown)
     final exceptionPackage = _getExceptionPackage(effectiveStackTrace);
     if (exceptionPackage != null && exceptionPackage.isNotEmpty) {
@@ -143,7 +137,6 @@ class DartExceptionProcessor {
     bool inAppByDefault = true,
   }) {
     final frameData = <String, dynamic>{
-      'module': _extractModule(frame),
       'platform': 'dart',
       'abs_path': _extractAbsolutePath(frame),
       'in_app': _isInAppFrame(
@@ -233,12 +226,6 @@ class DartExceptionProcessor {
     return frame.package;
   }
 
-  static String _extractModule(Frame frame) {
-    return frame.uri.pathSegments
-        .sublist(0, frame.uri.pathSegments.length - 1)
-        .join('/');
-  }
-
   static String? _extractFileName(Frame frame) {
     return frame.uri.pathSegments.isNotEmpty
         ? frame.uri.pathSegments.last
@@ -255,24 +242,6 @@ class DartExceptionProcessor {
 
     // For dart: and package: URIs, full path is safe
     return frame.uri.toString();
-  }
-
-  /// Extracts the module name from the first stack frame
-  /// This is more accurate than guessing from exception type
-  static String? _getExceptionModule(StackTrace stackTrace) {
-    try {
-      final chain = Chain.forTrace(stackTrace);
-
-      // Get the first frame from the first trace (where exception was thrown)
-      if (chain.traces.isNotEmpty && chain.traces.first.frames.isNotEmpty) {
-        final firstFrame = chain.traces.first.frames.first;
-        return _extractModule(firstFrame);
-      }
-    } catch (e) {
-      // If stack trace parsing fails, return null
-    }
-
-    return null;
   }
 
   /// Extracts the package name from the first stack frame

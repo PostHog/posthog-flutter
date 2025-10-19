@@ -76,7 +76,6 @@ void main() {
 
       // Verify first frame structure (should be main function)
       final firstFrame = frames.first;
-      expect(firstFrame.containsKey('module'), isTrue);
       expect(firstFrame.containsKey('function'), isTrue);
       expect(firstFrame.containsKey('filename'), isTrue);
       expect(firstFrame.containsKey('lineno'), isTrue);
@@ -87,7 +86,9 @@ void main() {
 
       // Check that dart core frames are marked as not inApp
       final dartFrame = frames.firstWhere(
-        (frame) => frame['module'] == 'async' || frame['module'] == 'dart-core',
+        (frame) =>
+            frame['package'] == null &&
+            (frame['abs_path']?.contains('dart:') == true),
         orElse: () => <String, dynamic>{},
       );
       if (dartFrame.isNotEmpty) {
@@ -117,10 +118,10 @@ void main() {
       final frames = exceptionData.first['stacktrace']['frames']
           as List<Map<String, dynamic>>;
 
-      // Find frames by module
-      final myAppFrame = frames.firstWhere((f) => f['module'] == 'my_app');
+      // Find frames by package
+      final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
       final thirdPartyFrame =
-          frames.firstWhere((f) => f['module'] == 'third_party');
+          frames.firstWhere((f) => f['package'] == 'third_party');
 
       // Verify inApp detection
       expect(myAppFrame['in_app'], isTrue); // Explicitly included
@@ -149,11 +150,12 @@ void main() {
       final frames = exceptionData.first['stacktrace']['frames']
           as List<Map<String, dynamic>>;
 
-      // Find frames by module
-      final myAppFrame = frames.firstWhere((f) => f['module'] == 'my_app');
+      // Find frames by package
+      final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
       final analyticsFrame =
-          frames.firstWhere((f) => f['module'] == 'analytics_lib');
-      final helperFrame = frames.firstWhere((f) => f['module'] == 'helper_lib');
+          frames.firstWhere((f) => f['package'] == 'analytics_lib');
+      final helperFrame =
+          frames.firstWhere((f) => f['package'] == 'helper_lib');
 
       // Verify inApp detection
       expect(myAppFrame['in_app'], isTrue); // Default true, not excluded
@@ -183,7 +185,7 @@ void main() {
 
       // Find any frame from test_package
       final testFrame = frames.firstWhere(
-        (frame) => frame['module'] == 'test_package',
+        (frame) => frame['package'] == 'test_package',
         orElse: () => <String, dynamic>{},
       );
 
