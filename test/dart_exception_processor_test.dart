@@ -202,51 +202,36 @@ void main() {
         // Real Exception/Error objects
         {
           'exception': Exception('Exception test'),
-          'expectedType': '_Exception',
-          'expectedSynthetic': false,
+          'expectedType': '_Exception'
         },
         {
           'exception': StateError('StateError test'),
-          'expectedType': 'StateError',
-          'expectedSynthetic': false,
+          'expectedType': 'StateError'
         },
         {
           'exception': ArgumentError('ArgumentError test'),
-          'expectedType': 'ArgumentError',
-          'expectedSynthetic': false,
+          'expectedType': 'ArgumentError'
         },
         {
           'exception': FormatException('FormatException test'),
-          'expectedType': 'FormatException',
-          'expectedSynthetic': false,
+          'expectedType': 'FormatException'
         },
         // Primitive types
+        {'exception': 'Plain string error', 'expectedType': 'String'},
+        {'exception': 42, 'expectedType': 'int'},
+        {'exception': true, 'expectedType': 'bool'},
+        {'exception': 3.14, 'expectedType': 'double'},
+        {'exception': [], 'expectedType': 'List<dynamic>'},
         {
-          'exception': 'Plain string error',
-          'expectedType': 'Error',
-          'expectedSynthetic': true,
+          'exception': ['some', 'error'],
+          'expectedType': 'List<String>'
         },
-        {
-          'exception': 42,
-          'expectedType': 'Error',
-          'expectedSynthetic': true,
-        },
-        {
-          'exception': true,
-          'expectedType': 'Error',
-          'expectedSynthetic': true,
-        },
-        {
-          'exception': 3.14,
-          'expectedType': 'Error',
-          'expectedSynthetic': true,
-        },
+        {'exception': {}, 'expectedType': '_Map<dynamic, dynamic>'},
       ];
 
       for (final testCase in testCases) {
         final exception = testCase['exception']!;
         final expectedType = testCase['expectedType'] as String;
-        final expectedSynthetic = testCase['expectedSynthetic'] as bool;
 
         final result = DartExceptionProcessor.processException(
           error: exception,
@@ -260,9 +245,6 @@ void main() {
 
         expect(exceptionData['type'], equals(expectedType),
             reason: 'Exception type mismatch for: $exception');
-        expect(
-            exceptionData['mechanism']['synthetic'], equals(expectedSynthetic),
-            reason: 'Synthetic flag mismatch for: $exception');
 
         // Verify the exception value is present and is a string
         expect(exceptionData['value'], isA<String>());
@@ -371,22 +353,6 @@ void main() {
       expect(frames[1]['filename'], 'posthog.dart');
       expect(frames[2]['package'], 'some_lib');
       expect(frames[2]['filename'], 'lib.dart');
-    });
-
-    test('marks primitives as synthetic', () {
-      final primitives = ['String error', 42, 3.14, true];
-
-      for (final primitive in primitives) {
-        final result = DartExceptionProcessor.processException(
-          error: primitive,
-        );
-
-        final exceptionData =
-            result['\$exception_list'] as List<Map<String, dynamic>>;
-
-        expect(exceptionData.first['type'], equals('Error'));
-        expect(exceptionData.first['mechanism']['synthetic'], isTrue);
-      }
     });
 
     test('marks generated stack frames as synthetic', () {

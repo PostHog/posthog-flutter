@@ -42,7 +42,7 @@ class DartExceptionProcessor {
       'type': _getExceptionType(error),
       'mechanism': {
         'handled': handled,
-        'synthetic': _isPrimitive(error) || isGeneratedStackTrace,
+        'synthetic': isGeneratedStackTrace,
         'type': 'generic',
       },
       'thread_id': _getCurrentThreadId(),
@@ -315,21 +315,11 @@ class DartExceptionProcessor {
     }
   }
 
-  static String _getExceptionType(dynamic error) {
-    // For primitives (String, int, bool, double, null, etc.), just use "Error"
-    if (_isPrimitive(error)) {
-      return 'Error';
-    }
-
+  static String _getExceptionType(Object error) {
+    // Even in obfuscated code, runtimeType.toString() never returns an empty string. The obfuscator generates valid, non-empty identifiers like:
+    // minified:aB
+    // a0
+    // _$className$_
     return error.runtimeType.toString();
-  }
-
-  /// Checks if a value is a primitive type
-  static bool _isPrimitive(dynamic value) {
-    return value is bool ||
-        value is int ||
-        value is double ||
-        value is num ||
-        value is String;
   }
 }
