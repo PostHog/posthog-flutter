@@ -44,8 +44,7 @@ class DartExceptionProcessor {
         'handled': handled,
         'synthetic': isGeneratedStackTrace,
         'type': 'generic',
-      },
-      'thread_id': _getCurrentThreadId(),
+      }
     };
 
     // Add exception message, if available
@@ -66,6 +65,12 @@ class DartExceptionProcessor {
         'frames': frames,
         'type': 'raw',
       };
+    }
+
+    // Add thread ID, if available
+    final threadId = _getCurrentThreadId();
+    if (threadId != null) {
+      exceptionData['thread_id'] = threadId;
     }
 
     final result = <String, dynamic>{
@@ -263,7 +268,7 @@ class DartExceptionProcessor {
   }
 
   /// Gets the current thread ID using isolate-based detection
-  static int _getCurrentThreadId() {
+  static int? _getCurrentThreadId() {
     try {
       // Check if we're in the root isolate (main thread)
       if (isolate_utils.isRootIsolate()) {
@@ -276,11 +281,9 @@ class DartExceptionProcessor {
         return isolateName.hashCode;
       }
 
-      // Fallback for unknown isolates
-      return 1;
+      return null;
     } catch (e) {
-      // Graceful fallback if isolate detection fails
-      return 1;
+      return null;
     }
   }
 
