@@ -37,12 +37,14 @@ class DartExceptionProcessor {
       removeTopPostHogFrames: isGeneratedStackTrace,
     );
 
+    final errorType = _getExceptionType(error);
+
     // we consider primitives and generated Strack traces as synthetic
     final exceptionData = <String, dynamic>{
-      'type': _getExceptionType(error),
+      'type': errorType ?? 'Error',
       'mechanism': {
         'handled': handled,
-        'synthetic': isGeneratedStackTrace,
+        'synthetic': errorType == null || isGeneratedStackTrace,
         'type': 'generic',
       }
     };
@@ -287,11 +289,9 @@ class DartExceptionProcessor {
     }
   }
 
-  static String _getExceptionType(Object error) {
-    // Even in obfuscated code, runtimeType.toString() never returns an empty string. The obfuscator generates valid, non-empty identifiers like:
-    // minified:aB
-    // a0
-    // _$className$_
-    return error.runtimeType.toString();
+  static String? _getExceptionType(Object error) {
+    // The string is only intended for providing information to a reader while debugging. There is no guaranteed format, the string value returned for a Type instances is entirely implementation dependent.
+    final type = error.runtimeType.toString();
+    return type.isNotEmpty ? type : null;
   }
 }
