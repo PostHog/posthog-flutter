@@ -89,20 +89,12 @@ class DartExceptionProcessor {
       exceptionData['thread_id'] = threadId;
     }
 
+    // Final result, merging system properties with user properties (user properties take precedence)
     final result = <String, dynamic>{
       '\$exception_level': handled ? 'error' : 'fatal',
       '\$exception_list': [exceptionData],
+      if (properties != null) ...properties,
     };
-
-    // Add custom properties if provided
-    if (properties != null) {
-      for (final entry in properties.entries) {
-        // Don't allow overwriting system properties
-        if (!result.containsKey(entry.key)) {
-          result[entry.key] = entry.value;
-        }
-      }
-    }
 
     return result;
   }

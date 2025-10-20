@@ -392,5 +392,26 @@ void main() {
         expect(exceptionData.first['mechanism']['synthetic'], isFalse);
       }
     });
+
+    test('allows user properties to override system properties', () {
+      final exception = Exception('Test exception');
+      final stackTrace = StackTrace.fromString('#0 test (test.dart:1:1)');
+
+      // Properties that override system properties
+      final overrideProperties = {
+        '\$exception_level': 'warning', // Override default 'error'
+        'custom_property': 'custom_value', // Additional custom property
+      };
+
+      final result = DartExceptionProcessor.processException(
+        error: exception,
+        stackTrace: stackTrace,
+        properties: overrideProperties,
+      );
+
+      // Verify that user properties take precedence
+      expect(result['\$exception_level'], equals('warning'));
+      expect(result['custom_property'], equals('custom_value'));
+    });
   });
 }
