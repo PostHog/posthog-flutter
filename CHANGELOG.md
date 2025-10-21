@@ -1,6 +1,7 @@
 ## Next
 
 - feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
+- **BREAKING**: Minimum Dart SDK version bumped to 3.4.0 and Flutter to 3.22.0 (required for `stack_trace` dependency compatibility)
 
 ## 5.6.0
 
