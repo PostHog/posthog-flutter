@@ -10,7 +10,6 @@ bool isRootIsolate() {
   try {
     return ServicesBinding.rootIsolateToken != null;
   } catch (_) {
-    // If ServicesBinding is not available (pure Dart), assume root isolate
     return true;
   }
 }
