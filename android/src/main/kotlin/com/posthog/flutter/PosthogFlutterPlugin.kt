@@ -19,6 +19,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.util.Date
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
@@ -546,7 +547,18 @@ class PosthogFlutterPlugin :
                     return
                 }
 
-            PostHog.capture("\$exception", properties = arguments)
+            var properties = arguments.toMutableMap() // make mutable
+
+            // Extract timestamp from Flutter
+            var timestamp: Date? = null
+            val timestampMs = properties["timestamp"] as? Long
+            if (timestampMs != null) {
+                // timestampMs already in UTC milliseconds epoch
+                timestamp = Date(timestampMs)
+                properties.remove("timestamp")
+            }
+
+            PostHog.capture("\$exception", properties = properties, timestamp = timestamp)
             result.success(null)
         } catch (e: Throwable) {
             result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)

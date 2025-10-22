@@ -175,9 +175,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      final normalizedProperties = properties != null
-          ? PropertyNormalizer.normalize(properties)
-          : null;
+      final normalizedProperties =
+          properties != null ? PropertyNormalizer.normalize(properties) : null;
 
       await _methodChannel.invokeMethod('capture', {
         'eventName': eventName,
@@ -198,9 +197,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      final normalizedProperties = properties != null
-          ? PropertyNormalizer.normalize(properties)
-          : null;
+      final normalizedProperties =
+          properties != null ? PropertyNormalizer.normalize(properties) : null;
 
       await _methodChannel.invokeMethod('screen', {
         'screenName': screenName,
@@ -463,8 +461,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
+      // Add timestamp from Flutter side (will be used and removed from native plugins)
+      exceptionData['timestamp'] = DateTime.now().millisecondsSinceEpoch;
 
-      final normalizedData = PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
+      final normalizedData =
+          PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
 
       await _methodChannel.invokeMethod('captureException', normalizedData);
     } on PlatformException catch (exception) {
