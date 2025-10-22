@@ -91,7 +91,7 @@ class DartExceptionProcessor {
 
     // Final result, merging system properties with user properties (user properties take precedence)
     final result = <String, dynamic>{
-      '\$exception_level': handled ? 'error' : 'fatal',
+      '\$exception_level': 'error', // Never crashes, so always error
       '\$exception_list': [exceptionData],
       if (properties != null) ...properties,
     };
