@@ -20,6 +20,8 @@ class PropertyNormalizer {
       return value;
     } else if (value is List) {
       return value.map((e) => _normalizeValue(e)).toList();
+    } else if (value is Set) {
+      return value.map((e) => _normalizeValue(e)).toList();
     } else if (value is Map) {
       return Map<String, Object?>.fromEntries(
         value.entries
