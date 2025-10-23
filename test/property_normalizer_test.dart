@@ -14,7 +14,15 @@ void main() {
 
       final result = PropertyNormalizer.normalize(properties);
 
-      expect(result, equals(properties));
+      // Null values are filtered out by the normalizer
+      final expected = <String, Object?>{
+        'bool_value': true,
+        'int_value': 42,
+        'double_value': 3.14,
+        'string_value': 'hello',
+      };
+
+      expect(result, equals(expected));
     });
 
     test('converts unsupported types to strings', () {
