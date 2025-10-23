@@ -7,11 +7,14 @@ class PropertyNormalizer {
   /// Nested maps and lists are recursively normalized.
   /// Nulls are stripped.
   static Map<String, Object?> normalize(Map<String, Object?> properties) {
-    return Map.fromEntries(
-      properties.entries
-          .map((entry) => MapEntry(entry.key, _normalizeValue(entry.value)))
-          .where((entry) => entry.value != null),
-    );
+    final result = <String, Object?>{};
+    for (final entry in properties.entries) {
+      final normalizedValue = _normalizeValue(entry.value);
+      if (normalizedValue != null) {
+        result[entry.key] = normalizedValue;
+      }
+    }
+    return result;
   }
 
   /// Normalizes a single value to ensure it's serializable through method channels.
@@ -23,12 +26,14 @@ class PropertyNormalizer {
     } else if (value is Set) {
       return value.map((e) => _normalizeValue(e)).toList();
     } else if (value is Map) {
-      return Map<String, Object?>.fromEntries(
-        value.entries
-            .map((entry) =>
-                MapEntry(entry.key.toString(), _normalizeValue(entry.value)))
-            .where((entry) => entry.value != null),
-      );
+      final result = <String, Object?>{};
+      for (final entry in value.entries) {
+        final normalizedValue = _normalizeValue(entry.value);
+        if (normalizedValue != null) {
+          result[entry.key.toString()] = normalizedValue;
+        }
+      }
+      return result;
     } else {
       return value.toString();
     }
