@@ -547,16 +547,15 @@ class PosthogFlutterPlugin :
                     return
                 }
 
-            var properties = arguments.toMutableMap() // make mutable
+            val properties = arguments["properties"] as? Map<String, Any>
+            val timestampMs = arguments["timestamp"] as? Long
 
             // Extract timestamp from Flutter
-            var timestamp: Date? = null
-            val timestampMs = properties["timestamp"] as? Long
-            if (timestampMs != null) {
-                // timestampMs already in UTC milliseconds epoch
-                timestamp = Date(timestampMs)
-                properties.remove("timestamp")
-            }
+            val timestamp: Date? =
+                timestampMs?.let {
+                    // timestampMs already in UTC milliseconds epoch
+                    Date(timestampMs)
+                }
 
             PostHog.capture("\$exception", properties = properties, timestamp = timestamp)
             result.success(null)

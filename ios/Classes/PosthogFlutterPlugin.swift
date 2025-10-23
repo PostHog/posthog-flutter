@@ -685,13 +685,12 @@ extension PosthogFlutterPlugin {
             return
         }
 
-        var properties = arguments // make mutable
+        let properties = arguments["properties"] as? [String: Any]
 
         // Extract timestamp from Flutter and convert to Date
         var timestamp: Date? = nil
-        if let timestampMs = properties["timestamp"] as? Int64 {
+        if let timestampMs = arguments["timestamp"] as? Int64 {
             timestamp = Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
-            properties.removeValue(forKey: "timestamp")
         }
 
         // Use capture method with timestamp to ensure Flutter timestamp is used
