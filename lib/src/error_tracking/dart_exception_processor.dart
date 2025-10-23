@@ -66,15 +66,6 @@ class DartExceptionProcessor {
       exceptionData['value'] = errorMessage;
     }
 
-    // Add package from first stack frame (where exception was thrown)
-    // Only attempt this if we have a valid stack trace
-    if (hasValidStackTrace) {
-      final exceptionPackage = _getExceptionPackage(effectiveStackTrace);
-      if (exceptionPackage != null && exceptionPackage.isNotEmpty) {
-        exceptionData['package'] = exceptionPackage;
-      }
-    }
-
     // Add stacktrace, if any frames are available
     if (frames.isNotEmpty) {
       exceptionData['stacktrace'] = {
@@ -255,24 +246,6 @@ class DartExceptionProcessor {
 
     // For dart: and package: URIs, full path is safe
     return frame.uri.toString();
-  }
-
-  /// Extracts the package name from the first stack frame
-  /// This is more accurate than guessing from exception type
-  static String? _getExceptionPackage(StackTrace stackTrace) {
-    try {
-      final chain = Chain.forTrace(stackTrace);
-
-      // Get the first frame from the first trace (where exception was thrown)
-      if (chain.traces.isNotEmpty && chain.traces.first.frames.isNotEmpty) {
-        final firstFrame = chain.traces.first.frames.first;
-        return _extractPackage(firstFrame);
-      }
-    } catch (e) {
-      // If stack trace parsing fails, return null
-    }
-
-    return null;
   }
 
   /// Gets the current thread ID using isolate-based detection

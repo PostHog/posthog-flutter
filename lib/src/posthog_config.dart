@@ -40,7 +40,7 @@ class PostHogConfig {
   var surveys = false;
 
   /// Configuration for error tracking and exception capture
-  var errorTrackingConfig = PostHogErrorTrackingConfig();
+  final errorTrackingConfig = PostHogErrorTrackingConfig();
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
