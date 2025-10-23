@@ -131,11 +131,7 @@ class Posthog {
           StackTrace? stackTrace,
           Map<String, Object>? properties}) =>
       _posthog.captureException(
-        error: error,
-        stackTrace: stackTrace,
-        properties: properties,
-        handled: true,
-      );
+          error: error, stackTrace: stackTrace, properties: properties);
 
   /// Closes the PostHog SDK and cleans up resources.
   ///

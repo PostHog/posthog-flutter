@@ -7,7 +7,6 @@ class DartExceptionProcessor {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
-    bool handled = true,
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
@@ -54,7 +53,7 @@ class DartExceptionProcessor {
     final exceptionData = <String, dynamic>{
       'type': errorType ?? 'Error',
       'mechanism': {
-        'handled': handled,
+        'handled': true, // always true for now
         'synthetic': isSynthetic,
         'type': 'generic',
       }

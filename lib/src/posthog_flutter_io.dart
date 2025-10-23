@@ -441,12 +441,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> captureException({
-    required Object error,
-    StackTrace? stackTrace,
-    Map<String, Object>? properties,
-    bool handled = true,
-  }) async {
+  Future<void> captureException(
+      {required Object error,
+      StackTrace? stackTrace,
+      Map<String, Object>? properties}) async {
     if (!isSupportedPlatform()) {
       return;
     }
@@ -456,7 +454,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         error: error,
         stackTrace: stackTrace,
         properties: properties,
-        handled: handled,
         inAppIncludes: _config?.errorTrackingConfig.inAppIncludes,
         inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
