@@ -10,7 +10,8 @@ class PostHog {}
 extension PostHogExtension on PostHog {
   external JSAny? identify(
       JSAny userId, JSAny properties, JSAny propertiesSetOnce);
-  external JSAny? capture(JSAny eventName, JSAny properties);
+  external JSAny? capture(
+      JSAny eventName, JSAny properties, CaptureOptions? options);
   external JSAny? alias(JSAny alias);
   // ignore: non_constant_identifier_names
   external JSAny? get_distinct_id();
@@ -31,6 +32,19 @@ extension PostHogExtension on PostHog {
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
+}
+
+@JS('Date')
+extension type JSDate._(JSObject _) implements JSObject {
+  external JSDate(num millisecondsSinceEpoch);
+}
+
+// PostHog capture options class
+@JS()
+@anonymous
+@staticInterop
+class CaptureOptions {
+  external factory CaptureOptions({JSDate? timestamp});
 }
 
 // Accessing PostHog from the window object
@@ -90,6 +104,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       posthog?.capture(
         stringToJSAny(eventName),
         mapToJSAny(properties),
+        null,
       );
       break;
     case 'screen':
@@ -100,6 +115,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       posthog?.capture(
         stringToJSAny('\$screen'),
         mapToJSAny(properties),
+        null,
       );
       break;
     case 'alias':
@@ -209,6 +225,23 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'surveyAction':
       // not supported on Web
+      break;
+    case 'captureException':
+      // grab event properties and timestamp from args
+      final properties = safeMapConversion(args['properties']);
+      final timestamp = args['timestamp'] as int?;
+
+      // The properties already contain the processed exception data from DartExceptionProcessor.processException
+      if (timestamp != null) {
+        final options = CaptureOptions(timestamp: JSDate(timestamp));
+
+        posthog?.capture(
+            stringToJSAny('\$exception'), mapToJSAny(properties), options);
+      } else {
+        // No timestamp provided: skip capture to avoid out-of-order events
+        print(
+            'PostHog: Skipping exception capture without timestamp to maintain event order');
+      }
       break;
     default:
       throw PlatformException(

@@ -40,7 +40,7 @@ class PostHogConfig {
   var surveys = false;
 
   /// Configuration for error tracking and exception capture
-  var errorTrackingConfig = PostHogErrorTrackingConfig();
+  final errorTrackingConfig = PostHogErrorTrackingConfig();
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
@@ -116,7 +116,9 @@ class PostHogErrorTrackingConfig {
   /// For Flutter/Dart, this typically includes:
   /// - Your app's main package (e.g., "package:your_app")
   /// - Any internal packages you own (e.g., "package:your_company_utils")
-  var inAppIncludes = <String>[];
+  ///
+  /// Note: This config will be ignored on web builds
+  final inAppIncludes = <String>[];
 
   /// List of package names to be excluded from inApp frames for exception tracking
   ///
@@ -129,7 +131,9 @@ class PostHogErrorTrackingConfig {
   /// - Third-party analytics packages
   /// - External utility libraries
   /// - Packages you don't control
-  var inAppExcludes = <String>[];
+  ///
+  /// Note: This config will be ignored on web builds
+  final inAppExcludes = <String>[];
 
   /// Configures whether stack trace frames are considered inApp by default
   /// when the origin cannot be determined or no explicit includes/excludes match.
@@ -141,6 +145,8 @@ class PostHogErrorTrackingConfig {
   /// - Local files (no package prefix) are inApp
   /// - dart and flutter packages are excluded
   /// - All other packages are inApp unless in inAppExcludes
+  ///
+  /// Note: This config will be ignored on web builds
   var inAppByDefault = true;
 
   /// Enable automatic capture of unhandled exceptions

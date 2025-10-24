@@ -1,4 +1,3 @@
-import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
@@ -37,28 +36,6 @@ Future<void> main() async {
   await Posthog().setup(config);
 
   runApp(const MyApp());
-}
-
-/// This function runs in a separate isolate with its own sandboxed thread, meant to demonstate capturing exceptions from background "threads"
-void _backgroundIsolateEntryPoint(SendPort sendPort) async {
-  await Future.delayed(const Duration(milliseconds: 500));
-
-  try {
-    // Simulate an exception in the background isolate
-    throw StateError('Background isolate processing failed!');
-  } catch (e, stack) {
-    // Send exception data back to main isolate for capture
-    sendPort.send({
-      'error': e.toString(),
-      'errorType': e.runtimeType.toString(),
-      'stackTrace': stack.toString(),
-      'properties': {
-        'test_type': 'background_isolate_exception',
-        'isolate_name': 'exception-demo-worker',
-        'button_pressed': 'capture_exception_background',
-      },
-    });
-  }
 }
 
 class MyApp extends StatefulWidget {
@@ -325,17 +302,19 @@ class InitialScreenState extends State<InitialScreen> {
                       }
                     }
                   },
-                  child: const Text("Capture Exception (Main)"),
+                  child: const Text("Capture Exception"),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                   ),
                   onPressed: () async {
-                    // Capture exception from background isolate
-                    await _captureExceptionFromBackgroundIsolate();
+                    await Posthog().captureException(
+                      error: 'No Stack Trace Error',
+                      properties: {'test_type': 'no_stack_trace'},
+                    );
                   },
-                  child: const Text("Capture Exception (Background)"),
+                  child: const Text("Capture Exception (Missing Stack)"),
                 ),
                 const Divider(),
                 const Padding(
@@ -450,53 +429,6 @@ class InitialScreenState extends State<InitialScreen> {
         ),
       ),
     );
-  }
-
-  /// Demonstrates exception capture from a background isolate
-  /// This should show a different thread_id than the main isolate
-  Future<void> _captureExceptionFromBackgroundIsolate() async {
-    final receivePort = ReceivePort();
-
-    // Spawn a background isolate with a custom name for demonstration
-    await Isolate.spawn(
-      _backgroundIsolateEntryPoint,
-      receivePort.sendPort,
-      debugName: 'custom-isolate-name-will-be-hashed-as-thread_id',
-    );
-
-    // Wait for the isolate to complete (or timeout after 5 seconds)
-    final result = await receivePort.first.timeout(
-      const Duration(seconds: 5),
-      onTimeout: () => {'type': 'timeout'},
-    );
-
-    if (result is Map<String, dynamic>) {
-      // Reconstruct the stack trace from the string
-      final stackTrace = StackTrace.fromString(result['stackTrace']);
-
-      // Create a synthetic error with the original error message and type
-      final syntheticError =
-          Exception('${result['errorType']}: ${result['error']}');
-
-      await Posthog().captureException(
-        error: syntheticError,
-        stackTrace: stackTrace,
-        properties: Map<String, Object>.from(result['properties'] ?? {}),
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Background isolate exception captured successfully! Check PostHog.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-
-    receivePort.close();
   }
 }
 

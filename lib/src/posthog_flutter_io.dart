@@ -9,7 +9,8 @@ import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
 import 'surveys/models/survey_callbacks.dart';
-import 'exceptions/dart_exception_processor.dart';
+import 'error_tracking/dart_exception_processor.dart';
+import 'utils/property_normalizer.dart';
 
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
@@ -145,11 +146,19 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
+      final normalizedUserProperties = userProperties != null
+          ? PropertyNormalizer.normalize(userProperties)
+          : null;
+      final normalizedUserPropertiesSetOnce = userPropertiesSetOnce != null
+          ? PropertyNormalizer.normalize(userPropertiesSetOnce)
+          : null;
+
       await _methodChannel.invokeMethod('identify', {
         'userId': userId,
-        if (userProperties != null) 'userProperties': userProperties,
-        if (userPropertiesSetOnce != null)
-          'userPropertiesSetOnce': userPropertiesSetOnce,
+        if (normalizedUserProperties != null)
+          'userProperties': normalizedUserProperties,
+        if (normalizedUserPropertiesSetOnce != null)
+          'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on identify: $exception');
@@ -166,9 +175,12 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
+      final normalizedProperties =
+          properties != null ? PropertyNormalizer.normalize(properties) : null;
+
       await _methodChannel.invokeMethod('capture', {
         'eventName': eventName,
-        if (properties != null) 'properties': properties,
+        if (normalizedProperties != null) 'properties': normalizedProperties,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on capture: $exception');
@@ -185,9 +197,12 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
+      final normalizedProperties =
+          properties != null ? PropertyNormalizer.normalize(properties) : null;
+
       await _methodChannel.invokeMethod('screen', {
         'screenName': screenName,
-        if (properties != null) 'properties': properties,
+        if (normalizedProperties != null) 'properties': normalizedProperties,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on screen: $exception');
@@ -334,10 +349,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
+      final normalizedGroupProperties = groupProperties != null
+          ? PropertyNormalizer.normalize(groupProperties)
+          : null;
+
       await _methodChannel.invokeMethod('group', {
         'groupType': groupType,
         'groupKey': groupKey,
-        if (groupProperties != null) 'groupProperties': groupProperties,
+        if (normalizedGroupProperties != null)
+          'groupProperties': normalizedGroupProperties,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on group: $exception');
@@ -421,12 +441,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> captureException({
-    required dynamic error,
-    StackTrace? stackTrace,
-    Map<String, Object>? properties,
-    bool handled = true,
-  }) async {
+  Future<void> captureException(
+      {required Object error,
+      StackTrace? stackTrace,
+      Map<String, Object>? properties}) async {
     if (!isSupportedPlatform()) {
       return;
     }
@@ -440,15 +458,20 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       final exceptionData = DartExceptionProcessor.processException(
         error: error,
-        stackTrace: stackTrace ?? StackTrace.current,
+        stackTrace: stackTrace,
         properties: properties,
-        handled: handled,
         inAppIncludes: _config?.errorTrackingConfig.inAppIncludes,
         inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-      await _methodChannel.invokeMethod('captureException', exceptionData);
+// Add timestamp from Flutter side (will be used and removed from native plugins)
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final normalizedData =
+          PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
+
+      await _methodChannel.invokeMethod('captureException',
+          {'timestamp': timestamp, 'properties': normalizedData});
     } on PlatformException catch (exception) {
       printIfDebug('Exception in captureException: $exception');
     }

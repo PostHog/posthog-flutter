@@ -1,6 +1,11 @@
 ## Next
 
 - feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
+  - **Note**: The following features are not yet supported:
+    - Automatic exception capture
+    - De-obfuscating stacktraces from obfuscated builds ([--obfuscate](https://docs.flutter.dev/deployment/obfuscate) and [--split-debug-info](https://docs.flutter.dev/deployment/obfuscate))
+    - [Source code context](/docs/error-tracking/stack-traces) associated with an exception
+  - **BREAKING**: Minimum Dart SDK version bumped to 3.4.0 and Flutter to 3.22.0 (required for `stack_trace` dependency compatibility)
 - feat: add autocapture of Flutter and Dart exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
 
 ## 5.6.0
