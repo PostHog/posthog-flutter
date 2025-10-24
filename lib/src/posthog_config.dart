@@ -116,6 +116,8 @@ class PostHogErrorTrackingConfig {
   /// For Flutter/Dart, this typically includes:
   /// - Your app's main package (e.g., "package:your_app")
   /// - Any internal packages you own (e.g., "package:your_company_utils")
+  ///
+  /// Note: This config will be ignored on web builds
   final inAppIncludes = <String>[];
 
   /// List of package names to be excluded from inApp frames for exception tracking
@@ -129,6 +131,8 @@ class PostHogErrorTrackingConfig {
   /// - Third-party analytics packages
   /// - External utility libraries
   /// - Packages you don't control
+  ///
+  /// Note: This config will be ignored on web builds
   final inAppExcludes = <String>[];
 
   /// Configures whether stack trace frames are considered inApp by default
@@ -141,6 +145,8 @@ class PostHogErrorTrackingConfig {
   /// - Local files (no package prefix) are inApp
   /// - dart and flutter packages are excluded
   /// - All other packages are inApp unless in inAppExcludes
+  ///
+  /// Note: This config will be ignored on web builds
   var inAppByDefault = true;
 
   Map<String, dynamic> toMap() {
