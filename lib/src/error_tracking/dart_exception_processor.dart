@@ -95,7 +95,18 @@ class DartExceptionProcessor {
     return frame.package == 'posthog_flutter';
   }
 
+  /// Asynchronous gap frame for separating async traces
+  static const _asynchronousGapFrame = <String, dynamic>{
+    'platform': 'dart',
+    'abs_path': '<asynchronous suspension>',
+    'in_app': false,
+    'synthetic': true
+  };
+
   /// Parses stack trace into PostHog format
+  ///
+  /// Approach inspired by Sentry's stack trace factory implementation:
+  /// https://github.com/getsentry/sentry-dart/blob/a69a51fd1695dd93024be80a50ad05dd990b2b82/packages/dart/lib/src/sentry_stack_trace_factory.dart#L29-L53
   static List<Map<String, dynamic>> _parseStackTrace(
     StackTrace stackTrace, {
     List<String>? inAppIncludes,
@@ -106,7 +117,7 @@ class DartExceptionProcessor {
     final chain = Chain.forTrace(stackTrace);
     final frames = <Map<String, dynamic>>[];
 
-    for (final trace in chain.traces) {
+    for (final (index, trace) in chain.traces.indexed) {
       bool skipNextPostHogFrame = removeTopPostHogFrames;
 
       for (final frame in trace.frames) {
@@ -127,6 +138,11 @@ class DartExceptionProcessor {
         if (processedFrame != null) {
           frames.add(processedFrame);
         }
+      }
+
+      // Add asynchronous gap frame between traces (skipping last trace)
+      if (index < chain.traces.length - 1) {
+        frames.add(_asynchronousGapFrame);
       }
     }
 
