@@ -31,7 +31,11 @@ class PostHogConfig {
 
   /// Enable Surveys
   ///
-  /// Note: Please note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// Note: Enabling this configuration alone is not enough for surveys to show.
+  /// You must also install `PosthogObserver` to your app.
+  /// See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
+  ///
+  /// Also note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
   ///
   /// Defaults to true.
   var surveys = true;
