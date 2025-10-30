@@ -1,5 +1,8 @@
 ## Next
 
+- feat: surveys GA ([#215](https://github.com/PostHog/posthog-flutter/pull/215))
+> Note: Surveys are now enabled by default.
+
 ## 5.6.0
 
 - feat: surveys use the new response question id format ([#210](https://github.com/PostHog/posthog-flutter/pull/210))
