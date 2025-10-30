@@ -5,6 +5,7 @@
     - Automatic exception capture
     - De-obfuscating stacktraces from obfuscated builds ([--obfuscate](https://docs.flutter.dev/deployment/obfuscate) and [--split-debug-info](https://docs.flutter.dev/deployment/obfuscate))
     - [Source code context](/docs/error-tracking/stack-traces) associated with an exception
+    - Flutter web support
   - **BREAKING**: Minimum Dart SDK version bumped to 3.4.0 and Flutter to 3.22.0 (required for `stack_trace` dependency compatibility)
 
 ## 5.6.0

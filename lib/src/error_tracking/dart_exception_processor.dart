@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
 
@@ -174,7 +173,7 @@ class DartExceptionProcessor {
     }
 
     // add function, if available
-    final member = _extractMember(frame);
+    final member = frame.member;
     if (member != null && member.isNotEmpty) {
       frameData['function'] = member;
     }
@@ -240,25 +239,6 @@ class DartExceptionProcessor {
 
     // 4. Default fallback
     return inAppByDefault;
-  }
-
-  static String? _extractMember(Frame frame) {
-    final member = frame.member;
-    if (member == null || member.isEmpty) {
-      return member;
-    }
-
-    // Only sanitize for web builds to avoid PII leakage
-    if (kIsWeb) {
-      // Handle WebAssembly format: "module0.InitialScreenState.build closure at file:///path/to/file.dart:251:30"
-      // For privacy, just return the function part (everything before "at")
-      final atIndex = member.indexOf(' at ');
-      if (atIndex != -1) {
-        return member.substring(0, atIndex);
-      }
-    }
-
-    return member;
   }
 
   static String? _extractPackage(Frame frame) {
