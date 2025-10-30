@@ -413,5 +413,52 @@ void main() {
       expect(result['\$exception_level'], equals('warning'));
       expect(result['custom_property'], equals('custom_value'));
     });
+
+    test('inserts asynchronous gap frames between traces', () async {
+      final exception = Exception('Async test exception');
+
+      // Create an async stack trace by throwing from an async function
+      StackTrace? asyncStackTrace;
+      try {
+        await _asyncFunction1();
+      } catch (e, stackTrace) {
+        asyncStackTrace = stackTrace;
+      }
+
+      final result = DartExceptionProcessor.processException(
+        error: exception,
+        stackTrace: asyncStackTrace,
+      );
+
+      final exceptionData =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
+
+      // Look for asynchronous gap frames
+      final gapFrames = frames
+          .where((frame) => frame['abs_path'] == '<asynchronous suspension>')
+          .toList();
+
+      // Should have at least one gap frame in an async stack trace
+      expect(gapFrames, isNotEmpty,
+          reason: 'Async stack traces should contain gap frames');
+
+      // Verify gap frame structure
+      final gapFrame = gapFrames.first;
+      expect(gapFrame['platform'], equals('dart'));
+      expect(gapFrame['in_app'], isFalse);
+      expect(gapFrame['abs_path'], equals('<asynchronous suspension>'));
+    });
   });
+}
+
+// Helper functions to generate async stack traces for testing
+Future<void> _asyncFunction1() async {
+  await _asyncFunction2();
+}
+
+Future<void> _asyncFunction2() async {
+  await Future.delayed(Duration.zero); // Force async boundary
+  throw StateError('Async error for testing');
 }
