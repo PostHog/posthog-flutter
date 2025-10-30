@@ -1,5 +1,3 @@
-import 'package:meta/meta.dart';
-
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
@@ -31,13 +29,16 @@ class PostHogConfig {
   /// iOS only
   var dataMode = PostHogDataMode.any;
 
-  /// Enable Surveys (Currently for iOS only)
+  /// Enable Surveys
   ///
-  /// Note: Please note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// Note: Enabling this configuration alone is not enough for surveys to show.
+  /// You must also install `PosthogObserver` to your app.
+  /// See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
   ///
-  /// Experimental. Defaults to false.
-  @experimental
-  var surveys = false;
+  /// Also note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  ///
+  /// Defaults to true.
+  var surveys = true;
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
