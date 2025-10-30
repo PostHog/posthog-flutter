@@ -1,5 +1,3 @@
-import 'package:meta/meta.dart';
-
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
