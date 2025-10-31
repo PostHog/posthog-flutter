@@ -1,5 +1,7 @@
 ## Next
 
+## 5.7.0
+
 - feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
   - **Note**: The following features are not yet supported:
     - Automatic exception capture
