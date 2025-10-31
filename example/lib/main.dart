@@ -243,6 +243,66 @@ class InitialScreenState extends State<InitialScreen> {
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
+                    "Error Tracking",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      // Simulate an exception in main isolate
+                      // throw 'a custom error string';
+                      // throw 333;
+                      throw CustomException(
+                        'This is a custom exception with additional context',
+                        code: 'DEMO_ERROR_001',
+                        additionalData: {
+                          'user_action': 'button_press',
+                          'timestamp': DateTime.now().millisecondsSinceEpoch,
+                          'feature_enabled': true,
+                        },
+                      );
+                    } catch (e, stack) {
+                      await Posthog().captureException(
+                        error: e,
+                        stackTrace: stack,
+                        properties: {
+                          'test_type': 'main_isolate_exception',
+                          'button_pressed': 'capture_exception_main',
+                          'exception_category': 'custom',
+                        },
+                      );
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Main isolate exception captured successfully! Check PostHog.'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Capture Exception"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  onPressed: () async {
+                    await Posthog().captureException(
+                      error: 'No Stack Trace Error',
+                      properties: {'test_type': 'no_stack_trace'},
+                    );
+                  },
+                  child: const Text("Capture Exception (Missing Stack)"),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
                     "Feature flags",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -389,5 +449,26 @@ class ThirdRoute extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Custom exception class for demonstration purposes
+class CustomException implements Exception {
+  final String message;
+  final String? code;
+  final Map<String, dynamic>? additionalData;
+
+  const CustomException(
+    this.message, {
+    this.code,
+    this.additionalData,
+  });
+
+  @override
+  String toString() {
+    if (code != null) {
+      return 'CustomException($code): $message $additionalData';
+    }
+    return 'CustomException: $message $additionalData';
   }
 }
