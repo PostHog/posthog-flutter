@@ -18,20 +18,10 @@ Future<void> main() async {
   config.flushAt = 1;
 
   // Configure error tracking and exception capture
-  config.errorTrackingConfig.captureUnhandledExceptions =
-      true; // Enable autocapture
   config.errorTrackingConfig.captureFlutterErrors =
       true; // Capture Flutter framework errors
-  config.errorTrackingConfig.captureDartErrors =
+  config.errorTrackingConfig.capturePlatformDispatcherErrors =
       true; // Capture Dart runtime errors
-  // Configure exception filtering
-  config.errorTrackingConfig.shouldCaptureException = (error) {
-    // Example: Don't capture StateError exceptions
-    if (error is StateError) return false;
-
-    // Capture all other exceptions
-    return true;
-  };
 
   await Posthog().setup(config);
 

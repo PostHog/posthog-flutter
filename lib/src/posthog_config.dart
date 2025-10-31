@@ -149,15 +149,6 @@ class PostHogErrorTrackingConfig {
   /// Note: This config will be ignored on web builds
   var inAppByDefault = true;
 
-  /// Enable automatic capture of unhandled exceptions
-  ///
-  /// When enabled, PostHog will automatically capture:
-  /// - Flutter framework errors (FlutterError.onError)
-  /// - Dart runtime errors (PlatformDispatcher.onError)
-  ///
-  /// Default: false
-  var captureUnhandledExceptions = false;
-
   /// Enable automatic capture of Flutter framework errors
   ///
   /// Only applies when captureUnhandledExceptions is true.
@@ -172,35 +163,15 @@ class PostHogErrorTrackingConfig {
   /// Controls whether `PlatformDispatcher.onError errors` are captured.
   ///
   /// Default: true
-  var captureDartErrors = true;
+  var capturePlatformDispatcherErrors = true;
 
-  /// Callback function to determine if an exception should be captured
-  ///
-  /// Return true to capture the exception, false to ignore it.
-  /// If null, all exceptions will be captured (default behavior).
-  ///
-  /// Example:
-  /// ```dart
-  /// shouldCaptureException: (error) {
-  ///   // Don't capture test exceptions
-  ///   if (error is TestException) return false;
-  ///   // Don't capture StateError exceptions
-  ///   if (error is StateError) return false;
-  ///   // Capture all other exceptions
-  ///   return true;
-  /// }
-  /// ```
-  bool Function(dynamic error)? shouldCaptureException;
-
-  // We could skip for now, but we will need this on the native layer soon
   Map<String, dynamic> toMap() {
     return {
       'inAppIncludes': inAppIncludes,
       'inAppExcludes': inAppExcludes,
       'inAppByDefault': inAppByDefault,
-      'captureUnhandledExceptions': captureUnhandledExceptions,
       'captureFlutterErrors': captureFlutterErrors,
-      'captureDartErrors': captureDartErrors,
+      'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
     };
   }
 }

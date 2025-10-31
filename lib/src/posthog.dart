@@ -1,6 +1,6 @@
 import 'package:meta/meta.dart';
 
-import 'exceptions/posthog_error_tracking_autocapture_integration.dart';
+import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_observer.dart';
@@ -33,7 +33,8 @@ class Posthog {
 
   void installFlutterIntegrations(PostHogConfig config) {
     // Install exception autocapture if enabled
-    if (config.errorTrackingConfig.captureUnhandledExceptions) {
+    if (config.errorTrackingConfig.captureFlutterErrors ||
+        config.errorTrackingConfig.capturePlatformDispatcherErrors) {
       PostHogErrorTrackingAutoCaptureIntegration.install(
         config: config.errorTrackingConfig,
         posthog: _posthog,

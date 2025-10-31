@@ -39,7 +39,7 @@ class PostHogErrorTrackingAutoCaptureIntegration {
       posthog: posthog,
     );
 
-    if (config.captureUnhandledExceptions) {
+    if (config.captureFlutterErrors || config.capturePlatformDispatcherErrors) {
       _instance!.start();
     }
 
@@ -66,7 +66,7 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     }
 
     // Set up platform error handler if enabled
-    if (_config.captureDartErrors) {
+    if (_config.capturePlatformDispatcherErrors) {
       _setupPlatformErrorHandler();
     }
   }
@@ -166,10 +166,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     String? context,
   }) {
     return _posthog.captureException(
-      error: error,
-      stackTrace: stackTrace ?? StackTrace.current,
-      properties: context != null ? {'context': context} : null,
-      handled: handled,
-    );
+        error: error,
+        stackTrace: stackTrace ?? StackTrace.current,
+        properties: context != null ? {'context': context} : null);
   }
 }
