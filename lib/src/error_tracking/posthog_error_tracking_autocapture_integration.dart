@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 import '../posthog_flutter_platform_interface.dart';
 import '../posthog_config.dart';
@@ -101,14 +102,37 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   }
 
   void _posthogFlutterErrorHandler(FlutterErrorDetails details) {
-    // don't capture silent errors (could maybe be a config?)
-    if (!details.silent) {
+    if (!details.silent || _config.captureSilentFlutterErrors) {
+      // Collect additional context information
+      //(see: https://github.com/getsentry/sentry-dart/blob/a69a51fd1695dd93024be80a50ad05dd990b2b82/packages/flutter/lib/src/integrations/flutter_error_integration.dart#L35-L60)
+      final context = details.context?.toDescription();
+      final collector = details.informationCollector?.call() ?? [];
+      final information = collector.isNotEmpty
+          ? (StringBuffer()..writeAll(collector, '\n')).toString()
+          : null;
+      final library = details.library;
+      final errorSummary = details.toStringShort();
+
+      // Build additional properties with Flutter-specific details
+      final flutterErrorDetails = <String, Object>{
+        if (context != null) 'context': 'thrown $context',
+        if (information != null) 'information': information,
+        if (library != null) 'library': library,
+        'error_summary': errorSummary,
+        'silent': details.silent,
+      };
+
+      final wrappedError = PostHogException(
+          source: details.exception, mechanism: 'FlutterError', handled: false);
+
       _captureException(
-        error: details.exception,
+        error: wrappedError,
         stackTrace: details.stack,
-        context: details.context?.toString(),
-        mechanismType: 'FlutterError',
+        properties: {'flutter_error_details': flutterErrorDetails},
       );
+    } else {
+      printIfDebug(
+          "Error not captured because FlutterErrorDetails.silent is true and captureSilentFlutterErrors is false");
     }
 
     // Call the original handler
@@ -138,10 +162,13 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   }
 
   bool _posthogPlatformErrorHandler(Object error, StackTrace stackTrace) {
-    _captureException(
-        error: error,
-        stackTrace: stackTrace,
-        mechanismType: 'PlatformDispatcher');
+    final wrappedError = PostHogException(
+      source: error,
+      mechanism: 'PlatformDispatcher',
+      handled: false,
+    );
+
+    _captureException(error: wrappedError, stackTrace: stackTrace);
 
     // Call the original handler
     if (_originalPlatformErrorHandler != null) {
@@ -158,21 +185,11 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   }
 
   Future<void> _captureException({
-    required dynamic error,
+    required PostHogException error,
     required StackTrace? stackTrace,
-    String? context,
-    String mechanismType = 'generic',
+    Map<String, Object>? properties,
   }) {
-    // Wrap the original error in PostHogException with mechanism information
-    final wrappedError = PostHogException(
-      source: error,
-      mechanism: mechanismType,
-      handled: false, // Always false for autocapture (unhandled exceptions)
-    );
-
     return _posthog.captureException(
-        error: wrappedError,
-        stackTrace: stackTrace ?? StackTrace.current,
-        properties: context != null ? {'context': context} : null);
+        error: error, stackTrace: stackTrace, properties: properties);
   }
 }

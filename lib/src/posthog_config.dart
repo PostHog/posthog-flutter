@@ -156,6 +156,13 @@ class PostHogErrorTrackingConfig {
   /// Default: true (when autocapture is enabled)
   var captureFlutterErrors = true;
 
+  /// Enable capturing of silent Flutter errors
+  ///
+  /// Controls whether Flutter errors marked as silent (FlutterErrorDetails.silent = true) are captured.
+  ///
+  /// Default: false
+  var captureSilentFlutterErrors = false;
+
   /// Enable automatic capture of Dart runtime errors
   ///
   /// Controls whether `PlatformDispatcher.onError errors` are captured.
@@ -176,6 +183,7 @@ class PostHogErrorTrackingConfig {
       'inAppExcludes': inAppExcludes,
       'inAppByDefault': inAppByDefault,
       'captureFlutterErrors': captureFlutterErrors,
+      'captureSilentFlutterErrors': captureSilentFlutterErrors,
       'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
       'captureNativeExceptions': captureNativeExceptions,
     };
