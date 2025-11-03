@@ -34,16 +34,18 @@ class PostHogErrorTrackingAutoCaptureIntegration {
       return null;
     }
 
-    _instance = PostHogErrorTrackingAutoCaptureIntegration._(
+    final instance = PostHogErrorTrackingAutoCaptureIntegration._(
       config: config,
       posthog: posthog,
     );
 
+    _instance = instance;
+
     if (config.captureFlutterErrors || config.capturePlatformDispatcherErrors) {
-      _instance!.start();
+      instance.start();
     }
 
-    return _instance;
+    return instance;
   }
 
   /// Uninstall the autocapture integration
