@@ -82,11 +82,16 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
     _isEnabled = false;
 
-    // Restore original handlers
-    FlutterError.onError = _originalFlutterErrorHandler;
-    PlatformDispatcher.instance.onError = _originalPlatformErrorHandler;
-    _originalPlatformErrorHandler = null;
+    // Restore original handlers only if our own handler is still set
+    if (FlutterError.onError == _posthogFlutterErrorHandler) {
+      FlutterError.onError = _originalFlutterErrorHandler;
+    }
+    if (PlatformDispatcher.instance.onError == _posthogPlatformErrorHandler) {
+      PlatformDispatcher.instance.onError = _originalPlatformErrorHandler;
+    }
+    // release refs
     _originalFlutterErrorHandler = null;
+    _originalPlatformErrorHandler = null;
   }
 
   /// Flutter framework error handler
@@ -135,19 +140,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
           "Error not captured because FlutterErrorDetails.silent is true and captureSilentFlutterErrors is false");
     }
 
-    // Call the original handler
-    if (_originalFlutterErrorHandler != null) {
-      try {
-        _originalFlutterErrorHandler!(details);
-      } catch (e) {
-        // Pretty sure we should be doing this to avoid infinite loops
-        debugPrint(
-            'PostHog: Error in original FlutterError.onError handler: $e');
-      }
-    } else {
-      // If no original handler, use the default behavior (default is to dump to console)
-      FlutterError.presentError(details);
-    }
+    // Call the original handler, if any
+    _originalFlutterErrorHandler?.call(details);
   }
 
   /// Platform error handler for Dart runtime errors
@@ -170,18 +164,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
     _captureException(error: wrappedError, stackTrace: stackTrace);
 
-    // Call the original handler
-    if (_originalPlatformErrorHandler != null) {
-      try {
-        return _originalPlatformErrorHandler!(error, stackTrace);
-      } catch (e) {
-        debugPrint(
-            'PostHog: Error in original PlatformDispatcher.onError handler: $e');
-        return true; // Consider the error handled
-      }
-    }
-
-    return false; // No original handler, don't modify behavior
+    // Call the original handler, if any
+    // False otherwise, so that default fallback mechanism is used
+    return _originalPlatformErrorHandler?.call(error, stackTrace) ?? false;
   }
 
   Future<void> _captureException({
