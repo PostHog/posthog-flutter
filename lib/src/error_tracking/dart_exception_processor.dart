@@ -1,5 +1,6 @@
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
+import 'posthog_exception.dart';
 
 class DartExceptionProcessor {
   /// Converts Dart error/exception and stack trace to PostHog exception format
@@ -12,12 +13,24 @@ class DartExceptionProcessor {
     bool inAppByDefault = true,
     StackTrace Function()? stackTraceProvider, //for testing
   }) {
+    // Extract PostHog metadata if error is wrapped in PostHogException
+    String mechanismType = 'generic';
+    bool handled = true;
+    bool isFatal = false;
+    Object currentError = error;
+
+    if (error is PostHogException) {
+      handled = error.handled;
+      mechanismType = error.mechanism;
+      currentError = error.source;
+    }
+
     StackTrace? effectiveStackTrace = stackTrace;
     bool isGeneratedStackTrace = false;
 
     // If it's an Error, try to use its built-in stackTrace
-    if (error is Error) {
-      effectiveStackTrace ??= error.stackTrace;
+    if (currentError is Error) {
+      effectiveStackTrace ??= currentError.stackTrace;
     }
 
     // If still null or empty, get current stack trace
@@ -41,7 +54,7 @@ class DartExceptionProcessor {
           )
         : <Map<String, dynamic>>[];
 
-    final errorType = _getExceptionType(error);
+    final errorType = _getExceptionType(currentError);
 
     // Mark exception as synthetic if:
     // - runtimeType.toString() returned empty/null (fallback to 'Error' type)
@@ -53,14 +66,14 @@ class DartExceptionProcessor {
     final exceptionData = <String, dynamic>{
       'type': errorType ?? 'Error',
       'mechanism': {
-        'handled': true, // always true for now
+        'handled': handled,
         'synthetic': isSynthetic,
-        'type': 'generic',
+        'type': mechanismType,
       }
     };
 
     // Add exception message, if available
-    final errorMessage = error.toString();
+    final errorMessage = currentError.toString();
     if (errorMessage.isNotEmpty) {
       exceptionData['value'] = errorMessage;
     }

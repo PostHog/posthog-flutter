@@ -1,8 +1,10 @@
 import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 
-import '../posthog_config.dart';
 import '../posthog_flutter_platform_interface.dart';
+import '../posthog_config.dart';
+import 'posthog_exception.dart';
 
 /// Handles automatic capture of Flutter and Dart exceptions
 class PostHogErrorTrackingAutoCaptureIntegration {
@@ -104,8 +106,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
       _captureException(
         error: details.exception,
         stackTrace: details.stack,
-        handled: false,
         context: details.context?.toString(),
+        mechanismType: 'FlutterError',
       );
     }
 
@@ -139,8 +141,7 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     _captureException(
         error: error,
         stackTrace: stackTrace,
-        handled: false,
-        context: 'Platform error');
+        mechanismType: 'PlatformDispatcher');
 
     // Call the original handler
     if (_originalPlatformErrorHandler != null) {
@@ -159,11 +160,18 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   Future<void> _captureException({
     required dynamic error,
     required StackTrace? stackTrace,
-    required bool handled,
     String? context,
+    String mechanismType = 'generic',
   }) {
+    // Wrap the original error in PostHogException with mechanism information
+    final wrappedError = PostHogException(
+      source: error,
+      mechanism: mechanismType,
+      handled: false, // Always false for autocapture (unhandled exceptions)
+    );
+
     return _posthog.captureException(
-        error: error,
+        error: wrappedError,
         stackTrace: stackTrace ?? StackTrace.current,
         properties: context != null ? {'context': context} : null);
   }
