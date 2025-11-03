@@ -31,11 +31,12 @@ class PostHogConfig {
 
   /// Enable Surveys
   ///
-  /// Note: Enabling this configuration alone is not enough for surveys to show.
-  /// You must also install `PosthogObserver` to your app.
-  /// See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
-  ///
-  /// Also note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// **Notes:**
+  /// - After calling `Posthog().close()`, surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// - You must install `PosthogObserver` in your app for surveys to display
+  ///   - See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
+  /// - For Flutter web, this setting will be ignored. Surveys on web use the JavaScript Web SDK instead.
+  ///   - See: https://posthog.com/docs/surveys/installation?tab=Web
   ///
   /// Defaults to true.
   var surveys = true;
