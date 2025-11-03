@@ -151,7 +151,6 @@ class PostHogErrorTrackingConfig {
 
   /// Enable automatic capture of Flutter framework errors
   ///
-  /// Only applies when captureUnhandledExceptions is true.
   /// Controls whether `FlutterError.onError` errors are captured.
   ///
   /// Default: true (when autocapture is enabled)
@@ -159,11 +158,17 @@ class PostHogErrorTrackingConfig {
 
   /// Enable automatic capture of Dart runtime errors
   ///
-  /// Only applies when captureUnhandledExceptions is true.
   /// Controls whether `PlatformDispatcher.onError errors` are captured.
   ///
   /// Default: true
   var capturePlatformDispatcherErrors = true;
+
+  /// Enable automatic capture of exceptions in the native SDKs (Android only for now)
+  ///
+  /// Controls whether native exceptions are captured.
+  ///
+  /// Default: true
+  var captureNativeExceptions = true;
 
   Map<String, dynamic> toMap() {
     return {
@@ -172,6 +177,7 @@ class PostHogErrorTrackingConfig {
       'inAppByDefault': inAppByDefault,
       'captureFlutterErrors': captureFlutterErrors,
       'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
+      'captureNativeExceptions': captureNativeExceptions,
     };
   }
 }
