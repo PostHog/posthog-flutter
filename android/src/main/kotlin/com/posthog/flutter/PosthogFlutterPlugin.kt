@@ -19,6 +19,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.util.Date
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
@@ -155,6 +156,9 @@ class PosthogFlutterPlugin :
             }
             "flush" -> {
                 flush(result)
+            }
+            "captureException" -> {
+                captureException(call, result)
             }
             "close" -> {
                 close(result)
@@ -529,6 +533,34 @@ class PosthogFlutterPlugin :
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureException(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val arguments =
+                call.arguments as? Map<String, Any> ?: run {
+                    result.error("INVALID_ARGUMENTS", "Invalid arguments for captureException", null)
+                    return
+                }
+
+            val properties = arguments["properties"] as? Map<String, Any>
+            val timestampMs = arguments["timestamp"] as? Long
+
+            // Extract timestamp from Flutter
+            val timestamp: Date? =
+                timestampMs?.let {
+                    // timestampMs already in UTC milliseconds epoch
+                    Date(timestampMs)
+                }
+
+            PostHog.capture("\$exception", properties = properties, timestamp = timestamp)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)
         }
     }
 

@@ -210,6 +210,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'surveyAction':
       // not supported on Web
       break;
+    case 'captureException':
+      // not implemented on Web
+      break;
     default:
       throw PlatformException(
         code: 'Unimplemented',
