@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
+import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 
 void main() {
   group('DartExceptionProcessor', () {
@@ -449,6 +450,115 @@ void main() {
       expect(gapFrame['platform'], equals('dart'));
       expect(gapFrame['in_app'], isFalse);
       expect(gapFrame['abs_path'], equals('<asynchronous suspension>'));
+    });
+
+    test('processes PostHogException with different mechanism types', () {
+      final testCases = [
+        {'mechanism': 'FlutterError', 'handled': false},
+        {'mechanism': 'PlatformDispatcher', 'handled': false},
+        {'mechanism': 'UncaughtExceptionHandler', 'handled': true},
+        {'mechanism': 'custom_mechanism', 'handled': true},
+      ];
+
+      for (final testCase in testCases) {
+        final originalError = StateError('Test error');
+        final postHogException = PostHogException(
+          source: originalError,
+          mechanism: testCase['mechanism'] as String,
+          handled: testCase['handled'] as bool,
+        );
+
+        final result = DartExceptionProcessor.processException(
+          error: postHogException,
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+        );
+
+        final exceptionData =
+            (result['\$exception_list'] as List).first as Map<String, dynamic>;
+
+        expect(
+            exceptionData['mechanism']['type'], equals(testCase['mechanism']));
+        expect(
+            exceptionData['mechanism']['handled'], equals(testCase['handled']));
+        expect(exceptionData['type'], equals('StateError'));
+      }
+    });
+
+    test(
+        'uses original error for stack trace processing when wrapped in PostHogException',
+        () {
+      // Create an Error (not Exception) so it has a built-in stackTrace
+      late Error originalError;
+
+      try {
+        throw StateError('Original error with stack trace');
+      } catch (error) {
+        originalError = error as Error;
+      }
+
+      // Wrap in PostHogException
+      final postHogException = PostHogException(
+        source: originalError,
+        mechanism: 'test_mechanism',
+        handled: true,
+      );
+
+      // Process without providing external stack trace - should use original error's stackTrace
+      final result = DartExceptionProcessor.processException(
+        error: postHogException,
+        // No stackTrace provided - should extract from original error
+      );
+
+      final exceptionData =
+          (result['\$exception_list'] as List).first as Map<String, dynamic>;
+
+      // Verify it used the original error for processing
+      expect(exceptionData['type'], equals('StateError'));
+      expect(exceptionData['value'],
+          equals('Bad state: Original error with stack trace'));
+      expect(exceptionData['mechanism']['type'], equals('test_mechanism'));
+      expect(exceptionData['mechanism']['handled'], equals(true));
+
+      // Should have stacktrace frames from the original error
+      expect(exceptionData['stacktrace'], isNotNull);
+      expect(exceptionData['stacktrace']['frames'], isA<List>());
+      expect(
+          (exceptionData['stacktrace']['frames'] as List).isNotEmpty, isTrue);
+    });
+
+    test('processes original error type correctly when wrapped', () {
+      final testErrorTypes = [
+        Exception('Test exception'),
+        StateError('State error'),
+        ArgumentError('Argument error'),
+        FormatException('Format error'),
+        RangeError('Range error'),
+      ];
+
+      for (final originalError in testErrorTypes) {
+        final postHogException = PostHogException(
+          source: originalError,
+          mechanism: 'test_mechanism',
+        );
+
+        final result = DartExceptionProcessor.processException(
+          error: postHogException,
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+        );
+
+        final exceptionData =
+            (result['\$exception_list'] as List).first as Map<String, dynamic>;
+
+        // Should extract type from original error, not PostHogException
+        final expectedType = originalError.runtimeType.toString();
+        expect(exceptionData['type'], equals(expectedType));
+
+        // Should use original error's toString for message
+        expect(exceptionData['value'], equals(originalError.toString()));
+
+        // But mechanism should come from wrapper
+        expect(exceptionData['mechanism']['type'], equals('test_mechanism'));
+      }
     });
   });
 }
