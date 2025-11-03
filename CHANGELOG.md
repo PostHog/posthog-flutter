@@ -1,5 +1,7 @@
 ## Next
 
+## 5.8.0
+
 - feat: surveys GA ([#215](https://github.com/PostHog/posthog-flutter/pull/215))
 > Note: Surveys are now enabled by default.
 
