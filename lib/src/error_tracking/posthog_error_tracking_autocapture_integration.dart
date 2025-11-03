@@ -80,15 +80,10 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     _isEnabled = false;
 
     // Restore original handlers
-    if (_originalFlutterErrorHandler != null) {
-      FlutterError.onError = _originalFlutterErrorHandler;
-      _originalFlutterErrorHandler = null;
-    }
-
-    if (_originalPlatformErrorHandler != null) {
-      PlatformDispatcher.instance.onError = _originalPlatformErrorHandler;
-      _originalPlatformErrorHandler = null;
-    }
+    FlutterError.onError = _originalFlutterErrorHandler;
+    PlatformDispatcher.instance.onError = _originalPlatformErrorHandler;
+    _originalPlatformErrorHandler = null;
+    _originalFlutterErrorHandler = null;
   }
 
   /// Flutter framework error handler
