@@ -1,5 +1,3 @@
-import 'package:meta/meta.dart';
-
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
@@ -31,13 +29,17 @@ class PostHogConfig {
   /// iOS only
   var dataMode = PostHogDataMode.any;
 
-  /// Enable Surveys (Currently for iOS only)
+  /// Enable Surveys
   ///
-  /// Note: Please note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// **Notes:**
+  /// - After calling `Posthog().close()`, surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// - You must install `PosthogObserver` in your app for surveys to display
+  ///   - See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
+  /// - For Flutter web, this setting will be ignored. Surveys on web use the JavaScript Web SDK instead.
+  ///   - See: https://posthog.com/docs/surveys/installation?tab=Web
   ///
-  /// Experimental. Defaults to false.
-  @experimental
-  var surveys = false;
+  /// Defaults to true.
+  var surveys = true;
 
   /// Configuration for error tracking and exception capture
   final errorTrackingConfig = PostHogErrorTrackingConfig();

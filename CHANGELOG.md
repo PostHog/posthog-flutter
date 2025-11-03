@@ -1,5 +1,8 @@
 ## Next
 
+- feat: surveys GA ([#215](https://github.com/PostHog/posthog-flutter/pull/215))
+> Note: Surveys are now enabled by default.
+
 ## 5.7.0
 
 - feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
