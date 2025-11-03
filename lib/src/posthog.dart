@@ -26,12 +26,12 @@ class Posthog {
   Future<void> setup(PostHogConfig config) {
     _config = config; // Store the config
 
-    installFlutterIntegrations(config);
+    _installFlutterIntegrations(config);
 
     return _posthog.setup(config);
   }
 
-  void installFlutterIntegrations(PostHogConfig config) {
+  void _installFlutterIntegrations(PostHogConfig config) {
     // Install exception autocapture if enabled
     if (config.errorTrackingConfig.captureFlutterErrors ||
         config.errorTrackingConfig.capturePlatformDispatcherErrors) {
@@ -42,7 +42,7 @@ class Posthog {
     }
   }
 
-  void uninstallFlutterIntegrations() {
+  void _uninstallFlutterIntegrations() {
     // Uninstall exception autocapture integration
     PostHogErrorTrackingAutoCaptureIntegration.uninstall();
   }
@@ -107,7 +107,7 @@ class Posthog {
 
   Future<void> disable() {
     // Uninstall Flutter-specific integrations when disabling
-    uninstallFlutterIntegrations();
+    _uninstallFlutterIntegrations();
 
     return _posthog.disable();
   }
@@ -167,7 +167,7 @@ class Posthog {
     PosthogObserver.clearCurrentContext();
 
     // Uninstall Flutter integrations
-    uninstallFlutterIntegrations();
+    _uninstallFlutterIntegrations();
 
     return _posthog.close();
   }
