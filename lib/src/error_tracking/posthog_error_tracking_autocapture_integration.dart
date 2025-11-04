@@ -1,6 +1,9 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+
+import 'isolate_handler_io.dart'
+    if (dart.library.html) 'isolate_handler_web.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 import '../posthog_flutter_platform_interface.dart';
@@ -15,6 +18,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   // Store original handlers (we'll chain with them from our handler)
   FlutterExceptionHandler? _originalFlutterErrorHandler;
   ErrorCallback? _originalPlatformErrorHandler;
+
+  // Isolate error handling
+  final IsolateErrorHandler _isolateErrorHandler = IsolateErrorHandler();
 
   bool _isEnabled = false;
 
@@ -44,7 +50,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
     _instance = instance;
 
-    if (config.captureFlutterErrors || config.capturePlatformDispatcherErrors) {
+    if (config.captureFlutterErrors ||
+        config.capturePlatformDispatcherErrors ||
+        config.captureIsolateErrors) {
       instance.start();
     }
 
@@ -74,6 +82,11 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     if (_config.capturePlatformDispatcherErrors) {
       _setupPlatformErrorHandler();
     }
+
+    // Set up isolate error handler if enabled
+    if (_config.captureIsolateErrors) {
+      _setupIsolateErrorHandler();
+    }
   }
 
   /// Stop automatic exception capture (restores original handlers)
@@ -89,6 +102,10 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     if (PlatformDispatcher.instance.onError == _posthogPlatformErrorHandler) {
       PlatformDispatcher.instance.onError = _originalPlatformErrorHandler;
     }
+
+    // Clean up isolate error handler
+    _isolateErrorHandler.removeErrorListener();
+
     // release refs
     _originalFlutterErrorHandler = null;
     _originalPlatformErrorHandler = null;
@@ -167,6 +184,36 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     // Call the original handler, if any
     // False otherwise, so that default fallback mechanism is used
     return _originalPlatformErrorHandler?.call(error, stackTrace) ?? false;
+  }
+
+  /// Isolate error handler for current isolate errors
+  void _setupIsolateErrorHandler() {
+    if (!_config.captureIsolateErrors) {
+      return;
+    }
+
+    _isolateErrorHandler.addErrorListener(_posthogIsolateErrorHandler);
+  }
+
+  void _posthogIsolateErrorHandler(dynamic error) {
+    // Isolate errors come as List<dynamic> with [errorString, stackTraceString]
+    // See: https://api.dartlang.org/stable/2.7.0/dart-isolate/Isolate/addErrorListener.html
+    if (error is List && error.length == 2) {
+      final String errorString = error.first;
+      final String? stackTraceString = error.last;
+
+      final wrappedError = PostHogException(
+        source: errorString,
+        mechanism: 'isolateError',
+        handled: false,
+      );
+
+      final stackTrace = stackTraceString != null
+          ? StackTrace.fromString(stackTraceString)
+          : null;
+
+      _captureException(error: wrappedError, stackTrace: stackTrace);
+    }
   }
 
   Future<void> _captureException({
