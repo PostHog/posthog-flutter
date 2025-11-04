@@ -1,10 +1,13 @@
 ## Next
 
 - feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
-  - **Note**: The following features are not yet supported:
-    - Flutter web platform (PlatformDispatcher.onError not implemented)
-    - Instrumentation to enable background isolate error auto capture
-    - Native iOS exception capture
+  - **Limitations**:
+    - No Flutter web support
+    - No native iOS exception capture
+    - No native C/C++ crash capture on Android (currently Java/Kotlin only)
+    - No stacktrace demangling for obfuscated builds ([--obfuscate](https://docs.flutter.dev/deployment/obfuscate) and [--split-debug-info](https://docs.flutter.dev/deployment/obfuscate))
+    - No [source code context](/docs/error-tracking/stack-traces)
+    - No background isolate error capture
 
 ## 5.8.0
 
