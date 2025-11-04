@@ -7,7 +7,11 @@
     - [Source code context](/docs/error-tracking/stack-traces) associated with an exception
     - Flutter web support
   - **BREAKING**: Minimum Dart SDK version bumped to 3.4.0 and Flutter to 3.22.0 (required for `stack_trace` dependency compatibility)
-- feat: add autocapture of Flutter and Dart exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
+- feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
+  - **Note**: The following features are not yet supported:
+    - Flutter web platform (PlatformDispatcher.onError not implemented)
+    - Instrumentation to enable background isolate error auto capture
+    - Native iOS exception capture
 
 ## 5.6.0
 
