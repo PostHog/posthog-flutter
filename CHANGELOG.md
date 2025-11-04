@@ -1,5 +1,18 @@
 ## Next
 
+- feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
+  - **Note**: The following features are not yet supported:
+    - Flutter web platform (PlatformDispatcher.onError not implemented)
+    - Instrumentation to enable background isolate error auto capture
+    - Native iOS exception capture
+
+## 5.8.0
+
+- feat: surveys GA ([#215](https://github.com/PostHog/posthog-flutter/pull/215))
+> Note: Surveys are now enabled by default.
+
+## 5.7.0
+
 - feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
   - **Note**: The following features are not yet supported:
     - Automatic exception capture
@@ -7,11 +20,6 @@
     - [Source code context](/docs/error-tracking/stack-traces) associated with an exception
     - Flutter web support
   - **BREAKING**: Minimum Dart SDK version bumped to 3.4.0 and Flutter to 3.22.0 (required for `stack_trace` dependency compatibility)
-- feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
-  - **Note**: The following features are not yet supported:
-    - Flutter web platform (PlatformDispatcher.onError not implemented)
-    - Instrumentation to enable background isolate error auto capture
-    - Native iOS exception capture
 
 ## 5.6.0
 

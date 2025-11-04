@@ -310,59 +310,6 @@ class InitialScreenState extends State<InitialScreen> {
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
-                    "Exception Autocapture",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Wrap(
-                  alignment: WrapAlignment.spaceEvenly,
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  children: [
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color.fromARGB(255, 207, 145, 218),
-                        foregroundColor: Colors.black,
-                      ),
-                      onPressed: () {
-                        // This will be automatically captured by FlutterError.onError
-                        throw FlutterError(
-                            'This is an unhandled Flutter error for autocapture demo');
-                      },
-                      child: const Text("Throw Flutter Error"),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.tealAccent,
-                        foregroundColor: Colors.black,
-                      ),
-                      onPressed: () {
-                        // This will be automatically captured by PlatformDispatcher.onError
-                        Future.microtask(() {
-                          throw MyCustomException(
-                              'This is an unhandled Dart error for autocapture demo');
-                        });
-                      },
-                      child: const Text("Throw Dart Error"),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 44, 106, 53),
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: () {
-                        throw StateError(
-                            'This should not appear in PostHog if ignored in configuration');
-                      },
-                      child: const Text("Throw Flutter Error (Ignored)"),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text(
                     "Feature flags",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -512,19 +459,7 @@ class ThirdRoute extends StatelessWidget {
   }
 }
 
-/// Custom exception classes for demonstration purposes
-
-class MyCustomException implements Exception {
-  final String message;
-
-  MyCustomException(this.message);
-
-  @override
-  String toString() {
-    return 'MyCustomException: $message';
-  }
-}
-
+/// Custom exception class for demonstration purposes
 class CustomException implements Exception {
   final String message;
   final String? code;
