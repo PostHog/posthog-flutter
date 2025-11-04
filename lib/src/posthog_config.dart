@@ -44,9 +44,6 @@ class PostHogConfig {
   /// Configuration for error tracking and exception capture
   final errorTrackingConfig = PostHogErrorTrackingConfig();
 
-  /// Configuration for error tracking and exception capture
-  final errorTrackingConfig = PostHogErrorTrackingConfig();
-
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
 
