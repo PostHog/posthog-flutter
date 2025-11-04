@@ -16,7 +16,6 @@ class DartExceptionProcessor {
     // Extract PostHog metadata if error is wrapped in PostHogException
     String mechanismType = 'generic';
     bool handled = true;
-    bool isFatal = false;
     Object currentError = error;
 
     if (error is PostHogException) {

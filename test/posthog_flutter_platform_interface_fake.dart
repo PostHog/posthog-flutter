@@ -1,4 +1,3 @@
-import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 
 /// Captured exception call data
