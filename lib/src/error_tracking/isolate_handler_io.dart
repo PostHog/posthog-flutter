@@ -1,6 +1,9 @@
 import 'dart:isolate';
 
+import 'package:meta/meta.dart';
+
 /// Native platform implementation of isolate error handling
+@internal
 class IsolateErrorHandler {
   RawReceivePort? _isolateErrorPort;
 
