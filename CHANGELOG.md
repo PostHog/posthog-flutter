@@ -1,5 +1,7 @@
 ## Next
 
+## 5.9.0
+
 - feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
   - **Limitations**:
     - No Flutter web support
