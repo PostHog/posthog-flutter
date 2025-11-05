@@ -119,7 +119,9 @@ class PostHogErrorTrackingConfig {
   /// - Your app's main package (e.g., "package:your_app")
   /// - Any internal packages you own (e.g., "package:your_company_utils")
   ///
-  /// Note: This config will be ignored on web builds
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
   final inAppIncludes = <String>[];
 
   /// List of package names to be excluded from inApp frames for exception tracking
@@ -134,7 +136,9 @@ class PostHogErrorTrackingConfig {
   /// - External utility libraries
   /// - Packages you don't control
   ///
-  /// Note: This config will be ignored on web builds
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
   final inAppExcludes = <String>[];
 
   /// Configures whether stack trace frames are considered inApp by default
@@ -148,14 +152,75 @@ class PostHogErrorTrackingConfig {
   /// - dart and flutter packages are excluded
   /// - All other packages are inApp unless in inAppExcludes
   ///
-  /// Note: This config will be ignored on web builds
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
   var inAppByDefault = true;
+
+  /// Enable automatic capture of Flutter framework errors
+  ///
+  /// Controls whether `FlutterError.onError` errors are captured.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: true (when autocapture is enabled)
+  var captureFlutterErrors = false;
+
+  /// Enable capturing of silent Flutter errors
+  ///
+  /// Controls whether Flutter errors marked as silent (FlutterErrorDetails.silent = true) are captured.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: false
+  var captureSilentFlutterErrors = false;
+
+  /// Enable automatic capture of Dart runtime errors
+  ///
+  /// Controls whether `PlatformDispatcher.onError errors` are captured.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: true
+  var capturePlatformDispatcherErrors = false;
+
+  /// Enable automatic capture of exceptions in the native SDKs (Android only for now)
+  ///
+  /// Controls whether native exceptions are captured.
+  ///
+  /// **Note:**
+  /// - iOS: Not supported
+  /// - Android: Java/Kotlin exceptions only (no native C/C++ crashes)
+  /// - Android: No stacktrace demangling for minified builds
+  ///
+  /// Default: true
+  var captureNativeExceptions = false;
+
+  /// Enable automatic capture of isolate errors
+  ///
+  /// Controls whether errors from the current isolate are captured.
+  /// This includes errors from the main isolate and any isolates spawned
+  /// without explicit error handling.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: true
+  var captureIsolateErrors = false;
 
   Map<String, dynamic> toMap() {
     return {
       'inAppIncludes': inAppIncludes,
       'inAppExcludes': inAppExcludes,
       'inAppByDefault': inAppByDefault,
+      'captureFlutterErrors': captureFlutterErrors,
+      'captureSilentFlutterErrors': captureSilentFlutterErrors,
+      'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
+      'captureNativeExceptions': captureNativeExceptions,
+      'captureIsolateErrors': captureIsolateErrors,
     };
   }
 }

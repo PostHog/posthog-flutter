@@ -459,7 +459,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-// Add timestamp from Flutter side (will be used and removed from native plugins)
+      // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final normalizedData =
           PropertyNormalizer.normalize(exceptionData.cast<String, Object>());

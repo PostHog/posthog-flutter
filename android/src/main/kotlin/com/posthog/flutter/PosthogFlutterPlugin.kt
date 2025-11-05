@@ -293,6 +293,16 @@ class PosthogFlutterPlugin :
                     }
                 }
 
+                // Configure error tracking autocapture
+                posthogConfig.getIfNotNull<Map<String, Any>>("errorTrackingConfig") { errorConfig ->
+                    errorConfig.getIfNotNull<Boolean>("captureNativeExceptions") {
+                        errorTrackingConfig.autoCapture = it
+                    }
+                    errorConfig.getIfNotNull<List<String>>("inAppIncludes") { includes ->
+                        errorTrackingConfig.inAppIncludes.addAll(includes)
+                    }
+                }
+
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
             }

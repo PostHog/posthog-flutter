@@ -1,5 +1,14 @@
 ## Next
 
+- feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
+  - **Limitations**:
+    - No Flutter web support
+    - No native iOS exception capture
+    - No native C/C++ exception capture on Android (Java/Kotlin only)
+    - No stacktrace demangling for obfuscated builds ([--obfuscate](https://docs.flutter.dev/deployment/obfuscate) and [--split-debug-info](https://docs.flutter.dev/deployment/obfuscate)) for Dart code and [isMinifyEnabled](https://developer.android.com/topic/performance/app-optimization/enable-app-optimization) for Java/Kotlin code
+    - No [source code context](/docs/error-tracking/stack-traces)
+    - No background isolate error capture
+
 ## 5.8.0
 
 - feat: surveys GA ([#215](https://github.com/PostHog/posthog-flutter/pull/215))
