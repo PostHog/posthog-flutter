@@ -206,8 +206,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     // Isolate errors come as List<dynamic> with [errorString, stackTraceString]
     // See: https://api.dartlang.org/stable/2.7.0/dart-isolate/Isolate/addErrorListener.html
     if (error is List && error.length == 2) {
-      final String errorString = error.first;
-      final String? stackTraceString = error.last;
+      final errorString = error.first;
+      final stackTraceString = error.last;
       final stackTrace = _parseStackTrace(stackTraceString);
       final isolateName = _isolateErrorHandler.isolateDebugName;
 
