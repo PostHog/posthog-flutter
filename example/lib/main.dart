@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
@@ -22,6 +24,8 @@ Future<void> main() async {
       true; // Capture Flutter framework errors
   config.errorTrackingConfig.capturePlatformDispatcherErrors =
       true; // Capture Dart runtime errors
+  config.errorTrackingConfig.captureIsolateErrors =
+      true; // Capture isolate errors
 
   await Posthog().setup(config);
 
@@ -250,7 +254,7 @@ class InitialScreenState extends State<InitialScreen> {
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
-                    "Error Tracking",
+                    "Error Tracking - Manual",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -305,6 +309,98 @@ class InitialScreenState extends State<InitialScreen> {
                     );
                   },
                   child: const Text("Capture Exception (Missing Stack)"),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "Error Tracking - Autocapture",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content:
+                              Text('Flutter error triggered! Check PostHog.'),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+
+                    // Test Flutter error handler by throwing in widget context
+                    throw const CustomException(
+                        'Test Flutter error for autocapture',
+                        code: 'FlutterErrorTest',
+                        additionalData: {'test_type': 'flutter_error'});
+                  },
+                  child: const Text("Test Flutter Error Handler"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    // Test PlatformDispatcher error handler with Future
+                    Future.delayed(Duration.zero, () {
+                      throw const CustomException(
+                          'Test PlatformDispatcher error for autocapture',
+                          code: 'PlatformDispatcherTest',
+                          additionalData: {
+                            'test_type': 'platform_dispatcher_error'
+                          });
+                    });
+
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Dart runtime error triggered! Check PostHog.'),
+                          backgroundColor: Colors.blue,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text("Test Dart Error Handler"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    // Test isolate error listener by throwing in an async callback
+                    Timer(Duration.zero, () {
+                      throw const CustomException(
+                        'Isolate error for testing',
+                        code: 'IsolateHandlerTest',
+                        additionalData: {
+                          'test_type': 'isolate_error_listener_timer',
+                        },
+                      );
+                    });
+
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content:
+                              Text('Isolate error triggered! Check PostHog.'),
+                          backgroundColor: Colors.purple,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text("Test Isolate Error Handler"),
                 ),
                 const Divider(),
                 const Padding(
