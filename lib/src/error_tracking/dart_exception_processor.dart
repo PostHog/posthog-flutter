@@ -14,9 +14,9 @@ class DartExceptionProcessor {
     StackTrace Function()? stackTraceProvider, //for testing
   }) {
     // Extract PostHog metadata if error is wrapped in PostHogException
-    String mechanismType = 'generic';
-    bool handled = true;
-    Object currentError = error;
+    var mechanismType = 'generic';
+    var handled = true;
+    var currentError = error;
 
     if (error is PostHogException) {
       handled = error.handled;

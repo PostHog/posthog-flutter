@@ -63,7 +63,7 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   /// Uninstall the autocapture integration
   static void uninstall() {
     if (_instance != null) {
-      _instance!.stop();
+      _instance?.stop();
       _instance = null;
     }
   }
@@ -138,7 +138,7 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
       // Build additional properties with Flutter-specific details
       final flutterErrorDetails = <String, Object>{
-        if (context != null) 'context': 'thrown $context',
+        if (context != null) 'context': context,
         if (information != null) 'information': information,
         if (library != null) 'library': library,
         'error_summary': errorSummary,
@@ -202,12 +202,14 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     _isolateErrorHandler.addErrorListener(_posthogIsolateErrorHandler);
   }
 
-  void _posthogIsolateErrorHandler(dynamic error) {
+  void _posthogIsolateErrorHandler(Object? error) {
     // Isolate errors come as List<dynamic> with [errorString, stackTraceString]
     // See: https://api.dartlang.org/stable/2.7.0/dart-isolate/Isolate/addErrorListener.html
     if (error is List && error.length == 2) {
       final String errorString = error.first;
       final String? stackTraceString = error.last;
+      final stackTrace = _parseStackTrace(stackTraceString);
+      final isolateName = _isolateErrorHandler.isolateDebugName;
 
       final wrappedError = PostHogException(
         source: errorString,
@@ -215,11 +217,21 @@ class PostHogErrorTrackingAutoCaptureIntegration {
         handled: false,
       );
 
-      final stackTrace = stackTraceString != null
-          ? StackTrace.fromString(stackTraceString)
-          : null;
+      _captureException(
+        error: wrappedError,
+        stackTrace: stackTrace,
+        properties: isolateName != null ? {'isolate_name': isolateName} : null,
+      );
+    }
+  }
 
-      _captureException(error: wrappedError, stackTrace: stackTrace);
+  StackTrace? _parseStackTrace(String? stackTraceString) {
+    if (stackTraceString == null) return null;
+    try {
+      return StackTrace.fromString(stackTraceString);
+    } catch (e) {
+      printIfDebug('Failed to parse isolate stack trace: $e');
+      return null;
     }
   }
 

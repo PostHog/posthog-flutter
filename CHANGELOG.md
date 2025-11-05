@@ -4,7 +4,7 @@
   - **Limitations**:
     - No Flutter web support
     - No native iOS exception capture
-    - No native C/C++ crash capture on Android (currently Java/Kotlin only)
+    - No native C/C++ exception capture on Android (Java/Kotlin only)
     - No stacktrace demangling for obfuscated builds ([--obfuscate](https://docs.flutter.dev/deployment/obfuscate) and [--split-debug-info](https://docs.flutter.dev/deployment/obfuscate))
     - No [source code context](/docs/error-tracking/stack-traces)
     - No background isolate error capture

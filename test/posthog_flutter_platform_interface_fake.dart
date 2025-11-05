@@ -2,7 +2,7 @@ import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 
 /// Captured exception call data
 class CapturedExceptionCall {
-  final dynamic error;
+  final Object error;
   final StackTrace? stackTrace;
   final Map<String, Object>? properties;
 
@@ -27,7 +27,7 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> captureException({
-    required dynamic error,
+    required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
   }) async {

@@ -13,9 +13,4 @@ class PostHogException implements Exception {
     required this.mechanism,
     this.handled = false,
   });
-
-  @override
-  String toString() {
-    return 'PostHogException: ${source.toString()}';
-  }
 }

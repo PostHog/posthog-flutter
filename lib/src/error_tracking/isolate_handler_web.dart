@@ -11,6 +11,6 @@ class IsolateErrorHandler {
     // No-op: Isolates are not available on web
   }
 
-  /// Check if error listener is active (always false on web)
-  bool get isActive => false;
+  /// Get current isolate name (always 'main' on web)
+  String? get isolateDebugName => 'main';
 }
