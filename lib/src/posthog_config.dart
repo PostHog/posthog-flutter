@@ -164,7 +164,7 @@ class PostHogErrorTrackingConfig {
   /// **Note:**
   /// - Flutter web: Not supported
   ///
-  /// Default: true (when autocapture is enabled)
+  /// Default: false
   var captureFlutterErrors = false;
 
   /// Enable capturing of silent Flutter errors
@@ -184,7 +184,7 @@ class PostHogErrorTrackingConfig {
   /// **Note:**
   /// - Flutter web: Not supported
   ///
-  /// Default: true
+  /// Default: false
   var capturePlatformDispatcherErrors = false;
 
   /// Enable automatic capture of exceptions in the native SDKs (Android only for now)
@@ -196,7 +196,7 @@ class PostHogErrorTrackingConfig {
   /// - Android: Java/Kotlin exceptions only (no native C/C++ crashes)
   /// - Android: No stacktrace demangling for minified builds
   ///
-  /// Default: true
+  /// Default: false
   var captureNativeExceptions = false;
 
   /// Enable automatic capture of isolate errors
@@ -208,7 +208,7 @@ class PostHogErrorTrackingConfig {
   /// **Note:**
   /// - Flutter web: Not supported
   ///
-  /// Default: true
+  /// Default: false
   var captureIsolateErrors = false;
 
   Map<String, dynamic> toMap() {
