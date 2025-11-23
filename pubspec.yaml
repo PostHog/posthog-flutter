@@ -19,6 +19,7 @@ dependencies:
   # plugin_platform_interface depends on meta anyway
   meta: ^1.3.0
   stack_trace: ^1.12.0
+  dio: ^5.9.0
 
 dev_dependencies:
   flutter_lints: ^5.0.0
