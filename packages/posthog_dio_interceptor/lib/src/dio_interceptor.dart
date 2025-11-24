@@ -6,7 +6,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 
 /// A Dio interceptor that captures network events and sends them to PostHog.
 class PostHogDioInterceptor extends Interceptor {
-  final NativeCommunicator _nativeCommunicator = NativeCommunicator();
+  final Posthog _posthog = Posthog();
   final bool attachPayloads;
 
   static const int _oneMbInBytes = 1024 * 1024;
@@ -23,7 +23,7 @@ class PostHogDioInterceptor extends Interceptor {
     super.onResponse(response, handler);
 
     final isSessionReplayActive =
-        await _nativeCommunicator.isSessionReplayActive();
+        await _posthog.isSessionReplayActive();
     if (isSessionReplayActive) {
       await _captureNetworkEvent(
         response: response,
@@ -39,7 +39,7 @@ class PostHogDioInterceptor extends Interceptor {
     super.onError(err, handler);
 
     final isSessionReplayActive =
-        await _nativeCommunicator.isSessionReplayActive();
+        await _posthog.isSessionReplayActive();
     if (isSessionReplayActive) {
       final Response<dynamic>? response = err.response;
       if (response != null) {
