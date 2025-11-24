@@ -1,15 +1,27 @@
 import 'package:dio/dio.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
-class PosthogDioInterceptor extends Interceptor {
+/// A Dio interceptor that captures network events and sends them to PostHog.
+class PostHogDioInterceptor extends Interceptor {
+  final NativeCommunicator _nativeCommunicator = NativeCommunicator();
+  final bool attachPayloads;
+
+  PostHogDioInterceptor({
+    required this.attachPayloads,
+  });
+
   @override
   Future<void> onResponse(
     Response<dynamic> response,
     ResponseInterceptorHandler handler,
   ) async {
-    await _captureNetworkEvent(
-      response: response,
-    );
+    final isSessionReplayActive =
+        await _nativeCommunicator.isSessionReplayActive();
+    if (isSessionReplayActive) {
+      _captureNetworkEvent(
+        response: response,
+      );
+    }
     super.onResponse(response, handler);
   }
 
@@ -18,25 +30,33 @@ class PosthogDioInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    final Response<dynamic>? response = err.response;
-    if (response != null) {
-      await _captureNetworkEvent(response: response);
+    final isSessionReplayActive =
+        await _nativeCommunicator.isSessionReplayActive();
+    if (isSessionReplayActive) {
+      final Response<dynamic>? response = err.response;
+      if (response != null) {
+        _captureNetworkEvent(response: response);
+      }
     }
     super.onError(err, handler);
   }
 
-  Future<void> _captureNetworkEvent({
+  void _captureNetworkEvent({
     required Response<dynamic> response,
   }) async {
     final String url = response.requestOptions.uri.toString();
     final String method = response.requestOptions.method;
     final int statusCode = response.statusCode ?? 0;
-    final Object? publishableRequest = _tryTransformDataToPublishableObject(
-      data: response.requestOptions.data,
-    );
-    final Object? publishableResponse = _tryTransformDataToPublishableObject(
-      data: response.data,
-    );
+    final Object? publishableRequest = attachPayloads
+        ? _tryTransformDataToPublishableObject(
+            data: response.requestOptions.data,
+          )
+        : null;
+    final Object? publishableResponse = attachPayloads
+        ? _tryTransformDataToPublishableObject(
+            data: response.data,
+          )
+        : null;
     final Map<String, Object> snapshotData = <String, Object>{
       'type': 6,
       'data': <String, Object>{
@@ -51,7 +71,7 @@ class PosthogDioInterceptor extends Interceptor {
       },
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
-    await Posthog().capture(
+    Posthog().capture(
       eventName: r'$snapshot',
       properties: <String, Object>{
         r'$snapshot_source': 'mobile',

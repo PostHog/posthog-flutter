@@ -1,0 +1,21 @@
+name: posthog_dio_interceptor
+description: A starting point for Dart libraries or applications.
+version: 1.0.0
+# repository: https://github.com/my_org/my_repo
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.22.0'
+
+# Add regular dependencies here.
+dependencies:
+  dio: ^5.9.0
+  posthog_flutter: ^5.9.0
+
+dependency_overrides:
+  posthog_flutter:
+    path: ../..
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
