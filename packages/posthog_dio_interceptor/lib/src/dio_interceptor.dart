@@ -55,21 +55,21 @@ class PostHogDioInterceptor extends Interceptor {
     final String method = response.requestOptions.method;
     final int statusCode = response.statusCode ?? 0;
     final [
-      (Object? publishableRequest, bool requestExceededLimit),
-      (Object? publishableResponse, bool responseExceededLimit),
+      (Object? publishableRequest, int requestSizeLimit),
+      (Object? publishableResponse, int responseSizeLimit),
     ] = await Future.wait([
       if (attachPayloads)
         _tryTransformDataToPublishableObject(
           data: response.requestOptions.data,
         ).then(
           (value) async {
-            final hasExceededLimit = await _hasExceededSizeLimit(
+            final sizeLimit = await _calculateSizeLimit(
               data: response.requestOptions.data,
               header: response.requestOptions.headers,
             );
             return (
               value,
-              hasExceededLimit,
+              sizeLimit,
             );
           },
         ),
@@ -78,13 +78,13 @@ class PostHogDioInterceptor extends Interceptor {
           data: response.data,
         ).then(
           (value) async {
-            final hasExceededLimit = await _hasExceededSizeLimit(
+            final sizeLimit = await _calculateSizeLimit(
               data: response.data,
               header: response.headers.map,
             );
             return (
               value,
-              hasExceededLimit,
+              sizeLimit,
             );
           },
         ),
@@ -98,10 +98,10 @@ class PostHogDioInterceptor extends Interceptor {
           'url': url,
           'method': method,
           'status_code': statusCode,
-          if (publishableRequest != null && !requestExceededLimit)
-            'request': publishableRequest,
-          if (publishableResponse != null && !responseExceededLimit)
-            'response': publishableResponse,
+          if (requestSizeLimit + responseSizeLimit <= _oneMbInBytes) ...{
+            if (publishableRequest != null) 'request': publishableRequest,
+            if (publishableResponse != null) 'response': publishableResponse,
+          }
         },
       },
       'timestamp': DateTime.now().millisecondsSinceEpoch,
@@ -115,31 +115,35 @@ class PostHogDioInterceptor extends Interceptor {
     );
   }
 
-  Future<bool> _hasExceededSizeLimit({
+  Future<int> _calculateSizeLimit({
     required dynamic data,
     required Map<String, dynamic> header,
   }) async {
     final contentLengthHeader = header['content-length'];
-    final contentLength =
-        _deriveContentLength(contentLengthHeader);
+    final contentLength = _deriveContentLength(contentLengthHeader);
     if (contentLength != null) {
-      return contentLength > _oneMbInBytes;
+      return contentLength;
     }
 
     if (data == null) {
-      return false;
+      return 0;
     }
 
-    if (data is num || data is bool) {
-      return false;
+    if (data is bool) {
+      return 4;
+    }
+
+    if (data is num) {
+      return 8;
     }
 
     try {
       final encodedData =
           await compute((data) => utf8.encode(jsonEncode(data)), data);
-      return encodedData.length > _oneMbInBytes;
+      return encodedData.length;
     } catch (e) {
-      return false;
+      // Since we couldn't serialize the data, assume it exceeds the limit.
+      return _oneMbInBytes + 1;
     }
   }
 
