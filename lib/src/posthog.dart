@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_observer.dart';
@@ -24,7 +25,26 @@ class Posthog {
   /// com.posthog.posthog.AUTO_INIT: false
   Future<void> setup(PostHogConfig config) {
     _config = config; // Store the config
+
+    _installFlutterIntegrations(config);
+
     return _posthog.setup(config);
+  }
+
+  void _installFlutterIntegrations(PostHogConfig config) {
+    // Install exception autocapture if enabled
+    if (config.errorTrackingConfig.captureFlutterErrors ||
+        config.errorTrackingConfig.capturePlatformDispatcherErrors) {
+      PostHogErrorTrackingAutoCaptureIntegration.install(
+        config: config.errorTrackingConfig,
+        posthog: _posthog,
+      );
+    }
+  }
+
+  void _uninstallFlutterIntegrations() {
+    // Uninstall exception autocapture integration
+    PostHogErrorTrackingAutoCaptureIntegration.uninstall();
   }
 
   @internal
@@ -85,9 +105,16 @@ class Posthog {
 
   Future<void> reset() => _posthog.reset();
 
-  Future<void> disable() => _posthog.disable();
+  Future<void> disable() {
+    // Uninstall Flutter-specific integrations when disabling
+    _uninstallFlutterIntegrations();
+
+    return _posthog.disable();
+  }
 
   Future<void> enable() => _posthog.enable();
+
+  Future<bool> isOptOut() => _posthog.isOptOut();
 
   Future<void> debug(bool enabled) => _posthog.debug(enabled);
 
@@ -119,6 +146,18 @@ class Posthog {
 
   Future<void> flush() => _posthog.flush();
 
+  /// Captures exceptions with optional custom properties
+  ///
+  /// [error] - The error/exception to capture
+  /// [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
+  /// [properties] - Optional custom properties to attach to the exception event
+  Future<void> captureException(
+          {required Object error,
+          StackTrace? stackTrace,
+          Map<String, Object>? properties}) =>
+      _posthog.captureException(
+          error: error, stackTrace: stackTrace, properties: properties);
+
   /// Closes the PostHog SDK and cleans up resources.
   ///
   /// Note: Please note that after calling close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
@@ -126,6 +165,10 @@ class Posthog {
     _config = null;
     _currentScreen = null;
     PosthogObserver.clearCurrentContext();
+
+    // Uninstall Flutter integrations
+    _uninstallFlutterIntegrations();
+
     return _posthog.close();
   }
 

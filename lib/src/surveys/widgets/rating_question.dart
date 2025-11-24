@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/posthog_display_survey_rating_type.dart';
+import '../models/posthog_display_survey_text_content_type.dart';
 import '../models/survey_appearance.dart';
 import 'question_header.dart';
 import 'survey_button.dart';
@@ -11,6 +12,7 @@ class RatingQuestion extends StatefulWidget {
     super.key,
     required this.question,
     required this.description,
+    this.descriptionContentType,
     required this.onSubmit,
     this.buttonText,
     this.optional = false,
@@ -24,6 +26,7 @@ class RatingQuestion extends StatefulWidget {
 
   final String? question;
   final String? description;
+  final PostHogDisplaySurveyTextContentType? descriptionContentType;
   final String? buttonText;
   final bool optional;
   final int scaleLowerBound;
@@ -147,6 +150,7 @@ class _RatingQuestionState extends State<RatingQuestion> {
         QuestionHeader(
           question: widget.question,
           description: widget.description,
+          descriptionContentType: widget.descriptionContentType,
           appearance: widget.appearance,
         ),
         const SizedBox(height: 24),

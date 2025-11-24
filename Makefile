@@ -1,4 +1,6 @@
-.PHONY: formatKotlin formatSwift formatDart checkDart installLinters
+.PHONY: format formatKotlin formatSwift formatDart checkDart installLinters test
+
+format: formatSwift formatKotlin formatDart
 
 installLinters:
 	brew install ktlint
@@ -19,3 +21,6 @@ checkFormatDart:
 
 analyzeDart:
 	dart analyze .
+
+test: 
+	flutter test -r expanded

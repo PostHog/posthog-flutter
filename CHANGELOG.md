@@ -1,5 +1,68 @@
 ## Next
 
+## 5.9.0
+
+- feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
+  - **Limitations**:
+    - No Flutter web support
+    - No native iOS exception capture
+    - No native C/C++ exception capture on Android (Java/Kotlin only)
+    - No stacktrace demangling for obfuscated builds ([--obfuscate](https://docs.flutter.dev/deployment/obfuscate) and [--split-debug-info](https://docs.flutter.dev/deployment/obfuscate)) for Dart code and [isMinifyEnabled](https://developer.android.com/topic/performance/app-optimization/enable-app-optimization) for Java/Kotlin code
+    - No [source code context](/docs/error-tracking/stack-traces)
+    - No background isolate error capture
+
+## 5.8.0
+
+- feat: surveys GA ([#215](https://github.com/PostHog/posthog-flutter/pull/215))
+> Note: Surveys are now enabled by default.
+
+## 5.7.0
+
+- feat: add manual error capture ([#212](https://github.com/PostHog/posthog-flutter/pull/212))
+  - **Note**: The following features are not yet supported:
+    - Automatic exception capture
+    - De-obfuscating stacktraces from obfuscated builds ([--obfuscate](https://docs.flutter.dev/deployment/obfuscate) and [--split-debug-info](https://docs.flutter.dev/deployment/obfuscate))
+    - [Source code context](/docs/error-tracking/stack-traces) associated with an exception
+    - Flutter web support
+  - **BREAKING**: Minimum Dart SDK version bumped to 3.4.0 and Flutter to 3.22.0 (required for `stack_trace` dependency compatibility)
+
+## 5.6.0
+
+- feat: surveys use the new response question id format ([#210](https://github.com/PostHog/posthog-flutter/pull/210))
+
+## 5.5.0
+
+- chore: Android plugin sets compileSdkVersion to flutter.compileSdkVersion instead of hardcoded ([#207](https://github.com/PostHog/posthog-flutter/pull/207))
+
+## 5.4.3
+
+- fix: Android back button wasn't cleaning up the Survey resources ([#205](https://github.com/PostHog/posthog-flutter/pull/205))
+
+## 5.4.2
+
+- fix: mask TextField widgets automatically if obscureText is enabled ([#204](https://github.com/PostHog/posthog-flutter/pull/204))
+
+## 5.4.1
+
+- chore: update posthog-ios dependency to min. 3.31.0 ([#202](https://github.com/PostHog/posthog-flutter/pull/202))
+
+## 5.4.0
+
+- feat: surveys for Android ([#198](https://github.com/PostHog/posthog-flutter/pull/198))
+  - See how to setup in [Surveys docs](https://posthog.com/docs/surveys/installation?tab=Flutter)
+
+## 5.3.1
+
+- fix: don't render HTML content ([#196](https://github.com/PostHog/posthog-flutter/pull/196))
+
+## 5.3.0
+
+- chore: update languageVersion and apiVersion from 1.6 to 1.8 on Android to be compatible with Kotlin 2.2 ([#193](https://github.com/PostHog/posthog-flutter/pull/193))
+
+## 5.2.0
+
+- feat: add `isOptOut` method to check if the current user is opted out of data capture. ([#190](https://github.com/PostHog/posthog-flutter/pull/190))
+
 ## 5.1.0
 
 - feat: surveys for iOS ([#188](https://github.com/PostHog/posthog-flutter/pull/188))

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'posthog_display_survey_text_content_type.dart';
 
 /// Appearance configuration for surveys
 @immutable
@@ -17,6 +18,7 @@ class PostHogDisplaySurveyAppearance {
     this.displayThankYouMessage = true,
     this.thankYouMessageHeader,
     this.thankYouMessageDescription,
+    this.thankYouMessageDescriptionContentType,
     this.thankYouMessageCloseButtonText,
   });
 
@@ -33,5 +35,7 @@ class PostHogDisplaySurveyAppearance {
   final bool displayThankYouMessage;
   final String? thankYouMessageHeader;
   final String? thankYouMessageDescription;
+  final PostHogDisplaySurveyTextContentType?
+      thankYouMessageDescriptionContentType;
   final String? thankYouMessageCloseButtonText;
 }

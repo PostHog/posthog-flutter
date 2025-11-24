@@ -1,4 +1,4 @@
-@_spi(Experimental) import PostHog
+import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
@@ -134,12 +134,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
             // configure surveys
             if #available(iOS 15.0, *) {
-                if let surveys: Bool = posthogConfig["surveys"] as? Bool {
-                    config.surveys = surveys
-                    if surveys {
-                        // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
-                        config.surveysConfig.surveysDelegate = instance
-                    }
+                let surveys: Bool = posthogConfig["surveys"] as? Bool ?? false
+                config.surveys = surveys
+                if surveys {
+                    // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
+                    config.surveysConfig.surveysDelegate = instance
                 }
             }
         #endif
@@ -182,6 +181,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             enable(result)
         case "disable":
             disable(result)
+        case "isOptOut":
+            isOptOut(result)
         case "debug":
             debug(call, result: result)
         case "reloadFeatureFlags":
@@ -194,6 +195,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             unregister(call, result: result)
         case "flush":
             flush(result)
+        case "captureException":
+            captureException(call, result: result)
         case "close":
             close(result)
         case "sendMetaEvent":
@@ -601,6 +604,11 @@ extension PosthogFlutterPlugin {
         result(nil)
     }
 
+    private func isOptOut(_ result: @escaping FlutterResult) {
+        let isOptedOut = PostHogSDK.shared.isOptOut()
+        result(isOptedOut)
+    }
+
     private func debug(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
@@ -668,6 +676,25 @@ extension PosthogFlutterPlugin {
 
     private func flush(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.flush()
+        result(nil)
+    }
+
+    private func captureException(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let arguments = call.arguments as? [String: Any] else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments for captureException", details: nil))
+            return
+        }
+
+        let properties = arguments["properties"] as? [String: Any]
+
+        // Extract timestamp from Flutter and convert to Date
+        var timestamp: Date? = nil
+        if let timestampMs = arguments["timestamp"] as? Int64 {
+            timestamp = Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
+        }
+
+        // Use capture method with timestamp to ensure Flutter timestamp is used
+        PostHogSDK.shared.capture("$exception", properties: properties, timestamp: timestamp)
         result(nil)
     }
 

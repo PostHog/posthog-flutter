@@ -49,6 +49,11 @@ class ElementData {
     if (!rectList.contains(element.rect)) {
       if (element.widget is PostHogMaskWidget) {
         rectList.add(element.rect);
+      } else if (element.widget is TextField) {
+        final textField = element.widget as TextField;
+        if (textField.obscureText) {
+          rectList.add(element.rect);
+        }
       }
     }
 

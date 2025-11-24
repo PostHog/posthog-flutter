@@ -76,6 +76,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('enable() has not been implemented.');
   }
 
+  Future<bool> isOptOut() {
+    throw UnimplementedError('isOptOut() has not been implemented.');
+  }
+
   Future<void> debug(bool enabled) {
     throw UnimplementedError('debug() has not been implemented.');
   }
@@ -123,6 +127,13 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
 
   Future<void> flush() {
     throw UnimplementedError('flush() has not been implemented.');
+  }
+
+  Future<void> captureException(
+      {required Object error,
+      StackTrace? stackTrace,
+      Map<String, Object>? properties}) {
+    throw UnimplementedError('captureException() has not been implemented.');
   }
 
   Future<void> close() {

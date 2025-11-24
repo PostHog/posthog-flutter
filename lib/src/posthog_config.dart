@@ -1,5 +1,3 @@
-import 'package:meta/meta.dart';
-
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
@@ -31,13 +29,20 @@ class PostHogConfig {
   /// iOS only
   var dataMode = PostHogDataMode.any;
 
-  /// Enable Surveys (Currently for iOS only)
+  /// Enable Surveys
   ///
-  /// Note: Please note that after calling Posthog().close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// **Notes:**
+  /// - After calling `Posthog().close()`, surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// - You must install `PosthogObserver` in your app for surveys to display
+  ///   - See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
+  /// - For Flutter web, this setting will be ignored. Surveys on web use the JavaScript Web SDK instead.
+  ///   - See: https://posthog.com/docs/surveys/installation?tab=Web
   ///
-  /// Experimental. Defaults to false.
-  @experimental
-  var surveys = false;
+  /// Defaults to true.
+  var surveys = true;
+
+  /// Configuration for error tracking and exception capture
+  final errorTrackingConfig = PostHogErrorTrackingConfig();
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
   // onFeatureFlags, integrations
@@ -62,6 +67,7 @@ class PostHogConfig {
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
       'sessionReplayConfig': sessionReplayConfig.toMap(),
+      'errorTrackingConfig': errorTrackingConfig.toMap(),
     };
   }
 }
@@ -97,6 +103,124 @@ class PostHogSessionReplayConfig {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
+    };
+  }
+}
+
+class PostHogErrorTrackingConfig {
+  /// List of package names to be considered inApp frames for exception tracking
+  ///
+  /// inApp Example:
+  /// inAppIncludes = ["package:your_app", "package:your_company_utils"]
+  /// All exception stacktrace frames from these packages will be considered inApp
+  ///
+  /// This option takes precedence over inAppExcludes.
+  /// For Flutter/Dart, this typically includes:
+  /// - Your app's main package (e.g., "package:your_app")
+  /// - Any internal packages you own (e.g., "package:your_company_utils")
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  final inAppIncludes = <String>[];
+
+  /// List of package names to be excluded from inApp frames for exception tracking
+  ///
+  /// inAppExcludes Example:
+  /// inAppExcludes = ["package:third_party_lib", "package:analytics_package"]
+  /// All exception stacktrace frames from these packages will be considered external
+  ///
+  /// Note: inAppIncludes takes precedence over this setting.
+  /// Common packages to exclude:
+  /// - Third-party analytics packages
+  /// - External utility libraries
+  /// - Packages you don't control
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  final inAppExcludes = <String>[];
+
+  /// Configures whether stack trace frames are considered inApp by default
+  /// when the origin cannot be determined or no explicit includes/excludes match.
+  ///
+  /// - If true: Frames are inApp unless explicitly excluded (allowlist approach)
+  /// - If false: Frames are external unless explicitly included (denylist approach)
+  ///
+  /// Default behavior when true:
+  /// - Local files (no package prefix) are inApp
+  /// - dart and flutter packages are excluded
+  /// - All other packages are inApp unless in inAppExcludes
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  var inAppByDefault = true;
+
+  /// Enable automatic capture of Flutter framework errors
+  ///
+  /// Controls whether `FlutterError.onError` errors are captured.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: false
+  var captureFlutterErrors = false;
+
+  /// Enable capturing of silent Flutter errors
+  ///
+  /// Controls whether Flutter errors marked as silent (FlutterErrorDetails.silent = true) are captured.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: false
+  var captureSilentFlutterErrors = false;
+
+  /// Enable automatic capture of Dart runtime errors
+  ///
+  /// Controls whether `PlatformDispatcher.onError errors` are captured.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: false
+  var capturePlatformDispatcherErrors = false;
+
+  /// Enable automatic capture of exceptions in the native SDKs (Android only for now)
+  ///
+  /// Controls whether native exceptions are captured.
+  ///
+  /// **Note:**
+  /// - iOS: Not supported
+  /// - Android: Java/Kotlin exceptions only (no native C/C++ crashes)
+  /// - Android: No stacktrace demangling for minified builds
+  ///
+  /// Default: false
+  var captureNativeExceptions = false;
+
+  /// Enable automatic capture of isolate errors
+  ///
+  /// Controls whether errors from the current isolate are captured.
+  /// This includes errors from the main isolate and any isolates spawned
+  /// without explicit error handling.
+  ///
+  /// **Note:**
+  /// - Flutter web: Not supported
+  ///
+  /// Default: false
+  var captureIsolateErrors = false;
+
+  Map<String, dynamic> toMap() {
+    return {
+      'inAppIncludes': inAppIncludes,
+      'inAppExcludes': inAppExcludes,
+      'inAppByDefault': inAppByDefault,
+      'captureFlutterErrors': captureFlutterErrors,
+      'captureSilentFlutterErrors': captureSilentFlutterErrors,
+      'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
+      'captureNativeExceptions': captureNativeExceptions,
+      'captureIsolateErrors': captureIsolateErrors,
     };
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/survey_appearance.dart';
+import '../models/posthog_display_survey_text_content_type.dart';
 import 'question_header.dart';
 import 'survey_button.dart';
 import 'survey_choice_button.dart';
@@ -10,6 +11,7 @@ class ChoiceQuestionWidget extends StatefulWidget {
     super.key,
     required this.question,
     required this.description,
+    this.descriptionContentType,
     required this.choices,
     required this.appearance,
     this.buttonText,
@@ -21,6 +23,7 @@ class ChoiceQuestionWidget extends StatefulWidget {
 
   final String question;
   final String? description;
+  final PostHogDisplaySurveyTextContentType? descriptionContentType;
   final List<String> choices;
   final SurveyAppearance appearance;
   final String? buttonText;
@@ -104,6 +107,7 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
             QuestionHeader(
               question: widget.question,
               description: widget.description,
+              descriptionContentType: widget.descriptionContentType,
               appearance: widget.appearance,
             ),
             const SizedBox(height: 16),

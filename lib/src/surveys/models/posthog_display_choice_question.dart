@@ -6,12 +6,14 @@ import 'posthog_display_survey_question.dart';
 @immutable
 class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
   const PostHogDisplayChoiceQuestion({
+    required super.id,
     required super.question,
     required this.choices,
     required this.isMultipleChoice,
     this.hasOpenChoice = false,
     this.shuffleOptions = false,
     super.description,
+    super.descriptionContentType,
     super.optional,
     super.buttonText,
   }) : super(
