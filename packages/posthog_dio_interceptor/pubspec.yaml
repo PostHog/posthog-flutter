@@ -10,11 +10,7 @@ environment:
 # Add regular dependencies here.
 dependencies:
   dio: ^5.9.0
-  posthog_flutter: ^5.9.0
-
-dependency_overrides:
-  posthog_flutter:
-    path: ../..
+  posthog_flutter: ^5.0.0
 
 dev_dependencies:
   lints: ^6.0.0
