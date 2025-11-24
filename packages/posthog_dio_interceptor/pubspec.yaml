@@ -9,7 +9,7 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
-  dio: ^5.9.0
+  dio: ^5.0.0
   posthog_flutter: ^5.0.0
 
 dev_dependencies:
