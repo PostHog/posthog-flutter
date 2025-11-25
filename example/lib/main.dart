@@ -454,6 +454,18 @@ class InitialScreenState extends State<InitialScreen> {
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
+                    "Network Performance",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: _callApiWithDio,
+                  child: Text("Call API with Dio"),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
                     "Data result",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -465,6 +477,10 @@ class InitialScreenState extends State<InitialScreen> {
         ),
       ),
     );
+  }
+
+  void _callApiWithDio() {
+    Dio()
   }
 }
 
