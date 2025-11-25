@@ -22,8 +22,7 @@ class PostHogDioInterceptor extends Interceptor {
   ) async {
     super.onResponse(response, handler);
 
-    final isSessionReplayActive =
-        await _posthog.isSessionReplayActive();
+    final isSessionReplayActive = await _posthog.isSessionReplayActive();
     if (isSessionReplayActive) {
       await _captureNetworkEvent(
         response: response,
@@ -38,8 +37,7 @@ class PostHogDioInterceptor extends Interceptor {
   ) async {
     super.onError(err, handler);
 
-    final isSessionReplayActive =
-        await _posthog.isSessionReplayActive();
+    final isSessionReplayActive = await _posthog.isSessionReplayActive();
     if (isSessionReplayActive) {
       final Response<dynamic>? response = err.response;
       if (response != null) {
