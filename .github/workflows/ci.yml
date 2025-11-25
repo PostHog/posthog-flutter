@@ -3,9 +3,17 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "packages/posthog_flutter/**"
+      - ".github/workflows/ci.yml"
+      - "Makefile"
+      - "ktlint-baseline.xml"
   pull_request:
-    paths-ignore:
-      - "**/*.md"
+    paths:
+      - "packages/posthog_flutter/**"
+      - ".github/workflows/ci.yml"
+      - "Makefile"
+      - "ktlint-baseline.xml"
 
 # Publish using custom workflow
 jobs:
@@ -35,6 +43,7 @@ jobs:
           flutter pub get
           cd example
           flutter pub get
+        working-directory: ./packages/posthog_flutter
 
       - name: SDK format check
         run: |
@@ -43,22 +52,25 @@ jobs:
           make analyzeDart
           make formatKotlin
           make formatSwift
+        working-directory: ./packages/posthog_flutter
 
       - name: Test
-        run: flutter test
+        run: |
+          flutter test
+        working-directory: ./packages/posthog_flutter
 
       - name: Build iOS
-        working-directory: ./example
+        working-directory: ./packages/posthog_flutter/example
         run: flutter build ios --simulator --no-codesign
 
       - name: Build macOS
-        working-directory: ./example
+        working-directory: ./packages/posthog_flutter/example
         run: flutter build macos
 
       - name: Build Android
-        working-directory: ./example
+        working-directory: ./packages/posthog_flutter/example
         run: flutter build apk
 
       - name: Build Web
-        working-directory: ./example
+        working-directory: ./packages/posthog_flutter/example
         run: flutter build web
