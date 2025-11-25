@@ -1,0 +1,28 @@
+name: Publish Dio Interceptor to pub.dev
+
+on:
+  push:
+    tags:
+      - 'dio-v[0-9]+.[0-9]+.[0-9]+*' # tag pattern for dio interceptor: eg 'dio-v1.0.0'
+
+jobs:
+  publish:
+    permissions:
+      id-token: write # Required for authentication using OIDC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: |
+          dart pub get
+        working-directory: ./packages/posthog_dio_interceptor
+
+      - name: Publish
+        run: |
+          dart pub publish --force
+        working-directory: ./packages/posthog_dio_interceptor

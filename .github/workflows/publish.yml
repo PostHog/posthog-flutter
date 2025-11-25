@@ -20,6 +20,10 @@ jobs:
         with:
           channel: 'stable'
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+        working-directory: ./packages/posthog_flutter
       - name: Publish
-        run: flutter pub publish --force
+        run: |
+          flutter pub publish --force
+        working-directory: ./packages/posthog_flutter
