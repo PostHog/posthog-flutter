@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:posthog_dio_interceptor/posthog_dio_interceptor.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 Future<void> main() async {
@@ -459,8 +461,12 @@ class InitialScreenState extends State<InitialScreen> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: _callApiWithDio,
-                  child: Text("Call API with Dio"),
+                  onPressed: _callPostApiWithDio,
+                  child: const Text("Call POST API with Dio"),
+                ),
+                ElevatedButton(
+                  onPressed: _callGetApiWithDio,
+                  child: const Text("Call GET API with Dio"),
                 ),
                 const Divider(),
                 const Padding(
@@ -479,8 +485,31 @@ class InitialScreenState extends State<InitialScreen> {
     );
   }
 
-  void _callApiWithDio() {
-    Dio()
+  void _callGetApiWithDio() async {
+    final dio = Dio()
+      ..interceptors.add(PostHogDioInterceptor(attachPayloads: true));
+    final response = await dio.get('https://httpbin.org/get');
+    setState(() {
+      _result = response.data;
+    });
+  }
+
+  Future<void> _callPostApiWithDio() async {
+    final dio = Dio()
+      ..interceptors.add(PostHogDioInterceptor(attachPayloads: true));
+    await dio.post('https://httpbin.org/post', data: {
+      'key': 'value',
+    });
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('API call successful! Check PostHog.'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 }
 

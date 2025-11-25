@@ -55,38 +55,41 @@ class PostHogDioInterceptor extends Interceptor {
     final [
       (Object? publishableRequest, int requestSizeLimit),
       (Object? publishableResponse, int responseSizeLimit),
-    ] = await Future.wait([
-      if (attachPayloads)
-        _tryTransformDataToPublishableObject(
-          data: response.requestOptions.data,
-        ).then(
-          (value) async {
-            final sizeLimit = await _calculateSizeLimit(
+    ] = attachPayloads
+        ? await Future.wait([
+            _tryTransformDataToPublishableObject(
               data: response.requestOptions.data,
-              header: response.requestOptions.headers,
-            );
-            return (
-              value,
-              sizeLimit,
-            );
-          },
-        ),
-      if (attachPayloads)
-        _tryTransformDataToPublishableObject(
-          data: response.data,
-        ).then(
-          (value) async {
-            final sizeLimit = await _calculateSizeLimit(
+            ).then(
+              (value) async {
+                final sizeLimit = await _calculateSizeLimit(
+                  data: response.requestOptions.data,
+                  header: response.requestOptions.headers,
+                );
+                return (
+                  value,
+                  sizeLimit,
+                );
+              },
+            ),
+            _tryTransformDataToPublishableObject(
               data: response.data,
-              header: response.headers.map,
-            );
-            return (
-              value,
-              sizeLimit,
-            );
-          },
-        ),
-    ]);
+            ).then(
+              (value) async {
+                final sizeLimit = await _calculateSizeLimit(
+                  data: response.data,
+                  header: response.headers.map,
+                );
+                return (
+                  value,
+                  sizeLimit,
+                );
+              },
+            ),
+          ])
+        : [
+            (null, 0),
+            (null, 0),
+          ];
 
     final Map<String, Object> snapshotData = <String, Object>{
       'type': 6,
@@ -166,6 +169,7 @@ class PostHogDioInterceptor extends Interceptor {
     if (data is Map ||
         data is String ||
         data is num ||
+        data is BigInt ||
         data is bool ||
         data is Iterable) {
       return data;
