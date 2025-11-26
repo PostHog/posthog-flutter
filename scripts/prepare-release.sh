@@ -22,7 +22,7 @@ git checkout -b "$BRANCH_NAME"
 git commit -am "chore(release): bump to ${NEW_VERSION}"
 git push -u origin "$BRANCH_NAME"
 
-PR_URL="https://github.com/PostHog/posthog-android/compare/main...release%2F${NEW_VERSION}?expand=1"
+PR_URL="https://github.com/PostHog/posthog-flutter/compare/main...release%2F${NEW_VERSION}?expand=1"
 
 echo ""
 echo "Done! Created release branch: $BRANCH_NAME"
