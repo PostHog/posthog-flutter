@@ -1,0 +1,43 @@
+name: CI - Dio Interceptor
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/posthog_dio_interceptor/**"
+      - ".github/workflows/ci-dio-interceptor.yml"
+  pull_request:
+    paths:
+      - "packages/posthog_dio_interceptor/**"
+      - ".github/workflows/ci-dio-interceptor.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: |
+          dart pub get
+        working-directory: ./packages/posthog_dio_interceptor
+
+      - name: Check format
+        run: |
+          dart format --set-exit-if-changed ./
+        working-directory: ./packages/posthog_dio_interceptor
+
+      - name: Analyze
+        run: |
+          dart analyze .
+        working-directory: ./packages/posthog_dio_interceptor
+
+      - name: Run tests
+        run: |
+          dart test
+        working-directory: ./packages/posthog_dio_interceptor
