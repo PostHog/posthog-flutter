@@ -46,7 +46,6 @@ class PostHogConfig {
   /// Configuration for error tracking and exception capture
   final errorTrackingConfig = PostHogErrorTrackingConfig();
 
-
   /// Callback to be invoked when feature flags are loaded.
   /// See [Posthog.onFeatureFlags] for more details on behavior per platform.
   final OnFeatureFlagsCallback? onFeatureFlags;

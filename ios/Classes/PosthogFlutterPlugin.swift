@@ -43,7 +43,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         let flags: [String] = []
         let flagVariants: [String: Any] = [:]
 
-        guard let channel = self.channel else {
+        guard let channel else {
             print("PosthogFlutterPlugin: FlutterMethodChannel is nil in featureFlagsDidUpdate.")
             return
         }
@@ -51,7 +51,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         channel.invokeMethod("onFeatureFlagsCallback", arguments: [
             "flags": flags,
             "flagVariants": flagVariants,
-            "errorsLoading": false
+            "errorsLoading": false,
         ])
     }
 

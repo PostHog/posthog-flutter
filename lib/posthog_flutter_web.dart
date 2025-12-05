@@ -51,7 +51,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     // }.jsify();
     // posthog?.callMethod('init'.toJS, config.apiKey.toJS, jsOptions);
 
-
     if (config.onFeatureFlags != null && posthog != null) {
       final dartCallback = config.onFeatureFlags!;
 
@@ -59,11 +58,13 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         final List<String> flags = jsFlags.toDart.whereType<String>().toList();
 
         Map<String, dynamic> flagVariants = {};
-        final dartVariantsMap = jsFlagVariants.dartify() as Map<dynamic, dynamic>?;
+        final dartVariantsMap =
+            jsFlagVariants.dartify() as Map<dynamic, dynamic>?;
         if (dartVariantsMap != null) {
-          flagVariants = dartVariantsMap.map((key, value) => MapEntry(key.toString(), value));
+          flagVariants = dartVariantsMap
+              .map((key, value) => MapEntry(key.toString(), value));
         }
-        
+
         // When posthog-js onFeatureFlags fires, it implies successful loading.
         dartCallback(flags, flagVariants, errorsLoading: false);
       }.toJS;
