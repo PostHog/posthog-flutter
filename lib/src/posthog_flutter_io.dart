@@ -25,6 +25,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   final _methodChannel = const MethodChannel('posthog_flutter');
 
   OnFeatureFlagsCallback? _onFeatureFlagsCallback;
+
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
 
@@ -39,7 +40,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       case 'hideSurveys':
         await cleanupSurveys();
         return null;
-	  case 'onFeatureFlagsCallback':
+      case 'onFeatureFlagsCallback':
         if (_onFeatureFlagsCallback != null) {
           try {
             final args = call.arguments as Map<dynamic, dynamic>;
@@ -70,15 +71,13 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
   }
 
-  @override
   void onFeatureFlags(OnFeatureFlagsCallback callback) {
     if (!isSupportedPlatform()) {
       return;
     }
-    _ensureMethodCallHandlerInitialized();
     _onFeatureFlagsCallback = callback;
   }
-  
+
   @override
   Future<void> showSurvey(Map<String, dynamic> survey) async {
     if (!isSupportedPlatform()) {
@@ -163,9 +162,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     _onFeatureFlagsCallback = config.onFeatureFlags;
-    if (_onFeatureFlagsCallback != null) {
-      _ensureMethodCallHandlerInitialized();
-    }
 
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());
