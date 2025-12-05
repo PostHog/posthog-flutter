@@ -19,10 +19,48 @@ class Posthog {
 
   String? _currentScreen;
 
-  /// Android and iOS only
-  /// Only used for the manual setup
-  /// Requires disabling the automatic init on Android and iOS:
-  /// com.posthog.posthog.AUTO_INIT: false
+  /// Initializes the PostHog SDK.
+  ///
+  /// This method sets up the connection to your PostHog instance and prepares the SDK for tracking events and feature flags.
+  ///
+  /// - [config]: The [PostHogConfig] object containing your API key, host, and other settings.
+  ///   To listen for feature flag load events, provide an `onFeatureFlags` callback in the [PostHogConfig].
+  ///
+  /// **Behavior of `onFeatureFlags` callback (when provided in `PostHogConfig`):**
+  ///
+  /// **Web:**
+  /// The callback will receive:
+  /// - `flags`: A list of active feature flag keys (`List<String>`).
+  /// - `flagVariants`: A map of feature flag keys to their variant values (`Map<String, dynamic>`).
+  /// - `errorsLoading`: Will be `false` as the callback firing implies success.
+  ///
+  /// **Mobile (Android/iOS):**
+  /// The callback serves primarily as a notification that the native PostHog SDK
+  /// has finished loading feature flags. In this case:
+  /// - `flags`: Will be an empty list (`List<String>`).
+  /// - `flagVariants`: Will be an empty map (`Map<String, dynamic>`).
+  /// - `errorsLoading`: Will be `null` if the native call was successful but contained no error info, or `true` if an error occurred during Dart-side processing of the callback.
+  /// After this callback is invoked, you can reliably use `Posthog().getFeatureFlag('your-flag-key')`
+  /// or `Posthog().isFeatureEnabled('your-flag-key')` to get the values of specific flags.
+  ///
+  /// **Example with `onFeatureFlags` in `PostHogConfig`:**
+  /// ```dart
+  /// final config = PostHogConfig(
+  ///   apiKey: 'YOUR_API_KEY',
+  ///   host: 'YOUR_POSTHOG_HOST',
+  ///   onFeatureFlags: (flags, flagVariants, {errorsLoading}) {
+  ///     if (errorsLoading == true) {
+  ///       print('Error loading feature flags!');
+  ///       return;
+  ///     }
+  ///     // ... process flags ...
+  ///   },
+  /// );
+  /// await Posthog().setup(config);
+  /// ```
+  ///
+  /// For Android and iOS, if you are performing a manual setup,
+  /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native configuration.
   Future<void> setup(PostHogConfig config) {
     _config = config; // Store the config
 

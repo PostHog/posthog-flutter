@@ -31,6 +31,7 @@ extension PostHogExtension on PostHog {
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
+  external void onFeatureFlags(JSFunction callback);
 }
 
 // Accessing PostHog from the window object

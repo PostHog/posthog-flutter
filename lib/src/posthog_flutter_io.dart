@@ -24,6 +24,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
+  OnFeatureFlagsCallback? _onFeatureFlagsCallback;
+
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
 
@@ -38,11 +40,42 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       case 'hideSurveys':
         await cleanupSurveys();
         return null;
+      case 'onFeatureFlagsCallback':
+        if (_onFeatureFlagsCallback != null) {
+          try {
+            final args = call.arguments as Map<dynamic, dynamic>;
+            // Ensure correct types from native
+            // For mobile, args will be an empty map. Callback expects optional params.
+            final flags =
+                (args['flags'] as List<dynamic>?)?.cast<String>() ?? [];
+            final flagVariants =
+                (args['flagVariants'] as Map<dynamic, dynamic>?)
+                        ?.map((k, v) => MapEntry(k.toString(), v)) ??
+                    <String, dynamic>{};
+            // For mobile, errorsLoading is not explicitly sent, so it will be null here.
+            final errorsLoading = args['errorsLoading'] as bool?;
+
+            _onFeatureFlagsCallback!(flags, flagVariants,
+                errorsLoading: errorsLoading);
+          } catch (e, s) {
+            printIfDebug('Error processing onFeatureFlagsCallback: $e\n$s');
+            _onFeatureFlagsCallback!([], <String, dynamic>{},
+                errorsLoading: true);
+          }
+        }
+        break;
       default:
         printIfDebug(
             '[PostHog] ${call.method} not implemented in PosthogFlutterPlatformInterface');
         return null;
     }
+  }
+
+  void onFeatureFlags(OnFeatureFlagsCallback callback) {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+    _onFeatureFlagsCallback = callback;
   }
 
   @override
@@ -127,6 +160,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (!isSupportedPlatform()) {
       return;
     }
+
+    _onFeatureFlagsCallback = config.onFeatureFlags;
 
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());

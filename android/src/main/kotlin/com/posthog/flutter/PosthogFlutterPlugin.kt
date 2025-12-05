@@ -11,6 +11,7 @@ import android.util.Log
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
 import com.posthog.PostHogConfig
+import com.posthog.PostHogOnFeatureFlags
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
@@ -305,7 +306,15 @@ class PosthogFlutterPlugin :
 
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
+
+                onFeatureFlags =
+                    PostHogOnFeatureFlags {
+                        Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
+                        // Send empty map, Dart side handles defaults
+                        invokeFlutterMethod("onFeatureFlagsCallback", emptyMap<String, Any?>())
+                    }
             }
+
         PostHogAndroid.setup(applicationContext, config)
     }
 
