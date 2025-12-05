@@ -47,11 +47,10 @@ class PostHogConfig {
   final errorTrackingConfig = PostHogErrorTrackingConfig();
 
   /// Callback to be invoked when feature flags are loaded.
-  /// See [Posthog.onFeatureFlags] for more details on behavior per platform.
-  final OnFeatureFlagsCallback? onFeatureFlags;
+  /// See [Posthog.setup] for more details on behavior per platform.
+  OnFeatureFlagsCallback? onFeatureFlags;
 
-  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
-  // onFeatureFlags, integrations
+  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
 
   PostHogConfig(
     this.apiKey, {
