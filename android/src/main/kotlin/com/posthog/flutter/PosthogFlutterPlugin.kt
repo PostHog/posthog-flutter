@@ -309,15 +309,9 @@ class PosthogFlutterPlugin :
 
                 onFeatureFlags =
                     PostHogOnFeatureFlags {
-                        try {
-                            Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
-                            val arguments = emptyMap<String, Any?>()
-                            channel.invokeMethod("onFeatureFlagsCallback", arguments)
-                        } catch (e: Exception) {
-                            Log.e("PostHogFlutter", "Error in onFeatureFlags signalling: ${e.message}", e)
-                            val errorArguments = emptyMap<String, Any?>()
-                            channel.invokeMethod("onFeatureFlagsCallback", errorArguments)
-                        }
+                        Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
+                        // Send empty map, Dart side handles defaults
+                        invokeFlutterMethod("onFeatureFlagsCallback", emptyMap<String, Any?>())
                     }
             }
 

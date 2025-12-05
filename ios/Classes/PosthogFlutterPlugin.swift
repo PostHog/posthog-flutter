@@ -25,6 +25,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         )
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let methodChannel: FlutterMethodChannel
         #if os(iOS)
@@ -40,25 +44,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     @objc func featureFlagsDidUpdate() {
-        let flags: [String] = []
-        let flagVariants: [String: Any] = [:]
-
-        guard let channel else {
-            print("PosthogFlutterPlugin: FlutterMethodChannel is nil in featureFlagsDidUpdate.")
-            return
-        }
-
-        channel.invokeMethod("onFeatureFlagsCallback", arguments: [
-            "flags": flags,
-            "flagVariants": flagVariants,
-            "errorsLoading": false,
-        ])
+        // Send empty map, Dart side handles defaults
+        invokeFlutterMethod("onFeatureFlagsCallback", arguments: [String: Any]())
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
                                               target: .global(qos: .utility))
-
-    private var channel: FlutterMethodChannel?
 
     public static func initPlugin() {
         let autoInit = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.AUTO_INIT") as? Bool ?? true
