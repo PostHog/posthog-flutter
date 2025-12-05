@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: 'Set up Java'
         uses: actions/setup-java@v5
@@ -20,15 +20,15 @@ jobs:
           java-version: 17
           distribution: 'temurin'
 
-      - uses: dart-lang/setup-dart@v1
-      - uses: subosito/flutter-action@v2
+      - uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
         with:
           channel: 'stable'
           
       - name: Select Xcode version
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
         with:
-          xcode-version: latest-stable
+          xcode-version: '16.4'
 
       - name: Install dependencies
         run: |
