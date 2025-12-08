@@ -23,6 +23,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     );
     final PosthogFlutterWeb instance = PosthogFlutterWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
+
+    // Set the platform instance so that Posthog() can call methods directly
+    // on the web implementation instead of going through the method channel.
+    // This is required because method channels can only pass serializable data,
+    // not function callbacks like onFeatureFlags.
     PosthogFlutterPlatformInterface.instance = instance;
   }
 
@@ -55,7 +60,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     if (config.onFeatureFlags != null && ph != null) {
       final dartCallback = config.onFeatureFlags!;
 
-      final jsCallback = (JSArray jsFlags, JSObject jsFlagVariants) {
+      // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
+      // Use optional positional param [jsContext] to handle when JS omits the 3rd argument
+      final jsCallback =
+          (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
         final List<String> flags = jsFlags.toDart.whereType<String>().toList();
 
         Map<String, Object?> flagVariants = {};
@@ -66,11 +74,171 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
               .map((key, value) => MapEntry(key.toString(), value));
         }
 
-        // When posthog-js onFeatureFlags fires, it implies successful loading.
-        dartCallback(flags, flagVariants, errorsLoading: false);
+        bool errorsLoading = false;
+        if (jsContext != null) {
+          final contextMap = jsContext.dartify() as Map<Object?, Object?>?;
+          errorsLoading = contextMap?['errorsLoading'] as bool? ?? false;
+        }
+
+        dartCallback(flags, flagVariants, errorsLoading: errorsLoading);
       }.toJS;
 
       ph.onFeatureFlags(jsCallback);
     }
+  }
+
+  @override
+  Future<void> identify({
+    required String userId,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+  }) async {
+    return handleWebMethodCall(MethodCall('identify', {
+      'userId': userId,
+      if (userProperties != null) 'userProperties': userProperties,
+      if (userPropertiesSetOnce != null)
+        'userPropertiesSetOnce': userPropertiesSetOnce,
+    }));
+  }
+
+  @override
+  Future<void> capture({
+    required String eventName,
+    Map<String, Object>? properties,
+  }) async {
+    return handleWebMethodCall(MethodCall('capture', {
+      'eventName': eventName,
+      if (properties != null) 'properties': properties,
+    }));
+  }
+
+  @override
+  Future<void> screen({
+    required String screenName,
+    Map<String, Object>? properties,
+  }) async {
+    return handleWebMethodCall(MethodCall('screen', {
+      'screenName': screenName,
+      if (properties != null) 'properties': properties,
+    }));
+  }
+
+  @override
+  Future<void> alias({required String alias}) async {
+    return handleWebMethodCall(MethodCall('alias', {'alias': alias}));
+  }
+
+  @override
+  Future<String> getDistinctId() async {
+    final result = await handleWebMethodCall(const MethodCall('distinctId'));
+    return result as String? ?? '';
+  }
+
+  @override
+  Future<void> reset() async {
+    return handleWebMethodCall(const MethodCall('reset'));
+  }
+
+  @override
+  Future<void> disable() async {
+    return handleWebMethodCall(const MethodCall('disable'));
+  }
+
+  @override
+  Future<void> enable() async {
+    return handleWebMethodCall(const MethodCall('enable'));
+  }
+
+  @override
+  Future<bool> isOptOut() async {
+    final result = await handleWebMethodCall(const MethodCall('isOptOut'));
+    return result as bool? ?? true;
+  }
+
+  @override
+  Future<void> debug(bool enabled) async {
+    return handleWebMethodCall(MethodCall('debug', {'debug': enabled}));
+  }
+
+  @override
+  Future<void> register(String key, Object value) async {
+    return handleWebMethodCall(
+        MethodCall('register', {'key': key, 'value': value}));
+  }
+
+  @override
+  Future<void> unregister(String key) async {
+    return handleWebMethodCall(MethodCall('unregister', {'key': key}));
+  }
+
+  @override
+  Future<bool> isFeatureEnabled(String key) async {
+    final result =
+        await handleWebMethodCall(MethodCall('isFeatureEnabled', {'key': key}));
+    return result as bool? ?? false;
+  }
+
+  @override
+  Future<void> reloadFeatureFlags() async {
+    return handleWebMethodCall(const MethodCall('reloadFeatureFlags'));
+  }
+
+  @override
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    Map<String, Object>? groupProperties,
+  }) async {
+    return handleWebMethodCall(MethodCall('group', {
+      'groupType': groupType,
+      'groupKey': groupKey,
+      if (groupProperties != null) 'groupProperties': groupProperties,
+    }));
+  }
+
+  @override
+  Future<Object?> getFeatureFlag({required String key}) async {
+    return handleWebMethodCall(MethodCall('getFeatureFlag', {'key': key}));
+  }
+
+  @override
+  Future<Object?> getFeatureFlagPayload({required String key}) async {
+    return handleWebMethodCall(
+        MethodCall('getFeatureFlagPayload', {'key': key}));
+  }
+
+  @override
+  Future<void> flush() async {
+    return handleWebMethodCall(const MethodCall('flush'));
+  }
+
+  @override
+  Future<void> close() async {
+    return handleWebMethodCall(const MethodCall('close'));
+  }
+
+  @override
+  Future<String?> getSessionId() async {
+    final result = await handleWebMethodCall(const MethodCall('getSessionId'));
+    return result as String?;
+  }
+
+  @override
+  Future<void> openUrl(String url) async {
+    // Not supported on web
+  }
+
+  @override
+  Future<void> showSurvey(Map<String, dynamic> survey) async {
+    // Not supported on web - surveys handled by posthog-js
+  }
+
+  @override
+  Future<void> captureException({
+    required Object error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+  }) async {
+    // Not implemented on web
   }
 }
