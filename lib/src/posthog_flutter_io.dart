@@ -71,13 +71,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
   }
 
-  void onFeatureFlags(OnFeatureFlagsCallback callback) {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-    _onFeatureFlagsCallback = callback;
-  }
-
   @override
   Future<void> showSurvey(Map<String, dynamic> survey) async {
     if (!isSupportedPlatform()) {
