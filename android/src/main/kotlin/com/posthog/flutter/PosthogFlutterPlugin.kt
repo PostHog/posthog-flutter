@@ -310,7 +310,6 @@ class PosthogFlutterPlugin :
                 onFeatureFlags =
                     PostHogOnFeatureFlags {
                         Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
-                        // Send empty map, Dart side handles defaults
                         invokeFlutterMethod("onFeatureFlagsCallback", emptyMap<String, Any?>())
                     }
             }

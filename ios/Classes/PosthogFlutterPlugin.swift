@@ -44,7 +44,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     @objc func featureFlagsDidUpdate() {
-        // Send empty map, Dart side handles defaults
         invokeFlutterMethod("onFeatureFlagsCallback", arguments: [String: Any]())
     }
 
