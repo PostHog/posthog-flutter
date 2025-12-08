@@ -51,15 +51,16 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     // }.jsify();
     // posthog?.callMethod('init'.toJS, config.apiKey.toJS, jsOptions);
 
-    if (config.onFeatureFlags != null && posthog != null) {
+    final ph = posthog;
+    if (config.onFeatureFlags != null && ph != null) {
       final dartCallback = config.onFeatureFlags!;
 
       final jsCallback = (JSArray jsFlags, JSObject jsFlagVariants) {
         final List<String> flags = jsFlags.toDart.whereType<String>().toList();
 
-        Map<String, dynamic> flagVariants = {};
+        Map<String, Object?> flagVariants = {};
         final dartVariantsMap =
-            jsFlagVariants.dartify() as Map<dynamic, dynamic>?;
+            jsFlagVariants.dartify() as Map<Object?, Object?>?;
         if (dartVariantsMap != null) {
           flagVariants = dartVariantsMap
               .map((key, value) => MapEntry(key.toString(), value));
@@ -69,7 +70,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         dartCallback(flags, flagVariants, errorsLoading: false);
       }.toJS;
 
-      posthog!.onFeatureFlags(jsCallback);
+      ph.onFeatureFlags(jsCallback);
     }
   }
 }
