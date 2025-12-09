@@ -35,7 +35,7 @@ class ElementObjectParser {
       final config = Posthog().config?.sessionReplayConfig;
       final maskAllTexts = config?.maskAllTexts ?? true;
 
-      bool isObscured = false;
+      var isObscured = false;
       if (element.widget is TextField) {
         isObscured = (element.widget as TextField).obscureText;
       }
