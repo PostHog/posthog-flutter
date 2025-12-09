@@ -168,7 +168,7 @@ class InitialScreenState extends State<InitialScreen> {
                       onPressed: () async {
                         final isOptedOut =
                             await _posthogFlutterPlugin.isOptOut();
-                        if (mounted) {
+                        if (mounted && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Opted out: $isOptedOut'),
@@ -284,7 +284,7 @@ class InitialScreenState extends State<InitialScreen> {
                         },
                       );
 
-                      if (mounted) {
+                      if (mounted && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
