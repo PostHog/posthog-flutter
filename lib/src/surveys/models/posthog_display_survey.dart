@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_dynamic_calls
+
 import 'package:flutter/foundation.dart';
 import 'posthog_display_survey_question.dart';
 import 'posthog_display_survey_rating_type.dart';

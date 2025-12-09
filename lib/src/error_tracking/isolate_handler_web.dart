@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_annotating_with_dynamic
+
 /// Web platform stub implementation of isolate error handling
 /// Isolates are not available on web, so this is a no-op implementation
 class IsolateErrorHandler {

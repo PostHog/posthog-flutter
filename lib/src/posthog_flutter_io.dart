@@ -43,15 +43,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       case 'onFeatureFlagsCallback':
         if (_onFeatureFlagsCallback != null) {
           try {
-            final args = call.arguments as Map<dynamic, dynamic>;
+            final args = call.arguments as Map<Object?, Object?>;
             // Ensure correct types from native
             // For mobile, args will be an empty map. Callback expects optional params.
-            final flags =
-                (args['flags'] as List<dynamic>?)?.cast<String>() ?? [];
+            final flags = (args['flags'] as List<Object?>?)
+                    ?.whereType<String>()
+                    .toList() ??
+                [];
             final flagVariants =
-                (args['flagVariants'] as Map<dynamic, dynamic>?)
+                (args['flagVariants'] as Map<Object?, Object?>?)
                         ?.map((k, v) => MapEntry(k.toString(), v)) ??
-                    <String, dynamic>{};
+                    <String, Object?>{};
             // For mobile, errorsLoading is not explicitly sent, so it will be null here.
             final errorsLoading = args['errorsLoading'] as bool?;
 
@@ -59,7 +61,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
                 errorsLoading: errorsLoading);
           } catch (e, s) {
             printIfDebug('Error processing onFeatureFlagsCallback: $e\n$s');
-            _onFeatureFlagsCallback!([], <String, dynamic>{},
+            _onFeatureFlagsCallback!([], <String, Object?>{},
                 errorsLoading: true);
           }
         }

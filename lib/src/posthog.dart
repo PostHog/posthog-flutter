@@ -31,14 +31,14 @@ class Posthog {
   /// **Web:**
   /// The callback will receive:
   /// - `flags`: A list of active feature flag keys (`List<String>`).
-  /// - `flagVariants`: A map of feature flag keys to their variant values (`Map<String, dynamic>`).
+  /// - `flagVariants`: A map of feature flag keys to their variant values (`Map<String, Object?>`).
   /// - `errorsLoading`: Will be `false` as the callback firing implies success.
   ///
   /// **Mobile (Android/iOS):**
   /// The callback serves primarily as a notification that the native PostHog SDK
   /// has finished loading feature flags. In this case:
   /// - `flags`: Will be an empty list (`List<String>`).
-  /// - `flagVariants`: Will be an empty map (`Map<String, dynamic>`).
+  /// - `flagVariants`: Will be an empty map (`Map<String, Object?>`).
   /// - `errorsLoading`: Will be `null` if the native call was successful but contained no error info, or `true` if an error occurred during Dart-side processing of the callback.
   /// After this callback is invoked, you can reliably use `Posthog().getFeatureFlag('your-flag-key')`
   /// or `Posthog().isFeatureEnabled('your-flag-key')` to get the values of specific flags.

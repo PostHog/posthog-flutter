@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_dynamic_calls
+
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_widget.dart';
 

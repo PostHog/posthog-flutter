@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_dynamic_calls, avoid_annotating_with_dynamic
+
 import 'dart:js_interop';
 
 import 'package:flutter/services.dart';
