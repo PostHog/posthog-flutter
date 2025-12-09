@@ -56,10 +56,6 @@ class ChangeDetector {
       return;
     }
 
-    if (!_isRunning) {
-      return;
-    }
-
     onChange();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onFrameRendered();
