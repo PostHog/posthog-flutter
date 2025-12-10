@@ -1,5 +1,7 @@
 ## Next
 
+## 5.9.1
+
 - fix: TextFormField widgets were not being masked ([#227](https://github.com/PostHog/posthog-flutter/pull/227))
 
 ## 5.9.0
