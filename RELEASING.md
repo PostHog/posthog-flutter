@@ -6,7 +6,7 @@ This repository uses GitHub Actions to automate the release process. The workflo
 
 The release process is split into two workflows:
 
-### 1. Prepare Release Workflow (`release.yml`)
+### 1. Prepare Release Workflow (`prepare-release.yml`)
 - Triggered manually via GitHub Actions UI with a version input
 - Creates a release branch
 - Updates version in all necessary files (pubspec.yaml, iOS, Android)
