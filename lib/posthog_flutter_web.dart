@@ -16,12 +16,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   PosthogFlutterWeb();
 
   static void registerWith(Registrar registrar) {
-    final MethodChannel channel = MethodChannel(
+    final channel = MethodChannel(
       'posthog_flutter',
       const StandardMethodCodec(),
       registrar,
     );
-    final PosthogFlutterWeb instance = PosthogFlutterWeb();
+    final instance = PosthogFlutterWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
 
     // Set the platform instance so that Posthog() can call methods directly
@@ -64,9 +64,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       // Use optional positional param [jsContext] to handle when JS omits the 3rd argument
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        final List<String> flags = jsFlags.toDart.whereType<String>().toList();
+        final flags = jsFlags.toDart.whereType<String>().toList();
 
-        Map<String, Object?> flagVariants = {};
+        var flagVariants = <String, Object?>{};
         final dartVariantsMap =
             jsFlagVariants.dartify() as Map<Object?, Object?>?;
         if (dartVariantsMap != null) {
@@ -74,7 +74,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
               .map((key, value) => MapEntry(key.toString(), value));
         }
 
-        bool errorsLoading = false;
+        var errorsLoading = false;
         if (jsContext != null) {
           final contextMap = jsContext.dartify() as Map<Object?, Object?>?;
           errorsLoading = contextMap?['errorsLoading'] as bool? ?? false;

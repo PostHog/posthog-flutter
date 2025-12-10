@@ -34,8 +34,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'showSurvey':
-        final Map<String, dynamic> survey =
-            Map<String, dynamic>.from(call.arguments);
+        final survey = Map<String, dynamic>.from(call.arguments);
         return showSurvey(survey);
       case 'hideSurveys':
         await cleanupSurveys();

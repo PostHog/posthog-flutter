@@ -14,7 +14,7 @@ void main() {
   late PostHogConfig testConfig;
 
   // For testing method calls
-  final List<MethodCall> log = <MethodCall>[];
+  final log = <MethodCall>[];
   const MethodChannel channel = MethodChannel('posthog_flutter');
 
   setUp(() {
@@ -84,7 +84,7 @@ void main() {
       testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
       await posthogFlutterIO.setup(testConfig);
 
-      final Map<String, dynamic> mockNativeArgs = {
+      final mockNativeArgs = {
         'flags': ['flag1', 'feature-abc'],
         'flagVariants': {'flag1': true, 'feature-abc': 'variant-x'},
         'errorsLoading': false,
@@ -123,7 +123,7 @@ void main() {
       await posthogFlutterIO.setup(testConfig);
 
       // Simulate mobile sending an empty map
-      final Map<String, dynamic> mockNativeArgs = {};
+      final mockNativeArgs = <String, dynamic>{};
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
@@ -159,7 +159,7 @@ void main() {
 
       // Simulate native sending an argument that will cause a cast error in _handleMethodCall (before the fix)
       // For the current code, this test will verify the catch block sets errorsLoading: true
-      final Map<String, dynamic> mockNativeArgsMalformed = {
+      final mockNativeArgsMalformed = {
         'flags': 123, // Invalid type, will cause cast error and trigger catch
       };
 
@@ -196,7 +196,7 @@ void main() {
       testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
       await posthogFlutterIO.setup(testConfig);
 
-      final Map<String, dynamic> mockNativeArgsMalformed = {
+      final mockNativeArgsMalformed = {
         'flags': 'not_a_list', // This will be handled by the ?? [] for flags
         'flagVariants': [
           'not_a_map'
