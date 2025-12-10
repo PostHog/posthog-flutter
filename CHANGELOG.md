@@ -2,6 +2,10 @@
 
 - feat: Add `onFeatureFlags` callback to `Posthog()` to listen for feature flag load events. On Web, this callback provides all flags and variants. On mobile (Android/iOS), it serves as a signal that flags have been loaded by the native SDK; the `flags` and `flagVariants` parameters will be empty in the callback, and developers should use `Posthog.getFeatureFlag()` or `Posthog.isFeatureEnabled()` to retrieve specific flag values. This allows developers to ensure flags are loaded before checking them, especially on the first app run. ([#224](https://github.com/PostHog/posthog-flutter/pull/224))
 
+## 5.9.1
+
+- fix: TextFormField widgets were not being masked ([#227](https://github.com/PostHog/posthog-flutter/pull/227))
+
 ## 5.9.0
 
 - feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))

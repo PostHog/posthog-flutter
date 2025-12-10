@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
-import 'package:posthog_flutter/src/replay/mask/posthog_mask_widget.dart';
 
 class ElementObjectParser {
   final ElementParser _elementParser = ElementParser();
@@ -30,9 +30,23 @@ class ElementObjectParser {
       }
     }
 
-    if (element.widget is TextField) {
-      final textField = element.widget as TextField;
-      if (textField.obscureText) {
+    // Handle TextField and TextFormField masking
+    if (element.widget is TextField || element.widget is TextFormField) {
+      final config = Posthog().config?.sessionReplayConfig;
+      final maskAllTexts = config?.maskAllTexts ?? true;
+
+      var isObscured = false;
+      if (element.widget is TextField) {
+        isObscured = (element.widget as TextField).obscureText;
+      }
+      // Note: TextFormField obscureText is handled differently in Flutter.
+      // TextFormField creates an internal TextField, but the obscureText property
+      // is not directly accessible on the TextFormField widget itself.
+      // For TextFormField, we rely on the maskAllTexts configuration.
+
+      final shouldMask = maskAllTexts || isObscured;
+
+      if (shouldMask) {
         final elementData = _elementParser.relate(element, activeElementData);
 
         if (elementData != null) {

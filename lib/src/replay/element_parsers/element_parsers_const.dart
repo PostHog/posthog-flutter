@@ -14,6 +14,7 @@ class ElementParsersConst {
     if (config?.maskAllTexts ?? true) {
       registerElementParser<RenderParagraph>();
       registerElementParser<RenderTransform>();
+      registerElementParser<RenderEditable>();
     }
   }
 
