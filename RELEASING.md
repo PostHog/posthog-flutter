@@ -1,21 +1,48 @@
-Releasing
-=========
+# Automated Release Process
 
-Since `main` is protected, releases are done via pull requests.
+This repository uses GitHub Actions to automate the release process. The workflow ensures that all version updates and changelog modifications are completed before creating the release tag.
 
- 1. Choose a tag name (e.g. `3.0.0`), this is the version number of the release.
-    1. Preview releases follow the pattern `3.0.0-alpha.1`, `3.0.0-beta.1`, `3.0.0-RC.1`
-    2. Execute the script with the tag's name, the script will update the version file and create a release branch.
+## How It Works
 
-    ```bash
-    ./scripts/prepare-release.sh 3.0.0
-    ```
- 2. Create a PR from the release branch to `main`
- 3. Get approval and merge the PR
- 4. Go to [GH Releases](https://github.com/PostHog/posthog-flutter/releases)
- 5. Choose a tag name (e.g. `3.0.0`), same as step 2.
- 6. Choose a release name (e.g. `3.0.0`), ideally it matches the above.
- 7. Write a description of the release.
- 8. Publish the release.
- 9. GH Action (publish.yml) is doing everything else [automatically](https://pub.dev/packages/posthog_flutter/admin).
-10. Done.
+The release process is split into two workflows:
+
+### 1. Prepare Release Workflow (`release.yml`)
+- Triggered manually via GitHub Actions UI with a version input
+- Creates a release branch
+- Updates version in all necessary files (pubspec.yaml, iOS, Android)
+- Updates CHANGELOG.md (replaces `## Next` with the version or adds it at the top)
+- Creates a Pull Request to main
+
+### 2. Tag Release Workflow (`tag-release.yml`)
+- Automatically triggered when a release PR is merged to main
+- Creates a git tag with the version
+- Creates a GitHub Release with auto-generated release notes
+
+## Release Steps
+
+### Step 1: Prepare Your Changes
+1. Ensure all your changes are merged to main
+2. Update CHANGELOG.md with release notes under `## Next` section (optional - if not present, version will be added at the top)
+
+### Step 2: Trigger the Release
+1. Go to Actions tab in GitHub
+2. Select "Prepare Release" workflow
+3. Click "Run workflow"
+4. Enter the version number (e.g., `5.10.0` or `5.10.0-beta.1`)
+5. Click "Run workflow"
+
+### Step 3: Review and Merge
+1. The workflow will create a PR with all version updates
+2. Review the changes
+3. Approve and merge the PR
+
+### Step 4: Automatic Tag Creation
+1. Once the PR is merged, the tag-release workflow automatically:
+   - Creates a git tag (e.g., `v5.10.0`)
+   - Creates a GitHub Release with release notes
+
+## Version Format
+
+The version must follow semantic versioning:
+- Format: `X.Y.Z` or `X.Y.Z-suffix`
+- Examples: `1.2.3`, `2.0.0-alpha.1`, `3.1.0-beta.2`

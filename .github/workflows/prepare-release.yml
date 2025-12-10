@@ -1,0 +1,74 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.2.3 or 1.2.3-alpha.1)'
+        required: true
+        type: string
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate version
+        id: validate_version
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          # Use the validation script
+          ./scripts/validate-version.sh "$VERSION"
+
+          # If validation passed, output the version
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create release branch
+        run: |
+          git checkout main
+          git pull origin main
+          git checkout -b release/${{ steps.validate_version.outputs.version }}
+
+      - name: Update versions and changelog
+        run: |
+          ./scripts/bump-version.sh ${{ steps.validate_version.outputs.version }}
+
+      - name: Commit changes
+        run: |
+          git add -A
+          git commit -m "chore(release): bump to ${{ steps.validate_version.outputs.version }}"
+
+      - name: Push release branch
+        run: |
+          git push origin release/${{ steps.validate_version.outputs.version }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725 # v8.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: release/${{ steps.validate_version.outputs.version }}
+          base: main
+          title: "chore(release): bump to ${{ steps.validate_version.outputs.version }}"
+          body: |
+            ## Release ${{ steps.validate_version.outputs.version }}
+
+            This PR was automatically created by the release workflow.
+
+            ### Changes
+            - Updated version in pubspec.yaml
+            - Updated version in iOS (PostHogFlutterVersion.swift)
+            - Updated version in Android (PostHogVersion.kt)
+            - Updated CHANGELOG.md
+
+            ### Next Steps
+            1. Review and approve this PR
+            2. Merge to main
+            3. The release tag will be created automatically after merge
