@@ -40,30 +40,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         await cleanupSurveys();
         return null;
       case 'onFeatureFlagsCallback':
-        if (_onFeatureFlagsCallback != null) {
-          try {
-            final args = call.arguments as Map<Object?, Object?>;
-            // Ensure correct types from native
-            // For mobile, args will be an empty map. Callback expects optional params.
-            final flags = (args['flags'] as List<Object?>?)
-                    ?.whereType<String>()
-                    .toList() ??
-                [];
-            final flagVariants =
-                (args['flagVariants'] as Map<Object?, Object?>?)
-                        ?.map((k, v) => MapEntry(k.toString(), v)) ??
-                    <String, Object?>{};
-            // For mobile, errorsLoading is not explicitly sent, so it will be null here.
-            final errorsLoading = args['errorsLoading'] as bool?;
-
-            _onFeatureFlagsCallback!(flags, flagVariants,
-                errorsLoading: errorsLoading);
-          } catch (e, s) {
-            printIfDebug('Error processing onFeatureFlagsCallback: $e\n$s');
-            _onFeatureFlagsCallback!([], <String, Object?>{},
-                errorsLoading: true);
-          }
-        }
+        _onFeatureFlagsCallback?.call();
         break;
       default:
         printIfDebug(

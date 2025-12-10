@@ -3,9 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
 
-// Converted from variable to function declaration
-void emptyCallback(List<String> flags, Map<String, dynamic> flagVariants,
-    {bool? errorsLoading}) {}
+// Simplified void callback for feature flags
+void emptyCallback() {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,9 +44,7 @@ void main() {
         'setup initializes method call handler and registers callback if provided',
         () async {
       bool callbackInvoked = false;
-      // Converted to function declaration
-      void testCallback(List<String> flags, Map<String, dynamic> flagVariants,
-          {bool? errorsLoading}) {
+      void testCallback() {
         callbackInvoked = true;
       }
 
@@ -66,29 +63,19 @@ void main() {
       expect(log.any((call) => call.method == 'setup'), isTrue);
     });
 
-    test(
-        'invokes callback when native sends onFeatureFlagsCallback event with valid data',
+    test('invokes callback when native sends onFeatureFlagsCallback event',
         () async {
-      List<String>? receivedFlags;
-      Map<String, dynamic>? receivedVariants;
-      bool? receivedErrorState;
+      bool callbackInvoked = false;
 
-      // Converted to function declaration
-      void testCallback(List<String> flags, Map<String, dynamic> flagVariants,
-          {bool? errorsLoading}) {
-        receivedFlags = flags;
-        receivedVariants = flagVariants;
-        receivedErrorState = errorsLoading;
+      void testCallback() {
+        callbackInvoked = true;
       }
 
       testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
       await posthogFlutterIO.setup(testConfig);
 
-      final mockNativeArgs = {
-        'flags': ['flag1', 'feature-abc'],
-        'flagVariants': {'flag1': true, 'feature-abc': 'variant-x'},
-        'errorsLoading': false,
-      };
+      // Native sends empty map (iOS/Android behavior)
+      final mockNativeArgs = <String, dynamic>{};
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
@@ -98,25 +85,16 @@ void main() {
         (ByteData? data) {},
       );
 
-      expect(receivedFlags, equals(['flag1', 'feature-abc']));
-      expect(receivedVariants,
-          equals({'flag1': true, 'feature-abc': 'variant-x'}));
-      expect(receivedErrorState, isFalse);
+      expect(callbackInvoked, isTrue);
     });
 
     test(
-        'invokes callback with default/empty data when native sends onFeatureFlagsCallback with empty map (mobile behavior)',
+        'invokes callback when native sends onFeatureFlagsCallback with empty map (mobile behavior)',
         () async {
-      List<String>? receivedFlags;
-      Map<String, dynamic>? receivedVariants;
-      bool? receivedErrorState;
+      bool callbackInvoked = false;
 
-      // Converted to function declaration
-      void testCallback(List<String> flags, Map<String, dynamic> flagVariants,
-          {bool? errorsLoading}) {
-        receivedFlags = flags;
-        receivedVariants = flagVariants;
-        receivedErrorState = errorsLoading;
+      void testCallback() {
+        callbackInvoked = true;
       }
 
       testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
@@ -133,76 +111,22 @@ void main() {
         (ByteData? data) {},
       );
 
-      expect(receivedFlags, isEmpty);
-      expect(receivedVariants, isEmpty);
-      expect(receivedErrorState,
-          isNull); // errorsLoading will be null as it's not in the map
+      expect(callbackInvoked, isTrue);
     });
 
-    test(
-        'invokes callback with errorsLoading true if Dart side processing fails, even with empty native args',
-        () async {
-      List<String>? receivedFlags;
-      Map<String, dynamic>? receivedVariants;
-      bool? receivedErrorState;
-
-      // Converted to function declaration
-      void testCallback(List<String> flags, Map<String, dynamic> flagVariants,
-          {bool? errorsLoading}) {
-        receivedFlags = flags;
-        receivedVariants = flagVariants;
-        receivedErrorState = errorsLoading;
-      }
-
-      testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
-      await posthogFlutterIO.setup(testConfig);
-
-      // Simulate native sending an argument that will cause a cast error in _handleMethodCall (before the fix)
-      // For the current code, this test will verify the catch block sets errorsLoading: true
-      final mockNativeArgsMalformed = {
-        'flags': 123, // Invalid type, will cause cast error and trigger catch
-      };
-
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-        channel.name,
-        channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed)),
-        (ByteData? data) {},
-      );
-
-      expect(receivedFlags, isEmpty);
-      expect(receivedVariants, isEmpty);
-      expect(receivedErrorState, isTrue);
-    });
-
-    test(
-        'handles onFeatureFlagsCallback with malformed data gracefully (e.g. wrong types in maps/lists)',
-        () async {
-      List<String>? receivedFlags;
-      Map<String, dynamic>? receivedVariants;
-      bool? receivedErrorState;
+    test('invokes callback even with malformed native args', () async {
       bool callbackInvoked = false;
 
-      // Converted to function declaration
-      void testCallback(List<String> flags, Map<String, dynamic> flagVariants,
-          {bool? errorsLoading}) {
+      void testCallback() {
         callbackInvoked = true;
-        receivedFlags = flags;
-        receivedVariants = flagVariants;
-        receivedErrorState = errorsLoading;
       }
 
       testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
       await posthogFlutterIO.setup(testConfig);
 
+      // Simulate native sending malformed arguments - callback should still be invoked
       final mockNativeArgsMalformed = {
-        'flags': 'not_a_list', // This will be handled by the ?? [] for flags
-        'flagVariants': [
-          'not_a_map'
-        ], // This will be handled by the ?? {} for variants
-        'errorsLoading':
-            'not_a_bool', // This will be handled by `as bool?` resulting in null or catch block
+        'flags': 123, // Invalid type, but callback is void so it doesn't matter
       };
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -213,17 +137,25 @@ void main() {
         (ByteData? data) {},
       );
 
-      expect(callbackInvoked, isTrue,
-          reason: "Callback should still be invoked on parse error.");
-      expect(receivedFlags, isEmpty,
-          reason:
-              "Flags should default to empty on parse error due to type mismatch.");
-      expect(receivedVariants, isEmpty,
-          reason:
-              "Variants should default to empty on parse error due to type mismatch.");
-      expect(receivedErrorState, isTrue,
-          reason:
-              "errorsLoading should be true on parse error in catch block.");
+      expect(callbackInvoked, isTrue);
+    });
+
+    test('does not invoke callback when no callback is registered', () async {
+      // Setup without callback
+      testConfig = PostHogConfig('test_api_key');
+      await posthogFlutterIO.setup(testConfig);
+
+      // This should not throw - just silently do nothing
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec
+            .encodeMethodCall(const MethodCall('onFeatureFlagsCallback', {})),
+        (ByteData? data) {},
+      );
+
+      // If we get here without exception, the test passes
+      expect(true, isTrue);
     });
   });
 }

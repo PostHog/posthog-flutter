@@ -61,26 +61,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       final dartCallback = config.onFeatureFlags!;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
-      // Use optional positional param [jsContext] to handle when JS omits the 3rd argument
+      // We ignore the JS parameters and just invoke the void callback
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        final flags = jsFlags.toDart.whereType<String>().toList();
-
-        var flagVariants = <String, Object?>{};
-        final dartVariantsMap =
-            jsFlagVariants.dartify() as Map<Object?, Object?>?;
-        if (dartVariantsMap != null) {
-          flagVariants = dartVariantsMap
-              .map((key, value) => MapEntry(key.toString(), value));
-        }
-
-        var errorsLoading = false;
-        if (jsContext != null) {
-          final contextMap = jsContext.dartify() as Map<Object?, Object?>?;
-          errorsLoading = contextMap?['errorsLoading'] as bool? ?? false;
-        }
-
-        dartCallback(flags, flagVariants, errorsLoading: errorsLoading);
+        dartCallback();
       }.toJS;
 
       ph.onFeatureFlags(jsCallback);

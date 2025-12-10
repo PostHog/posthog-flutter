@@ -9,13 +9,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final config =
       PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
-  config.onFeatureFlags = (flags, flagVariants, {errorsLoading}) {
-    debugPrint('=============');
-    debugPrint('[PostHog] Feature flags callback called!');
-    debugPrint('[PostHog] Flags: $flags');
-    debugPrint('[PostHog] Flag variants: $flagVariants');
-    debugPrint('[PostHog] Errors loading: $errorsLoading');
-    debugPrint('=============');
+  config.onFeatureFlags = () {
+    debugPrint('[PostHog] Feature flags loaded!');
   };
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;

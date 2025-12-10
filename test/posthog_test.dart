@@ -18,9 +18,7 @@ void main() {
     test(
         'setup passes config and onFeatureFlags callback to platform interface',
         () async {
-      // ignore: prefer_function_declarations_over_variables
-      final OnFeatureFlagsCallback testCallback =
-          (flags, flagVariants, {errorsLoading}) {};
+      void testCallback() {}
 
       final config = PostHogConfig(
         'test_api_key',

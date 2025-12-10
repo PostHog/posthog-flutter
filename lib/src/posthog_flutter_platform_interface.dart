@@ -4,12 +4,10 @@ import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
 /// Defines the callback signature for when feature flags are loaded.
-/// [flags] is a list of active feature flag keys.
-/// [flagVariants] is a map of feature flag keys to their variant values (String or bool).
-/// [errorsLoading] is true if there was an error loading flags, otherwise false or null.
-typedef OnFeatureFlagsCallback = void Function(
-    List<String> flags, Map<String, dynamic> flagVariants,
-    {bool? errorsLoading});
+///
+/// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
+/// callback to access the loaded flag values.
+typedef OnFeatureFlagsCallback = void Function();
 
 abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PosthogFlutterPlatform.

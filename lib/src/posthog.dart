@@ -26,36 +26,13 @@ class Posthog {
   /// - [config]: The [PostHogConfig] object containing your API key, host, and other settings.
   ///   To listen for feature flag load events, provide an `onFeatureFlags` callback in the [PostHogConfig].
   ///
-  /// **Behavior of `onFeatureFlags` callback (when provided in `PostHogConfig`):**
-  ///
-  /// **Web:**
-  /// The callback will receive:
-  /// - `flags`: A list of active feature flag keys (`List<String>`).
-  /// - `flagVariants`: A map of feature flag keys to their variant values (`Map<String, Object?>`).
-  /// - `errorsLoading`: Will be `false` as the callback firing implies success.
-  ///
-  /// **Mobile (Android/iOS):**
-  /// The callback serves primarily as a notification that the native PostHog SDK
-  /// has finished loading feature flags. In this case:
-  /// - `flags`: Will be an empty list (`List<String>`).
-  /// - `flagVariants`: Will be an empty map (`Map<String, Object?>`).
-  /// - `errorsLoading`: Will be `null` if the native call was successful but contained no error info, or `true` if an error occurred during Dart-side processing of the callback.
-  /// After this callback is invoked, you can reliably use `Posthog().getFeatureFlag('your-flag-key')`
-  /// or `Posthog().isFeatureEnabled('your-flag-key')` to get the values of specific flags.
-  ///
-  /// **Example with `onFeatureFlags` in `PostHogConfig`:**
+  /// **Example:**
   /// ```dart
-  /// final config = PostHogConfig(
-  ///   apiKey: 'YOUR_API_KEY',
-  ///   host: 'YOUR_POSTHOG_HOST',
-  ///   onFeatureFlags: (flags, flagVariants, {errorsLoading}) {
-  ///     if (errorsLoading == true) {
-  ///       print('Error loading feature flags!');
-  ///       return;
-  ///     }
-  ///     // ... process flags ...
-  ///   },
-  /// );
+  /// final config = PostHogConfig('YOUR_API_KEY');
+  /// config.host = 'YOUR_POSTHOG_HOST';
+  /// config.onFeatureFlags = () {
+  ///   // Feature flags are now loaded, you can read flag values here
+  /// };
   /// await Posthog().setup(config);
   /// ```
   ///
