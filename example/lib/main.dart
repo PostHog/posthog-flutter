@@ -9,6 +9,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final config =
       PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
+  config.onFeatureFlags = () {
+    debugPrint('[PostHog] Feature flags loaded!');
+  };
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';

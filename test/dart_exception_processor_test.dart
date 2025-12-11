@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_dynamic_calls
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';

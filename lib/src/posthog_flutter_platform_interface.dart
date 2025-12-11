@@ -3,6 +3,12 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
+/// Defines the callback signature for when feature flags are loaded.
+///
+/// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
+/// callback to access the loaded flag values.
+typedef OnFeatureFlagsCallback = void Function();
+
 abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PosthogFlutterPlatform.
   PosthogFlutterPlatformInterface() : super(token: _token);

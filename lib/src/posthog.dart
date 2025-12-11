@@ -19,10 +19,25 @@ class Posthog {
 
   String? _currentScreen;
 
-  /// Android and iOS only
-  /// Only used for the manual setup
-  /// Requires disabling the automatic init on Android and iOS:
-  /// com.posthog.posthog.AUTO_INIT: false
+  /// Initializes the PostHog SDK.
+  ///
+  /// This method sets up the connection to your PostHog instance and prepares the SDK for tracking events and feature flags.
+  ///
+  /// - [config]: The [PostHogConfig] object containing your API key, host, and other settings.
+  ///   To listen for feature flag load events, provide an `onFeatureFlags` callback in the [PostHogConfig].
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('YOUR_API_KEY');
+  /// config.host = 'YOUR_POSTHOG_HOST';
+  /// config.onFeatureFlags = () {
+  ///   // Feature flags are now loaded, you can read flag values here
+  /// };
+  /// await Posthog().setup(config);
+  /// ```
+  ///
+  /// For Android and iOS, if you are performing a manual setup,
+  /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native configuration.
   Future<void> setup(PostHogConfig config) {
     _config = config; // Store the config
 

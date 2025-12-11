@@ -1,3 +1,5 @@
+import 'posthog_flutter_platform_interface.dart';
+
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
@@ -44,10 +46,18 @@ class PostHogConfig {
   /// Configuration for error tracking and exception capture
   final errorTrackingConfig = PostHogErrorTrackingConfig();
 
-  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks
-  // onFeatureFlags, integrations
+  /// Callback to be invoked when feature flags are loaded.
+  ///
+  /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
+  /// callback to access the loaded flag values.
+  OnFeatureFlagsCallback? onFeatureFlags;
 
-  PostHogConfig(this.apiKey);
+  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
+
+  PostHogConfig(
+    this.apiKey, {
+    this.onFeatureFlags,
+  });
 
   Map<String, dynamic> toMap() {
     return {

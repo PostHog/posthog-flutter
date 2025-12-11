@@ -9,28 +9,46 @@ import PostHog
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private static var instance: PosthogFlutterPlugin?
+    private var channel: FlutterMethodChannel?
 
     public static func getInstance() -> PosthogFlutterPlugin? {
         instance
     }
 
+    override init() {
+        super.init()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(featureFlagsDidUpdate),
+            name: PostHogSDK.didReceiveFeatureFlags,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     public static func register(with registrar: FlutterPluginRegistrar) {
+        let methodChannel: FlutterMethodChannel
         #if os(iOS)
-            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
+            methodChannel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger())
         #elseif os(macOS)
-            let channel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
+            methodChannel = FlutterMethodChannel(name: "posthog_flutter", binaryMessenger: registrar.messenger)
         #endif
         let instance = PosthogFlutterPlugin()
-        instance.channel = channel
+        instance.channel = methodChannel
         PosthogFlutterPlugin.instance = instance
         initPlugin()
-        registrar.addMethodCallDelegate(instance, channel: channel)
+        registrar.addMethodCallDelegate(instance, channel: methodChannel)
+    }
+
+    @objc func featureFlagsDidUpdate() {
+        invokeFlutterMethod("onFeatureFlagsCallback", arguments: [String: Any]())
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
                                               target: .global(qos: .utility))
-
-    private var channel: FlutterMethodChannel?
 
     public static func initPlugin() {
         let autoInit = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.AUTO_INIT") as? Bool ?? true

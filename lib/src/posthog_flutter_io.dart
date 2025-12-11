@@ -24,6 +24,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
+  OnFeatureFlagsCallback? _onFeatureFlagsCallback;
+
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
 
@@ -32,12 +34,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'showSurvey':
-        final Map<String, dynamic> survey =
-            Map<String, dynamic>.from(call.arguments);
+        final survey = Map<String, dynamic>.from(call.arguments);
         return showSurvey(survey);
       case 'hideSurveys':
         await cleanupSurveys();
         return null;
+      case 'onFeatureFlagsCallback':
+        _onFeatureFlagsCallback?.call();
+        break;
       default:
         printIfDebug(
             '[PostHog] ${call.method} not implemented in PosthogFlutterPlatformInterface');
@@ -127,6 +131,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (!isSupportedPlatform()) {
       return;
     }
+
+    _onFeatureFlagsCallback = config.onFeatureFlags;
 
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());
