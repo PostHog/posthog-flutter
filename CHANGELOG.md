@@ -6,10 +6,6 @@
 
 - fix: TextFormField widgets were not being masked ([#227](https://github.com/PostHog/posthog-flutter/pull/227))
 
-## 5.9.1
-
-- fix: TextFormField widgets were not being masked ([#227](https://github.com/PostHog/posthog-flutter/pull/227))
-
 ## 5.9.0
 
 - feat: add autocapture exceptions ([#214](https://github.com/PostHog/posthog-flutter/pull/214))
