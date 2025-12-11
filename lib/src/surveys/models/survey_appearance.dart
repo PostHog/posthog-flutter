@@ -5,54 +5,85 @@ import 'posthog_display_survey_appearance.dart';
 @immutable
 class SurveyAppearance {
   const SurveyAppearance({
-    this.backgroundColor,
+    this.backgroundColor = Colors.white,
     this.submitButtonColor = Colors.black,
     this.submitButtonText = 'Submit',
     this.submitButtonTextColor = Colors.white,
-    this.descriptionTextColor,
-    this.ratingButtonColor,
-    this.ratingButtonActiveColor,
+    this.descriptionTextColor = Colors.black,
+    this.questionTextColor = Colors.black,
+    this.closeButtonColor = Colors.black,
+    this.ratingButtonColor = const Color(0xFFEEEEEE),
+    this.ratingButtonActiveColor = Colors.black,
+    this.ratingButtonSelectedTextColor = Colors.white,
+    this.ratingButtonUnselectedTextColor = const Color(0x80000000),
     this.displayThankYouMessage = true,
     this.thankYouMessageHeader = 'Thank you for your feedback!',
     this.thankYouMessageDescription,
     this.thankYouMessageCloseButtonText = 'Close',
-    this.borderColor,
+    this.borderColor = const Color(0xFFBDBDBD),
+    this.inputBackgroundColor = Colors.white,
+    this.inputTextColor = Colors.black,
+    this.inputPlaceholderColor = const Color(0xFF757575),
+    this.choiceButtonBorderColor = Colors.black,
+    this.choiceButtonTextColor = Colors.black,
   });
 
-  final Color? backgroundColor;
+  final Color backgroundColor;
   final Color submitButtonColor;
   final String submitButtonText;
   final Color submitButtonTextColor;
-  final Color? descriptionTextColor;
-  final Color? ratingButtonColor;
-  final Color? ratingButtonActiveColor;
+  final Color descriptionTextColor;
+  final Color questionTextColor;
+  final Color closeButtonColor;
+  final Color ratingButtonColor;
+  final Color ratingButtonActiveColor;
+  final Color ratingButtonSelectedTextColor;
+  final Color ratingButtonUnselectedTextColor;
   final bool displayThankYouMessage;
   final String thankYouMessageHeader;
   final String? thankYouMessageDescription;
   final String thankYouMessageCloseButtonText;
-  final Color? borderColor;
+  final Color borderColor;
+  final Color inputBackgroundColor;
+  final Color inputTextColor;
+  final Color inputPlaceholderColor;
+  final Color choiceButtonBorderColor;
+  final Color choiceButtonTextColor;
 
   /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance]
   static SurveyAppearance fromPostHog(
       PostHogDisplaySurveyAppearance? appearance) {
     return SurveyAppearance(
-      backgroundColor: _colorFromHex(appearance?.backgroundColor),
+      backgroundColor:
+          _colorFromHex(appearance?.backgroundColor) ?? Colors.white,
       submitButtonColor:
           _colorFromHex(appearance?.submitButtonColor) ?? Colors.black,
       submitButtonText: appearance?.submitButtonText ?? 'Submit',
       submitButtonTextColor:
           _colorFromHex(appearance?.submitButtonTextColor) ?? Colors.white,
-      descriptionTextColor: _colorFromHex(appearance?.descriptionTextColor),
-      ratingButtonColor: _colorFromHex(appearance?.ratingButtonColor),
+      descriptionTextColor:
+          _colorFromHex(appearance?.descriptionTextColor) ?? Colors.black,
+      questionTextColor: Colors.black,
+      closeButtonColor: Colors.black,
+      ratingButtonColor: _colorFromHex(appearance?.ratingButtonColor) ??
+          const Color(0xFFEEEEEE),
       ratingButtonActiveColor:
-          _colorFromHex(appearance?.ratingButtonActiveColor),
+          _colorFromHex(appearance?.ratingButtonActiveColor) ?? Colors.black,
+      ratingButtonSelectedTextColor: Colors.white,
+      ratingButtonUnselectedTextColor: const Color(0x80000000),
       displayThankYouMessage: appearance?.displayThankYouMessage ?? true,
       thankYouMessageHeader:
           appearance?.thankYouMessageHeader ?? 'Thank you for your feedback!',
       thankYouMessageDescription: appearance?.thankYouMessageDescription,
       thankYouMessageCloseButtonText:
           appearance?.thankYouMessageCloseButtonText ?? 'Close',
-      borderColor: _colorFromHex(appearance?.borderColor),
+      borderColor:
+          _colorFromHex(appearance?.borderColor) ?? const Color(0xFFBDBDBD),
+      inputBackgroundColor: Colors.white,
+      inputTextColor: Colors.black,
+      inputPlaceholderColor: const Color(0xFF757575),
+      choiceButtonBorderColor: Colors.black,
+      choiceButtonTextColor: Colors.black,
     );
   }
 
