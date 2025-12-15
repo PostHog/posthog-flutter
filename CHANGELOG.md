@@ -1,5 +1,7 @@
 ## Next
 
+# 5.10.0
+
 - feat: Add `onFeatureFlags` callback to `PostHogConfig` to get notified when feature flags are loaded. Use `Posthog().getFeatureFlag()` or `Posthog().isFeatureEnabled()` within the callback to access fresh flag values. ([#224](https://github.com/PostHog/posthog-flutter/pull/224))
 
 ## 5.9.1
