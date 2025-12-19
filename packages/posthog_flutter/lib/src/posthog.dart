@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
-
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
+import 'package:posthog_flutter/src/replay/native_communicator.dart';
+
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_observer.dart';
@@ -12,6 +13,8 @@ class Posthog {
   static final _instance = Posthog._internal();
 
   PostHogConfig? _config;
+
+  final NativeCommunicator _nativeCommunicator = NativeCommunicator();
 
   factory Posthog() {
     return _instance;
@@ -188,6 +191,9 @@ class Posthog {
   }
 
   Future<String?> getSessionId() => _posthog.getSessionId();
+
+  Future<bool> isSessionReplayActive() =>
+      _nativeCommunicator.isSessionReplayActive();
 
   Posthog._internal();
 }

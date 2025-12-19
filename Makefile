@@ -11,7 +11,7 @@ formatKotlin:
 
 # swiftlint ios/Classes --fix conflicts with swiftformat
 formatSwift:
-	swiftformat ios/Classes --swiftversion 5.3
+	swiftformat packages/posthog_flutter/ios/Classes --swiftversion 5.3
 
 formatDart:
 	dart format .
