@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
 import 'posthog_exception.dart';
+
+typedef ChunkIdMapType = Map<String, String>;
 
 class DartExceptionProcessor {
   /// Converts Dart error/exception and stack trace to PostHog exception format
@@ -167,8 +170,11 @@ class DartExceptionProcessor {
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
   }) {
+    // TODO: map chunk ID if available
+    final chunkIdMap = <String, String>{};
+
     final frameData = <String, dynamic>{
-      'platform': 'dart',
+      'platform': kIsWeb ? 'javascript:web' : 'dart',
       'abs_path': _extractAbsolutePath(frame),
       'in_app': _isInAppFrame(
         frame,
@@ -194,6 +200,12 @@ class DartExceptionProcessor {
     final fileName = _extractFileName(frame);
     if (fileName != null && fileName.isNotEmpty) {
       frameData['filename'] = fileName;
+
+      // TODO: verify symbolication
+      final chunkId = chunkIdMap[fileName];
+      if (chunkId != null) {
+        frameData['chunk_id'] = chunkId;
+      }
     }
 
     // Add line number, if available

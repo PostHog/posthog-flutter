@@ -40,6 +40,9 @@ extension PostHogExtension on PostHog {
 @JS('window.posthog')
 external PostHog? get posthog;
 
+@JS('globalThis')
+external JSObject get globalThis;
+
 // Conversion functions
 JSAny stringToJSAny(String value) {
   return value.toJS;
@@ -65,6 +68,78 @@ Map<String, dynamic> safeMapConversion(dynamic mapData) {
   }
 
   return {};
+}
+
+int _lastKeysCount = 0;
+final Set<String> _chunkIdsWithFilenames = {};
+final Map<String, String> _filenameToDebugIds = {};
+// JSObject? _options;
+
+// JSFunction? _stackParser(JSObject options) {
+//   final parser = options['stackParser'];
+//   if (parser != null && parser.isA<JSFunction>()) {
+//     return parser as JSFunction;
+//   }
+//   return null;
+// }
+
+void _buildFilenameToDebugIdMap(
+  Map<dynamic, dynamic> debugIdMap,
+  JSFunction stackParser,
+) {
+  // final stackParser = _stackParser(options);
+  // if (stackParser == null) {
+  //   return;
+  // }
+
+  for (final debugIdMapEntry in debugIdMap.entries) {
+    final String stackKeyStr = debugIdMapEntry.key.toString();
+    final String debugIdStr = debugIdMapEntry.value.toString();
+
+    final debugIdHasCachedFilename =
+        _chunkIdsWithFilenames.contains(debugIdStr);
+
+    if (!debugIdHasCachedFilename) {
+      final parsedStack = stackParser.callAsFunction(stackKeyStr.toJS).dartify()
+          as List<dynamic>?;
+
+      if (parsedStack == null) continue;
+
+      for (final stackFrame in parsedStack) {
+        final stackFrameMap = stackFrame as Map<dynamic, dynamic>;
+        final filename = stackFrameMap['filename']?.toString();
+        if (filename != null) {
+          _filenameToDebugIds[filename] = debugIdStr;
+          _chunkIdsWithFilenames.add(debugIdStr);
+          break;
+        }
+      }
+    }
+  }
+}
+
+Map<String, String>? getPosthogChunkIds() {
+  final debugIdMap =
+      globalThis['_posthogChunkIds'].dartify() as Map<dynamic, dynamic>?;
+  if (debugIdMap == null) {
+    return null;
+  }
+
+  // TODO: get method from https://github.com/PostHog/posthog-js/pull/2856
+  final stackParserFunction =
+      globalThis['createDefaultStackParser'] as JSFunction?;
+
+  if (stackParserFunction == null) {
+    return null;
+  }
+
+  if (debugIdMap.keys.length != _lastKeysCount) {
+    _buildFilenameToDebugIdMap(
+      debugIdMap,
+      stackParserFunction,
+    );
+    _lastKeysCount = debugIdMap.keys.length;
+  }
 }
 
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
