@@ -214,7 +214,13 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       // not supported on Web
       break;
     case 'captureException':
-      // not implemented on Web
+      final properties = safeMapConversion(args['properties']);
+      // final timestamp = args['timestamp'] as int;
+
+      posthog?.capture(
+        stringToJSAny('\$exception'),
+        mapToJSAny(properties),
+      );
       break;
     default:
       throw PlatformException(

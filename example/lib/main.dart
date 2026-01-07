@@ -8,15 +8,15 @@ Future<void> main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   final config =
-      PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
+      PostHogConfig('phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06');
   config.onFeatureFlags = () {
     debugPrint('[PostHog] Feature flags loaded!');
   };
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
-  config.surveys = true;
-  config.sessionReplay = true;
+  config.surveys = false;
+  config.sessionReplay = false;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
   config.sessionReplayConfig.throttleDelay = const Duration(milliseconds: 1000);
@@ -354,6 +354,7 @@ class InitialScreenState extends State<InitialScreen> {
                   onPressed: () {
                     // Test PlatformDispatcher error handler with Future
                     Future.delayed(Duration.zero, () {
+                      // TODO: does not throw in web, we will need runZonedGuarded handler
                       throw const CustomException(
                           'Test PlatformDispatcher error for autocapture',
                           code: 'PlatformDispatcherTest',
@@ -382,6 +383,7 @@ class InitialScreenState extends State<InitialScreen> {
                   ),
                   onPressed: () {
                     // Test isolate error listener by throwing in an async callback
+                    // TODO: does not throw in web, is this even possible on the web?
                     Timer(Duration.zero, () {
                       throw const CustomException(
                         'Isolate error for testing',

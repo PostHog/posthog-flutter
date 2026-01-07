@@ -171,18 +171,12 @@ class PostHogErrorTrackingConfig {
   ///
   /// Controls whether `FlutterError.onError` errors are captured.
   ///
-  /// **Note:**
-  /// - Flutter web: Not supported
-  ///
   /// Default: false
   var captureFlutterErrors = false;
 
   /// Enable capturing of silent Flutter errors
   ///
   /// Controls whether Flutter errors marked as silent (FlutterErrorDetails.silent = true) are captured.
-  ///
-  /// **Note:**
-  /// - Flutter web: Not supported
   ///
   /// Default: false
   var captureSilentFlutterErrors = false;
