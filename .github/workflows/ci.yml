@@ -7,24 +7,63 @@ on:
     paths-ignore:
       - "**/*.md"
 
-# Publish using custom workflow
 jobs:
-  build:
-    runs-on: macos-latest
+  # Linting and formatting checks
+  lint:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: 'Set up Java'
-        uses: actions/setup-java@v5
-        with:
-          java-version: 17
-          distribution: 'temurin'
 
       - uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
       - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
         with:
           channel: 'stable'
-          
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: SDK format check
+        run: |
+          make installLinters
+          make checkFormatDart
+          make analyzeDart
+          make formatKotlin
+          make formatSwift
+
+  # Unit tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Test
+        run: flutter test
+
+  # Apple builds (iOS and macOS)
+  build-apple:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [ios, macos]
+        include:
+          - target: ios
+            build_command: flutter build ios --simulator --no-codesign
+          - target: macos
+            build_command: flutter build macos
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
         with:
@@ -36,28 +75,51 @@ jobs:
           cd example
           flutter pub get
 
-      - name: SDK format check
+      - name: Build ${{ matrix.target }}
+        working-directory: ./example
+        run: ${{ matrix.build_command }}
+
+  # Android build
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 'Set up Java'
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: 'temurin'
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
         run: |
-          make installLinters
-          make checkFormatDart
-          make analyzeDart
-          make formatKotlin
-          make formatSwift
-
-      - name: Test
-        run: flutter test
-
-      - name: Build iOS
-        working-directory: ./example
-        run: flutter build ios --simulator --no-codesign
-
-      - name: Build macOS
-        working-directory: ./example
-        run: flutter build macos
+          flutter pub get
+          cd example
+          flutter pub get
 
       - name: Build Android
         working-directory: ./example
         run: flutter build apk
+
+  # Web build
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          cd example
+          flutter pub get
 
       - name: Build Web
         working-directory: ./example
