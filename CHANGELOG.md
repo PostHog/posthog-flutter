@@ -1,5 +1,7 @@
 ## Next
 
+# 5.11.0
+
 - chore: update languageVersion and apiVersion from 1.8 to 2.0 on Android to be compatible with Kotlin 2.3 ([#245](https://github.com/PostHog/posthog-flutter/pull/245))
 
 # 5.10.0
