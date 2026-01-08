@@ -4,6 +4,7 @@ import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
 import 'package:flutter/services.dart';
+import 'package:meta/meta.dart';
 
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
@@ -19,6 +20,11 @@ import 'posthog_flutter_platform_interface.dart';
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   PosthogFlutterIO() {
     _methodChannel.setMethodCallHandler(_handleMethodCall);
+  }
+
+  @visibleForTesting
+  Future<dynamic> handleMethodCallForTest(MethodCall call) {
+    return _handleMethodCall(call);
   }
 
   /// The method channel used to interact with the native platform.
@@ -175,6 +181,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? groups,
   }) async {
     if (!isSupportedPlatform()) {
       return;
@@ -184,9 +191,18 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       final normalizedProperties =
           properties != null ? PropertyNormalizer.normalize(properties) : null;
 
+      // Convert groups to Map<String, String> for native SDK compatibility
+      Map<String, String>? normalizedGroups;
+      if (groups != null && groups.isNotEmpty) {
+        normalizedGroups = groups.map(
+          (key, value) => MapEntry(key, value.toString()),
+        );
+      }
+
       await _methodChannel.invokeMethod('capture', {
         'eventName': eventName,
         if (normalizedProperties != null) 'properties': normalizedProperties,
+        if (normalizedGroups != null) 'groups': normalizedGroups,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on capture: $exception');

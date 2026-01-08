@@ -14,10 +14,24 @@ class CapturedExceptionCall {
   });
 }
 
+/// Captured event call data
+class CapturedEventCall {
+  final String eventName;
+  final Map<String, Object>? properties;
+  final Map<String, Object>? groups;
+
+  CapturedEventCall({
+    required this.eventName,
+    this.properties,
+    this.groups,
+  });
+}
+
 class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   String? screenName;
   OnFeatureFlagsCallback? registeredOnFeatureFlagsCallback;
   final List<CapturedExceptionCall> capturedExceptions = [];
+  final List<CapturedEventCall> capturedEvents = [];
   PostHogConfig? receivedConfig;
 
   @override
@@ -46,6 +60,19 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
       error: error,
       stackTrace: stackTrace,
       properties: properties,
+    ));
+  }
+
+  @override
+  Future<void> capture({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? groups,
+  }) async {
+    capturedEvents.add(CapturedEventCall(
+      eventName: eventName,
+      properties: properties,
+      groups: groups,
     ));
   }
 }

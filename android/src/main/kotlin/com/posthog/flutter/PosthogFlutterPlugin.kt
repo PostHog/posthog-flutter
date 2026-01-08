@@ -389,7 +389,14 @@ class PosthogFlutterPlugin :
         try {
             val eventName: String = call.argument("eventName")!!
             val properties: Map<String, Any>? = call.argument("properties")
-            PostHog.capture(eventName, properties = properties)
+            val groups: Map<String, String>? = call.argument("groups")
+            PostHog.capture(
+                event = eventName,
+                properties = properties,
+                userProperties = null,
+                userPropertiesSetOnce = null,
+                groups = groups
+            )
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

@@ -83,18 +83,34 @@ class Posthog {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    /// Event-level group context.
+    ///
+    /// This associates *only this event* with the provided groups, without
+    /// persisting the group mapping for future events (unlike `group()`).
+    ///
+    /// On iOS/Android, this is passed to the native SDK's `groups` parameter
+    /// which properly merges with any sticky groups set via `group()`.
+    Map<String, Object>? groups,
   }) {
     final propertiesCopy = properties == null ? null : {...properties};
 
     final currentScreen = _currentScreen;
-    if (propertiesCopy != null &&
-        !propertiesCopy.containsKey('\$screen_name') &&
-        currentScreen != null) {
-      propertiesCopy['\$screen_name'] = currentScreen;
+    if (currentScreen != null) {
+      final props = propertiesCopy ?? <String, Object>{};
+      if (!props.containsKey('\$screen_name')) {
+        props['\$screen_name'] = currentScreen;
+      }
+      return _posthog.capture(
+        eventName: eventName,
+        properties: props,
+        groups: groups,
+      );
     }
+
     return _posthog.capture(
       eventName: eventName,
       properties: propertiesCopy,
+      groups: groups,
     );
   }
 
