@@ -14,7 +14,7 @@ permissions:
 jobs:
   # Linting and formatting checks
   lint:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -26,28 +26,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Install linters
-        run: |
-          # Create local bin directory
-          mkdir -p $HOME/.local/bin
-          export PATH="$HOME/.local/bin:$PATH"
-
-          # Install latest ktlint for Kotlin formatting
-          KTLINT_VERSION=$(curl -s https://api.github.com/repos/pinterest/ktlint/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-          curl -sSLO "https://github.com/pinterest/ktlint/releases/download/${KTLINT_VERSION}/ktlint"
-          chmod a+x ktlint
-          mv ktlint $HOME/.local/bin/
-
-          # Install latest swiftformat for Swift formatting
-          SWIFTFORMAT_VERSION=$(curl -s https://api.github.com/repos/nicklockwood/SwiftFormat/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-          curl -L "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat_linux.zip" -o swiftformat.zip
-          unzip swiftformat.zip
-          chmod +x swiftformat
-          mv swiftformat $HOME/.local/bin/
-
       - name: SDK format check
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          make installLinters
           make checkFormatDart
           make analyzeDart
           make formatKotlin
