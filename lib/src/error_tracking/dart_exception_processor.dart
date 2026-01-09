@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
 import 'posthog_exception.dart';
@@ -171,7 +172,7 @@ class DartExceptionProcessor {
     bool inAppByDefault = true,
   }) {
     // TODO: map chunk ID if available
-    final chunkIdMap = <String, String>{};
+    final chunkIdMap = getPosthogChunkIds() ?? {};
 
     final frameData = <String, dynamic>{
       'platform': kIsWeb ? 'javascript:web' : 'dart',

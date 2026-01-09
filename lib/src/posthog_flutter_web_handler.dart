@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_dynamic_calls, avoid_annotating_with_dynamic
 
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 
@@ -70,6 +71,197 @@ Map<String, dynamic> safeMapConversion(dynamic mapData) {
   return {};
 }
 
+// Stack frame data structure
+class StackFrame {
+  final String? filename;
+  final String? function;
+  final int? lineno;
+  final int? colno;
+  final bool inApp;
+
+  StackFrame({
+    this.filename,
+    this.function,
+    this.lineno,
+    this.colno,
+    this.inApp = true,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'filename': filename,
+      'function': function ?? '<anonymous>',
+      'lineno': lineno,
+      'colno': colno,
+      'in_app': inApp,
+    };
+  }
+}
+
+// Stack line parser type
+typedef StackLineParser = StackFrame? Function(String line, String platform);
+
+// Chrome stack line parser
+StackFrame? chromeStackLineParser(String line, String platform) {
+  // Chrome regex patterns
+  final chromeRegexNoFnName = RegExp(r'^\s*at\s+(\S+?)\s*:\s*(\d+)\s*:\s*(\d+)\s*$');
+  final chromeRegex = RegExp(r'^\s*at\s+(?:(.+?)\s+)?\((?:address\s+at\s+)?(?:async\s+)?((?:<anonymous>|[-a-z]+:|.*bundle|\/)?.*?)(?::(\d+))?(?::(\d+))?\)?\s*$');
+  final evalRegex = RegExp(r'\((\S*)(?::(\d+))(?::(\d+))\)');
+
+  // Try no function name pattern first
+  final noFnMatch = chromeRegexNoFnName.firstMatch(line);
+  if (noFnMatch != null) {
+    return StackFrame(
+      filename: noFnMatch.group(1),
+      function: '<anonymous>',
+      lineno: int.tryParse(noFnMatch.group(2) ?? ''),
+      colno: int.tryParse(noFnMatch.group(3) ?? ''),
+    );
+  }
+
+  // Try full pattern
+  final match = chromeRegex.firstMatch(line);
+  if (match != null) {
+    String? filename = match.group(2);
+    String? functionName = match.group(1);
+    int? lineno = int.tryParse(match.group(3) ?? '');
+    int? colno = int.tryParse(match.group(4) ?? '');
+
+    // Handle eval cases
+    if (filename != null && filename.startsWith('eval')) {
+      final evalMatch = evalRegex.firstMatch(filename);
+      if (evalMatch != null) {
+        filename = evalMatch.group(1);
+        lineno = int.tryParse(evalMatch.group(2) ?? '');
+        colno = int.tryParse(evalMatch.group(3) ?? '');
+      }
+    }
+
+    // Extract safari extension details
+    final safariDetails = extractSafariExtensionDetails(functionName ?? '<anonymous>', filename ?? '');
+    functionName = safariDetails[0];
+    filename = safariDetails[1];
+
+    return StackFrame(
+      filename: filename,
+      function: functionName,
+      lineno: lineno,
+      colno: colno,
+    );
+  }
+
+  return null;
+}
+
+// Gecko (Firefox) stack line parser
+StackFrame? geckoStackLineParser(String line, String platform) {
+  final geckoRegex = RegExp(r'^\s*(.*?)(?:\((.*?)\))?(?:^|@)?((?:[-a-z]+)?:\/.*?|\[native code\]|[^@]*(?:bundle|\d+\.js)|\/[\w\-\.\ \/=]+)(?::(\d+))?(?::(\d+))?\s*$');
+  final geckoEvalRegex = RegExp(r'(\S+)\s+line\s+(\d+)(?:\s+>\s+eval\s+line\s+\d+)*\s+>\s+eval');
+
+  final match = geckoRegex.firstMatch(line);
+  if (match != null) {
+    String? filename = match.group(3);
+    String? functionName = match.group(1);
+    int? lineno = int.tryParse(match.group(4) ?? '');
+    int? colno = int.tryParse(match.group(5) ?? '');
+
+    // Handle eval cases
+    if (filename != null && filename.contains(' > eval')) {
+      final evalMatch = geckoEvalRegex.firstMatch(filename);
+      if (evalMatch != null) {
+        functionName = functionName == '<anonymous>' || functionName == null ? 'eval' : functionName;
+        filename = evalMatch.group(1);
+        lineno = int.tryParse(evalMatch.group(2) ?? '');
+        colno = null;
+      }
+    }
+
+    // Extract safari extension details
+    final safariDetails = extractSafariExtensionDetails(functionName ?? '<anonymous>', filename ?? '');
+    functionName = safariDetails[0];
+    filename = safariDetails[1];
+
+    return StackFrame(
+      filename: filename,
+      function: functionName,
+      lineno: lineno,
+      colno: colno,
+    );
+  }
+
+  return null;
+}
+
+// Extract Safari extension details (ported from JS)
+List<String> extractSafariExtensionDetails(String functionName, String filename) {
+  final isSafariExtension = filename.contains('safari-extension');
+  final isSafariWebExtension = filename.contains('safari-web-extension');
+
+  if (isSafariExtension || isSafariWebExtension) {
+    final extractedFunction = filename.contains('@') ? filename.split('@')[0] : '<anonymous>';
+    final prefix = isSafariExtension ? 'safari-extension:' : 'safari-web-extension:';
+    return [extractedFunction, '$prefix$filename'];
+  }
+
+  return [functionName, filename];
+}
+
+// Create stack parser function
+List<StackFrame> Function(String, [int]) createStackParser(String platform, List<StackLineParser> lineParsers) {
+  return (String stack, [int skipLines = 0]) {
+    final lines = stack.split('\n');
+    final frames = <StackFrame>[];
+
+    for (int i = skipLines; i < lines.length; i++) {
+      final line = lines[i];
+
+      // Skip lines over 1024 characters
+      if (line.length > 1024) continue;
+
+      // Skip lines that contain webpack error wrappers
+      final cleanedLine = line.replaceFirst(RegExp(r'\(error: (.*)\)'), r'$1');
+
+      // Skip "Error:" lines
+      if (cleanedLine.contains(RegExp(r'\S*Error: '))) continue;
+
+      // Try each parser
+      for (final parser in lineParsers) {
+        final frame = parser(cleanedLine, platform);
+        if (frame != null) {
+          frames.add(frame);
+          break;
+        }
+      }
+
+      // Limit to 50 frames
+      if (frames.length >= 50) break;
+    }
+
+    // Reverse and process frames (like the original implementation)
+    final reversedFrames = frames.reversed.toList();
+
+    // Ensure each frame has a filename if possible
+    for (int i = 0; i < reversedFrames.length; i++) {
+      if (reversedFrames[i].filename == null && reversedFrames.isNotEmpty) {
+        reversedFrames[i] = StackFrame(
+          filename: reversedFrames.last.filename,
+          function: reversedFrames[i].function,
+          lineno: reversedFrames[i].lineno,
+          colno: reversedFrames[i].colno,
+          inApp: reversedFrames[i].inApp,
+        );
+      }
+    }
+
+    return reversedFrames.take(50).toList();
+  };
+}
+
+// Create default stack parser
+List<StackFrame> Function(String, [int]) createDefaultStackParser() {
+  return createStackParser('web:javascript', [chromeStackLineParser, geckoStackLineParser]);
+}
+
 int _lastKeysCount = 0;
 final Set<String> _chunkIdsWithFilenames = {};
 final Map<String, String> _filenameToDebugIds = {};
@@ -83,15 +275,10 @@ final Map<String, String> _filenameToDebugIds = {};
 //   return null;
 // }
 
-void _buildFilenameToDebugIdMap(
+void _buildFilenameToDebugIdMapDart(
   Map<dynamic, dynamic> debugIdMap,
-  JSFunction stackParser,
+  List<StackFrame> Function(String, [int]) stackParser,
 ) {
-  // final stackParser = _stackParser(options);
-  // if (stackParser == null) {
-  //   return;
-  // }
-
   for (final debugIdMapEntry in debugIdMap.entries) {
     final String stackKeyStr = debugIdMapEntry.key.toString();
     final String debugIdStr = debugIdMapEntry.value.toString();
@@ -100,14 +287,12 @@ void _buildFilenameToDebugIdMap(
         _chunkIdsWithFilenames.contains(debugIdStr);
 
     if (!debugIdHasCachedFilename) {
-      final parsedStack = stackParser.callAsFunction(stackKeyStr.toJS).dartify()
-          as List<dynamic>?;
+      final parsedStack = stackParser(stackKeyStr);
 
-      if (parsedStack == null) continue;
+      if (parsedStack.isEmpty) continue;
 
       for (final stackFrame in parsedStack) {
-        final stackFrameMap = stackFrame as Map<dynamic, dynamic>;
-        final filename = stackFrameMap['filename']?.toString();
+        final filename = stackFrame.filename;
         if (filename != null) {
           _filenameToDebugIds[filename] = debugIdStr;
           _chunkIdsWithFilenames.add(debugIdStr);
@@ -119,27 +304,24 @@ void _buildFilenameToDebugIdMap(
 }
 
 Map<String, String>? getPosthogChunkIds() {
-  final debugIdMap =
-      globalThis['_posthogChunkIds'].dartify() as Map<dynamic, dynamic>?;
+  final debugIdMapJS = globalThis['_posthogChunkIds'];
+  final debugIdMap = debugIdMapJS?.dartify() as Map<dynamic, dynamic>?;
   if (debugIdMap == null) {
     return null;
   }
 
-  // TODO: get method from https://github.com/PostHog/posthog-js/pull/2856
-  final stackParserFunction =
-      globalThis['createDefaultStackParser'] as JSFunction?;
-
-  if (stackParserFunction == null) {
-    return null;
-  }
+  // Use our pure Dart implementation of createDefaultStackParser
+  final stackParser = createDefaultStackParser();
 
   if (debugIdMap.keys.length != _lastKeysCount) {
-    _buildFilenameToDebugIdMap(
+    _buildFilenameToDebugIdMapDart(
       debugIdMap,
-      stackParserFunction,
+      stackParser,
     );
     _lastKeysCount = debugIdMap.keys.length;
   }
+
+  return _filenameToDebugIds;
 }
 
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
