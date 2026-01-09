@@ -131,6 +131,16 @@ class InitialScreenState extends State<InitialScreen> {
                       },
                       child: const Text("Capture Event"),
                     ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _posthogFlutterPlugin.capture(
+                          eventName: "event_with_groups",
+                          properties: {"foo": "bar"},
+                          groups: {"company": "company_123"},
+                        );
+                      },
+                      child: const Text("Capture (groups)"),
+                    ),
                   ],
                 ),
                 const Divider(),

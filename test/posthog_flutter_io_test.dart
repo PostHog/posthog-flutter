@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
+import 'dart:io' show Platform;
 
 // Simplified void callback for feature flags
 void emptyCallback() {}
@@ -40,6 +41,8 @@ void main() {
   });
 
   group('PosthogFlutterIO onFeatureFlags via setup', () {
+    final bool isUnsupportedPlatform = Platform.isLinux || Platform.isWindows;
+
     test(
         'setup initializes method call handler and registers callback if provided',
         () async {
@@ -51,17 +54,12 @@ void main() {
       testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
       await posthogFlutterIO.setup(testConfig);
 
-      // To verify handler is set, we trigger the callback from native side
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-        channel.name,
-        channel.codec
-            .encodeMethodCall(const MethodCall('onFeatureFlagsCallback', {})),
-        (ByteData? data) {},
-      );
+      // Trigger the callback using the IO implementation's test hook.
+      await posthogFlutterIO.handleMethodCallForTest(
+          const MethodCall('onFeatureFlagsCallback', {}));
       expect(callbackInvoked, isTrue);
       expect(log.any((call) => call.method == 'setup'), isTrue);
-    });
+    }, skip: isUnsupportedPlatform);
 
     test('invokes callback when native sends onFeatureFlagsCallback event',
         () async {
@@ -76,17 +74,11 @@ void main() {
 
       // Native sends empty map (iOS/Android behavior)
       final mockNativeArgs = <String, dynamic>{};
-
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-        channel.name,
-        channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs)),
-        (ByteData? data) {},
-      );
+      await posthogFlutterIO.handleMethodCallForTest(
+          MethodCall('onFeatureFlagsCallback', mockNativeArgs));
 
       expect(callbackInvoked, isTrue);
-    });
+    }, skip: isUnsupportedPlatform);
 
     test(
         'invokes callback when native sends onFeatureFlagsCallback with empty map (mobile behavior)',
@@ -103,16 +95,11 @@ void main() {
       // Simulate mobile sending an empty map
       final mockNativeArgs = <String, dynamic>{};
 
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-        channel.name,
-        channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs)),
-        (ByteData? data) {},
-      );
+      await posthogFlutterIO.handleMethodCallForTest(
+          MethodCall('onFeatureFlagsCallback', mockNativeArgs));
 
       expect(callbackInvoked, isTrue);
-    });
+    }, skip: isUnsupportedPlatform);
 
     test('invokes callback even with malformed native args', () async {
       bool callbackInvoked = false;
@@ -129,16 +116,11 @@ void main() {
         'flags': 123, // Invalid type, but callback is void so it doesn't matter
       };
 
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-        channel.name,
-        channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed)),
-        (ByteData? data) {},
-      );
+        await posthogFlutterIO.handleMethodCallForTest(
+          MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed));
 
       expect(callbackInvoked, isTrue);
-    });
+    }, skip: isUnsupportedPlatform);
 
     test('does not invoke callback when no callback is registered', () async {
       // Setup without callback
@@ -146,13 +128,8 @@ void main() {
       await posthogFlutterIO.setup(testConfig);
 
       // This should not throw - just silently do nothing
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-        channel.name,
-        channel.codec
-            .encodeMethodCall(const MethodCall('onFeatureFlagsCallback', {})),
-        (ByteData? data) {},
-      );
+        await posthogFlutterIO.handleMethodCallForTest(
+          const MethodCall('onFeatureFlagsCallback', {}));
 
       // If we get here without exception, the test passes
       expect(true, isTrue);

@@ -89,10 +89,31 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? groups,
   }) async {
+    Map<String, Object>? mergedProperties =
+        properties == null ? null : {...properties};
+
+    if (groups != null && groups.isNotEmpty) {
+      mergedProperties ??= <String, Object>{};
+      final existingGroups = mergedProperties['\$groups'];
+      if (existingGroups is Map) {
+        mergedProperties['\$groups'] = {
+          ...Map<String, Object>.from(
+            existingGroups.map(
+              (key, value) => MapEntry(key.toString(), value as Object),
+            ),
+          ),
+          ...groups,
+        };
+      } else {
+        mergedProperties['\$groups'] = groups;
+      }
+    }
+
     return handleWebMethodCall(MethodCall('capture', {
       'eventName': eventName,
-      if (properties != null) 'properties': properties,
+      if (mergedProperties != null) 'properties': mergedProperties,
     }));
   }
 
