@@ -70,6 +70,21 @@ class ElementObjectParser {
       }
     }
 
+    if (element.renderObject is RenderParagraph ||
+        element.renderObject is RenderEditable) {
+      final dataType = element.renderObject.runtimeType.toString();
+
+      final parser = PostHogMaskController.instance.parsers[dataType];
+      if (parser != null) {
+        final elementData = parser.relate(element, activeElementData);
+
+        if (elementData != null) {
+          activeElementData.addChildren(elementData);
+          return elementData;
+        }
+      }
+    }
+
     return null;
   }
 }
