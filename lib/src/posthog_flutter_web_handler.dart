@@ -105,8 +105,10 @@ typedef StackLineParser = StackFrame? Function(String line, String platform);
 // Chrome stack line parser
 StackFrame? chromeStackLineParser(String line, String platform) {
   // Chrome regex patterns
-  final chromeRegexNoFnName = RegExp(r'^\s*at\s+(\S+?)\s*:\s*(\d+)\s*:\s*(\d+)\s*$');
-  final chromeRegex = RegExp(r'^\s*at\s+(?:(.+?)\s+)?\((?:address\s+at\s+)?(?:async\s+)?((?:<anonymous>|[-a-z]+:|.*bundle|\/)?.*?)(?::(\d+))?(?::(\d+))?\)?\s*$');
+  final chromeRegexNoFnName =
+      RegExp(r'^\s*at\s+(\S+?)\s*:\s*(\d+)\s*:\s*(\d+)\s*$');
+  final chromeRegex = RegExp(
+      r'^\s*at\s+(?:(.+?)\s+)?\((?:address\s+at\s+)?(?:async\s+)?((?:<anonymous>|[-a-z]+:|.*bundle|\/)?.*?)(?::(\d+))?(?::(\d+))?\)?\s*$');
   final evalRegex = RegExp(r'\((\S*)(?::(\d+))(?::(\d+))\)');
 
   // Try no function name pattern first
@@ -139,7 +141,8 @@ StackFrame? chromeStackLineParser(String line, String platform) {
     }
 
     // Extract safari extension details
-    final safariDetails = extractSafariExtensionDetails(functionName ?? '<anonymous>', filename ?? '');
+    final safariDetails = extractSafariExtensionDetails(
+        functionName ?? '<anonymous>', filename ?? '');
     functionName = safariDetails[0];
     filename = safariDetails[1];
 
@@ -156,8 +159,10 @@ StackFrame? chromeStackLineParser(String line, String platform) {
 
 // Gecko (Firefox) stack line parser
 StackFrame? geckoStackLineParser(String line, String platform) {
-  final geckoRegex = RegExp(r'^\s*(.*?)(?:\((.*?)\))?(?:^|@)?((?:[-a-z]+)?:\/.*?|\[native code\]|[^@]*(?:bundle|\d+\.js)|\/[\w\-\.\ \/=]+)(?::(\d+))?(?::(\d+))?\s*$');
-  final geckoEvalRegex = RegExp(r'(\S+)\s+line\s+(\d+)(?:\s+>\s+eval\s+line\s+\d+)*\s+>\s+eval');
+  final geckoRegex = RegExp(
+      r'^\s*(.*?)(?:\((.*?)\))?(?:^|@)?((?:[-a-z]+)?:\/.*?|\[native code\]|[^@]*(?:bundle|\d+\.js)|\/[\w\-\.\ \/=]+)(?::(\d+))?(?::(\d+))?\s*$');
+  final geckoEvalRegex =
+      RegExp(r'(\S+)\s+line\s+(\d+)(?:\s+>\s+eval\s+line\s+\d+)*\s+>\s+eval');
 
   final match = geckoRegex.firstMatch(line);
   if (match != null) {
@@ -170,7 +175,9 @@ StackFrame? geckoStackLineParser(String line, String platform) {
     if (filename != null && filename.contains(' > eval')) {
       final evalMatch = geckoEvalRegex.firstMatch(filename);
       if (evalMatch != null) {
-        functionName = functionName == '<anonymous>' || functionName == null ? 'eval' : functionName;
+        functionName = functionName == '<anonymous>' || functionName == null
+            ? 'eval'
+            : functionName;
         filename = evalMatch.group(1);
         lineno = int.tryParse(evalMatch.group(2) ?? '');
         colno = null;
@@ -178,7 +185,8 @@ StackFrame? geckoStackLineParser(String line, String platform) {
     }
 
     // Extract safari extension details
-    final safariDetails = extractSafariExtensionDetails(functionName ?? '<anonymous>', filename ?? '');
+    final safariDetails = extractSafariExtensionDetails(
+        functionName ?? '<anonymous>', filename ?? '');
     functionName = safariDetails[0];
     filename = safariDetails[1];
 
@@ -194,13 +202,16 @@ StackFrame? geckoStackLineParser(String line, String platform) {
 }
 
 // Extract Safari extension details (ported from JS)
-List<String> extractSafariExtensionDetails(String functionName, String filename) {
+List<String> extractSafariExtensionDetails(
+    String functionName, String filename) {
   final isSafariExtension = filename.contains('safari-extension');
   final isSafariWebExtension = filename.contains('safari-web-extension');
 
   if (isSafariExtension || isSafariWebExtension) {
-    final extractedFunction = filename.contains('@') ? filename.split('@')[0] : '<anonymous>';
-    final prefix = isSafariExtension ? 'safari-extension:' : 'safari-web-extension:';
+    final extractedFunction =
+        filename.contains('@') ? filename.split('@')[0] : '<anonymous>';
+    final prefix =
+        isSafariExtension ? 'safari-extension:' : 'safari-web-extension:';
     return [extractedFunction, '$prefix$filename'];
   }
 
@@ -208,7 +219,8 @@ List<String> extractSafariExtensionDetails(String functionName, String filename)
 }
 
 // Create stack parser function
-List<StackFrame> Function(String, [int]) createStackParser(String platform, List<StackLineParser> lineParsers) {
+List<StackFrame> Function(String, [int]) createStackParser(
+    String platform, List<StackLineParser> lineParsers) {
   return (String stack, [int skipLines = 0]) {
     final lines = stack.split('\n');
     final frames = <StackFrame>[];
@@ -260,7 +272,8 @@ List<StackFrame> Function(String, [int]) createStackParser(String platform, List
 
 // Create default stack parser
 List<StackFrame> Function(String, [int]) createDefaultStackParser() {
-  return createStackParser('web:javascript', [chromeStackLineParser, geckoStackLineParser]);
+  return createStackParser(
+      'web:javascript', [chromeStackLineParser, geckoStackLineParser]);
 }
 
 int _lastKeysCount = 0;
