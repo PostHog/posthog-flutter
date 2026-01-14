@@ -354,7 +354,7 @@ class InitialScreenState extends State<InitialScreen> {
                   onPressed: () {
                     // Test PlatformDispatcher error handler with Future
                     Future.delayed(Duration.zero, () {
-                      // TODO: does not throw in web, we will need runZonedGuarded handler
+                      // does not throw on web here, just with runZonedGuarded handler
                       throw const CustomException(
                           'Test PlatformDispatcher error for autocapture',
                           code: 'PlatformDispatcherTest',
@@ -383,7 +383,7 @@ class InitialScreenState extends State<InitialScreen> {
                   ),
                   onPressed: () {
                     // Test isolate error listener by throwing in an async callback
-                    // TODO: does not throw in web, is this even possible on the web?
+                    // does not throw on web here, just with runZonedGuarded handler
                     Timer(Duration.zero, () {
                       throw const CustomException(
                         'Isolate error for testing',

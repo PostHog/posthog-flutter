@@ -244,14 +244,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       );
       printIfDebug('exceptionData: $exceptionData');
 
-      // TODO: add timestamp param on JS SDK
-      // final timestamp = DateTime.now().millisecondsSinceEpoch;
       final normalizedData =
           PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
 
       return handleWebMethodCall(MethodCall('captureException', {
         'properties': normalizedData,
-        // 'timestamp': timestamp,
       }));
     } on Exception catch (exception) {
       printIfDebug('Exception in captureException: $exception');

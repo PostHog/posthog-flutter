@@ -172,7 +172,6 @@ class DartExceptionProcessor {
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
   }) {
-    // TODO: map chunk ID if available
     final chunkIdMap = getPosthogChunkIds() ?? {};
     printIfDebug('chunkIdMap: $chunkIdMap');
 

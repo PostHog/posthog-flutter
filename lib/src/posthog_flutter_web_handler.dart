@@ -279,15 +279,6 @@ List<StackFrame> Function(String, [int]) createDefaultStackParser() {
 int _lastKeysCount = 0;
 final Set<String> _chunkIdsWithFilenames = {};
 final Map<String, String> _filenameToDebugIds = {};
-// JSObject? _options;
-
-// JSFunction? _stackParser(JSObject options) {
-//   final parser = options['stackParser'];
-//   if (parser != null && parser.isA<JSFunction>()) {
-//     return parser as JSFunction;
-//   }
-//   return null;
-// }
 
 void _buildFilenameToDebugIdMapDart(
   Map<dynamic, dynamic> debugIdMap,
@@ -487,7 +478,6 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
       printIfDebug('captureException: $properties');
-      // final timestamp = args['timestamp'] as int;
 
       posthog?.capture(
         stringToJSAny('\$exception'),
