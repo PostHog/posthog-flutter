@@ -1,12 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
 Future<void> main() async {
-  // // init WidgetsFlutterBinding if not yet
-
-  WidgetsFlutterBinding.ensureInitialized();
   final config =
       PostHogConfig('phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06');
   config.onFeatureFlags = () {
@@ -30,9 +28,26 @@ Future<void> main() async {
   config.errorTrackingConfig.captureIsolateErrors =
       true; // Capture isolate errors
 
-  await Posthog().setup(config);
+  if (kIsWeb) {
+    runZonedGuarded(
+      () => _initAndRun(config),
+      (error, stackTrace) => _captureError(error, stackTrace),
+    );
+  } else {
+    await _initAndRun(config);
+  }
+}
 
+Future<void> _initAndRun(PostHogConfig config) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Posthog().setup(config);
   runApp(const MyApp());
+}
+
+Future<void> _captureError(Object error, StackTrace? stackTrace) async {
+  final wrappedError = PostHogException(
+      source: error, mechanism: 'runZonedGuarded', handled: false);
+  await Posthog().captureException(error: wrappedError, stackTrace: stackTrace);
 }
 
 class MyApp extends StatefulWidget {
