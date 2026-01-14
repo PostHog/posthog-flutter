@@ -173,7 +173,6 @@ class DartExceptionProcessor {
     bool inAppByDefault = true,
   }) {
     final chunkIdMap = getPosthogChunkIds() ?? {};
-    printIfDebug('chunkIdMap: $chunkIdMap');
 
     final frameData = <String, dynamic>{
       'platform': kIsWeb ? 'web:javascript' : 'dart',
@@ -203,7 +202,6 @@ class DartExceptionProcessor {
     if (fileName != null && fileName.isNotEmpty) {
       frameData['filename'] = fileName;
 
-      printIfDebug('fileName: $fileName');
       // Check if any key in chunkIdMap contains the fileName as a substring
       String? chunkId;
       for (final entry in chunkIdMap.entries) {

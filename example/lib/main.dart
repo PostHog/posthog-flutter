@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter_example/error_example.dart';
 
 Future<void> main() async {
   final config =
@@ -278,55 +279,9 @@ class InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    try {
-                      // Simulate an exception in main isolate
-                      // throw 'a custom error string';
-                      // throw 333;
-                      throw CustomException(
-                        'This is a custom exception with additional context',
-                        code: 'DEMO_ERROR_001',
-                        additionalData: {
-                          'user_action': 'button_press',
-                          'timestamp': DateTime.now().millisecondsSinceEpoch,
-                          'feature_enabled': true,
-                        },
-                      );
-                    } catch (e, stack) {
-                      await Posthog().captureException(
-                        error: e,
-                        stackTrace: stack,
-                        properties: {
-                          'test_type': 'main_isolate_exception',
-                          'button_pressed': 'capture_exception_main',
-                          'exception_category': 'custom',
-                        },
-                      );
-
-                      if (mounted && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Main isolate exception captured successfully! Check PostHog.'),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
-                      }
-                    }
+                    await ErrorExample().causeHandledDivisionError();
                   },
                   child: const Text("Capture Exception"),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                  ),
-                  onPressed: () async {
-                    await Posthog().captureException(
-                      error: 'No Stack Trace Error',
-                      properties: {'test_type': 'no_stack_trace'},
-                    );
-                  },
-                  child: const Text("Capture Exception (Missing Stack)"),
                 ),
                 const Divider(),
                 const Padding(
@@ -341,7 +296,7 @@ class InitialScreenState extends State<InitialScreen> {
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -354,10 +309,7 @@ class InitialScreenState extends State<InitialScreen> {
                     }
 
                     // Test Flutter error handler by throwing in widget context
-                    throw const CustomException(
-                        'Test Flutter error for autocapture',
-                        code: 'FlutterErrorTest',
-                        additionalData: {'test_type': 'flutter_error'});
+                    await ErrorExample().causeHandledDivisionError();
                   },
                   child: const Text("Test Flutter Error Handler"),
                 ),
@@ -366,17 +318,9 @@ class InitialScreenState extends State<InitialScreen> {
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
-                    // Test PlatformDispatcher error handler with Future
-                    Future.delayed(Duration.zero, () {
-                      // does not throw on web here, just with runZonedGuarded handler
-                      throw const CustomException(
-                          'Test PlatformDispatcher error for autocapture',
-                          code: 'PlatformDispatcherTest',
-                          additionalData: {
-                            'test_type': 'platform_dispatcher_error'
-                          });
-                    });
+                  onPressed: () async {
+                    // does not throw on web here, just with runZonedGuarded handler
+                    await ErrorExample().throwWithinDelayed();
 
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -396,18 +340,10 @@ class InitialScreenState extends State<InitialScreen> {
                     backgroundColor: Colors.purple,
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     // Test isolate error listener by throwing in an async callback
                     // does not throw on web here, just with runZonedGuarded handler
-                    Timer(Duration.zero, () {
-                      throw const CustomException(
-                        'Isolate error for testing',
-                        code: 'IsolateHandlerTest',
-                        additionalData: {
-                          'test_type': 'isolate_error_listener_timer',
-                        },
-                      );
-                    });
+                    await ErrorExample().throwWithinTimer();
 
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(

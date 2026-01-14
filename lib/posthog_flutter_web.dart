@@ -242,7 +242,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
-      printIfDebug('exceptionData: $exceptionData');
+      
 
       final normalizedData =
           PropertyNormalizer.normalize(exceptionData.cast<String, Object>());

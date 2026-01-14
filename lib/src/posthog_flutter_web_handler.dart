@@ -477,7 +477,6 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
-      printIfDebug('captureException: $properties');
 
       posthog?.capture(
         stringToJSAny('\$exception'),
