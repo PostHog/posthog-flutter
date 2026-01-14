@@ -242,6 +242,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
+      printIfDebug('exceptionData: $exceptionData');
 
       // TODO: add timestamp param on JS SDK
       // final timestamp = DateTime.now().millisecondsSinceEpoch;

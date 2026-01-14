@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
 import 'posthog_exception.dart';
@@ -173,9 +174,10 @@ class DartExceptionProcessor {
   }) {
     // TODO: map chunk ID if available
     final chunkIdMap = getPosthogChunkIds() ?? {};
+    printIfDebug('chunkIdMap: $chunkIdMap');
 
     final frameData = <String, dynamic>{
-      'platform': kIsWeb ? 'javascript:web' : 'dart',
+      'platform': kIsWeb ? 'web:javascript' : 'dart',
       'abs_path': _extractAbsolutePath(frame),
       'in_app': _isInAppFrame(
         frame,
@@ -202,8 +204,16 @@ class DartExceptionProcessor {
     if (fileName != null && fileName.isNotEmpty) {
       frameData['filename'] = fileName;
 
-      // TODO: verify symbolication
-      final chunkId = chunkIdMap[fileName];
+      printIfDebug('fileName: $fileName');
+      // Check if any key in chunkIdMap contains the fileName as a substring
+      String? chunkId;
+      for (final entry in chunkIdMap.entries) {
+        if (entry.key.contains(fileName)) {
+          chunkId = entry.value;
+          printIfDebug('chunkId found: $chunkId for fileName: $fileName');
+          break;
+        }
+      }
       if (chunkId != null) {
         frameData['chunk_id'] = chunkId;
       }
