@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
-import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
 import 'posthog_exception.dart';
 import 'origin.dart';
+import 'chunk_ids.dart';
 
 typedef ChunkIdMapType = Map<String, String>;
 
