@@ -4,6 +4,7 @@ import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
 import 'posthog_exception.dart';
+import 'origin.dart';
 
 typedef ChunkIdMapType = Map<String, String>;
 
@@ -174,9 +175,10 @@ class DartExceptionProcessor {
   }) {
     final chunkIdMap = getPosthogChunkIds() ?? {};
 
+    final absPath = '$eventOrigin${_extractAbsolutePath(frame)}';
     final frameData = <String, dynamic>{
       'platform': kIsWeb ? 'web:javascript' : 'dart',
-      'abs_path': _extractAbsolutePath(frame),
+      'abs_path': absPath,
       'in_app': _isInAppFrame(
         frame,
         inAppIncludes: inAppIncludes,
