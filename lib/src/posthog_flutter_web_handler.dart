@@ -4,7 +4,6 @@ import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
-import 'package:posthog_flutter/src/util/logging.dart';
 
 // Definition of the JS interface for PostHog
 @JS()

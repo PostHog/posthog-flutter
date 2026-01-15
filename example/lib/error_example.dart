@@ -4,15 +4,13 @@ import 'package:posthog_flutter_example/main.dart';
 class ErrorExample {
   void causeUnhandledDivisionError() {
     // This will cause a division by zero error
-    int result = 10 ~/ 0;
-    print(result);
+    10 ~/ 0;
   }
 
   Future<void> causeHandledDivisionError() async {
     try {
       // This will cause a division by zero error
-      int result = 10 ~/ 0;
-      print(result);
+      10 ~/ 0;
     } catch (e, stackTrace) {
       await Posthog().captureException(
         error: e,

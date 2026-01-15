@@ -322,7 +322,7 @@ class InitialScreenState extends State<InitialScreen> {
                     // does not throw on web here, just with runZonedGuarded handler
                     await ErrorExample().throwWithinDelayed();
 
-                    if (mounted) {
+                    if (mounted && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
@@ -345,7 +345,7 @@ class InitialScreenState extends State<InitialScreen> {
                     // does not throw on web here, just with runZonedGuarded handler
                     await ErrorExample().throwWithinTimer();
 
-                    if (mounted) {
+                    if (mounted && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content:
