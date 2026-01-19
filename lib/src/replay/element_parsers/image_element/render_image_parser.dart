@@ -18,7 +18,7 @@ class RenderImageParser extends ElementParser {
         _positionCalculator = positionCalculator;
 
   @override
-  Rect? buildElementRect(Element element, Rect? parentRect) {
+  ({Rect rect, Matrix4 transform})? buildElementData(Element element) {
     final RenderImage renderImage = element.renderObject as RenderImage;
     final image = renderImage.image;
     if (!renderImage.hasSize ||
@@ -28,7 +28,6 @@ class RenderImageParser extends ElementParser {
       return null;
     }
 
-    final offset = renderImage.localToGlobal(Offset.zero);
     final BoxFit fit = renderImage.fit ?? BoxFit.scaleDown;
 
     final Size size = _scaler.getScaledSize(
@@ -44,11 +43,18 @@ class RenderImageParser extends ElementParser {
 
     final AlignmentGeometry alignment = renderImage.alignment;
 
+    // Calculate position within the container in local coordinates
     final double left = _positionCalculator.calculateLeftPosition(
-        alignment, offset, renderImage.size.width, size.width);
+        alignment, Offset.zero, renderImage.size.width, size.width);
     final double top = _positionCalculator.calculateTopPosition(
-        alignment, offset, renderImage.size.height, size.height);
+        alignment, Offset.zero, renderImage.size.height, size.height);
 
-    return Rect.fromLTWH(left, top, size.width, size.height);
+    // Store rect in local coordinates - transform handles global positioning
+    final Rect localRect = Rect.fromLTWH(left, top, size.width, size.height);
+
+    // Get the full transform from this render object to the screen
+    final Matrix4 transform = renderImage.getTransformTo(null);
+
+    return (rect: localRect, transform: transform);
   }
 }

@@ -10,31 +10,36 @@ class ElementParser {
     Element element,
     ElementData parentElementData,
   ) {
-    final Rect? elementRect = buildElementRect(element, parentElementData.rect);
-    if (elementRect == null) {
+    final result = buildElementData(element);
+    if (result == null) {
       return null;
     }
 
     final thisElementData = ElementData(
         type: element.widget.runtimeType.toString(),
-        rect: elementRect,
-        widget: element.widget);
+        rect: result.rect,
+        widget: element.widget,
+        transform: result.transform);
 
     return thisElementData;
   }
 
-  Rect? buildElementRect(Element element, Rect? parentRect) {
+  /// Returns a record containing the local rect and transform for the element
+  ({Rect rect, Matrix4 transform})? buildElementData(Element element) {
     final renderObject = element.renderObject;
     if (renderObject is RenderBox &&
         renderObject.hasSize &&
         renderObject.size.isValidSize) {
-      final Offset offset = renderObject.localToGlobal(Offset.zero);
-      return Rect.fromLTWH(
-        offset.dx,
-        offset.dy,
-        renderObject.size.width,
-        renderObject.size.height,
-      );
+      // Use paintBounds to capture the actual painted area
+      // This is important for text with ScreenUtil scaling where the painted
+      // text can be larger than the logical layout bounds
+      final Rect localRect = renderObject.paintBounds;
+
+      // Get the full transform from this render object to the screen
+      // This transforms from local to global screen coordinates
+      final Matrix4 transform = renderObject.getTransformTo(null);
+
+      return (rect: localRect, transform: transform);
     }
     return null;
   }

@@ -31,6 +31,8 @@ class ElementObjectParser {
     }
 
     // Handle TextField and TextFormField masking
+    // Only mask at widget level for obscureText fields when maskAllTexts is false
+    // When maskAllTexts is true, RenderEditable detection will handle it with better bounds
     if (element.widget is TextField || element.widget is TextFormField) {
       final config = Posthog().config?.sessionReplayConfig;
       final maskAllTexts = config?.maskAllTexts ?? true;
@@ -39,12 +41,13 @@ class ElementObjectParser {
       if (element.widget is TextField) {
         isObscured = (element.widget as TextField).obscureText;
       }
+
       // Note: TextFormField obscureText is handled differently in Flutter.
       // TextFormField creates an internal TextField, but the obscureText property
       // is not directly accessible on the TextFormField widget itself.
       // For TextFormField, we rely on the maskAllTexts configuration.
-
-      final shouldMask = maskAllTexts || isObscured;
+      // Otherwise, let RenderEditable handle it (it has better bounds via preferredLineHeight)
+      final shouldMask = !maskAllTexts && isObscured;
 
       if (shouldMask) {
         final elementData = _elementParser.relate(element, activeElementData);

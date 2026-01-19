@@ -9,15 +9,16 @@ class ElementDataFactory {
     if (renderObject is RenderBox &&
         renderObject.hasSize &&
         renderObject.size.isValidSize) {
-      final offset = renderObject.localToGlobal(Offset.zero);
+      // Use paintBounds to capture the actual painted area
+      final Rect localRect = renderObject.paintBounds;
+
+      // Get the full transform from this render object to the screen
+      final Matrix4 transform = renderObject.getTransformTo(null);
+
       return ElementData(
         type: type,
-        rect: Rect.fromLTWH(
-          offset.dx,
-          offset.dy,
-          renderObject.size.width,
-          renderObject.size.height,
-        ),
+        rect: localRect,
+        transform: transform,
       );
     }
     return null;

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 
+import 'masking_tests_screen.dart';
+
 Future<void> main() async {
   // // init WidgetsFlutterBinding if not yet
 
@@ -102,6 +104,21 @@ class InitialScreenState extends State<InitialScreen> {
                       'Go to Second Route',
                     ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const MaskingTestsScreen(),
+                          settings: const RouteSettings(name: 'masking_tests')),
+                    );
+                  },
+                  child: const Text('Masking Tests'),
                 ),
                 const Padding(
                   padding: EdgeInsets.all(8.0),

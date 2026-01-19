@@ -8,12 +8,14 @@ class ElementData {
   String type;
   List<ElementData>? children;
   Widget? widget;
+  Matrix4? transform;
 
   ElementData({
     required this.rect,
     required this.type,
     this.children,
     this.widget,
+    this.transform,
   });
 
   void addChildren(ElementData elementData) {
