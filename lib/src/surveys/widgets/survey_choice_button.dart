@@ -52,7 +52,7 @@ class SurveyChoiceButton extends StatelessWidget {
                               color: isSelected
                                   ? appearance.choiceButtonTextColor
                                   : appearance.choiceButtonTextColor
-                                      .withAlpha(128),
+                                      .withValues(alpha: 0.5),
                               fontWeight: isSelected ? FontWeight.bold : null,
                             ),
                           ),
@@ -71,7 +71,7 @@ class SurveyChoiceButton extends StatelessWidget {
                               color: isSelected
                                   ? appearance.choiceButtonTextColor
                                   : appearance.choiceButtonTextColor
-                                      .withAlpha(128),
+                                      .withValues(alpha: 0.5),
                               fontSize: 14,
                             ),
                           ),
@@ -82,7 +82,7 @@ class SurveyChoiceButton extends StatelessWidget {
                         style: TextStyle(
                           color: isSelected
                               ? Colors.black
-                              : Colors.black.withAlpha(128),
+                              : Colors.black.withValues(alpha: 0.5),
                           fontWeight: isSelected ? FontWeight.bold : null,
                         ),
                       ),
