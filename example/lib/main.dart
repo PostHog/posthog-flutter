@@ -8,7 +8,7 @@ Future<void> main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   final config =
-      PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
+      PostHogConfig('phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06');
   config.onFeatureFlags = () {
     debugPrint('[PostHog] Feature flags loaded!');
   };
@@ -127,6 +127,10 @@ class InitialScreenState extends State<InitialScreen> {
                         _posthogFlutterPlugin
                             .capture(eventName: "eventName", properties: {
                           "foo": "bar",
+                        }, userProperties: {
+                          "user_foo": "user_bar",
+                        }, userPropertiesSetOnce: {
+                          "user_foo_once": "user_bar_once",
                         });
                       },
                       child: const Text("Capture Event"),
