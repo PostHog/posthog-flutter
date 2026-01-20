@@ -10,6 +10,7 @@ import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
 import 'surveys/models/survey_callbacks.dart';
 import 'error_tracking/dart_exception_processor.dart';
+import 'utils/capture_utils.dart';
 import 'utils/property_normalizer.dart';
 
 import 'posthog_config.dart';
@@ -183,46 +184,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      // Create a mutable copy of properties to extract $set and $set_once
-      final propertiesCopy =
-          properties != null ? Map<String, Object>.from(properties) : null;
+      final extracted = CaptureUtils.extractUserProperties(
+        properties: properties,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+      );
 
-      // Extract $set and $set_once from properties for backward compatibility
-      Map<String, Object>? legacyUserProperties;
-      Map<String, Object>? legacyUserPropertiesSetOnce;
-
-      if (propertiesCopy != null) {
-        if (propertiesCopy['\$set'] is Map) {
-          legacyUserProperties =
-              Map<String, Object>.from(propertiesCopy['\$set'] as Map);
-          propertiesCopy.remove('\$set');
-        }
-        if (propertiesCopy['\$set_once'] is Map) {
-          legacyUserPropertiesSetOnce =
-              Map<String, Object>.from(propertiesCopy['\$set_once'] as Map);
-          propertiesCopy.remove('\$set_once');
-        }
-      }
-
-      // Merge legacy properties with new parameters (new parameters take precedence)
-      final mergedUserProperties = <String, Object>{
-        ...?legacyUserProperties,
-        ...?userProperties,
-      };
-      final mergedUserPropertiesSetOnce = <String, Object>{
-        ...?legacyUserPropertiesSetOnce,
-        ...?userPropertiesSetOnce,
-      };
-
-      final normalizedProperties = propertiesCopy != null
-          ? PropertyNormalizer.normalize(propertiesCopy)
+      final normalizedProperties = extracted.properties != null
+          ? PropertyNormalizer.normalize(extracted.properties!)
           : null;
-      final normalizedUserProperties = mergedUserProperties.isNotEmpty
-          ? PropertyNormalizer.normalize(mergedUserProperties)
+      final normalizedUserProperties = extracted.userProperties != null
+          ? PropertyNormalizer.normalize(extracted.userProperties!)
           : null;
       final normalizedUserPropertiesSetOnce =
-          mergedUserPropertiesSetOnce.isNotEmpty
-              ? PropertyNormalizer.normalize(mergedUserPropertiesSetOnce)
+          extracted.userPropertiesSetOnce != null
+              ? PropertyNormalizer.normalize(extracted.userPropertiesSetOnce!)
               : null;
 
       await _methodChannel.invokeMethod('capture', {

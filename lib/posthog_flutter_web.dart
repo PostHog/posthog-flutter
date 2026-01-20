@@ -9,6 +9,7 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
+import 'src/utils/capture_utils.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
 class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
@@ -92,44 +93,19 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
-    // Create a mutable copy of properties to extract $set and $set_once
-    final propertiesCopy =
-        properties != null ? Map<String, Object>.from(properties) : null;
-
-    // Extract $set and $set_once from properties for backward compatibility
-    Map<String, Object>? legacyUserProperties;
-    Map<String, Object>? legacyUserPropertiesSetOnce;
-
-    if (propertiesCopy != null) {
-      if (propertiesCopy['\$set'] is Map) {
-        legacyUserProperties =
-            Map<String, Object>.from(propertiesCopy['\$set'] as Map);
-        propertiesCopy.remove('\$set');
-      }
-      if (propertiesCopy['\$set_once'] is Map) {
-        legacyUserPropertiesSetOnce =
-            Map<String, Object>.from(propertiesCopy['\$set_once'] as Map);
-        propertiesCopy.remove('\$set_once');
-      }
-    }
-
-    // Merge legacy properties with new parameters (new parameters take precedence)
-    final mergedUserProperties = <String, Object>{
-      ...?legacyUserProperties,
-      ...?userProperties,
-    };
-    final mergedUserPropertiesSetOnce = <String, Object>{
-      ...?legacyUserPropertiesSetOnce,
-      ...?userPropertiesSetOnce,
-    };
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
 
     return handleWebMethodCall(MethodCall('capture', {
       'eventName': eventName,
-      if (propertiesCopy != null) 'properties': propertiesCopy,
-      if (mergedUserProperties.isNotEmpty)
-        'userProperties': mergedUserProperties,
-      if (mergedUserPropertiesSetOnce.isNotEmpty)
-        'userPropertiesSetOnce': mergedUserPropertiesSetOnce,
+      if (extracted.properties != null) 'properties': extracted.properties,
+      if (extracted.userProperties != null)
+        'userProperties': extracted.userProperties,
+      if (extracted.userPropertiesSetOnce != null)
+        'userPropertiesSetOnce': extracted.userPropertiesSetOnce,
     }));
   }
 
