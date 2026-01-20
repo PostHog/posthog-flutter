@@ -175,6 +175,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
     if (!isSupportedPlatform()) {
       return;
@@ -183,10 +185,20 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       final normalizedProperties =
           properties != null ? PropertyNormalizer.normalize(properties) : null;
+      final normalizedUserProperties = userProperties != null
+          ? PropertyNormalizer.normalize(userProperties)
+          : null;
+      final normalizedUserPropertiesSetOnce = userPropertiesSetOnce != null
+          ? PropertyNormalizer.normalize(userPropertiesSetOnce)
+          : null;
 
       await _methodChannel.invokeMethod('capture', {
         'eventName': eventName,
         if (normalizedProperties != null) 'properties': normalizedProperties,
+        if (normalizedUserProperties != null)
+          'userProperties': normalizedUserProperties,
+        if (normalizedUserPropertiesSetOnce != null)
+          'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on capture: $exception');

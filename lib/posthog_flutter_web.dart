@@ -89,10 +89,15 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
     return handleWebMethodCall(MethodCall('capture', {
       'eventName': eventName,
       if (properties != null) 'properties': properties,
+      if (userProperties != null) 'userProperties': userProperties,
+      if (userPropertiesSetOnce != null)
+        'userPropertiesSetOnce': userPropertiesSetOnce,
     }));
   }
 

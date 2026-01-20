@@ -83,6 +83,8 @@ class Posthog {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) {
     final propertiesCopy = properties == null ? null : {...properties};
 
@@ -95,6 +97,8 @@ class Posthog {
     return _posthog.capture(
       eventName: eventName,
       properties: propertiesCopy,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
     );
   }
 

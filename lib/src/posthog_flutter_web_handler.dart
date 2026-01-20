@@ -89,6 +89,17 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'capture':
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
+      final userProperties = safeMapConversion(args['userProperties']);
+      final userPropertiesSetOnce =
+          safeMapConversion(args['userPropertiesSetOnce']);
+
+      // Add $set and $set_once to properties if userProperties are provided
+      if (userProperties.isNotEmpty) {
+        properties['\$set'] = userProperties;
+      }
+      if (userPropertiesSetOnce.isNotEmpty) {
+        properties['\$set_once'] = userPropertiesSetOnce;
+      }
 
       posthog?.capture(
         stringToJSAny(eventName),
