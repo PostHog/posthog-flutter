@@ -13,6 +13,7 @@ import 'error_tracking/dart_exception_processor.dart';
 import 'utils/property_normalizer.dart';
 
 import 'posthog_config.dart';
+import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
@@ -28,6 +29,31 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
+
+  /// Stored beforeSend callback for dropping/modifying events
+  BeforeSendCallback? _beforeSendCallback;
+
+  /// Applies the beforeSend callback to an event.
+  /// Returns the possibly modified event, or null if the event should be dropped.
+  PostHogEvent? _runBeforeSend(
+      String eventName, Map<String, Object>? properties) {
+    final event = PostHogEvent(
+      event: eventName,
+      properties: properties,
+    );
+
+    if (_beforeSendCallback == null) {
+      return event;
+    }
+
+    try {
+      return _beforeSendCallback!(event);
+    } catch (e) {
+      printIfDebug('[PostHog] beforeSend callback threw exception: $e');
+      // On exception, pass through unchanged
+      return event;
+    }
+  }
 
   /// Native plugin calls to Flutter
   ///
@@ -133,6 +159,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     _onFeatureFlagsCallback = config.onFeatureFlags;
+    _beforeSendCallback = config.beforeSend;
 
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());
@@ -180,12 +207,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
+    // Apply beforeSend callback
+    final processedEvent = _runBeforeSend(eventName, properties);
+    if (processedEvent == null) {
+      printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
+      return;
+    }
+
     try {
-      final normalizedProperties =
-          properties != null ? PropertyNormalizer.normalize(properties) : null;
+      final normalizedProperties = processedEvent.properties != null
+          ? PropertyNormalizer.normalize(
+              processedEvent.properties!.cast<String, Object>())
+          : null;
 
       await _methodChannel.invokeMethod('capture', {
-        'eventName': eventName,
+        'eventName': processedEvent.event,
         if (normalizedProperties != null) 'properties': normalizedProperties,
       });
     } on PlatformException catch (exception) {
@@ -202,12 +238,42 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
+    // Add screenName as $screen_name property for beforeSend
+    final propsWithScreenName = <String, Object>{
+      '\$screen_name': screenName,
+      ...?properties,
+    };
+
+    // Apply beforeSend callback - screen events are captured as $screen
+    final processedEvent = _runBeforeSend('\$screen', propsWithScreenName);
+    if (processedEvent == null) {
+      printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
+      return;
+    }
+
+    // If event name was changed, use regular capture() instead
+    if (processedEvent.event != '\$screen') {
+      await capture(
+        eventName: processedEvent.event,
+        properties: processedEvent.properties?.cast<String, Object>(),
+      );
+      return;
+    }
+
+    // Get the (possibly modified) screen name from properties and remove it
+    final finalScreenName =
+        processedEvent.properties?['\$screen_name'] as String? ?? screenName;
+    // It will be added back by native sdk
+    processedEvent.properties?.remove('\$screen_name');
+
     try {
-      final normalizedProperties =
-          properties != null ? PropertyNormalizer.normalize(properties) : null;
+      final normalizedProperties = processedEvent.properties?.isNotEmpty == true
+          ? PropertyNormalizer.normalize(
+              processedEvent.properties!.cast<String, Object>())
+          : null;
 
       await _methodChannel.invokeMethod('screen', {
-        'screenName': screenName,
+        'screenName': finalScreenName,
         if (normalizedProperties != null) 'properties': normalizedProperties,
       });
     } on PlatformException catch (exception) {
@@ -456,7 +522,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      final exceptionData = DartExceptionProcessor.processException(
+      final exceptionProps = DartExceptionProcessor.processException(
         error: error,
         stackTrace: stackTrace,
         properties: properties,
@@ -465,10 +531,30 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
+      // Apply beforeSend callback - exception events are captured as $exception
+      final processedEvent =
+          _runBeforeSend('\$exception', exceptionProps.cast<String, Object>());
+      if (processedEvent == null) {
+        printIfDebug(
+            '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}');
+        return;
+      }
+
+      // If event name was changed, use capture() instead
+      if (processedEvent.event != '\$exception') {
+        await capture(
+          eventName: processedEvent.event,
+          properties: processedEvent.properties?.cast<String, Object>(),
+        );
+        return;
+      }
+
       // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final normalizedData =
-          PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
+      final normalizedData = processedEvent.properties != null
+          ? PropertyNormalizer.normalize(
+              processedEvent.properties!.cast<String, Object>())
+          : <String, Object>{};
 
       await _methodChannel.invokeMethod('captureException',
           {'timestamp': timestamp, 'properties': normalizedData});

@@ -1,5 +1,13 @@
 ## Next
 
+- feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
+  - **Limitation**:
+    - Does NOT intercept native-initiated events such as:
+      - Session replay events (`$snapshot`)
+      - Application lifecycle events (`Application Opened`, etc.)
+      - etc.
+    - Only user-provided properties are available; system properties (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
+
 # 5.11.1
 
 - fix: RichText, SelectableText, TextField labels and hints not being masked in session replay ([#251](https://github.com/PostHog/posthog-flutter/pull/251))

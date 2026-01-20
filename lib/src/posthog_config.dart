@@ -1,4 +1,10 @@
+import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+
+/// Callback to intercept and modify events before they are sent to PostHog.
+///
+/// Return a possibly modified event to send it, or return `null` to drop it.
+typedef BeforeSendCallback = PostHogEvent? Function(PostHogEvent event);
 
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
@@ -52,11 +58,47 @@ class PostHogConfig {
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
 
+  /// Callback to intercept and modify events before they are sent to PostHog.
+  ///
+  /// This callback is invoked for events captured via Dart APIs:
+  /// - `Posthog().capture()` - custom events
+  /// - `Posthog().screen()` - screen events (event name will be `$screen`)
+  /// - `Posthog().captureException()` - exception events (event name will be `$exception`)
+  ///
+  /// Return a possibly modified event to send it, or return `null` to drop it.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// config.beforeSend = (event) {
+  ///   // Drop specific events
+  ///   if (event.event == 'sensitive_event') {
+  ///     return null;
+  ///   }
+  ///   // Modify event properties
+  ///   event.properties ??= {};
+  ///   event.properties?['some_custom_field'] = 'new value';
+  ///   return event;
+  /// };
+  /// ```
+  ///
+  /// **Limitations:**
+  /// - This callback does NOT intercept native-initiated events such as:
+  ///   - Session replay events (`$snapshot`)
+  ///   - Application lifecycle events (`Application Opened`, etc.)
+  /// - Only user-provided properties are available; system properties
+  ///   (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
+  ///
+  /// **Note:**
+  /// - This callback runs synchronously on the Dart side
+  /// - Exceptions in the callback will cause the event to be sent unchanged
+  BeforeSendCallback? beforeSend;
+
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
 
   PostHogConfig(
     this.apiKey, {
     this.onFeatureFlags,
+    this.beforeSend,
   });
 
   Map<String, dynamic> toMap() {
