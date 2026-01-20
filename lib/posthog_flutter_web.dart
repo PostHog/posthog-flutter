@@ -10,6 +10,7 @@ import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
 import 'src/utils/capture_utils.dart';
+import 'src/utils/property_normalizer.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
 class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
@@ -99,13 +100,24 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
 
+    final normalizedProperties = extracted.properties != null
+        ? PropertyNormalizer.normalize(extracted.properties!)
+        : null;
+    final normalizedUserProperties = extracted.userProperties != null
+        ? PropertyNormalizer.normalize(extracted.userProperties!)
+        : null;
+    final normalizedUserPropertiesSetOnce =
+        extracted.userPropertiesSetOnce != null
+            ? PropertyNormalizer.normalize(extracted.userPropertiesSetOnce!)
+            : null;
+
     return handleWebMethodCall(MethodCall('capture', {
       'eventName': eventName,
-      if (extracted.properties != null) 'properties': extracted.properties,
-      if (extracted.userProperties != null)
-        'userProperties': extracted.userProperties,
-      if (extracted.userPropertiesSetOnce != null)
-        'userPropertiesSetOnce': extracted.userPropertiesSetOnce,
+      if (normalizedProperties != null) 'properties': normalizedProperties,
+      if (normalizedUserProperties != null)
+        'userProperties': normalizedUserProperties,
+      if (normalizedUserPropertiesSetOnce != null)
+        'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
     }));
   }
 
