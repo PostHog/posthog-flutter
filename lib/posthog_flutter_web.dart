@@ -92,12 +92,44 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
+    // Create a mutable copy of properties to extract $set and $set_once
+    final propertiesCopy =
+        properties != null ? Map<String, Object>.from(properties) : null;
+
+    // Extract $set and $set_once from properties for backward compatibility
+    Map<String, Object>? legacyUserProperties;
+    Map<String, Object>? legacyUserPropertiesSetOnce;
+
+    if (propertiesCopy != null) {
+      if (propertiesCopy['\$set'] is Map) {
+        legacyUserProperties =
+            Map<String, Object>.from(propertiesCopy['\$set'] as Map);
+        propertiesCopy.remove('\$set');
+      }
+      if (propertiesCopy['\$set_once'] is Map) {
+        legacyUserPropertiesSetOnce =
+            Map<String, Object>.from(propertiesCopy['\$set_once'] as Map);
+        propertiesCopy.remove('\$set_once');
+      }
+    }
+
+    // Merge legacy properties with new parameters (new parameters take precedence)
+    final mergedUserProperties = <String, Object>{
+      ...?legacyUserProperties,
+      ...?userProperties,
+    };
+    final mergedUserPropertiesSetOnce = <String, Object>{
+      ...?legacyUserPropertiesSetOnce,
+      ...?userPropertiesSetOnce,
+    };
+
     return handleWebMethodCall(MethodCall('capture', {
       'eventName': eventName,
-      if (properties != null) 'properties': properties,
-      if (userProperties != null) 'userProperties': userProperties,
-      if (userPropertiesSetOnce != null)
-        'userPropertiesSetOnce': userPropertiesSetOnce,
+      if (propertiesCopy != null) 'properties': propertiesCopy,
+      if (mergedUserProperties.isNotEmpty)
+        'userProperties': mergedUserProperties,
+      if (mergedUserPropertiesSetOnce.isNotEmpty)
+        'userPropertiesSetOnce': mergedUserPropertiesSetOnce,
     }));
   }
 

@@ -183,14 +183,47 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      final normalizedProperties =
-          properties != null ? PropertyNormalizer.normalize(properties) : null;
-      final normalizedUserProperties = userProperties != null
-          ? PropertyNormalizer.normalize(userProperties)
+      // Create a mutable copy of properties to extract $set and $set_once
+      final propertiesCopy =
+          properties != null ? Map<String, Object>.from(properties) : null;
+
+      // Extract $set and $set_once from properties for backward compatibility
+      Map<String, Object>? legacyUserProperties;
+      Map<String, Object>? legacyUserPropertiesSetOnce;
+
+      if (propertiesCopy != null) {
+        if (propertiesCopy['\$set'] is Map) {
+          legacyUserProperties =
+              Map<String, Object>.from(propertiesCopy['\$set'] as Map);
+          propertiesCopy.remove('\$set');
+        }
+        if (propertiesCopy['\$set_once'] is Map) {
+          legacyUserPropertiesSetOnce =
+              Map<String, Object>.from(propertiesCopy['\$set_once'] as Map);
+          propertiesCopy.remove('\$set_once');
+        }
+      }
+
+      // Merge legacy properties with new parameters (new parameters take precedence)
+      final mergedUserProperties = <String, Object>{
+        ...?legacyUserProperties,
+        ...?userProperties,
+      };
+      final mergedUserPropertiesSetOnce = <String, Object>{
+        ...?legacyUserPropertiesSetOnce,
+        ...?userPropertiesSetOnce,
+      };
+
+      final normalizedProperties = propertiesCopy != null
+          ? PropertyNormalizer.normalize(propertiesCopy)
           : null;
-      final normalizedUserPropertiesSetOnce = userPropertiesSetOnce != null
-          ? PropertyNormalizer.normalize(userPropertiesSetOnce)
+      final normalizedUserProperties = mergedUserProperties.isNotEmpty
+          ? PropertyNormalizer.normalize(mergedUserProperties)
           : null;
+      final normalizedUserPropertiesSetOnce =
+          mergedUserPropertiesSetOnce.isNotEmpty
+              ? PropertyNormalizer.normalize(mergedUserPropertiesSetOnce)
+              : null;
 
       await _methodChannel.invokeMethod('capture', {
         'eventName': eventName,
