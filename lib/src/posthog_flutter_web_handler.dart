@@ -87,7 +87,7 @@ class StackFrame {
     this.inApp = true,
   });
 
-  Map<String, dynamic> toMap() {
+  Map<String, Object?> toMap() {
     return {
       'filename': filename,
       'function': function ?? '<anonymous>',
@@ -309,7 +309,7 @@ void _buildFilenameToDebugIdMapDart(
 
 Map<String, String>? getPosthogChunkIds() {
   final debugIdMapJS = globalThis['_posthogChunkIds'];
-  final debugIdMap = debugIdMapJS?.dartify() as Map<dynamic, dynamic>?;
+  final debugIdMap = debugIdMapJS?.dartify() as Map<String, Object>?;
   if (debugIdMap == null) {
     return null;
   }

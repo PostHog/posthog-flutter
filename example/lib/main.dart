@@ -319,7 +319,6 @@ class InitialScreenState extends State<InitialScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    // does not throw on web here, just with runZonedGuarded handler
                     await ErrorExample().throwWithinDelayed();
 
                     if (mounted && context.mounted) {
@@ -342,7 +341,6 @@ class InitialScreenState extends State<InitialScreen> {
                   ),
                   onPressed: () async {
                     // Test isolate error listener by throwing in an async callback
-                    // does not throw on web here, just with runZonedGuarded handler
                     await ErrorExample().throwWithinTimer();
 
                     if (mounted && context.mounted) {

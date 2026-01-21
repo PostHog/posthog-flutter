@@ -133,6 +133,7 @@ class DartExceptionProcessor {
   }) {
     final chain = Chain.forTrace(stackTrace);
     final frames = <Map<String, dynamic>>[];
+    final chunkIdMap = getPosthogChunkIds() ?? {};
 
     for (final (index, trace) in chain.traces.indexed) {
       bool skipNextPostHogFrame = removeTopPostHogFrames;
@@ -148,6 +149,7 @@ class DartExceptionProcessor {
 
         final processedFrame = _convertFrameToPostHog(
           frame,
+          chunkIdMap,
           inAppIncludes: inAppIncludes,
           inAppExcludes: inAppExcludes,
           inAppByDefault: inAppByDefault,
@@ -168,13 +170,12 @@ class DartExceptionProcessor {
 
   /// Converts a Frame from stack_trace package to PostHog format
   static Map<String, dynamic>? _convertFrameToPostHog(
-    Frame frame, {
+    Frame frame,
+    Map<String, String> chunkIdMap, {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
   }) {
-    final chunkIdMap = getPosthogChunkIds() ?? {};
-
     final absPath = '$eventOrigin${_extractAbsolutePath(frame)}';
     final frameData = <String, dynamic>{
       'platform': kIsWeb ? 'web:javascript' : 'dart',

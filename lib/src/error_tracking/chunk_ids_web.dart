@@ -6,7 +6,7 @@ external JSObject get globalThis;
 
 Map<String, String>? getPosthogChunkIds() {
   final debugIdMapJS = globalThis['_posthogChunkIds'];
-  final debugIdMap = debugIdMapJS?.dartify() as Map<dynamic, dynamic>?;
+  final debugIdMap = debugIdMapJS?.dartify() as Map<String, Object>?;
   if (debugIdMap == null) {
     return null;
   }
