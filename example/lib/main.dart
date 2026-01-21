@@ -31,8 +31,9 @@ Future<void> main() async {
 
   if (kIsWeb) {
     runZonedGuarded(
-      () => _initAndRun(config),
-      (error, stackTrace) => _captureError(error, stackTrace),
+      () async => await _initAndRun(config),
+      (error, stackTrace) async => await Posthog()
+          .captureRunZonedGuardedError(error: error, stackTrace: stackTrace),
     );
   } else {
     await _initAndRun(config);
@@ -43,12 +44,6 @@ Future<void> _initAndRun(PostHogConfig config) async {
   WidgetsFlutterBinding.ensureInitialized();
   await Posthog().setup(config);
   runApp(const MyApp());
-}
-
-Future<void> _captureError(Object error, StackTrace? stackTrace) async {
-  final wrappedError = PostHogException(
-      source: error, mechanism: 'runZonedGuarded', handled: false);
-  await Posthog().captureException(error: wrappedError, stackTrace: stackTrace);
 }
 
 class MyApp extends StatefulWidget {
