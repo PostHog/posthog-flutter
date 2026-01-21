@@ -34,6 +34,19 @@ extension PostHogExtension on PostHog {
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
   external void onFeatureFlags(JSFunction callback);
+  external void startSessionRecording();
+  external void stopSessionRecording();
+  external bool sessionRecordingStarted();
+  external SessionManager? get sessionManager;
+}
+
+// SessionManager JS interop
+@JS()
+@staticInterop
+class SessionManager {}
+
+extension SessionManagerExtension on SessionManager {
+  external void resetSessionId();
 }
 
 // Accessing PostHog from the window object
@@ -204,9 +217,18 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       // Flutter Web uses the JS SDK for Session replay
       break;
     case 'isSessionReplayActive':
-      // not supported on Web
-      // Flutter Web uses the JS SDK for Session replay
-      return false;
+      return posthog?.sessionRecordingStarted() ?? false;
+    case 'startSessionRecording':
+      final resumeCurrent = args['resumeCurrent'] as bool? ?? true;
+      if (!resumeCurrent) {
+        // Reset session ID to start a new session
+        posthog?.sessionManager?.resetSessionId();
+      }
+      posthog?.startSessionRecording();
+      break;
+    case 'stopSessionRecording':
+      posthog?.stopSessionRecording();
+      break;
     case 'openUrl':
       // not supported on Web
       break;

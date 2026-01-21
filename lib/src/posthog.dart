@@ -189,5 +189,23 @@ class Posthog {
 
   Future<String?> getSessionId() => _posthog.getSessionId();
 
+  /// Starts session recording.
+  ///
+  /// This method will have no effect if PostHog is not enabled, or if session
+  /// replay is disabled in your project settings.
+  ///
+  /// [resumeCurrent] - If true (default), resumes recording of the current session.
+  /// If false, starts a new session and begins recording.
+  Future<void> startSessionRecording({bool resumeCurrent = true}) =>
+      _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
+
+  /// Stops the current session recording if one is in progress.
+  ///
+  /// This method will have no effect if PostHog is not enabled.
+  Future<void> stopSessionRecording() => _posthog.stopSessionRecording();
+
+  /// Returns whether session replay is currently active.
+  Future<bool> isSessionReplayActive() => _posthog.isSessionReplayActive();
+
   Posthog._internal();
 }
