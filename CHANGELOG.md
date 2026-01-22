@@ -1,6 +1,9 @@
 ## Next
 
+- chore: add support for thumbs up/down surveys ([#257](https://github.com/PostHog/posthog-flutter/pull/257))
+
 - perf: Optimize Screenshot diff check ([#271](https://github.com/PostHog/posthog-flutter/pull/271))
+
 - chore: improve survey color handling ([#233](https://github.com/PostHog/posthog-flutter/pull/233))
 
 - feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
