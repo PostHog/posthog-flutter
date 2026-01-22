@@ -207,8 +207,9 @@ class _RatingQuestionState extends State<RatingQuestion> {
         Builder(builder: (context) {
           final rating = _rating;
           return SurveyButton(
-            onPressed:
-                _canSubmit && rating != null ? () => widget.onSubmit(rating) : null,
+            onPressed: _canSubmit && rating != null
+                ? () => widget.onSubmit(rating)
+                : null,
             text: widget.buttonText ?? 'Submit',
             appearance: widget.appearance,
             enabled: _canSubmit,
