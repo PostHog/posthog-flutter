@@ -100,15 +100,19 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
 
-    final normalizedProperties = extracted.properties != null
-        ? PropertyNormalizer.normalize(extracted.properties!)
+    final extractedProperties = extracted.properties;
+    final extractedUserProperties = extracted.userProperties;
+    final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
+
+    final normalizedProperties = extractedProperties != null
+        ? PropertyNormalizer.normalize(extractedProperties)
         : null;
-    final normalizedUserProperties = extracted.userProperties != null
-        ? PropertyNormalizer.normalize(extracted.userProperties!)
+    final normalizedUserProperties = extractedUserProperties != null
+        ? PropertyNormalizer.normalize(extractedUserProperties)
         : null;
     final normalizedUserPropertiesSetOnce =
-        extracted.userPropertiesSetOnce != null
-            ? PropertyNormalizer.normalize(extracted.userPropertiesSetOnce!)
+        extractedUserPropertiesSetOnce != null
+            ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
             : null;
 
     return handleWebMethodCall(MethodCall('capture', {
