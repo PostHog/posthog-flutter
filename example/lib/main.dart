@@ -138,6 +138,10 @@ class InitialScreenState extends State<InitialScreen> {
                         _posthogFlutterPlugin
                             .capture(eventName: "eventName", properties: {
                           "foo": "bar",
+                        }, userProperties: {
+                          "user_foo": "user_bar",
+                        }, userPropertiesSetOnce: {
+                          "user_foo_once": "user_bar_once",
                         });
                       },
                       child: const Text("Capture Event"),

@@ -560,9 +560,13 @@ extension PosthogFlutterPlugin {
            let eventName = args["eventName"] as? String
         {
             let properties = args["properties"] as? [String: Any]
+            let userProperties = args["userProperties"] as? [String: Any]
+            let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
             PostHogSDK.shared.capture(
                 eventName,
-                properties: properties
+                properties: properties,
+                userProperties: userProperties,
+                userPropertiesSetOnce: userPropertiesSetOnce
             )
             result(nil)
         } else {

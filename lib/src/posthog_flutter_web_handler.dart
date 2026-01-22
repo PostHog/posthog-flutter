@@ -13,7 +13,7 @@ class PostHog {}
 extension PostHogExtension on PostHog {
   external JSAny? identify(
       JSAny userId, JSAny properties, JSAny propertiesSetOnce);
-  external JSAny? capture(JSAny eventName, JSAny properties);
+  external JSAny? capture(JSAny eventName, JSAny? properties, JSAny? options);
   external JSAny? alias(JSAny alias);
   // ignore: non_constant_identifier_names
   external JSAny? get_distinct_id();
@@ -351,10 +351,24 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'capture':
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
+      final userProperties = safeMapConversion(args['userProperties']);
+      final userPropertiesSetOnce =
+          safeMapConversion(args['userPropertiesSetOnce']);
+
+      // Build options object for posthog-js capture with $set and $set_once
+      // See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
+      final options = <String, Object>{};
+      if (userProperties.isNotEmpty) {
+        options['\$set'] = userProperties;
+      }
+      if (userPropertiesSetOnce.isNotEmpty) {
+        options['\$set_once'] = userPropertiesSetOnce;
+      }
 
       posthog?.capture(
         stringToJSAny(eventName),
-        mapToJSAny(properties),
+        properties.isNotEmpty ? mapToJSAny(properties) : null,
+        options.isNotEmpty ? mapToJSAny(options) : null,
       );
       break;
     case 'screen':
@@ -365,6 +379,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       posthog?.capture(
         stringToJSAny('\$screen'),
         mapToJSAny(properties),
+        null,
       );
       break;
     case 'alias':

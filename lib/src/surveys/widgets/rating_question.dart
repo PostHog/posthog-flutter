@@ -204,12 +204,17 @@ class _RatingQuestionState extends State<RatingQuestion> {
             ),
           ),
         const SizedBox(height: 24),
-        SurveyButton(
-          onPressed: _canSubmit ? () => widget.onSubmit(_rating!) : null,
-          text: widget.buttonText ?? 'Submit',
-          appearance: widget.appearance,
-          enabled: _canSubmit,
-        ),
+        Builder(builder: (context) {
+          final rating = _rating;
+          return SurveyButton(
+            onPressed: _canSubmit && rating != null
+                ? () => widget.onSubmit(rating)
+                : null,
+            text: widget.buttonText ?? 'Submit',
+            appearance: widget.appearance,
+            enabled: _canSubmit,
+          );
+        }),
       ],
     );
   }

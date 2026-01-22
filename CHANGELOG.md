@@ -1,6 +1,7 @@
 ## Next
 
 - chore: flutter error tracking support for web ([#243](https://github.com/PostHog/posthog-flutter/pull/243))
+- feat: add `userProperties` and `userPropertiesSetOnce` parameters to `capture()` method ([#254](https://github.com/PostHog/posthog-flutter/pull/254))
 
 # 5.11.1
 

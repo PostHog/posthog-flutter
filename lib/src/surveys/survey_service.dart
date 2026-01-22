@@ -101,9 +101,10 @@ class SurveyService {
 
   /// Hides any active survey
   void hideSurvey() {
-    if (_isShowingSurvey && _currentSurveyContext != null) {
+    final context = _currentSurveyContext;
+    if (_isShowingSurvey && context != null) {
       // Use the stored context to properly dismiss the bottom sheet
-      Navigator.of(_currentSurveyContext!).pop();
+      Navigator.of(context).pop();
       _currentSurveyContext = null;
     }
     _isShowingSurvey = false;
