@@ -101,17 +101,23 @@ class StackFrame {
 // Stack line parser type
 typedef StackLineParser = StackFrame? Function(String line, String platform);
 
+// Global regex patterns (compiled once)
+final _chromeRegexNoFnName =
+    RegExp(r'^\s*at\s+(\S+?)\s*:\s*(\d+)\s*:\s*(\d+)\s*$');
+final _chromeRegex = RegExp(
+    r'^\s*at\s+(?:(.+?)\s+)?\((?:address\s+at\s+)?(?:async\s+)?((?:<anonymous>|[-a-z]+:|.*bundle|\/)?.*?)(?::(\d+))?(?::(\d+))?\)?\s*$');
+final _chromeEvalRegex = RegExp(r'\((\S*)(?::(\d+))(?::(\d+))\)');
+final _geckoRegex = RegExp(
+    r'^\s*(.*?)(?:\((.*?)\))?(?:^|@)?((?:[-a-z]+)?:\/.*?|\[native code\]|[^@]*(?:bundle|\d+\.js)|\/[\w\-\.\ \/=]+)(?::(\d+))?(?::(\d+))?\s*$');
+final _geckoEvalRegex =
+    RegExp(r'(\S+)\s+line\s+(\d+)(?:\s+>\s+eval\s+line\s+\d+)*\s+>\s+eval');
+final _errorWrapperRegex = RegExp(r'\(error: (.*)\)');
+final _errorLineRegex = RegExp(r'\S*Error: ');
+
 // Chrome stack line parser
 StackFrame? chromeStackLineParser(String line, String platform) {
-  // Chrome regex patterns
-  final chromeRegexNoFnName =
-      RegExp(r'^\s*at\s+(\S+?)\s*:\s*(\d+)\s*:\s*(\d+)\s*$');
-  final chromeRegex = RegExp(
-      r'^\s*at\s+(?:(.+?)\s+)?\((?:address\s+at\s+)?(?:async\s+)?((?:<anonymous>|[-a-z]+:|.*bundle|\/)?.*?)(?::(\d+))?(?::(\d+))?\)?\s*$');
-  final evalRegex = RegExp(r'\((\S*)(?::(\d+))(?::(\d+))\)');
-
   // Try no function name pattern first
-  final noFnMatch = chromeRegexNoFnName.firstMatch(line);
+  final noFnMatch = _chromeRegexNoFnName.firstMatch(line);
   if (noFnMatch != null) {
     return StackFrame(
       filename: noFnMatch.group(1),
@@ -122,7 +128,7 @@ StackFrame? chromeStackLineParser(String line, String platform) {
   }
 
   // Try full pattern
-  final match = chromeRegex.firstMatch(line);
+  final match = _chromeRegex.firstMatch(line);
   if (match != null) {
     String? filename = match.group(2);
     String? functionName = match.group(1);
@@ -131,7 +137,7 @@ StackFrame? chromeStackLineParser(String line, String platform) {
 
     // Handle eval cases
     if (filename != null && filename.startsWith('eval')) {
-      final evalMatch = evalRegex.firstMatch(filename);
+      final evalMatch = _chromeEvalRegex.firstMatch(filename);
       if (evalMatch != null) {
         filename = evalMatch.group(1);
         lineno = int.tryParse(evalMatch.group(2) ?? '');
@@ -158,12 +164,7 @@ StackFrame? chromeStackLineParser(String line, String platform) {
 
 // Gecko (Firefox) stack line parser
 StackFrame? geckoStackLineParser(String line, String platform) {
-  final geckoRegex = RegExp(
-      r'^\s*(.*?)(?:\((.*?)\))?(?:^|@)?((?:[-a-z]+)?:\/.*?|\[native code\]|[^@]*(?:bundle|\d+\.js)|\/[\w\-\.\ \/=]+)(?::(\d+))?(?::(\d+))?\s*$');
-  final geckoEvalRegex =
-      RegExp(r'(\S+)\s+line\s+(\d+)(?:\s+>\s+eval\s+line\s+\d+)*\s+>\s+eval');
-
-  final match = geckoRegex.firstMatch(line);
+  final match = _geckoRegex.firstMatch(line);
   if (match != null) {
     String? filename = match.group(3);
     String? functionName = match.group(1);
@@ -172,7 +173,7 @@ StackFrame? geckoStackLineParser(String line, String platform) {
 
     // Handle eval cases
     if (filename != null && filename.contains(' > eval')) {
-      final evalMatch = geckoEvalRegex.firstMatch(filename);
+      final evalMatch = _geckoEvalRegex.firstMatch(filename);
       if (evalMatch != null) {
         functionName = functionName == '<anonymous>' || functionName == null
             ? 'eval'
@@ -231,10 +232,10 @@ List<StackFrame> Function(String, [int]) createStackParser(
       if (line.length > 1024) continue;
 
       // Skip lines that contain webpack error wrappers
-      final cleanedLine = line.replaceFirst(RegExp(r'\(error: (.*)\)'), r'$1');
+      final cleanedLine = line.replaceFirst(_errorWrapperRegex, r'$1');
 
       // Skip "Error:" lines
-      if (cleanedLine.contains(RegExp(r'\S*Error: '))) continue;
+      if (cleanedLine.contains(_errorLineRegex)) continue;
 
       // Try each parser
       for (final parser in lineParsers) {
