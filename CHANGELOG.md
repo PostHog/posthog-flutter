@@ -1,5 +1,7 @@
 ## Next
 
+- feat: add `userProperties` and `userPropertiesSetOnce` parameters to `capture()` method ([#254](https://github.com/PostHog/posthog-flutter/pull/254))
+
 # 5.11.1
 
 - fix: RichText, SelectableText, TextField labels and hints not being masked in session replay ([#251](https://github.com/PostHog/posthog-flutter/pull/251))

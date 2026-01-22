@@ -9,6 +9,8 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
+import 'src/utils/capture_utils.dart';
+import 'src/utils/property_normalizer.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
 class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
@@ -89,10 +91,37 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+
+    final extractedProperties = extracted.properties;
+    final extractedUserProperties = extracted.userProperties;
+    final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
+
+    final normalizedProperties = extractedProperties != null
+        ? PropertyNormalizer.normalize(extractedProperties)
+        : null;
+    final normalizedUserProperties = extractedUserProperties != null
+        ? PropertyNormalizer.normalize(extractedUserProperties)
+        : null;
+    final normalizedUserPropertiesSetOnce =
+        extractedUserPropertiesSetOnce != null
+            ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+            : null;
+
     return handleWebMethodCall(MethodCall('capture', {
       'eventName': eventName,
-      if (properties != null) 'properties': properties,
+      if (normalizedProperties != null) 'properties': normalizedProperties,
+      if (normalizedUserProperties != null)
+        'userProperties': normalizedUserProperties,
+      if (normalizedUserPropertiesSetOnce != null)
+        'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
     }));
   }
 
