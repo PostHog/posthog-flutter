@@ -1,6 +1,7 @@
 import 'package:meta/meta.dart';
 
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
+import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_observer.dart';
@@ -176,6 +177,22 @@ class Posthog {
           Map<String, Object>? properties}) =>
       _posthog.captureException(
           error: error, stackTrace: stackTrace, properties: properties);
+
+  /// Captures runZonedGuarded exceptions with optional custom properties
+  /// https://api.flutter.dev/flutter/dart-async/runZonedGuarded.html
+  ///
+  /// [error] - The error/exception to capture
+  /// [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
+  /// [properties] - Optional custom properties to attach to the exception event
+  Future<void> captureRunZonedGuardedError(
+      {required Object error,
+      StackTrace? stackTrace,
+      Map<String, Object>? properties}) async {
+    final wrappedError = PostHogException(
+        source: error, mechanism: 'runZonedGuarded', handled: false);
+    await _posthog.captureException(
+        error: wrappedError, stackTrace: stackTrace, properties: properties);
+  }
 
   /// Closes the PostHog SDK and cleans up resources.
   ///
