@@ -496,6 +496,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       posthog?.capture(
         stringToJSAny('\$exception'),
         mapToJSAny(properties),
+        null,
       );
       break;
     default:

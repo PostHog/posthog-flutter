@@ -13,7 +13,6 @@ import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
 import 'src/utils/capture_utils.dart';
-import 'src/utils/property_normalizer.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
 class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
