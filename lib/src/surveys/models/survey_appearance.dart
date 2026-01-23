@@ -82,9 +82,8 @@ class SurveyAppearance {
       backgroundColor: backgroundColor,
       submitButtonColor: submitButtonColor,
       submitButtonText: appearance?.submitButtonText ?? 'Submit',
-      submitButtonTextColor:
-          _colorFromHex(appearance?.submitButtonTextColor) ??
-              _getContrastingTextColor(submitButtonColor),
+      submitButtonTextColor: _colorFromHex(appearance?.submitButtonTextColor) ??
+          _getContrastingTextColor(submitButtonColor),
       descriptionTextColor:
           _colorFromHex(appearance?.descriptionTextColor) ?? primaryTextColor,
       questionTextColor: primaryTextColor,
@@ -118,8 +117,7 @@ class SurveyAppearance {
     final g = color.green;
     final b = color.blue;
     // HSP equation for perceived brightness
-    final hsp =
-        sqrt(0.299 * (r * r) + 0.587 * (g * g) + 0.114 * (b * b));
+    final hsp = sqrt(0.299 * (r * r) + 0.587 * (g * g) + 0.114 * (b * b));
     // Using 127.5 as threshold (same as JS)
     return hsp > 127.5 ? Colors.black : Colors.white;
   }

@@ -1,5 +1,7 @@
 ## Next
 
+- chore: improve survey color handling ([#233](https://github.com/PostHog/posthog-flutter/pull/233))
+
 - feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
   - **Limitation**:
     - Does NOT intercept native-initiated events such as:
@@ -14,9 +16,6 @@
 # 5.12.0
 
 - feat: flutter error tracking support for web ([#243](https://github.com/PostHog/posthog-flutter/pull/243))
-
-- chore: improve survey color handling ([#233](https://github.com/PostHog/posthog-flutter/pull/233))
-
 - feat: add `userProperties` and `userPropertiesSetOnce` parameters to `capture()` method ([#254](https://github.com/PostHog/posthog-flutter/pull/254))
 
 # 5.11.1
