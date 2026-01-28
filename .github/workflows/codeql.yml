@@ -90,7 +90,7 @@ jobs:
           flutter build ios --simulator --no-codesign --config-only
           cd ios
           pod install
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
