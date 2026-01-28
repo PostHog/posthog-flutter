@@ -83,8 +83,11 @@ class PostHogConfig {
   ///
   /// **Limitations:**
   /// - This callback does NOT intercept native-initiated events such as:
-  ///   - Session replay events (`$snapshot`)
-  ///   - Application lifecycle events (`Application Opened`, etc.)
+  ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is enabled
+  ///   - Application lifecycle events (`Application Opened`, etc.) when `config.captureApplicationLifecycleEvents` is enabled
+  ///   - Feature flag events (`$feature_flag_called`) when `config.sendFeatureFlagEvents` is enabled
+  ///   - Identity events (`$set`) when `identify` is called
+  ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
   /// - Only user-provided properties are available; system properties
   ///   (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
   ///
