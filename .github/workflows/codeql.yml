@@ -20,7 +20,7 @@ jobs:
       matrix:
         include:
           - language: java-kotlin
-            build-mode: autobuild
+            build-mode: manual
             runner: ubuntu-latest
           - language: swift
             build-mode: autobuild
@@ -51,12 +51,37 @@ jobs:
           cd example
           flutter pub get
 
+      - name: Setup Java (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: 'temurin'
+
+      - name: Setup Flutter (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        run: |
+          flutter pub get
+          cd example
+          flutter pub get
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
+
+      - name: Build Android (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        working-directory: ./example
+        run: flutter build apk
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
