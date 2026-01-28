@@ -1,6 +1,5 @@
 ## Next
 
-# 5.12.1
 
 - perf: Optimize mask widget rect collection to O(N) ([#269](https://github.com/PostHog/posthog-flutter/pull/269))
 
