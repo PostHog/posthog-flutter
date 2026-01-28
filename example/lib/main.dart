@@ -15,7 +15,7 @@ Future<void> main() async {
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
   config.surveys = false;
-  config.sessionReplay = false;
+  config.sessionReplay = true;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
   config.sessionReplayConfig.throttleDelay = const Duration(milliseconds: 1000);
@@ -23,11 +23,11 @@ Future<void> main() async {
 
   // Configure error tracking and exception capture
   config.errorTrackingConfig.captureFlutterErrors =
-      true; // Capture Flutter framework errors
+      false; // Capture Flutter framework errors
   config.errorTrackingConfig.capturePlatformDispatcherErrors =
-      true; // Capture Dart runtime errors
+      false; // Capture Dart runtime errors
   config.errorTrackingConfig.captureIsolateErrors =
-      true; // Capture isolate errors
+      false; // Capture isolate errors
 
   if (kIsWeb) {
     runZonedGuarded(
