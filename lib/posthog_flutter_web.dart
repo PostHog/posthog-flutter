@@ -5,15 +5,24 @@ import 'dart:js_interop';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
+import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
+import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
+import 'src/utils/capture_utils.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
 class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Constructs a PosthogFlutterWeb
   PosthogFlutterWeb();
+
+  /// Stored configuration for accessing inAppIncludes and other settings
+  PostHogConfig? _config;
+
+  // TODO: we should change the $lib and $lib_version to be the flutter one when capturing things
 
   static void registerWith(Registrar registrar) {
     final channel = MethodChannel(
@@ -57,6 +66,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     // posthog?.callMethod('init'.toJS, config.apiKey.toJS, jsOptions);
 
     final ph = posthog;
+    _config = config;
+
     if (config.onFeatureFlags != null && ph != null) {
       final dartCallback = config.onFeatureFlags!;
 
@@ -89,10 +100,37 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+
+    final extractedProperties = extracted.properties;
+    final extractedUserProperties = extracted.userProperties;
+    final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
+
+    final normalizedProperties = extractedProperties != null
+        ? PropertyNormalizer.normalize(extractedProperties)
+        : null;
+    final normalizedUserProperties = extractedUserProperties != null
+        ? PropertyNormalizer.normalize(extractedUserProperties)
+        : null;
+    final normalizedUserPropertiesSetOnce =
+        extractedUserPropertiesSetOnce != null
+            ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+            : null;
+
     return handleWebMethodCall(MethodCall('capture', {
       'eventName': eventName,
-      if (properties != null) 'properties': properties,
+      if (normalizedProperties != null) 'properties': normalizedProperties,
+      if (normalizedUserProperties != null)
+        'userProperties': normalizedUserProperties,
+      if (normalizedUserPropertiesSetOnce != null)
+        'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
     }));
   }
 
@@ -223,6 +261,24 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     StackTrace? stackTrace,
     Map<String, Object>? properties,
   }) async {
-    // Not implemented on web
+    try {
+      final exceptionData = DartExceptionProcessor.processException(
+        error: error,
+        stackTrace: stackTrace,
+        properties: properties,
+        inAppIncludes: _config?.errorTrackingConfig.inAppIncludes,
+        inAppExcludes: _config?.errorTrackingConfig.inAppExcludes,
+        inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
+      );
+
+      final normalizedData =
+          PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
+
+      return handleWebMethodCall(MethodCall('captureException', {
+        'properties': normalizedData,
+      }));
+    } on Exception catch (exception) {
+      printIfDebug('Exception in captureException: $exception');
+    }
   }
 }

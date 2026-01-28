@@ -200,6 +200,12 @@ class PostHogErrorTrackingAutoCaptureIntegration {
       return;
     }
 
+    // https://docs.flutter.dev/perf/isolates#web-platforms-and-compute
+    // web has no isolates support
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
     _isolateErrorHandler.addErrorListener(_posthogIsolateErrorHandler);
   }
 

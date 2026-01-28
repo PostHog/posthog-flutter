@@ -10,6 +10,11 @@
       - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
     - Only user-provided properties are available; system properties (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
 
+# 5.12.0
+
+- feat: flutter error tracking support for web ([#243](https://github.com/PostHog/posthog-flutter/pull/243))
+- feat: add `userProperties` and `userPropertiesSetOnce` parameters to `capture()` method ([#254](https://github.com/PostHog/posthog-flutter/pull/254))
+
 # 5.11.1
 
 - fix: RichText, SelectableText, TextField labels and hints not being masked in session replay ([#251](https://github.com/PostHog/posthog-flutter/pull/251))

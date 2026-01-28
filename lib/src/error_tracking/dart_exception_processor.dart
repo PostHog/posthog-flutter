@@ -1,6 +1,12 @@
+import 'package:flutter/foundation.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'utils/isolate_utils.dart' as isolate_utils;
 import 'posthog_exception.dart';
+import 'origin.dart';
+import 'chunk_ids.dart';
+
+typedef ChunkIdMapType = Map<String, String>;
 
 class DartExceptionProcessor {
   /// Converts Dart error/exception and stack trace to PostHog exception format
@@ -127,6 +133,7 @@ class DartExceptionProcessor {
   }) {
     final chain = Chain.forTrace(stackTrace);
     final frames = <Map<String, dynamic>>[];
+    final chunkIdMap = getPosthogChunkIds() ?? {};
 
     for (final (index, trace) in chain.traces.indexed) {
       bool skipNextPostHogFrame = removeTopPostHogFrames;
@@ -142,6 +149,7 @@ class DartExceptionProcessor {
 
         final processedFrame = _convertFrameToPostHog(
           frame,
+          chunkIdMap,
           inAppIncludes: inAppIncludes,
           inAppExcludes: inAppExcludes,
           inAppByDefault: inAppByDefault,
@@ -162,14 +170,16 @@ class DartExceptionProcessor {
 
   /// Converts a Frame from stack_trace package to PostHog format
   static Map<String, dynamic>? _convertFrameToPostHog(
-    Frame frame, {
+    Frame frame,
+    Map<String, String> chunkIdMap, {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
   }) {
+    final absPath = '$eventOrigin${_extractAbsolutePath(frame)}';
     final frameData = <String, dynamic>{
-      'platform': 'dart',
-      'abs_path': _extractAbsolutePath(frame),
+      'platform': kIsWeb ? 'web:javascript' : 'dart',
+      'abs_path': absPath,
       'in_app': _isInAppFrame(
         frame,
         inAppIncludes: inAppIncludes,
@@ -194,6 +204,19 @@ class DartExceptionProcessor {
     final fileName = _extractFileName(frame);
     if (fileName != null && fileName.isNotEmpty) {
       frameData['filename'] = fileName;
+
+      // Check if any key in chunkIdMap contains the fileName as a substring
+      String? chunkId;
+      for (final entry in chunkIdMap.entries) {
+        if (entry.key.contains(fileName)) {
+          chunkId = entry.value;
+          printIfDebug('chunkId found: $chunkId for fileName: $fileName');
+          break;
+        }
+      }
+      if (chunkId != null) {
+        frameData['chunk_id'] = chunkId;
+      }
     }
 
     // Add line number, if available

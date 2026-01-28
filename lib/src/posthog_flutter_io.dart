@@ -10,6 +10,7 @@ import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
 import 'surveys/models/survey_callbacks.dart';
 import 'error_tracking/dart_exception_processor.dart';
+import 'utils/capture_utils.dart';
 import 'utils/property_normalizer.dart';
 
 import 'posthog_config.dart';
@@ -208,6 +209,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
     if (!isSupportedPlatform()) {
       return;
@@ -221,14 +224,34 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      final eventProperties = processedEvent.properties;
-      final normalizedProperties = eventProperties != null
-          ? PropertyNormalizer.normalize(eventProperties.cast<String, Object>())
+      final extracted = CaptureUtils.extractUserProperties(
+        properties: properties,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+      );
+
+      final extractedProperties = extracted.properties;
+      final extractedUserProperties = extracted.userProperties;
+      final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
+
+      final normalizedProperties = extractedProperties != null
+          ? PropertyNormalizer.normalize(extractedProperties)
           : null;
+      final normalizedUserProperties = extractedUserProperties != null
+          ? PropertyNormalizer.normalize(extractedUserProperties)
+          : null;
+      final normalizedUserPropertiesSetOnce =
+          extractedUserPropertiesSetOnce != null
+              ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+              : null;
 
       await _methodChannel.invokeMethod('capture', {
         'eventName': processedEvent.event,
         if (normalizedProperties != null) 'properties': normalizedProperties,
+        if (normalizedUserProperties != null)
+          'userProperties': normalizedUserProperties,
+        if (normalizedUserPropertiesSetOnce != null)
+          'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on capture: $exception');
