@@ -58,31 +58,42 @@ class PostHogConfig {
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
 
-  /// Callback to intercept and modify events before they are sent to PostHog.
+  /// Callbacks to intercept and modify events before they are sent to PostHog.
   ///
-  /// This callback is invoked for events captured via Dart APIs:
+  /// Callbacks are invoked in order for events captured via Dart APIs:
   /// - `Posthog().capture()` - custom events
   /// - `Posthog().screen()` - screen events (event name will be `$screen`)
   /// - `Posthog().captureException()` - exception events (event name will be `$exception`)
   ///
-  /// Return a possibly modified event to send it, or return `null` to drop it.
+  /// Each callback receives the event (possibly modified by previous callbacks).
+  /// Return a possibly modified event to continue, or return `null` to drop it.
   ///
-  /// **Example:**
+  /// **Example (single callback):**
   /// ```dart
-  /// config.beforeSend = (event) {
+  /// config.beforeSend = [(event) {
   ///   // Drop specific events
   ///   if (event.event == 'sensitive_event') {
   ///     return null;
   ///   }
-  ///   // Modify event properties
-  ///   event.properties ??= {};
-  ///   event.properties?['some_custom_field'] = 'new value';
   ///   return event;
-  /// };
+  /// }];
+  /// ```
+  ///
+  /// **Example (multiple callbacks):**
+  /// ```dart
+  /// config.beforeSend = [
+  ///   // First: PII redaction
+  ///   (event) {
+  ///     event.properties?.remove('email');
+  ///     return event;
+  ///   },
+  ///   // Second: Event filtering
+  ///   (event) => event.event == 'drop me' ? null : event,
+  /// ];
   /// ```
   ///
   /// **Limitations:**
-  /// - This callback does NOT intercept native-initiated events such as:
+  /// - These callbacks do NOT intercept native-initiated events such as:
   ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is enabled
   ///   - Application lifecycle events (`Application Opened`, etc.) when `config.captureApplicationLifecycleEvents` is enabled
   ///   - Feature flag events (`$feature_flag_called`) when `config.sendFeatureFlagEvents` is enabled
@@ -92,17 +103,18 @@ class PostHogConfig {
   ///   (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
   ///
   /// **Note:**
-  /// - This callback runs synchronously on the Dart side
-  /// - Exceptions in the callback will cause the event to be sent unchanged
-  BeforeSendCallback? beforeSend;
+  /// - Callbacks run synchronously on the Dart side
+  /// - Exceptions in a callback will skip that callback and continue with the next one in the list
+  /// - If any callback returns `null`, the event is dropped and subsequent callbacks are not called.
+  List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
 
   PostHogConfig(
     this.apiKey, {
     this.onFeatureFlags,
-    this.beforeSend,
-  });
+    List<BeforeSendCallback>? beforeSend,
+  }) : beforeSend = beforeSend ?? [];
 
   Map<String, dynamic> toMap() {
     return {

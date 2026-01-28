@@ -13,26 +13,28 @@ Future<void> main() async {
     debugPrint('[PostHog] Feature flags loaded!');
   };
 
-  // Configure beforeSend callback to filter/modify events
-  config.beforeSend = (PostHogEvent event) {
-    debugPrint('[beforeSend] Event: ${event.event}');
+  // Configure beforeSend callbacks to filter/modify events
+  config.beforeSend = [
+    (event) {
+      debugPrint('[beforeSend] Event: ${event.event}');
 
-    // Test case 1: Drop specific events
-    if (event.event == 'drop_me') {
-      debugPrint('[beforeSend] Dropping event: ${event.event}');
-      return null;
-    }
+      // Test case 1: Drop specific events
+      if (event.event == 'drop me') {
+        debugPrint('[beforeSend] Dropping event: ${event.event}');
+        return null;
+      }
 
-    // Test case 2: Modify event properties
-    if (event.event == 'modify_me') {
-      event.properties ??= {};
-      event.properties?['modified_by_before_send'] = true;
-      debugPrint('[beforeSend] Modified event: ${event.event}');
-    }
+      // Test case 2: Modify event properties
+      if (event.event == 'modify me') {
+        event.properties ??= {};
+        event.properties?['modified_by_before_send'] = true;
+        debugPrint('[beforeSend] Modified event: ${event.event}');
+      }
 
-    // Pass through all other events unchanged
-    return event;
-  };
+      // Pass through all other events unchanged
+      return event;
+    },
+  ];
 
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
@@ -463,7 +465,7 @@ class InitialScreenState extends State<InitialScreen> {
                       ),
                       onPressed: () {
                         _posthogFlutterPlugin.capture(
-                          eventName: 'drop_me',
+                          eventName: 'drop me',
                           properties: {'should_be': 'dropped'},
                         );
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -484,7 +486,7 @@ class InitialScreenState extends State<InitialScreen> {
                       ),
                       onPressed: () {
                         _posthogFlutterPlugin.capture(
-                          eventName: 'modify_me',
+                          eventName: 'modify me',
                           properties: {'original': true},
                         );
                         ScaffoldMessenger.of(context).showSnackBar(

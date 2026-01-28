@@ -30,27 +30,33 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
 
-  /// Stored beforeSend callback for dropping/modifying events
-  BeforeSendCallback? _beforeSendCallback;
+  /// Stored beforeSend callbacks for dropping/modifying events
+  List<BeforeSendCallback> _beforeSendCallbacks = [];
 
-  /// Applies the beforeSend callback to an event.
-  /// Returns the possibly modified event, or null if the event should be dropped.
+  /// Applies the beforeSend callbacks to an event in order.
+  /// Returns the possibly modified event, or null if any callback drops it.
   PostHogEvent? _runBeforeSend(
       String eventName, Map<String, Object>? properties) {
-    final event = PostHogEvent(
-      event: eventName,
-      properties: properties,
-    );
+    var event = PostHogEvent(event: eventName, properties: properties);
 
-    if (_beforeSendCallback == null) {
-      return event;
+    if (_beforeSendCallbacks.isEmpty) return event;
+
+    for (final callback in _beforeSendCallbacks) {
+      final result = _applyBeforeSendCallback(callback, event);
+      if (result == null) return null;
+      event = result;
     }
+    return event;
+  }
 
+  /// Applies a single beforeSend callback safely.
+  /// Returns null if event should be dropped, otherwise returns the (possibly modified) event.
+  PostHogEvent? _applyBeforeSendCallback(
+      BeforeSendCallback callback, PostHogEvent event) {
     try {
-      return _beforeSendCallback!(event);
+      return callback(event);
     } catch (e) {
       printIfDebug('[PostHog] beforeSend callback threw exception: $e');
-      // On exception, pass through unchanged
       return event;
     }
   }
@@ -159,7 +165,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     _onFeatureFlagsCallback = config.onFeatureFlags;
-    _beforeSendCallback = config.beforeSend;
+    _beforeSendCallbacks = config.beforeSend;
 
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());
