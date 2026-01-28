@@ -221,9 +221,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      final normalizedProperties = processedEvent.properties != null
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+      final eventProperties = processedEvent.properties;
+      final normalizedProperties = eventProperties != null
+          ? PropertyNormalizer.normalize(eventProperties.cast<String, Object>())
           : null;
 
       await _methodChannel.invokeMethod('capture', {
