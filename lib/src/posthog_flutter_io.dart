@@ -37,8 +37,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// Applies the beforeSend callbacks to an event in order.
   /// Returns the possibly modified event, or null if any callback drops it.
   PostHogEvent? _runBeforeSend(
-      String eventName, Map<String, Object>? properties) {
-    var event = PostHogEvent(event: eventName, properties: properties);
+    String eventName,
+    Map<String, Object>? properties, {
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+  }) {
+    var event = PostHogEvent(
+      event: eventName,
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
 
     if (_beforeSendCallbacks.isEmpty) return event;
 
@@ -217,17 +226,25 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     // Apply beforeSend callback
-    final processedEvent = _runBeforeSend(eventName, properties);
+    final processedEvent = _runBeforeSend(
+      eventName,
+      properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+
     if (processedEvent == null) {
       printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
       return;
     }
 
     try {
+      // Use processed event properties (potentially modified by beforeSend)
       final extracted = CaptureUtils.extractUserProperties(
-        properties: properties,
-        userProperties: userProperties,
-        userPropertiesSetOnce: userPropertiesSetOnce,
+        properties: processedEvent.properties?.cast<String, Object>(),
+        userProperties: processedEvent.userProperties?.cast<String, Object>(),
+        userPropertiesSetOnce:
+            processedEvent.userPropertiesSetOnce?.cast<String, Object>(),
       );
 
       final extractedProperties = extracted.properties;
