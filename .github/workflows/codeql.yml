@@ -23,7 +23,7 @@ jobs:
             build-mode: autobuild
             runner: ubuntu-latest
           - language: swift
-            build-mode: none
+            build-mode: autobuild
             runner: macos-latest
           - language: actions
             build-mode: none
@@ -31,6 +31,25 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Setup Flutter (Swift)
+        if: matrix.language == 'swift'
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Setup Xcode (Swift)
+        if: matrix.language == 'swift'
+        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+        with:
+          xcode-version: '16.4'
+
+      - name: Install dependencies (Swift)
+        if: matrix.language == 'swift'
+        run: |
+          flutter pub get
+          cd example
+          flutter pub get
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
