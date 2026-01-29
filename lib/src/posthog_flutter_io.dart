@@ -666,9 +666,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      await _methodChannel.invokeMethod('startSessionRecording', {
-        'resumeCurrent': resumeCurrent,
-      });
+      await _methodChannel.invokeMethod('startSessionRecording', resumeCurrent);
     } on PlatformException catch (exception) {
       printIfDebug('Exception on startSessionRecording: $exception');
     }

@@ -464,14 +464,7 @@ extension PosthogFlutterPlugin {
         result: @escaping FlutterResult
     ) {
         #if os(iOS)
-            let resumeCurrent: Bool
-            if let args = call.arguments as? [String: Any],
-               let resume = args["resumeCurrent"] as? Bool
-            {
-                resumeCurrent = resume
-            } else {
-                resumeCurrent = true
-            }
+            let resumeCurrent = call.arguments as? Bool ?? true
             PostHogSDK.shared.startSessionRecording(resumeCurrent: resumeCurrent)
             result(nil)
         #else
@@ -678,8 +671,7 @@ extension PosthogFlutterPlugin {
         }
     }
 
-    private func reloadFeatureFlags(_ result: @escaping FlutterResult
-    ) {
+    private func reloadFeatureFlags(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.reloadFeatureFlags()
         result(nil)
     }

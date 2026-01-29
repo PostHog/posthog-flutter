@@ -200,7 +200,7 @@ class PosthogFlutterPlugin :
         call: MethodCall,
         result: Result,
     ) {
-        val resumeCurrent = call.argument<Boolean>("resumeCurrent") ?: true
+        val resumeCurrent = call.arguments as? Boolean ?: true
         PostHog.startSessionReplay(resumeCurrent)
         result.success(null)
     }
