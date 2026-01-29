@@ -14,6 +14,7 @@ import 'utils/capture_utils.dart';
 import 'utils/property_normalizer.dart';
 
 import 'posthog_config.dart';
+import 'posthog_constants.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
@@ -290,20 +291,20 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     // Add screenName as $screen_name property for beforeSend
     final propsWithScreenName = <String, Object>{
-      '\$screen_name': screenName,
+      PostHogPropertyName.screenName: screenName,
       ...?properties,
     };
 
     // Apply beforeSend callback - screen events are captured as $screen
     final processedEvent =
-        await _runBeforeSend('\$screen', propsWithScreenName);
+        await _runBeforeSend(PostHogEventName.screen, propsWithScreenName);
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
       return;
     }
 
     // If event name was changed, use regular capture() instead
-    if (processedEvent.event != '\$screen') {
+    if (processedEvent.event != PostHogEventName.screen) {
       await capture(
         eventName: processedEvent.event,
         properties: processedEvent.properties?.cast<String, Object>(),
@@ -313,9 +314,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     // Get the (possibly modified) screen name from properties and remove it
     final finalScreenName =
-        processedEvent.properties?['\$screen_name'] as String? ?? screenName;
+        processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
+            screenName;
     // It will be added back by native sdk
-    processedEvent.properties?.remove('\$screen_name');
+    processedEvent.properties?.remove(PostHogPropertyName.screenName);
 
     try {
       final normalizedProperties = processedEvent.properties?.isNotEmpty == true
@@ -584,7 +586,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
       // Apply beforeSend callback - exception events are captured as $exception
       final processedEvent = await _runBeforeSend(
-          '\$exception', exceptionProps.cast<String, Object>());
+          PostHogEventName.exception, exceptionProps.cast<String, Object>());
       if (processedEvent == null) {
         printIfDebug(
             '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}');
@@ -592,7 +594,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       }
 
       // If event name was changed, use capture() instead
-      if (processedEvent.event != '\$exception') {
+      if (processedEvent.event != PostHogEventName.exception) {
         await capture(
           eventName: processedEvent.event,
           properties: processedEvent.properties?.cast<String, Object>(),
