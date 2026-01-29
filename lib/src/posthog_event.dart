@@ -9,17 +9,17 @@ class PostHogEvent {
   ///
   /// Note: System properties (like $device_type, $session_id, etc.) are added
   /// by the native SDK at a later stage and are not available in this map.
-  Map<String, Object?>? properties;
+  Map<String, Object>? properties;
 
   /// User properties to set on the user profile ($set).
   ///
   /// These properties will be merged with any existing user properties.
-  Map<String, Object?>? userProperties;
+  Map<String, Object>? userProperties;
 
   /// User properties to set only once on the user profile ($set_once).
   ///
   /// These properties will only be set if they don't already exist on the user profile.
-  Map<String, Object?>? userPropertiesSetOnce;
+  Map<String, Object>? userPropertiesSetOnce;
 
   PostHogEvent({
     required this.event,

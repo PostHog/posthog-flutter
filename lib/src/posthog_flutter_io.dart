@@ -246,10 +246,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       // Use processed event properties (potentially modified by beforeSend)
       final extracted = CaptureUtils.extractUserProperties(
-        properties: processedEvent.properties?.cast<String, Object>(),
-        userProperties: processedEvent.userProperties?.cast<String, Object>(),
-        userPropertiesSetOnce:
-            processedEvent.userPropertiesSetOnce?.cast<String, Object>(),
+        properties: processedEvent.properties,
+        userProperties: processedEvent.userProperties,
+        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
       );
 
       final extractedProperties = extracted.properties;
