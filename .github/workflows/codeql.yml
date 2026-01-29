@@ -1,0 +1,98 @@
+name: "CodeQL Advanced"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      security-events: write
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+            runner: ubuntu-latest
+          - language: swift
+            build-mode: manual
+            runner: macos-latest
+          - language: actions
+            build-mode: none
+            runner: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Flutter (Swift)
+        if: matrix.language == 'swift'
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Setup Xcode (Swift)
+        if: matrix.language == 'swift'
+        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+        with:
+          xcode-version: '16.4'
+
+      - name: Install dependencies (Swift)
+        if: matrix.language == 'swift'
+        run: |
+          flutter pub get
+          cd example
+          flutter pub get
+
+      - name: Setup Java (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: 'temurin'
+
+      - name: Setup Flutter (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        run: |
+          flutter pub get
+          cd example
+          flutter pub get
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      - name: Build Android (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        working-directory: ./example
+        run: flutter build apk
+
+      - name: Build iOS (Swift)
+        if: matrix.language == 'swift'
+        working-directory: ./example
+        run: |
+          flutter build ios --simulator --no-codesign --config-only
+          cd ios
+          pod install
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:${{matrix.language}}'
