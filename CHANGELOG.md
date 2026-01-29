@@ -9,6 +9,7 @@
       - Identity events (`$set`) when `identify` is called
       - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
     - Only user-provided properties are available; system properties (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
+- perf: Optimize mask widget rect collection to O(N) ([#269](https://github.com/PostHog/posthog-flutter/pull/269))
 
 # 5.12.0
 
