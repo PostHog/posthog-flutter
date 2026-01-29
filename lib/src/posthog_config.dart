@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
 ///
 /// Return a possibly modified event to send it, or return `null` to drop it.
-typedef BeforeSendCallback = PostHogEvent? Function(PostHogEvent event);
+/// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
+typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+    PostHogEvent event);
 
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
@@ -92,6 +96,23 @@ class PostHogConfig {
   /// ];
   /// ```
   ///
+  /// **Example (async callback):**
+  /// ```dart
+  /// config.beforeSend = [
+  ///   (event) async {
+  ///     // Perform async operations
+  ///     final shouldSend = await checkIfEventAllowed(event.event);
+  ///     if (!shouldSend) {
+  ///       return null; // Drop the event
+  ///     }
+  ///     // Enrich event with async data
+  ///     final extraData = await fetchExtraContext();
+  ///     event.properties = {...?event.properties, ...extraData};
+  ///     return event;
+  ///   },
+  /// ];
+  /// ```
+  ///
   /// **Limitations:**
   /// - These callbacks do NOT intercept native-initiated events such as:
   ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is enabled
@@ -103,7 +124,7 @@ class PostHogConfig {
   ///   (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
   ///
   /// **Note:**
-  /// - Callbacks run synchronously on the Dart side
+  /// - Callbacks can be synchronous or asynchronous (via `FutureOr<PostHogEvent?>`)
   /// - Exceptions in a callback will skip that callback and continue with the next one in the list
   /// - If any callback returns `null`, the event is dropped and subsequent callbacks are not called.
   List<BeforeSendCallback> beforeSend = [];

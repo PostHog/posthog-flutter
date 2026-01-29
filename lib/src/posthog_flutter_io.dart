@@ -36,12 +36,12 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// Applies the beforeSend callbacks to an event in order.
   /// Returns the possibly modified event, or null if any callback drops it.
-  PostHogEvent? _runBeforeSend(
+  Future<PostHogEvent?> _runBeforeSend(
     String eventName,
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
-  }) {
+  }) async {
     var event = PostHogEvent(
       event: eventName,
       properties: properties,
@@ -52,7 +52,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (_beforeSendCallbacks.isEmpty) return event;
 
     for (final callback in _beforeSendCallbacks) {
-      final result = _applyBeforeSendCallback(callback, event);
+      final result = await _applyBeforeSendCallback(callback, event);
       if (result == null) return null;
       event = result;
     }
@@ -61,10 +61,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// Applies a single beforeSend callback safely.
   /// Returns null if event should be dropped, otherwise returns the (possibly modified) event.
-  PostHogEvent? _applyBeforeSendCallback(
-      BeforeSendCallback callback, PostHogEvent event) {
+  /// Handles both synchronous and asynchronous callbacks via FutureOr.
+  Future<PostHogEvent?> _applyBeforeSendCallback(
+      BeforeSendCallback callback, PostHogEvent event) async {
     try {
-      return callback(event);
+      final callbackResult = callback(event);
+      if (callbackResult is Future<PostHogEvent?>) {
+        return await callbackResult;
+      }
+      return callbackResult;
     } catch (e) {
       printIfDebug('[PostHog] beforeSend callback threw exception: $e');
       return event;
@@ -226,7 +231,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     // Apply beforeSend callback
-    final processedEvent = _runBeforeSend(
+    final processedEvent = await _runBeforeSend(
       eventName,
       properties,
       userProperties: userProperties,
@@ -291,7 +296,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     };
 
     // Apply beforeSend callback - screen events are captured as $screen
-    final processedEvent = _runBeforeSend('\$screen', propsWithScreenName);
+    final processedEvent =
+        await _runBeforeSend('\$screen', propsWithScreenName);
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
       return;
@@ -578,8 +584,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       );
 
       // Apply beforeSend callback - exception events are captured as $exception
-      final processedEvent =
-          _runBeforeSend('\$exception', exceptionProps.cast<String, Object>());
+      final processedEvent = await _runBeforeSend(
+          '\$exception', exceptionProps.cast<String, Object>());
       if (processedEvent == null) {
         printIfDebug(
             '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}');

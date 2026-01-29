@@ -172,8 +172,9 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['eventName'], 'test_event');
-      expect(captureCall.arguments['properties'], {'key': 'value'});
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['eventName'], 'test_event');
+      expect(args['properties'], {'key': 'value'});
     });
 
     test('beforeSend can modify event name', () async {
@@ -191,7 +192,8 @@ void main() {
       await posthogFlutterIO.capture(eventName: 'original_event');
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['eventName'], 'modified_event');
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['eventName'], 'modified_event');
     });
 
     test('beforeSend can modify properties', () async {
@@ -212,7 +214,8 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['properties'], {'modified': true});
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['properties'], {'modified': true});
     });
 
     test('beforeSend can modify userProperties', () async {
@@ -233,8 +236,8 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(
-          captureCall.arguments['userProperties'], {'name': 'Modified Name'});
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['userProperties'], {'name': 'Modified Name'});
     });
 
     test('beforeSend can modify userPropertiesSetOnce', () async {
@@ -255,8 +258,9 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['userPropertiesSetOnce'],
-          {'last_logged_in_at': '2025-01-01'});
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(
+          args['userPropertiesSetOnce'], {'last_logged_in_at': '2025-01-01'});
     });
 
     test('beforeSend can drop event by returning null', () async {
@@ -289,7 +293,9 @@ void main() {
 
       final captureCalls = log.where((c) => c.method == 'capture').toList();
       expect(captureCalls.length, 1);
-      expect(captureCalls.first.arguments['eventName'], 'keep me');
+      final args =
+          Map<String, dynamic>.from(captureCalls.first.arguments as Map);
+      expect(args['eventName'], 'keep me');
     });
 
     test('beforeSend exception returns original event', () async {
@@ -309,8 +315,9 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['eventName'], 'test_event');
-      expect(captureCall.arguments['properties'], {'key': 'value'});
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['eventName'], 'test_event');
+      expect(args['properties'], {'key': 'value'});
     });
 
     test('multiple beforeSend callbacks are applied in order', () async {
@@ -341,7 +348,8 @@ void main() {
       await posthogFlutterIO.capture(eventName: 'original');
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['eventName'], 'original_first_second_third');
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['eventName'], 'original_first_second_third');
       expect(callOrder, [1, 2, 3]);
     });
 
@@ -398,9 +406,9 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['properties'], {'event_prop': 'value'});
-      expect(
-          captureCall.arguments['userProperties'], {'developer_name': 'John'});
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['properties'], {'event_prop': 'value'});
+      expect(args['userProperties'], {'developer_name': 'John'});
     });
 
     test(
@@ -426,9 +434,9 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['properties'], {'event_prop': 'value'});
-      expect(captureCall.arguments['userPropertiesSetOnce'],
-          {'first_seen': '2025-01-01'});
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['properties'], {'event_prop': 'value'});
+      expect(args['userPropertiesSetOnce'], {'first_seen': '2025-01-01'});
     });
 
     test('beforeSend legacy \$set merges with direct userProperties', () async {
@@ -454,8 +462,9 @@ void main() {
       });
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments['properties'], {'event_prop': 'value'});
-      expect(captureCall.arguments['userProperties'], {
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['properties'], {'event_prop': 'value'});
+      expect(args['userProperties'], {
         'from_legacy': 'legacy_value',
         'from_direct': 'direct_value',
         'shared': 'direct',
@@ -480,7 +489,213 @@ void main() {
       );
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
-      expect(captureCall.arguments.containsKey('userProperties'), isFalse);
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args.containsKey('userProperties'), isFalse);
+    });
+
+    test('async beforeSend can modify event', () async {
+      testConfig = PostHogConfig(
+        'test_api_key',
+        beforeSend: [
+          (event) async {
+            await Future.delayed(const Duration(milliseconds: 10));
+            event.event = 'async_modified_event';
+            return event;
+          },
+        ],
+      );
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.capture(eventName: 'original_event');
+
+      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['eventName'], 'async_modified_event');
+    });
+
+    test('async beforeSend can drop event by returning null', () async {
+      testConfig = PostHogConfig(
+        'test_api_key',
+        beforeSend: [
+          (event) async {
+            await Future.delayed(const Duration(milliseconds: 100));
+            return null;
+          },
+        ],
+      );
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.capture(eventName: 'dropped_event');
+
+      final captureCalls = log.where((c) => c.method == 'capture');
+      expect(captureCalls, isEmpty);
+    });
+
+    test('mixed sync and async beforeSend callbacks work correctly', () async {
+      final callOrder = <String>[];
+
+      testConfig = PostHogConfig(
+        'test_api_key',
+        beforeSend: [
+          (event) {
+            callOrder.add('sync1');
+            event.event = '${event.event}_sync1';
+            return event;
+          },
+          (event) async {
+            await Future.delayed(const Duration(milliseconds: 100));
+            callOrder.add('async1');
+            event.event = '${event.event}_async1';
+            return event;
+          },
+          (event) {
+            callOrder.add('sync2');
+            event.event = '${event.event}_sync2';
+            return event;
+          },
+        ],
+      );
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.capture(eventName: 'original');
+
+      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['eventName'], 'original_sync1_async1_sync2');
+      expect(callOrder, ['sync1', 'async1', 'sync2']);
+    });
+
+    test('async beforeSend exception returns original event', () async {
+      testConfig = PostHogConfig(
+        'test_api_key',
+        beforeSend: [
+          (event) async {
+            await Future.delayed(const Duration(milliseconds: 100));
+            throw Exception('Async error');
+          },
+        ],
+      );
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.capture(
+        eventName: 'test_event',
+        properties: {'key': 'value'},
+      );
+
+      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
+      expect(args['eventName'], 'test_event');
+      expect(args['properties'], {'key': 'value'});
+    });
+
+    test('async beforeSend drops event and stops chain when returning null',
+        () async {
+      final callOrder = <int>[];
+
+      testConfig = PostHogConfig(
+        'test_api_key',
+        beforeSend: [
+          (event) async {
+            callOrder.add(1);
+            await Future.delayed(const Duration(milliseconds: 100));
+            return null; // Drop event
+          },
+          (event) {
+            callOrder.add(2); // Should not be called
+            return event;
+          },
+        ],
+      );
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.capture(eventName: 'test_event');
+
+      final captureCalls = log.where((c) => c.method == 'capture');
+      expect(captureCalls, isEmpty);
+      expect(callOrder, [1]); // Only first callback should have been called
+    });
+
+    test(
+        'multiple events with async beforeSend are captured in order when capture is awaited',
+        () async {
+      testConfig = PostHogConfig(
+        'test_api_key',
+        beforeSend: [
+          (event) async {
+            // Add delay only for second event
+            if (event.event == 'event_2') {
+              await Future.delayed(const Duration(milliseconds: 500));
+            }
+            return event;
+          },
+        ],
+      );
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.capture(eventName: 'event_1');
+      await posthogFlutterIO.capture(eventName: 'event_2');
+      await posthogFlutterIO.capture(eventName: 'event_3');
+
+      final captureCalls = log.where((c) => c.method == 'capture').toList();
+      expect(captureCalls.length, 3);
+
+      final event1Args =
+          Map<String, dynamic>.from(captureCalls[0].arguments as Map);
+      final event2Args =
+          Map<String, dynamic>.from(captureCalls[1].arguments as Map);
+      final event3Args =
+          Map<String, dynamic>.from(captureCalls[2].arguments as Map);
+
+      final eventOrder = [
+        event1Args['eventName'],
+        event2Args['eventName'],
+        event3Args['eventName'],
+      ];
+      expect(eventOrder, ['event_1', 'event_2', 'event_3']);
+    });
+
+    test(
+        'multiple events with async beforeSend are captured out of order when capture is NOT awaited',
+        () async {
+      testConfig = PostHogConfig(
+        'test_api_key',
+        beforeSend: [
+          (event) async {
+            // Add delay only for first event
+            if (event.event == 'event_1') {
+              await Future.delayed(const Duration(milliseconds: 100));
+            }
+            return event;
+          },
+        ],
+      );
+      await posthogFlutterIO.setup(testConfig);
+
+      // Fire all events without awaiting - they run concurrently
+      posthogFlutterIO.capture(eventName: 'event_1');
+      posthogFlutterIO.capture(eventName: 'event_2');
+      posthogFlutterIO.capture(eventName: 'event_3');
+
+      // Wait for all to complete
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final captureCalls = log.where((c) => c.method == 'capture').toList();
+      expect(captureCalls.length, 3);
+
+      final event1Args =
+          Map<String, dynamic>.from(captureCalls[0].arguments as Map);
+      final event2Args =
+          Map<String, dynamic>.from(captureCalls[1].arguments as Map);
+      final event3Args =
+          Map<String, dynamic>.from(captureCalls[2].arguments as Map);
+
+      // Verify events were NOT captured in original order (event_1 should not be first due to delay)
+      final eventOrder = [
+        event1Args['eventName'],
+        event2Args['eventName'],
+        event3Args['eventName'],
+      ];
+      expect(eventOrder, isNot(['event_1', 'event_2', 'event_3']));
     });
   });
 }
