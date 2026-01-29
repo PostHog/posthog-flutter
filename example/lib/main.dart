@@ -11,6 +11,30 @@ Future<void> main() async {
   config.onFeatureFlags = () {
     debugPrint('[PostHog] Feature flags loaded!');
   };
+
+  // Configure beforeSend callbacks to filter/modify events
+  config.beforeSend = [
+    (event) {
+      debugPrint('[beforeSend] Event: ${event.event}');
+
+      // Test case 1: Drop specific events
+      if (event.event == 'drop me') {
+        debugPrint('[beforeSend] Dropping event: ${event.event}');
+        return null;
+      }
+
+      // Test case 2: Modify event properties
+      if (event.event == 'modify me') {
+        event.properties ??= {};
+        event.properties?['modified_by_before_send'] = true;
+        debugPrint('[beforeSend] Modified event: ${event.event}');
+      }
+
+      // Pass through all other events unchanged
+      return event;
+    },
+  ];
+
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
@@ -354,6 +378,79 @@ class InitialScreenState extends State<InitialScreen> {
                     }
                   },
                   child: const Text("Test Isolate Error Handler"),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "beforeSend Tests",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        _posthogFlutterPlugin.capture(
+                          eventName: 'normal_event',
+                          properties: {'test': 'pass_through'},
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Normal event sent (should appear in PostHog)'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Text("Normal Event"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        _posthogFlutterPlugin.capture(
+                          eventName: 'drop me',
+                          properties: {'should_be': 'dropped'},
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Drop event sent (should NOT appear in PostHog)'),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Text("Drop Event"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        _posthogFlutterPlugin.capture(
+                          eventName: 'modify me',
+                          properties: {'original': true},
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Modify event sent (check for modified_by_before_send property)'),
+                            backgroundColor: Colors.orange,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Text("Modify Event"),
+                    ),
+                  ],
                 ),
                 const Divider(),
                 const Padding(
