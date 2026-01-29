@@ -1,5 +1,8 @@
 ## Next
 
+
+- perf: Optimize mask widget rect collection to O(N) ([#269](https://github.com/PostHog/posthog-flutter/pull/269))
+
 # 5.12.0
 
 - feat: flutter error tracking support for web ([#243](https://github.com/PostHog/posthog-flutter/pull/243))
