@@ -199,7 +199,7 @@ class PostHogErrorTrackingConfig {
   /// List of package names to be considered inApp frames for exception tracking
   ///
   /// inApp Example:
-  /// inAppIncludes = ["package:your_app", "package:your_company_utils"]
+  /// inAppIncludes.addAll(["package:your_app", "package:your_company_utils"])
   /// All exception stacktrace frames from these packages will be considered inApp
   ///
   /// This option takes precedence over inAppExcludes.
@@ -215,7 +215,7 @@ class PostHogErrorTrackingConfig {
   /// List of package names to be excluded from inApp frames for exception tracking
   ///
   /// inAppExcludes Example:
-  /// inAppExcludes = ["package:third_party_lib", "package:analytics_package"]
+  /// inAppExcludes.addAll(["package:third_party_lib", "package:analytics_package"])
   /// All exception stacktrace frames from these packages will be considered external
   ///
   /// Note: inAppIncludes takes precedence over this setting.
