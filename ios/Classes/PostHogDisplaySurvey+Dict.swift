@@ -69,6 +69,9 @@
                 if let submitButtonTextColor = appearance.submitButtonTextColor {
                     appearanceDict["submitButtonTextColor"] = submitButtonTextColor
                 }
+                if let textColor = appearance.textColor {
+                    appearanceDict["textColor"] = textColor
+                }
                 if let descriptionTextColor = appearance.descriptionTextColor {
                     appearanceDict["descriptionTextColor"] = descriptionTextColor
                 }
@@ -77,6 +80,12 @@
                 }
                 if let ratingButtonActiveColor = appearance.ratingButtonActiveColor {
                     appearanceDict["ratingButtonActiveColor"] = ratingButtonActiveColor
+                }
+                if let inputBackground = appearance.inputBackground {
+                    appearanceDict["inputBackground"] = inputBackground
+                }
+                if let inputTextColor = appearance.inputTextColor {
+                    appearanceDict["inputTextColor"] = inputTextColor
                 }
                 if let placeholder = appearance.placeholder {
                     appearanceDict["placeholder"] = placeholder

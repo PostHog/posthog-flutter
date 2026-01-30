@@ -182,7 +182,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: widget.appearance.backgroundColor ?? Colors.white,
+          color: widget.appearance.backgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: SafeArea(
@@ -201,7 +201,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.close),
+                        icon: Icon(Icons.close,
+                            color: widget.appearance.closeButtonColor),
                         onPressed: () => _handleClose(),
                       ),
                     ],

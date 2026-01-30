@@ -445,14 +445,14 @@ enum RatingIconType {
 class RatingIcon extends StatelessWidget {
   final bool selected;
   final RatingIconType type;
-  final Color? color;
+  final Color color;
   final double size;
 
   const RatingIcon({
     super.key,
     required this.type,
     this.selected = false,
-    this.color,
+    required this.color,
     this.size = 48.0,
   });
 
@@ -465,7 +465,7 @@ class RatingIcon extends StatelessWidget {
         painter: RatingIconPainter(
           selected: selected,
           type: type,
-          color: color ?? Theme.of(context).iconTheme.color ?? Colors.grey,
+          color: color,
         ),
       ),
     );

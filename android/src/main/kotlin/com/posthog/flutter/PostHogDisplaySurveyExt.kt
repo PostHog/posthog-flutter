@@ -60,19 +60,24 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
     appearance?.let { app ->
         map["appearance"] =
             mapOf(
+                "fontFamily" to app.fontFamily,
                 "backgroundColor" to app.backgroundColor,
+                "borderColor" to app.borderColor,
                 "submitButtonColor" to app.submitButtonColor,
                 "submitButtonText" to app.submitButtonText,
                 "submitButtonTextColor" to app.submitButtonTextColor,
+                "textColor" to app.textColor,
                 "descriptionTextColor" to app.descriptionTextColor,
                 "ratingButtonColor" to app.ratingButtonColor,
                 "ratingButtonActiveColor" to app.ratingButtonActiveColor,
-                "borderColor" to app.borderColor,
+                "inputBackground" to app.inputBackground,
+                "inputTextColor" to app.inputTextColor,
                 "placeholder" to app.placeholder,
                 "displayThankYouMessage" to app.displayThankYouMessage,
                 "thankYouMessageHeader" to app.thankYouMessageHeader,
                 "thankYouMessageDescription" to app.thankYouMessageDescription,
                 "thankYouMessageDescriptionContentType" to app.thankYouMessageDescriptionContentType?.value,
+                "thankYouMessageCloseButtonText" to app.thankYouMessageCloseButtonText,
             )
     }
 
