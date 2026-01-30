@@ -1,5 +1,9 @@
 ## Next
 
+- feat: add manual session recording control APIs ([#256](https://github.com/PostHog/posthog-flutter/pull/256))
+  - `startSessionRecording({bool resumeCurrent = true})` Start session recording, optionally starting a new session
+  - `stopSessionRecording()` Stop the current session recording
+  - `isSessionReplayActive()` Check if session replay is currently active
 - feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
   - **Limitation**:
     - Does NOT intercept native-initiated events such as:

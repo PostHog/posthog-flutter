@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
@@ -34,10 +35,14 @@ class NativeCommunicator {
   }
 
   Future<bool> isSessionReplayActive() async {
+    if (kIsWeb) {
+      // Flutter doesn't capture screenshots on web, JS SDK handles session replay
+      return false;
+    }
     try {
       return await _channel.invokeMethod('isSessionReplayActive');
     } catch (e) {
-      printIfDebug('Error sending full snapshot to native: $e');
+      printIfDebug('Error checking session replay status: $e');
       return false;
     }
   }
