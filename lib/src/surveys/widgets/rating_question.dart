@@ -60,7 +60,17 @@ class _RatingQuestionState extends State<RatingQuestion> {
   RatingIconType _getRatingIconType(int index) {
     final range = widget.scaleUpperBound - widget.scaleLowerBound + 1;
 
-    if (range == 3) {
+    if (range == 2) {
+      // 2-point scale (thumbs up/down)
+      switch (index) {
+        case 0:
+          return RatingIconType.thumbsUp;
+        case 1:
+          return RatingIconType.thumbsDown;
+        default:
+          return RatingIconType.thumbsUp;
+      }
+    } else if (range == 3) {
       // 3-point scale
       switch (index) {
         case 0:
@@ -108,10 +118,10 @@ class _RatingQuestionState extends State<RatingQuestion> {
       });
     }
 
-    // Show emoji ratings when display == .emoji and scale is 3-point or 5-point
+    // Show emoji ratings when display == .emoji and scale is 2-point, 3-point or 5-point
     final range = widget.scaleUpperBound - widget.scaleLowerBound + 1;
     if (widget.type == PostHogDisplaySurveyRatingType.emoji &&
-        (range == 3 || range == 5)) {
+        (range == 2 || range == 3 || range == 5)) {
       final buttonColor = isSelected
           ? widget.appearance.choiceButtonTextColor
           : widget.appearance.choiceButtonTextColor.withAlpha(128);
@@ -144,6 +154,9 @@ class _RatingQuestionState extends State<RatingQuestion> {
 
   @override
   Widget build(BuildContext context) {
+    final isThumbSurvey =
+        (widget.scaleUpperBound - widget.scaleLowerBound + 1) == 2;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -157,7 +170,9 @@ class _RatingQuestionState extends State<RatingQuestion> {
         const SizedBox(height: 24),
         if (widget.type == PostHogDisplaySurveyRatingType.emoji)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: isThumbSurvey
+                ? MainAxisAlignment.spaceAround
+                : MainAxisAlignment.spaceBetween,
             children:
                 _ratingRange.map((value) => _buildRatingButton(value)).toList(),
           )
@@ -177,7 +192,9 @@ class _RatingQuestionState extends State<RatingQuestion> {
                   .toList(),
             ),
           ),
-        if (widget.lowerBoundLabel != null || widget.upperBoundLabel != null)
+        if ((widget.lowerBoundLabel != null ||
+                widget.upperBoundLabel != null) &&
+            !isThumbSurvey)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Row(
