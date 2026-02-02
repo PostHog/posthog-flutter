@@ -1,5 +1,7 @@
 ## Next
 
+# 5.13.0
+
 - chore: add support for thumbs up/down surveys ([#257](https://github.com/PostHog/posthog-flutter/pull/257))
 
 - perf: Optimize Screenshot diff check ([#271](https://github.com/PostHog/posthog-flutter/pull/271))
