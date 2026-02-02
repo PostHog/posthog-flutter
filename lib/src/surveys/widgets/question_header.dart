@@ -27,7 +27,7 @@ class QuestionHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black,
+              color: appearance.questionTextColor,
             ),
           ),
         ],
@@ -39,7 +39,7 @@ class QuestionHeader extends StatelessWidget {
             description!,
             style: TextStyle(
               fontSize: 16,
-              color: appearance.descriptionTextColor ?? Colors.black,
+              color: appearance.descriptionTextColor,
             ),
           ),
         ],

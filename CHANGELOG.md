@@ -1,5 +1,7 @@
 ## Next
 
+- chore: improve survey color handling ([#233](https://github.com/PostHog/posthog-flutter/pull/233))
+
 - feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
   - **Limitation**:
     - Does NOT intercept native-initiated events such as:
