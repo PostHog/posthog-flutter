@@ -1,5 +1,6 @@
 ## Next
 
+- perf: Optimize Screenshot diff check ([#271](https://github.com/PostHog/posthog-flutter/pull/271))
 - feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
   - **Limitation**:
     - Does NOT intercept native-initiated events such as:
