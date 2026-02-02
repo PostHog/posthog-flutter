@@ -22,8 +22,8 @@ class NumberRatingButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final buttonColor = isSelected
-        ? appearance.ratingButtonActiveColor ?? Colors.black
-        : appearance.ratingButtonColor ?? Colors.grey.shade200;
+        ? appearance.ratingButtonActiveColor
+        : appearance.ratingButtonColor;
 
     return Expanded(
       child: Row(
@@ -61,8 +61,8 @@ class NumberRatingButton extends StatelessWidget {
                           value.toString(),
                           style: TextStyle(
                             color: isSelected
-                                ? Colors.white
-                                : Colors.black.withValues(alpha: 0.5),
+                                ? appearance.ratingButtonSelectedTextColor
+                                : appearance.ratingButtonUnselectedTextColor,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -78,7 +78,7 @@ class NumberRatingButton extends StatelessWidget {
             Container(
               height: 45,
               width: 1,
-              color: appearance.borderColor ?? Colors.grey.shade400,
+              color: appearance.borderColor,
             ),
         ],
       ),

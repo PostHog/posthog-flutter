@@ -112,8 +112,9 @@ class _RatingQuestionState extends State<RatingQuestion> {
     final range = widget.scaleUpperBound - widget.scaleLowerBound + 1;
     if (widget.type == PostHogDisplaySurveyRatingType.emoji &&
         (range == 3 || range == 5)) {
-      final buttonColor =
-          isSelected ? Colors.black : Colors.black.withAlpha(128);
+      final buttonColor = isSelected
+          ? widget.appearance.choiceButtonTextColor
+          : widget.appearance.choiceButtonTextColor.withAlpha(128);
       // Convert value to 0-based index.
       // When scaleLowerBound is zero (NPS), the index is the same as the value.
       final index = value - widget.scaleLowerBound;
@@ -163,10 +164,10 @@ class _RatingQuestionState extends State<RatingQuestion> {
         else
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: widget.appearance.inputBackgroundColor,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: widget.appearance.borderColor ?? Colors.grey.shade400,
+                color: widget.appearance.borderColor,
                 width: 2,
               ),
             ),
