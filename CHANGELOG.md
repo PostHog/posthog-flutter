@@ -1,5 +1,7 @@
 ## Next
 
+- feat: add `getFeatureFlagResult` API ([#279](https://github.com/PostHog/posthog-flutter/pull/279))
+
 # 5.13.0
 
 - chore: add support for thumbs up/down surveys ([#257](https://github.com/PostHog/posthog-flutter/pull/257))
