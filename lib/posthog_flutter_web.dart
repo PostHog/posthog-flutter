@@ -9,6 +9,7 @@ import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
+import 'src/feature_flag_result.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
@@ -227,6 +228,18 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<Object?> getFeatureFlagPayload({required String key}) async {
     return handleWebMethodCall(
         MethodCall('getFeatureFlagPayload', {'key': key}));
+  }
+
+  @override
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
+    required String key,
+    bool sendEvent = true,
+  }) async {
+    final result = await handleWebMethodCall(MethodCall(
+        'getFeatureFlagResult', {'key': key, 'sendEvent': sendEvent}));
+
+    // Web SDK returns: { key, enabled, variant, payload }
+    return PostHogFeatureFlagResult.fromMap(result, key);
   }
 
   @override

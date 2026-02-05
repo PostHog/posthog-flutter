@@ -1,3 +1,4 @@
+import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 
@@ -19,6 +20,13 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   OnFeatureFlagsCallback? registeredOnFeatureFlagsCallback;
   final List<CapturedExceptionCall> capturedExceptions = [];
   PostHogConfig? receivedConfig;
+
+  // Feature flag test data
+  final Map<String, Object?> featureFlagValues = {};
+  final Map<String, Object?> featureFlagPayloads = {};
+
+  // Call tracking for getFeatureFlagResult
+  final List<Map<String, dynamic>> getFeatureFlagResultCalls = [];
 
   @override
   Future<void> screen({
@@ -47,5 +55,30 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
       stackTrace: stackTrace,
       properties: properties,
     ));
+  }
+
+  @override
+  Future<Object?> getFeatureFlag({required String key}) async {
+    return featureFlagValues[key];
+  }
+
+  @override
+  Future<Object?> getFeatureFlagPayload({required String key}) async {
+    return featureFlagPayloads[key];
+  }
+
+  @override
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
+    required String key,
+    bool sendEvent = true,
+  }) async {
+    getFeatureFlagResultCalls.add({'key': key, 'sendEvent': sendEvent});
+
+    if (!featureFlagValues.containsKey(key)) {
+      return null;
+    }
+    final value = featureFlagValues[key];
+    final payload = featureFlagPayloads[key];
+    return PostHogFeatureFlagResult.fromValueAndPayload(key, value, payload);
   }
 }

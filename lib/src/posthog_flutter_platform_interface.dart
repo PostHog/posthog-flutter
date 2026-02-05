@@ -1,5 +1,6 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
@@ -131,6 +132,14 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   }) {
     throw UnimplementedError(
         'getFeatureFlagPayload() has not been implemented.');
+  }
+
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
+    required String key,
+    bool sendEvent = true,
+  }) {
+    throw UnimplementedError(
+        'getFeatureFlagResult() has not been implemented.');
   }
 
   Future<void> flush() {

@@ -146,6 +146,10 @@ class PosthogFlutterPlugin :
                 getFeatureFlagPayload(call, result)
             }
 
+            "getFeatureFlagResult" -> {
+                getFeatureFlagResult(call, result)
+            }
+
             "register" -> {
                 register(call, result)
             }
@@ -362,6 +366,32 @@ class PosthogFlutterPlugin :
             val featureFlagKey: String = call.argument("key")!!
             val flag = PostHog.getFeatureFlagPayload(featureFlagKey)
             result.success(flag)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun getFeatureFlagResult(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val featureFlagKey: String = call.argument("key")!!
+            val sendEvent: Boolean = call.argument("sendEvent") ?: true
+            val flagResult = PostHog.getFeatureFlagResult(featureFlagKey, sendEvent)
+
+            if (flagResult != null) {
+                result.success(
+                    mapOf(
+                        "key" to flagResult.key,
+                        "enabled" to flagResult.enabled,
+                        "variant" to flagResult.variant,
+                        "payload" to flagResult.payload,
+                    ),
+                )
+            } else {
+                result.success(null)
+            }
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }

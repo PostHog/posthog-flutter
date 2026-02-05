@@ -13,6 +13,7 @@ import 'error_tracking/dart_exception_processor.dart';
 import 'utils/capture_utils.dart';
 import 'utils/property_normalizer.dart';
 
+import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
 import 'posthog_event.dart';
@@ -521,6 +522,29 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on getFeatureFlagPayload: $exception');
+      return null;
+    }
+  }
+
+  @override
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
+    required String key,
+    bool sendEvent = true,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return null;
+    }
+
+    try {
+      final result = await _methodChannel.invokeMethod('getFeatureFlagResult', {
+        'key': key,
+        'sendEvent': sendEvent,
+      });
+
+      // Native returns: { key, enabled, variant, payload }
+      return PostHogFeatureFlagResult.fromMap(result, key);
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on getFeatureFlagResult: $exception');
       return null;
     }
   }

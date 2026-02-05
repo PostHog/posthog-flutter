@@ -183,6 +183,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             isFeatureEnabled(call, result: result)
         case "getFeatureFlagPayload":
             getFeatureFlagPayload(call, result: result)
+        case "getFeatureFlagResult":
+            getFeatureFlagResult(call, result: result)
         case "identify":
             identify(call, result: result)
         case "capture":
@@ -526,6 +528,31 @@ extension PosthogFlutterPlugin {
         {
             let value = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
             result(value)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func getFeatureFlagResult(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let featureFlagKey = args["key"] as? String
+        {
+            let sendEvent = args["sendEvent"] as? Bool ?? true
+            let flagResult = PostHogSDK.shared.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+
+            if let flagResult {
+                result([
+                    "key": flagResult.key,
+                    "enabled": flagResult.enabled,
+                    "variant": flagResult.variant as Any,
+                    "payload": flagResult.payload as Any
+                ])
+            } else {
+                result(nil)
+            }
         } else {
             _badArgumentError(result)
         }
