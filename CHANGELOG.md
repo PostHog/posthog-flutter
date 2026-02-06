@@ -4,6 +4,15 @@
   - `startSessionRecording({bool resumeCurrent = true})` Start session recording, optionally starting a new session
   - `stopSessionRecording()` Stop the current session recording
   - `isSessionReplayActive()` Check if session replay is currently active
+
+# 5.13.0
+
+- chore: add support for thumbs up/down surveys ([#257](https://github.com/PostHog/posthog-flutter/pull/257))
+
+- perf: Optimize Screenshot diff check ([#271](https://github.com/PostHog/posthog-flutter/pull/271))
+
+- chore: improve survey color handling ([#233](https://github.com/PostHog/posthog-flutter/pull/233))
+
 - feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
   - **Limitation**:
     - Does NOT intercept native-initiated events such as:

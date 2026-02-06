@@ -52,6 +52,12 @@ class RatingIconPainter extends CustomPainter {
       case RatingIconType.verySatisfied:
         _drawVerySatisfied(canvas, size, paint);
         break;
+      case RatingIconType.thumbsUp:
+        _drawThumbsUp(canvas, size, paint);
+        break;
+      case RatingIconType.thumbsDown:
+        _drawThumbsDown(canvas, size, paint);
+        break;
     }
   }
 
@@ -432,6 +438,216 @@ class RatingIconPainter extends CustomPainter {
     // Draw circle outline
     canvas.drawPath(path, paint);
   }
+
+  void _drawThumbsUp(Canvas canvas, Size size, Paint paint) {
+    // Create filled paint style for the thumb
+    final fillPaint = Paint()
+      ..color = paint.color
+      ..style = PaintingStyle.fill;
+
+    Path path = Path();
+    final width = _scale;
+    final height = _scale;
+
+    // Left rectangle (base)
+    path.moveTo(0.08333 * width, 0.83333 * height);
+    path.lineTo(0.16667 * width, 0.83333 * height);
+    path.cubicTo(
+      0.18958 * width,
+      0.83333 * height,
+      0.20833 * width,
+      0.81458 * height,
+      0.20833 * width,
+      0.79167 * height,
+    );
+    path.lineTo(0.20833 * width, 0.41667 * height);
+    path.cubicTo(
+      0.20833 * width,
+      0.39375 * height,
+      0.18958 * width,
+      0.375 * height,
+      0.16667 * width,
+      0.375 * height,
+    );
+    path.lineTo(0.08333 * width, 0.375 * height);
+    path.close();
+
+    // Main thumb shape
+    path.moveTo(0.91208 * width, 0.53667 * height);
+    path.cubicTo(
+      0.91667 * width,
+      0.52625 * height,
+      0.91917 * width,
+      0.51500 * height,
+      0.91917 * width,
+      0.50333 * height,
+    );
+    path.lineTo(0.91917 * width, 0.45833 * height);
+    path.cubicTo(
+      0.91917 * width,
+      0.4125 * height,
+      0.87917 * width,
+      0.375 * height,
+      0.83333 * width,
+      0.375 * height,
+    );
+    path.lineTo(0.60417 * width, 0.375 * height);
+    path.lineTo(0.6425 * width, 0.18125 * height);
+    path.cubicTo(
+      0.64458 * width,
+      0.17208 * height,
+      0.64333 * width,
+      0.16292 * height,
+      0.63917 * width,
+      0.15375 * height,
+    );
+    path.cubicTo(
+      0.62958 * width,
+      0.13500 * height,
+      0.61750 * width,
+      0.11792 * height,
+      0.60250 * width,
+      0.10292 * height,
+    );
+    path.lineTo(0.58333 * width, 0.08333 * height);
+    path.lineTo(0.31625 * width, 0.35042 * height);
+    path.cubicTo(
+      0.30042 * width,
+      0.36625 * height,
+      0.29167 * width,
+      0.3875 * height,
+      0.29167 * width,
+      0.40958 * height,
+    );
+    path.lineTo(0.29167 * width, 0.73625 * height);
+    path.cubicTo(
+      0.29167 * width,
+      0.78958 * height,
+      0.33542 * width,
+      0.83333 * height,
+      0.38917 * width,
+      0.83333 * height,
+    );
+    path.lineTo(0.72708 * width, 0.83333 * height);
+    path.cubicTo(
+      0.75625 * width,
+      0.83333 * height,
+      0.78542 * width,
+      0.81792 * height,
+      0.79875 * width,
+      0.79292 * height,
+    );
+    path.lineTo(0.90958 * width, 0.53667 * height);
+    path.close();
+
+    // Draw the filled thumb
+    canvas.drawPath(path, fillPaint);
+  }
+
+  void _drawThumbsDown(Canvas canvas, Size size, Paint paint) {
+    // Create filled paint style for the thumb
+    final fillPaint = Paint()
+      ..color = paint.color
+      ..style = PaintingStyle.fill;
+
+    Path path = Path();
+    final width = _scale;
+    final height = _scale;
+
+    // Right rectangle (base)
+    path.moveTo(0.91667 * width, 0.16667 * height);
+    path.lineTo(0.83333 * width, 0.16667 * height);
+    path.cubicTo(
+      0.81042 * width,
+      0.16667 * height,
+      0.79167 * width,
+      0.18542 * height,
+      0.79167 * width,
+      0.20833 * height,
+    );
+    path.lineTo(0.79167 * width, 0.58333 * height);
+    path.cubicTo(
+      0.79167 * width,
+      0.60625 * height,
+      0.81042 * width,
+      0.625 * height,
+      0.83333 * width,
+      0.625 * height,
+    );
+    path.lineTo(0.91667 * width, 0.625 * height);
+    path.close();
+
+    // Main thumb shape
+    path.moveTo(0.09042 * width, 0.46333 * height);
+    path.cubicTo(
+      0.08583 * width,
+      0.47375 * height,
+      0.08333 * width,
+      0.485 * height,
+      0.08333 * width,
+      0.49667 * height,
+    );
+    path.lineTo(0.08333 * width, 0.54167 * height);
+    path.cubicTo(
+      0.08333 * width,
+      0.5875 * height,
+      0.12083 * width,
+      0.625 * height,
+      0.16667 * width,
+      0.625 * height,
+    );
+    path.lineTo(0.39583 * width, 0.625 * height);
+    path.lineTo(0.3575 * width, 0.81875 * height);
+    path.cubicTo(
+      0.35542 * width,
+      0.82792 * height,
+      0.35667 * width,
+      0.83708 * height,
+      0.36083 * width,
+      0.84625 * height,
+    );
+    path.cubicTo(
+      0.37042 * width,
+      0.865 * height,
+      0.3825 * width,
+      0.88208 * height,
+      0.3975 * width,
+      0.89708 * height,
+    );
+    path.lineTo(0.41667 * width, 0.91667 * height);
+    path.lineTo(0.68375 * width, 0.64958 * height);
+    path.cubicTo(
+      0.69958 * width,
+      0.63375 * height,
+      0.70833 * width,
+      0.6125 * height,
+      0.70833 * width,
+      0.59042 * height,
+    );
+    path.lineTo(0.70833 * width, 0.26417 * height);
+    path.cubicTo(
+      0.70833 * width,
+      0.21042 * height,
+      0.66458 * width,
+      0.16667 * height,
+      0.61083 * width,
+      0.16667 * height,
+    );
+    path.lineTo(0.27292 * width, 0.16667 * height);
+    path.cubicTo(
+      0.24375 * width,
+      0.16667 * height,
+      0.21458 * width,
+      0.18208 * height,
+      0.20125 * width,
+      0.20708 * height,
+    );
+    path.lineTo(0.09042 * width, 0.46333 * height);
+    path.close();
+
+    // Draw the filled thumb
+    canvas.drawPath(path, fillPaint);
+  }
 }
 
 enum RatingIconType {
@@ -440,19 +656,21 @@ enum RatingIconType {
   neutral,
   satisfied,
   verySatisfied,
+  thumbsUp,
+  thumbsDown,
 }
 
 class RatingIcon extends StatelessWidget {
   final bool selected;
   final RatingIconType type;
-  final Color? color;
+  final Color color;
   final double size;
 
   const RatingIcon({
     super.key,
     required this.type,
     this.selected = false,
-    this.color,
+    required this.color,
     this.size = 48.0,
   });
 
@@ -465,7 +683,7 @@ class RatingIcon extends StatelessWidget {
         painter: RatingIconPainter(
           selected: selected,
           type: type,
-          color: color ?? Theme.of(context).iconTheme.color ?? Colors.grey,
+          color: color,
         ),
       ),
     );

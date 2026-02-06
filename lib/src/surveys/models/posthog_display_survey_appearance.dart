@@ -11,9 +11,12 @@ class PostHogDisplaySurveyAppearance {
     this.submitButtonColor,
     this.submitButtonText,
     this.submitButtonTextColor,
+    this.textColor,
     this.descriptionTextColor,
     this.ratingButtonColor,
     this.ratingButtonActiveColor,
+    this.inputBackground,
+    this.inputTextColor,
     this.placeholder,
     this.displayThankYouMessage = true,
     this.thankYouMessageHeader,
@@ -28,9 +31,12 @@ class PostHogDisplaySurveyAppearance {
   final String? submitButtonColor;
   final String? submitButtonText;
   final String? submitButtonTextColor;
+  final String? textColor;
   final String? descriptionTextColor;
   final String? ratingButtonColor;
   final String? ratingButtonActiveColor;
+  final String? inputBackground;
+  final String? inputTextColor;
   final String? placeholder;
   final bool displayThankYouMessage;
   final String? thankYouMessageHeader;

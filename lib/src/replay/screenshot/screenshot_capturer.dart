@@ -54,10 +54,10 @@ class ScreenshotCapturer {
     return min(width / srcWidth, height / srcHeight);
   }
 
-  Future<Uint8List?> _getImageBytes(ui.Image img) async {
+  Future<Uint8List?> _getImageBytes(ui.Image img,
+      {ui.ImageByteFormat format = ui.ImageByteFormat.png}) async {
     try {
-      final ByteData? byteData =
-          await img.toByteData(format: ui.ImageByteFormat.png);
+      final ByteData? byteData = await img.toByteData(format: format);
       if (byteData == null || byteData.lengthInBytes == 0) {
         printIfDebug('Error: Failed to convert image to byte data.');
         return null;
@@ -133,11 +133,10 @@ class ScreenshotCapturer {
         final recorder = ui.PictureRecorder();
         final canvas = Canvas(recorder);
 
-        // using png because its compressed, the native SDKs will decompress it
-        // and transform to webp or jpeg if needed
-        // https://github.com/brendan-duncan/image does not have webp encoding
-        Uint8List? pngBytes = await _getImageBytes(image);
-        if (pngBytes == null || pngBytes.isEmpty) {
+        // using rawRgba for the diff check because it is faster than png encoding
+        Uint8List? imageBytes =
+            await _getImageBytes(image, format: ui.ImageByteFormat.rawRgba);
+        if (imageBytes == null || imageBytes.isEmpty) {
           printIfDebug(
               'Error: Failed to convert image byte data to Uint8List.');
           recorder.endRecording().dispose();
@@ -146,7 +145,7 @@ class ScreenshotCapturer {
           return;
         }
 
-        if (const PHListEquality().equals(pngBytes, statusView.imageBytes)) {
+        if (const PHListEquality().equals(imageBytes, statusView.imageBytes)) {
           printIfDebug(
               'Debug: Snapshot is the same as the last one, nothing changed, do nothing.');
           recorder.endRecording().dispose();
@@ -155,7 +154,7 @@ class ScreenshotCapturer {
           return;
         }
 
-        statusView.imageBytes = pngBytes;
+        statusView.imageBytes = imageBytes;
 
         try {
           canvas.drawImage(image, Offset.zero, Paint());
