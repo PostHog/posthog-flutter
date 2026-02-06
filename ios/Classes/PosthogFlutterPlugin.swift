@@ -223,6 +223,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendFullSnapshot(call, result: result)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
+        case "startSessionRecording":
+            startSessionRecording(call, result: result)
+        case "stopSessionRecording":
+            stopSessionRecording(result: result)
         case "getSessionId":
             getSessionId(result: result)
         case "openUrl":
@@ -455,6 +459,28 @@ extension PosthogFlutterPlugin {
         #endif
     }
 
+    private func startSessionRecording(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        #if os(iOS)
+            let resumeCurrent = call.arguments as? Bool ?? true
+            PostHogSDK.shared.startSessionRecording(resumeCurrent: resumeCurrent)
+            result(nil)
+        #else
+            result(nil)
+        #endif
+    }
+
+    private func stopSessionRecording(result: @escaping FlutterResult) {
+        #if os(iOS)
+            PostHogSDK.shared.stopSessionRecording()
+            result(nil)
+        #else
+            result(nil)
+        #endif
+    }
+
     private func openUrl(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
@@ -645,8 +671,7 @@ extension PosthogFlutterPlugin {
         }
     }
 
-    private func reloadFeatureFlags(_ result: @escaping FlutterResult
-    ) {
+    private func reloadFeatureFlags(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.reloadFeatureFlags()
         result(nil)
     }

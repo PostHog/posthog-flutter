@@ -1,5 +1,10 @@
 ## Next
 
+- feat: add manual session recording control APIs ([#256](https://github.com/PostHog/posthog-flutter/pull/256))
+  - `startSessionRecording({bool resumeCurrent = true})` Start session recording, optionally starting a new session
+  - `stopSessionRecording()` Stop the current session recording
+  - `isSessionReplayActive()` Check if session replay is currently active
+
 # 5.13.0
 
 - chore: add support for thumbs up/down surveys ([#257](https://github.com/PostHog/posthog-flutter/pull/257))
