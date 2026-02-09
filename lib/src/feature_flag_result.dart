@@ -36,12 +36,11 @@ class PostHogFeatureFlagResult {
     return other is PostHogFeatureFlagResult &&
         other.key == key &&
         other.enabled == enabled &&
-        other.variant == variant &&
-        other.payload == payload;
+        other.variant == variant;
   }
 
   @override
-  int get hashCode => Object.hash(key, enabled, variant, payload);
+  int get hashCode => Object.hash(key, enabled, variant);
 
   /// Creates a [PostHogFeatureFlagResult] from a native SDK response map.
   ///
