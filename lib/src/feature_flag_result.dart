@@ -25,44 +25,6 @@ class PostHogFeatureFlagResult {
     this.payload,
   });
 
-  /// Creates a [PostHogFeatureFlagResult] from a raw flag value and payload.
-  ///
-  /// The [flagValue] can be:
-  /// - `null` or `false`: Flag is disabled
-  /// - `true`: Boolean flag is enabled
-  /// - `String`: Multivariate flag with the given variant
-  factory PostHogFeatureFlagResult.fromValueAndPayload(
-    String key,
-    Object? flagValue,
-    Object? payload,
-  ) {
-    if (flagValue == null || flagValue == false) {
-      return PostHogFeatureFlagResult(
-        key: key,
-        enabled: false,
-        variant: null,
-        payload: payload,
-      );
-    }
-
-    if (flagValue == true) {
-      return PostHogFeatureFlagResult(
-        key: key,
-        enabled: true,
-        variant: null,
-        payload: payload,
-      );
-    }
-
-    // Multivariate flag - value is the variant string
-    return PostHogFeatureFlagResult(
-      key: key,
-      enabled: true,
-      variant: flagValue.toString(),
-      payload: payload,
-    );
-  }
-
   @override
   String toString() {
     return 'PostHogFeatureFlagResult(key: $key, enabled: $enabled, variant: $variant, payload: $payload)';

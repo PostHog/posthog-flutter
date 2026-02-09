@@ -79,6 +79,13 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     }
     final value = featureFlagValues[key];
     final payload = featureFlagPayloads[key];
-    return PostHogFeatureFlagResult.fromValueAndPayload(key, value, payload);
+    final enabled = value != null && value != false;
+    final variant = (value is String) ? value : null;
+    return PostHogFeatureFlagResult(
+      key: key,
+      enabled: enabled,
+      variant: variant,
+      payload: payload,
+    );
   }
 }

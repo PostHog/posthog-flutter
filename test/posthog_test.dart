@@ -144,44 +144,6 @@ void main() {
   });
 
   group('PostHogFeatureFlagResult', () {
-    test('fromValueAndPayload with null value', () {
-      final result = PostHogFeatureFlagResult.fromValueAndPayload(
-        'test-key',
-        null,
-        null,
-      );
-
-      expect(result.key, equals('test-key'));
-      expect(result.enabled, isFalse);
-      expect(result.variant, isNull);
-    });
-
-    test('fromValueAndPayload with boolean true', () {
-      final result = PostHogFeatureFlagResult.fromValueAndPayload(
-        'test-key',
-        true,
-        {'data': 'value'},
-      );
-
-      expect(result.key, equals('test-key'));
-      expect(result.enabled, isTrue);
-      expect(result.variant, isNull);
-      expect(result.payload, equals({'data': 'value'}));
-    });
-
-    test('fromValueAndPayload with string variant', () {
-      final result = PostHogFeatureFlagResult.fromValueAndPayload(
-        'test-key',
-        'variant-b',
-        42,
-      );
-
-      expect(result.key, equals('test-key'));
-      expect(result.enabled, isTrue);
-      expect(result.variant, equals('variant-b'));
-      expect(result.payload, equals(42));
-    });
-
     test('equality', () {
       final result1 = PostHogFeatureFlagResult(
         key: 'flag',
