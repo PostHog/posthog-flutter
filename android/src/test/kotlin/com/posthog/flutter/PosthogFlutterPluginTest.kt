@@ -39,4 +39,19 @@ internal class PosthogFlutterPluginTest {
 
         Mockito.verify(mockResult).success(true)
     }
+
+    @Test
+    fun onMethodCall_getFeatureFlagResult_missingKey_returnsError() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("getFeatureFlagResult", mapOf<String, Any>())
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).error(
+            Mockito.eq("PosthogFlutterException"),
+            Mockito.eq("Missing argument: key"),
+            Mockito.isNull()
+        )
+    }
 }

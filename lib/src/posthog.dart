@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
+import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_observer.dart';
@@ -158,9 +159,37 @@ class Posthog {
         groupProperties: groupProperties,
       );
 
+  /// Returns the feature flag value for the given key.
+  ///
+  /// Returns `null` if the flag doesn't exist.
+  /// For boolean flags, returns `true` or `false`.
+  /// For multivariate flags, returns the variant string.
   Future<Object?> getFeatureFlag(String key) =>
       _posthog.getFeatureFlag(key: key);
 
+  /// Returns the full feature flag result including value and payload.
+  ///
+  /// This is the canonical method for getting feature flag data.
+  /// Returns `null` if the flag doesn't exist.
+  ///
+  /// Set [sendEvent] to `false` to suppress the `$feature_flag_called` event.
+  /// This is useful when you only need the payload and don't want to emit the event.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final result = await Posthog().getFeatureFlagResult('my-flag');
+  /// if (result != null && result.enabled) {
+  ///   final variant = result.variant; // For multivariate flags
+  ///   final payload = result.payload; // Associated payload data
+  /// }
+  /// ```
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult(String key,
+          {bool sendEvent = true}) =>
+      _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
+
+  /// Returns the payload for a feature flag.
+  @Deprecated(
+      'Use getFeatureFlagResult instead, which returns both value and payload.')
   Future<Object?> getFeatureFlagPayload(String key) =>
       _posthog.getFeatureFlagPayload(key: key);
 
