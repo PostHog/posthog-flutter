@@ -14,8 +14,10 @@ class Posthog {
 
   PostHogConfig? _config;
 
+  final _sessionRecordingActive = ValueNotifier<bool>(false);
+
   @internal
-  final sessionRecordingActive = ValueNotifier<bool>(false);
+  ValueListenable<bool> get sessionRecordingActive => _sessionRecordingActive;
 
   factory Posthog() {
     return _instance;
@@ -46,7 +48,7 @@ class Posthog {
     _config = config; // Store the config
 
     if (config.sessionReplay) {
-      sessionRecordingActive.value = true;
+      _sessionRecordingActive.value = true;
     }
 
     _installFlutterIntegrations(config);
@@ -207,7 +209,7 @@ class Posthog {
   Future<void> close() {
     _config = null;
     _currentScreen = null;
-    sessionRecordingActive.value = false;
+    _sessionRecordingActive.value = false;
     PosthogObserver.clearCurrentContext();
 
     // Uninstall Flutter integrations
@@ -227,7 +229,7 @@ class Posthog {
   /// If false, starts a new session and begins recording.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
-    sessionRecordingActive.value = true;
+    _sessionRecordingActive.value = true;
   }
 
   /// Stops the current session recording if one is in progress.
@@ -235,7 +237,7 @@ class Posthog {
   /// This method will have no effect if PostHog is not enabled.
   Future<void> stopSessionRecording() async {
     await _posthog.stopSessionRecording();
-    sessionRecordingActive.value = false;
+    _sessionRecordingActive.value = false;
   }
 
   /// Returns whether session replay is currently active.
