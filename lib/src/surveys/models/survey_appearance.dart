@@ -113,9 +113,9 @@ class SurveyAppearance {
   /// Uses the HSP (Highly Sensitive Perceived) color model for perceived brightness.
   /// This matches the algorithm used in posthog-js.
   static Color _getContrastingTextColor(Color color) {
-    final r = color.red;
-    final g = color.green;
-    final b = color.blue;
+    final r = color.r;
+    final g = color.g;
+    final b = color.b;
     // HSP equation for perceived brightness
     final hsp = sqrt(0.299 * (r * r) + 0.587 * (g * g) + 0.114 * (b * b));
     // Using 127.5 as threshold (same as JS)
