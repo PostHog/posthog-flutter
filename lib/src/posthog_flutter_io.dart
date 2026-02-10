@@ -661,7 +661,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
-    if (!isSupportedPlatform()) {
+    if (!isSupportedPlatform() || isMacOS()) {
       return;
     }
 
@@ -674,7 +674,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> stopSessionRecording() async {
-    if (!isSupportedPlatform()) {
+    if (!isSupportedPlatform() || isMacOS()) {
       return;
     }
 
@@ -687,7 +687,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isSessionReplayActive() async {
-    if (!isSupportedPlatform()) {
+    if (!isSupportedPlatform() || isMacOS()) {
       return false;
     }
 
