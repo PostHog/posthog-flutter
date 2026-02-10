@@ -31,17 +31,49 @@ class PostHogWidgetState extends State<PostHogWidget> {
     super.initState();
 
     final config = Posthog().config;
-    if (config == null || !config.sessionReplay) {
+    if (config == null) {
       return;
     }
 
-    _throttleDuration = config.sessionReplayConfig.throttleDelay;
+    if (config.sessionReplay) {
+      _initComponents(config);
+      _changeDetector?.start();
+    }
 
+    // start listening for session recording toggles
+    Posthog().sessionRecordingActive.addListener(_onSessionRecordingChanged);
+  }
+
+  void _initComponents(PostHogConfig config) {
+    _throttleDuration = config.sessionReplayConfig.throttleDelay;
     _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
-
     _changeDetector = ChangeDetector(_onChangeDetected);
+  }
+
+  void _onSessionRecordingChanged() {
+    if (Posthog().sessionRecordingActive.value) {
+      _startRecording();
+    } else {
+      _stopRecording();
+    }
+  }
+
+  void _startRecording() {
+    final config = Posthog().config;
+    if (config == null) {
+      return;
+    }
+
+    if (_changeDetector == null) {
+      _initComponents(config);
+    }
+
     _changeDetector?.start();
+  }
+
+  void _stopRecording() {
+    _changeDetector?.stop();
   }
 
   // This works as onRootViewsChangedListeners
@@ -97,6 +129,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   @override
   void dispose() {
+    Posthog().sessionRecordingActive.removeListener(_onSessionRecordingChanged);
+
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _changeDetector?.stop();
