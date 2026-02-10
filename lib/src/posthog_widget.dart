@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 import 'replay/change_detector.dart';
@@ -41,7 +42,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
     }
 
     // start listening for session recording toggles
-    Posthog().sessionRecordingActive.addListener(_onSessionRecordingChanged);
+    PostHogInternalEvents.sessionRecordingActive
+        .addListener(_onSessionRecordingChanged);
   }
 
   void _initComponents(PostHogConfig config) {
@@ -52,7 +54,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   void _onSessionRecordingChanged() {
-    if (Posthog().sessionRecordingActive.value) {
+    if (PostHogInternalEvents.sessionRecordingActive.value) {
       _startRecording();
     } else {
       _stopRecording();
@@ -129,7 +131,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   @override
   void dispose() {
-    Posthog().sessionRecordingActive.removeListener(_onSessionRecordingChanged);
+    PostHogInternalEvents.sessionRecordingActive
+        .removeListener(_onSessionRecordingChanged);
 
     _throttleTimer?.cancel();
     _throttleTimer = null;
