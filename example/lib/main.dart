@@ -582,6 +582,16 @@ class InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    final result = await _posthogFlutterPlugin
+                        .getFeatureFlagResult("feature_name");
+                    setState(() {
+                      _result = result?.toString();
+                    });
+                  },
+                  child: const Text("getFeatureFlagResult"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
                     await _posthogFlutterPlugin.reloadFeatureFlags();
                   },
                   child: const PostHogMaskWidget(
