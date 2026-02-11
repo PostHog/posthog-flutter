@@ -682,4 +682,45 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       printIfDebug('Exception on openUrl: $exception');
     }
   }
+
+  @override
+  Future<void> startSessionRecording({bool resumeCurrent = true}) async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('startSessionRecording', resumeCurrent);
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on startSessionRecording: $exception');
+    }
+  }
+
+  @override
+  Future<void> stopSessionRecording() async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('stopSessionRecording');
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on stopSessionRecording: $exception');
+    }
+  }
+
+  @override
+  Future<bool> isSessionReplayActive() async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      return false;
+    }
+
+    try {
+      final result = await _methodChannel.invokeMethod('isSessionReplayActive');
+      return result as bool? ?? false;
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on isSessionReplayActive: $exception');
+      return false;
+    }
+  }
 }

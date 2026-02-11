@@ -7,3 +7,7 @@ bool isSupportedPlatform() {
   }
   return !(Platform.isLinux || Platform.isWindows);
 }
+
+bool isMacOS() {
+  return Platform.isMacOS;
+}

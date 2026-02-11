@@ -161,5 +161,27 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('getSessionId() not implemented');
   }
 
+  /// Starts session recording.
+  ///
+  /// [resumeCurrent] - If true, resumes recording of the current session.
+  /// If false, starts a new session and begins recording.
+  /// Defaults to true.
+  Future<void> startSessionRecording({bool resumeCurrent = true}) {
+    throw UnimplementedError(
+        'startSessionRecording() has not been implemented.');
+  }
+
+  /// Stops the current session recording if one is in progress.
+  Future<void> stopSessionRecording() {
+    throw UnimplementedError(
+        'stopSessionRecording() has not been implemented.');
+  }
+
+  /// Returns whether session replay is currently active.
+  Future<bool> isSessionReplayActive() {
+    throw UnimplementedError(
+        'isSessionReplayActive() has not been implemented.');
+  }
+
   // TODO: missing capture with more parameters
 }

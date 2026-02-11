@@ -1,10 +1,11 @@
-import 'package:meta/meta.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
 
 class Posthog {
@@ -42,6 +43,10 @@ class Posthog {
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native configuration.
   Future<void> setup(PostHogConfig config) {
     _config = config; // Store the config
+
+    if (config.sessionReplay) {
+      PostHogInternalEvents.sessionRecordingActive.value = true;
+    }
 
     _installFlutterIntegrations(config);
 
@@ -314,6 +319,7 @@ class Posthog {
   Future<void> close() {
     _config = null;
     _currentScreen = null;
+    PostHogInternalEvents.sessionRecordingActive.value = false;
     PosthogObserver.clearCurrentContext();
 
     // Uninstall Flutter integrations
@@ -324,6 +330,29 @@ class Posthog {
 
   /// Returns the session Id if a session is active
   Future<String?> getSessionId() => _posthog.getSessionId();
+
+  /// Starts session recording.
+  ///
+  /// This method will have no effect if PostHog is not enabled, or if session
+  /// replay is disabled in your project settings.
+  ///
+  /// [resumeCurrent] - If true (default), resumes recording of the current session.
+  /// If false, starts a new session and begins recording.
+  Future<void> startSessionRecording({bool resumeCurrent = true}) async {
+    await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
+    PostHogInternalEvents.sessionRecordingActive.value = true;
+  }
+
+  /// Stops the current session recording if one is in progress.
+  ///
+  /// This method will have no effect if PostHog is not enabled.
+  Future<void> stopSessionRecording() async {
+    await _posthog.stopSessionRecording();
+    PostHogInternalEvents.sessionRecordingActive.value = false;
+  }
+
+  /// Returns whether session replay is currently active.
+  Future<bool> isSessionReplayActive() => _posthog.isSessionReplayActive();
 
   Posthog._internal();
 }

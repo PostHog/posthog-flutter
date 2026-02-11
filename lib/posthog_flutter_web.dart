@@ -294,4 +294,23 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       printIfDebug('Exception in captureException: $exception');
     }
   }
+
+  @override
+  Future<void> startSessionRecording({bool resumeCurrent = true}) async {
+    return handleWebMethodCall(MethodCall('startSessionRecording', {
+      'resumeCurrent': resumeCurrent,
+    }));
+  }
+
+  @override
+  Future<void> stopSessionRecording() async {
+    return handleWebMethodCall(const MethodCall('stopSessionRecording'));
+  }
+
+  @override
+  Future<bool> isSessionReplayActive() async {
+    final result =
+        await handleWebMethodCall(const MethodCall('isSessionReplayActive'));
+    return result as bool? ?? false;
+  }
 }

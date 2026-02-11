@@ -1,5 +1,9 @@
 ## Next
 
+- feat: add manual session recording control APIs ([#256](https://github.com/PostHog/posthog-flutter/pull/256))
+  - `startSessionRecording({bool resumeCurrent = true})` Start session recording, optionally starting a new session
+  - `stopSessionRecording()` Stop the current session recording
+  - `isSessionReplayActive()` Check if session replay is currently active
 - feat: add `getFeatureFlagResult` API ([#279](https://github.com/PostHog/posthog-flutter/pull/279))
 
 # 5.13.0

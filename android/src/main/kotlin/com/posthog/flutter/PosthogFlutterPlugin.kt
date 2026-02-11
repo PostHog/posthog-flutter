@@ -177,6 +177,12 @@ class PosthogFlutterPlugin :
             "isSessionReplayActive" -> {
                 result.success(isSessionReplayActive())
             }
+            "startSessionRecording" -> {
+                startSessionRecording(call, result)
+            }
+            "stopSessionRecording" -> {
+                stopSessionRecording(result)
+            }
             "getSessionId" -> {
                 getSessionId(result)
             }
@@ -193,6 +199,20 @@ class PosthogFlutterPlugin :
     }
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
+
+    private fun startSessionRecording(
+        call: MethodCall,
+        result: Result,
+    ) {
+        val resumeCurrent = call.arguments as? Boolean ?: true
+        PostHog.startSessionReplay(resumeCurrent)
+        result.success(null)
+    }
+
+    private fun stopSessionRecording(result: Result) {
+        PostHog.stopSessionReplay()
+        result.success(null)
+    }
 
     private fun handleMetaEvent(
         call: MethodCall,
