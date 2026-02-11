@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
 import 'package:posthog_flutter/src/replay/image_extension.dart';
 
@@ -52,8 +53,10 @@ class RenderImageParser extends ElementParser {
     // Store rect in local coordinates - transform handles global positioning
     final Rect localRect = Rect.fromLTWH(left, top, size.width, size.height);
 
-    // Get the full transform from this render object to the screen
-    final Matrix4 transform = renderImage.getTransformTo(null);
+    // Get the transform relative to the screenshot container (RepaintBoundary)
+    final ancestor = PostHogMaskController.instance.containerKey.currentContext
+        ?.findRenderObject();
+    final Matrix4 transform = renderImage.getTransformTo(ancestor);
 
     return (rect: localRect, transform: transform);
   }

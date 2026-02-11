@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
 
 /// Parser for [RenderEditable] objects (TextField input text).
@@ -37,7 +38,9 @@ class RenderEditableParser extends ElementParser {
     final double height = textHeight * lines;
 
     final Rect localRect = Rect.fromLTWH(0, 0, width, height);
-    final Matrix4 transform = renderObject.getTransformTo(null);
+    final ancestor = PostHogMaskController.instance.containerKey.currentContext
+        ?.findRenderObject();
+    final Matrix4 transform = renderObject.getTransformTo(ancestor);
 
     return (rect: localRect, transform: transform);
   }
