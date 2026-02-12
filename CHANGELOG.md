@@ -1,5 +1,7 @@
 ## Next
 
+# 5.14.0
+
 - feat: add manual session recording control APIs ([#256](https://github.com/PostHog/posthog-flutter/pull/256))
   - `startSessionRecording({bool resumeCurrent = true})` Start session recording, optionally starting a new session
   - `stopSessionRecording()` Stop the current session recording
