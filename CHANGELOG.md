@@ -1,5 +1,7 @@
 ## Next
 
+- feat: add `setPersonProperties` method to set person properties without requiring `identify` ([#284](https://github.com/PostHog/posthog-flutter/pull/284))
+
 # 5.14.0
 
 - feat: add manual session recording control APIs ([#256](https://github.com/PostHog/posthog-flutter/pull/256))
