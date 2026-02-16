@@ -101,6 +101,31 @@ class Posthog {
           userProperties: userProperties,
           userPropertiesSetOnce: userPropertiesSetOnce);
 
+  /// Sets person properties for the current user without requiring identify.
+  ///
+  /// This method sends a `$set` event to update person properties.
+  ///
+  /// - [userPropertiesToSet] the user properties to set, will overwrite existing values
+  /// - [userPropertiesToSetOnce] the user properties to set only once, will not overwrite existing values
+  ///
+  /// Returns early without sending an event if both property maps are null or empty.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().setPersonProperties(
+  ///   userPropertiesToSet: {"name": "John Doe", "email": "john@example.com"},
+  ///   userPropertiesToSetOnce: {"date_of_first_login": "2024-03-01"}
+  /// );
+  /// ```
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
+  }) =>
+      _posthog.setPersonProperties(
+        userPropertiesToSet: userPropertiesToSet,
+        userPropertiesToSetOnce: userPropertiesToSetOnce,
+      );
+
   /// Captures events.
   /// Docs https://posthog.com/docs/product-analytics/user-properties
   ///

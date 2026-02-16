@@ -1,23 +1,21 @@
 import 'dart:async';
 
-import 'util/platform_io_stub.dart'
-    if (dart.library.io) 'util/platform_io_real.dart';
-
 import 'package:flutter/services.dart';
-
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
-import 'surveys/models/posthog_display_survey.dart' as models;
-import 'surveys/models/survey_callbacks.dart';
-import 'error_tracking/dart_exception_processor.dart';
-import 'utils/capture_utils.dart';
-import 'utils/property_normalizer.dart';
 
+import 'error_tracking/dart_exception_processor.dart';
 import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'surveys/models/posthog_display_survey.dart' as models;
+import 'surveys/models/survey_callbacks.dart';
+import 'util/platform_io_stub.dart'
+    if (dart.library.io) 'util/platform_io_real.dart';
+import 'utils/capture_utils.dart';
+import 'utils/property_normalizer.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
@@ -218,6 +216,34 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on identify: $exception');
+    }
+  }
+
+  @override
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      final normalizedUserPropertiesToSet = userPropertiesToSet != null
+          ? PropertyNormalizer.normalize(userPropertiesToSet)
+          : null;
+      final normalizedUserPropertiesToSetOnce = userPropertiesToSetOnce != null
+          ? PropertyNormalizer.normalize(userPropertiesToSetOnce)
+          : null;
+
+      await _methodChannel.invokeMethod('setPersonProperties', {
+        if (normalizedUserPropertiesToSet != null)
+          'userPropertiesToSet': normalizedUserPropertiesToSet,
+        if (normalizedUserPropertiesToSetOnce != null)
+          'userPropertiesToSetOnce': normalizedUserPropertiesToSetOnce,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on setPersonProperties: $exception');
     }
   }
 
