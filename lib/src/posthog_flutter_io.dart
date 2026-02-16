@@ -222,6 +222,34 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      final normalizedUserPropertiesToSet = userPropertiesToSet != null
+          ? PropertyNormalizer.normalize(userPropertiesToSet)
+          : null;
+      final normalizedUserPropertiesToSetOnce = userPropertiesToSetOnce != null
+          ? PropertyNormalizer.normalize(userPropertiesToSetOnce)
+          : null;
+
+      await _methodChannel.invokeMethod('setPersonProperties', {
+        if (normalizedUserPropertiesToSet != null)
+          'userPropertiesToSet': normalizedUserPropertiesToSet,
+        if (normalizedUserPropertiesToSetOnce != null)
+          'userPropertiesToSetOnce': normalizedUserPropertiesToSetOnce,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on setPersonProperties: $exception');
+    }
+  }
+
+  @override
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,

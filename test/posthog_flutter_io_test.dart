@@ -160,6 +160,53 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO setPersonProperties', () {
+    test('sends method channel call with userPropertiesToSet', () async {
+      testConfig = PostHogConfig('test_api_key');
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.setPersonProperties(
+        userPropertiesToSet: {'name': 'John Doe', 'email': 'john@example.com'},
+      );
+
+      final call = log.firstWhere((c) => c.method == 'setPersonProperties');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['userPropertiesToSet'],
+          {'name': 'John Doe', 'email': 'john@example.com'});
+      expect(args.containsKey('userPropertiesToSetOnce'), isFalse);
+    });
+
+    test('sends method channel call with userPropertiesToSetOnce', () async {
+      testConfig = PostHogConfig('test_api_key');
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.setPersonProperties(
+        userPropertiesToSetOnce: {'date_of_first_login': '2024-03-01'},
+      );
+
+      final call = log.firstWhere((c) => c.method == 'setPersonProperties');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['userPropertiesToSetOnce'],
+          {'date_of_first_login': '2024-03-01'});
+      expect(args.containsKey('userPropertiesToSet'), isFalse);
+    });
+
+    test('sends method channel call with both property types', () async {
+      testConfig = PostHogConfig('test_api_key');
+      await posthogFlutterIO.setup(testConfig);
+
+      await posthogFlutterIO.setPersonProperties(
+        userPropertiesToSet: {'name': 'John Doe'},
+        userPropertiesToSetOnce: {'created_at': '2024-03-01'},
+      );
+
+      final call = log.firstWhere((c) => c.method == 'setPersonProperties');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['userPropertiesToSet'], {'name': 'John Doe'});
+      expect(args['userPropertiesToSetOnce'], {'created_at': '2024-03-01'});
+    });
+  });
+
   group('PosthogFlutterIO beforeSend callback', () {
     test('capture sends event unchanged when no beforeSend registered',
         () async {

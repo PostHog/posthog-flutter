@@ -22,6 +22,8 @@ extension PostHogExtension on PostHog {
   external JSAny? isFeatureEnabled(JSAny key);
   external void group(JSAny type, JSAny key, JSAny properties);
   external void reloadFeatureFlags();
+  external void setPersonProperties(
+      JSAny? userPropertiesToSet, JSAny? userPropertiesToSetOnce);
   // ignore: non_constant_identifier_names
   external void opt_in_capturing();
   // ignore: non_constant_identifier_names
@@ -360,6 +362,19 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
         stringToJSAny(userId),
         mapToJSAny(userProperties),
         mapToJSAny(userPropertiesSetOnce),
+      );
+      break;
+    case 'setPersonProperties':
+      final userPropertiesToSet =
+          safeMapConversion(args['userPropertiesToSet']);
+      final userPropertiesToSetOnce =
+          safeMapConversion(args['userPropertiesToSetOnce']);
+
+      posthog?.setPersonProperties(
+        userPropertiesToSet.isNotEmpty ? mapToJSAny(userPropertiesToSet) : null,
+        userPropertiesToSetOnce.isNotEmpty
+            ? mapToJSAny(userPropertiesToSetOnce)
+            : null,
       );
       break;
     case 'capture':

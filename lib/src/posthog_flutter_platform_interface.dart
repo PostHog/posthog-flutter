@@ -42,6 +42,13 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('identify() has not been implemented.');
   }
 
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
+  }) {
+    throw UnimplementedError('setPersonProperties() has not been implemented.');
+  }
+
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,

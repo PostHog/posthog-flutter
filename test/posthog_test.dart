@@ -143,6 +143,62 @@ void main() {
     });
   });
 
+  group('setPersonProperties', () {
+    late PosthogFlutterPlatformFake fakePlatformInterface;
+
+    setUp(() {
+      fakePlatformInterface = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+    });
+
+    test('passes userPropertiesToSet to platform interface', () async {
+      await Posthog().setPersonProperties(
+        userPropertiesToSet: {'name': 'John Doe', 'email': 'john@example.com'},
+      );
+
+      expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
+      expect(
+        fakePlatformInterface
+            .setPersonPropertiesCalls.last['userPropertiesToSet'],
+        {'name': 'John Doe', 'email': 'john@example.com'},
+      );
+    });
+
+    test('passes userPropertiesToSetOnce to platform interface', () async {
+      await Posthog().setPersonProperties(
+        userPropertiesToSetOnce: {'date_of_first_login': '2024-03-01'},
+      );
+
+      expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
+      expect(
+        fakePlatformInterface
+            .setPersonPropertiesCalls.last['userPropertiesToSetOnce'],
+        {'date_of_first_login': '2024-03-01'},
+      );
+    });
+
+    test('passes both property types to platform interface', () async {
+      await Posthog().setPersonProperties(
+        userPropertiesToSet: {'name': 'John Doe'},
+        userPropertiesToSetOnce: {'created_at': '2024-03-01'},
+      );
+
+      expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
+      final call = fakePlatformInterface.setPersonPropertiesCalls.last;
+      expect(call['userPropertiesToSet'], {'name': 'John Doe'});
+      expect(call['userPropertiesToSetOnce'], {'created_at': '2024-03-01'});
+    });
+
+    test('can be called with no properties', () async {
+      await Posthog().setPersonProperties();
+
+      expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
+      final call = fakePlatformInterface.setPersonPropertiesCalls.last;
+      expect(call['userPropertiesToSet'], isNull);
+      expect(call['userPropertiesToSetOnce'], isNull);
+    });
+  });
+
   group('PostHogFeatureFlagResult', () {
     test('equality', () {
       final result1 = PostHogFeatureFlagResult(

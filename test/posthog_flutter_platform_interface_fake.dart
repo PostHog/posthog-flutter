@@ -21,6 +21,9 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   final List<CapturedExceptionCall> capturedExceptions = [];
   PostHogConfig? receivedConfig;
 
+  // Tracking for setPersonProperties calls
+  final List<Map<String, dynamic>> setPersonPropertiesCalls = [];
+
   // Feature flag test data
   final Map<String, Object?> featureFlagValues = {};
   final Map<String, Object?> featureFlagPayloads = {};
@@ -55,6 +58,17 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
       stackTrace: stackTrace,
       properties: properties,
     ));
+  }
+
+  @override
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
+  }) async {
+    setPersonPropertiesCalls.add({
+      'userPropertiesToSet': userPropertiesToSet,
+      'userPropertiesToSetOnce': userPropertiesToSetOnce,
+    });
   }
 
   @override

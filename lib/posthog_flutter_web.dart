@@ -98,6 +98,24 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
+  }) async {
+    if ((userPropertiesToSet?.isEmpty ?? true) &&
+        (userPropertiesToSetOnce?.isEmpty ?? true)) {
+      return;
+    }
+
+    return handleWebMethodCall(MethodCall('setPersonProperties', {
+      if (userPropertiesToSet != null)
+        'userPropertiesToSet': userPropertiesToSet,
+      if (userPropertiesToSetOnce != null)
+        'userPropertiesToSetOnce': userPropertiesToSetOnce,
+    }));
+  }
+
+  @override
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
