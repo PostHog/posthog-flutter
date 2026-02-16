@@ -169,8 +169,7 @@ void main() {
         userPropertiesToSet: {'name': 'John Doe', 'email': 'john@example.com'},
       );
 
-      final call =
-          log.firstWhere((c) => c.method == 'setPersonProperties');
+      final call = log.firstWhere((c) => c.method == 'setPersonProperties');
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args['userPropertiesToSet'],
           {'name': 'John Doe', 'email': 'john@example.com'});
@@ -185,8 +184,7 @@ void main() {
         userPropertiesToSetOnce: {'date_of_first_login': '2024-03-01'},
       );
 
-      final call =
-          log.firstWhere((c) => c.method == 'setPersonProperties');
+      final call = log.firstWhere((c) => c.method == 'setPersonProperties');
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args['userPropertiesToSetOnce'],
           {'date_of_first_login': '2024-03-01'});
@@ -202,13 +200,11 @@ void main() {
         userPropertiesToSetOnce: {'created_at': '2024-03-01'},
       );
 
-      final call =
-          log.firstWhere((c) => c.method == 'setPersonProperties');
+      final call = log.firstWhere((c) => c.method == 'setPersonProperties');
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args['userPropertiesToSet'], {'name': 'John Doe'});
       expect(args['userPropertiesToSetOnce'], {'created_at': '2024-03-01'});
     });
-
   });
 
   group('PosthogFlutterIO beforeSend callback', () {
