@@ -94,6 +94,10 @@ class PosthogFlutterPlugin :
                 identify(call, result)
             }
 
+            "setPersonProperties" -> {
+                setPersonProperties(call, result)
+            }
+
             "capture" -> {
                 capture(call, result)
             }
@@ -430,6 +434,20 @@ class PosthogFlutterPlugin :
             val userProperties: Map<String, Any>? = call.argument("userProperties")
             val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
             PostHog.identify(userId, userProperties, userPropertiesSetOnce)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun setPersonProperties(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val userPropertiesToSet: Map<String, Any>? = call.argument("userPropertiesToSet")
+            val userPropertiesToSetOnce: Map<String, Any>? = call.argument("userPropertiesToSetOnce")
+            PostHog.setPersonProperties(userPropertiesToSet, userPropertiesToSetOnce)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
