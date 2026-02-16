@@ -81,6 +81,7 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
                         color: widget.appearance.inputPlaceholderColor),
                     contentPadding: const EdgeInsets.all(12),
                     border: InputBorder.none,
+                    filled: false,
                   ),
                   style: TextStyle(color: widget.appearance.inputTextColor),
                   onChanged: (value) {

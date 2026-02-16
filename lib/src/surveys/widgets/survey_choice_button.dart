@@ -64,6 +64,7 @@ class SurveyChoiceButton extends StatelessWidget {
                             initialValue: openChoiceInput,
                             decoration: const InputDecoration(
                               border: InputBorder.none,
+                              filled: false,
                               isDense: true,
                               contentPadding: EdgeInsets.zero,
                             ),

@@ -89,6 +89,9 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp(
         navigatorObservers: [PosthogObserver()],
         title: 'Flutter App',
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        themeMode: ThemeMode.system,
         home: const InitialScreen(),
       ),
     );
