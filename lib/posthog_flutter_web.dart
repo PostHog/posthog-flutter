@@ -102,8 +102,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
   }) async {
-    if ((userPropertiesToSet == null || userPropertiesToSet.isEmpty) &&
-        (userPropertiesToSetOnce == null || userPropertiesToSetOnce.isEmpty)) {
+    if ((userPropertiesToSet?.isEmpty ?? true) &&
+        (userPropertiesToSetOnce?.isEmpty ?? true)) {
       return;
     }
 
