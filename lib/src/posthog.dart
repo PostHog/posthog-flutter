@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
