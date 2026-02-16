@@ -187,6 +187,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             getFeatureFlagResult(call, result: result)
         case "identify":
             identify(call, result: result)
+        case "setPersonProperties":
+            setPersonProperties(call, result: result)
         case "capture":
             capture(call, result: result)
         case "screen":
@@ -598,6 +600,24 @@ extension PosthogFlutterPlugin {
                 userId,
                 userProperties: userProperties,
                 userPropertiesSetOnce: userPropertiesSetOnce
+            )
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func setPersonProperties(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any] {
+            let userPropertiesToSet = args["userPropertiesToSet"] as? [String: Any]
+            let userPropertiesToSetOnce = args["userPropertiesToSetOnce"] as? [String: Any]
+
+            PostHogSDK.shared.setPersonProperties(
+                userPropertiesToSet: userPropertiesToSet,
+                userPropertiesToSetOnce: userPropertiesToSetOnce
             )
             result(nil)
         } else {
