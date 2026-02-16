@@ -1,21 +1,23 @@
 import 'dart:async';
 
+import 'util/platform_io_stub.dart'
+    if (dart.library.io) 'util/platform_io_real.dart';
+
 import 'package:flutter/services.dart';
+
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
-
+import 'surveys/models/posthog_display_survey.dart' as models;
+import 'surveys/models/survey_callbacks.dart';
 import 'error_tracking/dart_exception_processor.dart';
+import 'utils/capture_utils.dart';
+import 'utils/property_normalizer.dart';
+
 import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
-import 'surveys/models/posthog_display_survey.dart' as models;
-import 'surveys/models/survey_callbacks.dart';
-import 'util/platform_io_stub.dart'
-    if (dart.library.io) 'util/platform_io_real.dart';
-import 'utils/capture_utils.dart';
-import 'utils/property_normalizer.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
