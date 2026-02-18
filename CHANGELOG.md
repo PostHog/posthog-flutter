@@ -1,5 +1,3 @@
-## Next
-
 # 5.15.0
 
 - fix: add explicit `package:meta/meta.dart` import for `@internal` annotation ([#286](https://github.com/PostHog/posthog-flutter/issues/286))

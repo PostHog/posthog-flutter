@@ -1,0 +1,35 @@
+name: Setup
+description: Setup Flutter, Node.js, and install dependencies
+
+inputs:
+  install:
+    description: 'Whether to install dependencies'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Flutter
+      uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+      with:
+        channel: 'stable'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: 'pnpm'
+
+    - name: Install Flutter dependencies
+      if: inputs.install == 'true'
+      run: flutter pub get
+      shell: bash
+
+    - name: Install Node.js dependencies
+      if: inputs.install == 'true'
+      run: pnpm install --frozen-lockfile
+      shell: bash
