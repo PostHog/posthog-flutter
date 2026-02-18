@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+// ignore: unnecessary_import
 import 'package:meta/meta.dart';
 
 import 'posthog.dart';
