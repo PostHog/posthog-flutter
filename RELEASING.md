@@ -43,7 +43,7 @@ When the PR is merged to `main`, the release workflow will automatically:
 
 ### Manual Trigger
 
-You can also manually trigger the release workflow from the [Actions tab](https://github.com/PostHog/posthog-flutter/actions/workflows/release.yml) by clicking "Run workflow".
+You can also manually trigger the release workflow from the [Actions tab](https://github.com/PostHog/posthog-flutter/actions/workflows/publish.yml) by clicking "Run workflow".
 
 ## Version Bumping
 
