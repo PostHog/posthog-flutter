@@ -207,36 +207,18 @@ jobs:
           echo "committed-version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version from pubspec.yaml: $VERSION"
 
-      - name: Check if version is new on pub.dev
-        id: check-pub-version
-        run: |
-          PACKAGE_NAME=$(grep '^name:' pubspec.yaml | sed 's/name: //')
-          VERSION=${{ steps.get-version.outputs.committed-version }}
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pub.dev/api/packages/$PACKAGE_NAME/versions/$VERSION")
-          if [ "$HTTP_STATUS" = "404" ]; then
-            echo "is-new-version=true" >> "$GITHUB_OUTPUT"
-            echo "✓ Version $VERSION is not yet published on pub.dev"
-          else
-            echo "is-new-version=false" >> "$GITHUB_OUTPUT"
-            echo "Version $VERSION already exists on pub.dev (HTTP $HTTP_STATUS)"
-          fi
-
       - name: Tag repository
-        if: steps.check-pub-version.outputs.is-new-version == 'true'
         run: |
           git tag -a "v${{ steps.get-version.outputs.committed-version }}" -m "v${{ steps.get-version.outputs.committed-version }}"
 
       - name: Publish to pub.dev
-        if: steps.check-pub-version.outputs.is-new-version == 'true'
         run: flutter pub publish --force
 
       - name: Push tag to GitHub
-        if: steps.check-pub-version.outputs.is-new-version == 'true'
         run: |
           git push origin "v${{ steps.get-version.outputs.committed-version }}"
 
       - name: Create GitHub release
-        if: steps.check-pub-version.outputs.is-new-version == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
