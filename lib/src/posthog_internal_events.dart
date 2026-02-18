@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+// ignore: unnecessary_import
 import 'package:meta/meta.dart';
 
 @internal
