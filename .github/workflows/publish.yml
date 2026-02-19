@@ -160,7 +160,7 @@ jobs:
 
       - name: Cache Slack thread_ts for publish workflow
         if: steps.commit-version-bump.outputs.committed == 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .slack-thread-ts
           key: slack-thread-ts-${{ steps.apply-changesets.outputs.new-version }}
