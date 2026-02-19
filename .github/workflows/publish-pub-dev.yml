@@ -22,6 +22,31 @@ jobs:
           ref: ${{ github.ref }}
           fetch-depth: 0
 
+      - name: Validate tag matches version bump
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+
+          # Check that the tagged commit is a version bump commit from the release workflow
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          EXPECTED_MSG="chore: release ${TAG_VERSION} [version bump]"
+          if [ "$COMMIT_MSG" != "$EXPECTED_MSG" ]; then
+            echo "❌ Tag '${TAG_VERSION}' does not point to a version bump commit."
+            echo "   Expected commit message: '${EXPECTED_MSG}'"
+            echo "   Actual commit message:   '${COMMIT_MSG}'"
+            echo ""
+            echo "This workflow should only be triggered by tags created by the Release workflow."
+            exit 1
+          fi
+
+          # Check that the tag version matches the version in pubspec.yaml
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          if [ "$TAG_VERSION" != "$PUBSPEC_VERSION" ]; then
+            echo "❌ Tag version '${TAG_VERSION}' does not match pubspec.yaml version '${PUBSPEC_VERSION}'."
+            exit 1
+          fi
+
+          echo "✓ Tag '${TAG_VERSION}' is valid: commit message and pubspec.yaml version match."
+
       - name: Setup Dart
         uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
 
