@@ -1,5 +1,11 @@
 # 5.15.0
 
+## 5.15.1
+
+### Patch Changes
+
+- fe383a5: chore: test new release process
+
 - fix: add explicit `package:meta/meta.dart` import for `@internal` annotation ([#286](https://github.com/PostHog/posthog-flutter/issues/286))
 - feat: add `setPersonProperties` method to set person properties without requiring `identify` ([#284](https://github.com/PostHog/posthog-flutter/pull/284))
 - fix: add `filled: false` to survey open-text questions to prevent app theme from overriding survey customization values ([#285](https://github.com/PostHog/posthog-flutter/pull/285))
