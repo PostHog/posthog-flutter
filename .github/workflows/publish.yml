@@ -136,14 +136,6 @@ jobs:
           echo "new-version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
 
-      - name: Fix changelog format
-        run: |
-          # Changesets generates '## version' (h2) and '### Patch/Minor/Major Changes' (h3).
-          # Our convention uses '# version' (h1) and '## Patch/Minor/Major Changes' (h2).
-          # Downgrade heading levels for the new entry at the top of the changelog.
-          sed -i 's/^## \([0-9]\)/# \1/' CHANGELOG.md
-          sed -i 's/^### \(Patch\|Minor\|Major\) Changes/## \1 Changes/' CHANGELOG.md
-
       - name: Sync version to all platform files
         run: ./scripts/bump-version.sh ${{ steps.apply-changesets.outputs.new-version }}
 
