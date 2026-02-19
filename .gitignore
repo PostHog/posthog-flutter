@@ -633,3 +633,6 @@ posthog_flutter.iml
 
 # pod files
 Podfile.lock
+
+# https://nightshift.haplab.com/
+PLAN.md
