@@ -73,7 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Read from the first until the second header in the changelog file
-          LAST_CHANGELOG_ENTRY=$(awk -v defText="see CHANGELOG.md" '/^## /{if (flag) exit; flag=1} flag && /^##$/{exit} flag; END{if (!flag) print defText}' CHANGELOG.md)
+          LAST_CHANGELOG_ENTRY=$(awk -v defText="see CHANGELOG.md" '/^## /{if (flag) exit; flag=1; next} flag; END{if (!flag) print defText}' CHANGELOG.md)
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
@@ -114,6 +114,25 @@ jobs:
           VERSION="${GITHUB_REF#refs/tags/}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Restore Slack thread_ts from cache
+        id: restore-thread-ts
+        uses: actions/cache/restore@v4
+        with:
+          path: .slack-thread-ts
+          key: slack-thread-ts-${{ steps.get-version.outputs.version }}
+
+      - name: Read Slack thread_ts
+        id: slack-thread
+        run: |
+          if [ -f .slack-thread-ts ]; then
+            THREAD_TS=$(cat .slack-thread-ts)
+            echo "thread_ts=$THREAD_TS" >> "$GITHUB_OUTPUT"
+            echo "✓ Found thread_ts: $THREAD_TS"
+          else
+            echo "⚠ No thread_ts found, will post as a new message"
+            echo "thread_ts=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Notify Slack - Released
         if: needs.publish.result == 'success'
         continue-on-error: true
@@ -121,7 +140,7 @@ jobs:
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
-          # Cannot thread to original message across workflows, post new message
+          thread_ts: ${{ steps.slack-thread.outputs.thread_ts }}
           message: '🚀 `posthog_flutter@${{ steps.get-version.outputs.version }}` released successfully!'
 
       - name: Notify Slack - Failed
@@ -131,4 +150,5 @@ jobs:
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
+          thread_ts: ${{ steps.slack-thread.outputs.thread_ts }}
           message: '❌ Failed to publish `posthog_flutter@${{ steps.get-version.outputs.version }}` to pub.dev! <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>'

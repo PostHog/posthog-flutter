@@ -154,6 +154,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
 
+      - name: Save Slack thread_ts to cache
+        if: steps.commit-version-bump.outputs.committed == 'true'
+        run: echo "${{ needs.notify-approval-needed.outputs.slack_ts }}" > .slack-thread-ts
+
+      - name: Cache Slack thread_ts for publish workflow
+        if: steps.commit-version-bump.outputs.committed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .slack-thread-ts
+          key: slack-thread-ts-${{ steps.apply-changesets.outputs.new-version }}
+
       - name: Tag and push
         if: steps.commit-version-bump.outputs.committed == 'true'
         run: |
