@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     # Use `always()` to ensure the job runs even if the notify-approval-needed job fails
     if: always() && needs.check-changesets.outputs.has-changesets == 'true'
-    environment: 'pub-Release' # Requires approval from a maintainer
+    environment: 'Release' # Requires approval from a maintainer
     permissions:
       contents: write
     outputs:
@@ -173,7 +173,7 @@ jobs:
     needs: [version-bump, notify-approval-needed]
     runs-on: ubuntu-latest
     if: always() && needs.version-bump.outputs.committed == 'true'
-    environment: 'pub-Release' # Required for OIDC authentication with pub.dev
+    environment: 'Release' # Required for OIDC authentication with pub.dev
     permissions:
       contents: write
       id-token: write # Required for authentication using OIDC
