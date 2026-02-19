@@ -4,8 +4,7 @@ permissions:
   contents: read
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -18,16 +17,42 @@ jobs:
   check-changesets:
     name: Check for changesets
     runs-on: ubuntu-latest
-    # Run when PR with 'release' label is merged to main, or when manually triggered
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request'
-       && github.event.pull_request.merged == true
-       && contains(github.event.pull_request.labels.*.name, 'release'))
+    # Run when a push to main comes from a merged PR with the 'release' label, or when manually triggered
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     outputs:
       has-changesets: ${{ steps.check.outputs.has-changesets }}
     steps:
+      - name: Check for release label on merged PR
+        if: github.event_name == 'push'
+        id: check-label
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Find the PR associated with this merge commit
+          COMMIT_SHA="${{ github.sha }}"
+          PR_NUMBER=$(gh api "/repos/${{ github.repository }}/commits/${COMMIT_SHA}/pulls" --jq '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR found for commit ${COMMIT_SHA}. Skipping release."
+            echo "has-release-label=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Found PR #${PR_NUMBER} for commit ${COMMIT_SHA}"
+
+          # Check if the PR has the 'release' label
+          HAS_LABEL=$(gh api "/repos/${{ github.repository }}/issues/${PR_NUMBER}/labels" --jq '[.[] | select(.name == "release")] | length')
+
+          if [ "$HAS_LABEL" -gt 0 ]; then
+            echo "✓ PR #${PR_NUMBER} has the 'release' label"
+            echo "has-release-label=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PR #${PR_NUMBER} does not have the 'release' label. Skipping release."
+            echo "has-release-label=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: github.event_name == 'workflow_dispatch' || steps.check-label.outputs.has-release-label == 'true'
         uses: actions/checkout@v6
         with:
           ref: main
@@ -35,6 +60,7 @@ jobs:
 
       - name: Check for changesets
         id: check
+        if: github.event_name == 'workflow_dispatch' || steps.check-label.outputs.has-release-label == 'true'
         run: |
           if [ ! -d ".changeset" ] || [ -z "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "❌ No changesets found. Cannot proceed with release."
