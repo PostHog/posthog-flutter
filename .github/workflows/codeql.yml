@@ -24,7 +24,7 @@ jobs:
             runner: ubuntu-latest
           - language: swift
             build-mode: manual
-            runner: macos-latest
+            runner: macos-15-xlarge
           - language: actions
             build-mode: none
             runner: ubuntu-latest
