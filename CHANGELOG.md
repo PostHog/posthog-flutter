@@ -1,5 +1,11 @@
 ## 5.15.1
 
+## 5.15.2
+
+### Patch Changes
+
+- c7dcd9c: test new release process, again
+
 ### Patch Changes
 
 - f7801dc: test new release process
