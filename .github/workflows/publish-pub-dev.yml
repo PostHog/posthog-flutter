@@ -1,0 +1,134 @@
+name: 'Publish to pub.dev'
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+*'
+
+jobs:
+  publish:
+    name: Publish to pub.dev
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # Required for authentication using OIDC
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Validate tag matches version bump
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+
+          # Check that the tagged commit is a version bump commit from the release workflow
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          EXPECTED_MSG="chore: release ${TAG_VERSION} [version bump]"
+          if [ "$COMMIT_MSG" != "$EXPECTED_MSG" ]; then
+            echo "❌ Tag '${TAG_VERSION}' does not point to a version bump commit."
+            echo "   Expected commit message: '${EXPECTED_MSG}'"
+            echo "   Actual commit message:   '${COMMIT_MSG}'"
+            echo ""
+            echo "This workflow should only be triggered by tags created by the Release workflow."
+            exit 1
+          fi
+
+          # Check that the tag version matches the version in pubspec.yaml
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          if [ "$TAG_VERSION" != "$PUBSPEC_VERSION" ]; then
+            echo "❌ Tag version '${TAG_VERSION}' does not match pubspec.yaml version '${PUBSPEC_VERSION}'."
+            exit 1
+          fi
+
+          echo "✓ Tag '${TAG_VERSION}' is valid: commit message and pubspec.yaml version match."
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Get version from tag
+        id: get-version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing version: $VERSION"
+
+      - name: Publish to pub.dev
+        run: flutter pub publish --force
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Read from the first until the second header in the changelog file
+          LAST_CHANGELOG_ENTRY=$(awk -v defText="see CHANGELOG.md" '/^## /{if (flag) exit; flag=1} flag && /^##$/{exit} flag; END{if (!flag) print defText}' CHANGELOG.md)
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/releases \
+            -f tag_name="${{ steps.get-version.outputs.version }}" \
+            -f target_commitish='main' \
+            -f name="${{ steps.get-version.outputs.version }}" \
+            -f body="$LAST_CHANGELOG_ENTRY" \
+            -F draft=false \
+            -F prerelease=false \
+            -F generate_release_notes=false
+
+      # Notify in case of failure
+      - name: Send failure event to PostHog
+        if: ${{ failure() }}
+        uses: PostHog/posthog-github-action@v0.1
+        with:
+          posthog-token: '${{ secrets.POSTHOG_PROJECT_API_KEY }}'
+          event: 'posthog-flutter-release-workflow-failure'
+          properties: >-
+            {
+              "commitSha": "${{ github.sha }}",
+              "jobStatus": "${{ job.status }}",
+              "ref": "${{ github.ref }}",
+              "packageVersion": "${{ steps.get-version.outputs.version }}"
+            }
+
+  notify-released:
+    name: Notify Slack - Released
+    needs: publish
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Get version from tag
+        id: get-version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack - Released
+        if: needs.publish.result == 'success'
+        continue-on-error: true
+        uses: PostHog/.github/.github/actions/slack-thread-reply@main
+        with:
+          slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
+          slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
+          # Cannot thread to original message across workflows, post new message
+          message: '🚀 `posthog_flutter@${{ steps.get-version.outputs.version }}` released successfully!'
+
+      - name: Notify Slack - Failed
+        if: needs.publish.result == 'failure'
+        continue-on-error: true
+        uses: PostHog/.github/.github/actions/slack-thread-reply@main
+        with:
+          slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
+          slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
+          message: '❌ Failed to publish `posthog_flutter@${{ steps.get-version.outputs.version }}` to pub.dev! <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>'
