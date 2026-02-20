@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:posthog_flutter/posthog_flutter.dart';
 
 /// A class that detects changes in the UI and executes a callback when changes occur.
 ///
@@ -51,11 +50,6 @@ class ChangeDetector {
   /// Executes the [onChange] callback and schedules itself for the next frame
   /// if the change detector is still running.
   void _onFrameRendered() {
-    final config = Posthog().config;
-    if (config == null || !config.sessionReplay) {
-      return;
-    }
-
     if (!_isRunning) {
       return;
     }

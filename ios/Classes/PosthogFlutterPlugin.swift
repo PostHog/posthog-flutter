@@ -183,8 +183,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             isFeatureEnabled(call, result: result)
         case "getFeatureFlagPayload":
             getFeatureFlagPayload(call, result: result)
+        case "getFeatureFlagResult":
+            getFeatureFlagResult(call, result: result)
         case "identify":
             identify(call, result: result)
+        case "setPersonProperties":
+            setPersonProperties(call, result: result)
         case "capture":
             capture(call, result: result)
         case "screen":
@@ -223,6 +227,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendFullSnapshot(call, result: result)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
+        case "startSessionRecording":
+            startSessionRecording(call, result: result)
+        case "stopSessionRecording":
+            stopSessionRecording(result: result)
         case "getSessionId":
             getSessionId(result: result)
         case "openUrl":
@@ -455,6 +463,28 @@ extension PosthogFlutterPlugin {
         #endif
     }
 
+    private func startSessionRecording(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        #if os(iOS)
+            let resumeCurrent = call.arguments as? Bool ?? true
+            PostHogSDK.shared.startSessionRecording(resumeCurrent: resumeCurrent)
+            result(nil)
+        #else
+            result(nil)
+        #endif
+    }
+
+    private func stopSessionRecording(result: @escaping FlutterResult) {
+        #if os(iOS)
+            PostHogSDK.shared.stopSessionRecording()
+            result(nil)
+        #else
+            result(nil)
+        #endif
+    }
+
     private func openUrl(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
@@ -531,6 +561,31 @@ extension PosthogFlutterPlugin {
         }
     }
 
+    private func getFeatureFlagResult(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let featureFlagKey = args["key"] as? String
+        {
+            let sendEvent = args["sendEvent"] as? Bool ?? true
+            let flagResult = PostHogSDK.shared.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+
+            if let flagResult {
+                result([
+                    "key": flagResult.key,
+                    "enabled": flagResult.enabled,
+                    "variant": flagResult.variant as Any,
+                    "payload": flagResult.payload as Any
+                ])
+            } else {
+                result(nil)
+            }
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
     private func identify(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
@@ -552,6 +607,24 @@ extension PosthogFlutterPlugin {
         }
     }
 
+    private func setPersonProperties(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any] {
+            let userPropertiesToSet = args["userPropertiesToSet"] as? [String: Any]
+            let userPropertiesToSetOnce = args["userPropertiesToSetOnce"] as? [String: Any]
+
+            PostHogSDK.shared.setPersonProperties(
+                userPropertiesToSet: userPropertiesToSet,
+                userPropertiesToSetOnce: userPropertiesToSetOnce
+            )
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
     private func capture(
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
@@ -560,9 +633,13 @@ extension PosthogFlutterPlugin {
            let eventName = args["eventName"] as? String
         {
             let properties = args["properties"] as? [String: Any]
+            let userProperties = args["userProperties"] as? [String: Any]
+            let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
             PostHogSDK.shared.capture(
                 eventName,
-                properties: properties
+                properties: properties,
+                userProperties: userProperties,
+                userPropertiesSetOnce: userPropertiesSetOnce
             )
             result(nil)
         } else {
@@ -641,8 +718,7 @@ extension PosthogFlutterPlugin {
         }
     }
 
-    private func reloadFeatureFlags(_ result: @escaping FlutterResult
-    ) {
+    private func reloadFeatureFlags(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.reloadFeatureFlags()
         result(nil)
     }

@@ -1,5 +1,6 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
@@ -41,9 +42,18 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('identify() has not been implemented.');
   }
 
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
+  }) {
+    throw UnimplementedError('setPersonProperties() has not been implemented.');
+  }
+
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) {
     throw UnimplementedError('capture() has not been implemented.');
   }
@@ -131,6 +141,14 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
         'getFeatureFlagPayload() has not been implemented.');
   }
 
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
+    required String key,
+    bool sendEvent = true,
+  }) {
+    throw UnimplementedError(
+        'getFeatureFlagResult() has not been implemented.');
+  }
+
   Future<void> flush() {
     throw UnimplementedError('flush() has not been implemented.');
   }
@@ -148,6 +166,28 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
 
   Future<String?> getSessionId() async {
     throw UnimplementedError('getSessionId() not implemented');
+  }
+
+  /// Starts session recording.
+  ///
+  /// [resumeCurrent] - If true, resumes recording of the current session.
+  /// If false, starts a new session and begins recording.
+  /// Defaults to true.
+  Future<void> startSessionRecording({bool resumeCurrent = true}) {
+    throw UnimplementedError(
+        'startSessionRecording() has not been implemented.');
+  }
+
+  /// Stops the current session recording if one is in progress.
+  Future<void> stopSessionRecording() {
+    throw UnimplementedError(
+        'stopSessionRecording() has not been implemented.');
+  }
+
+  /// Returns whether session replay is currently active.
+  Future<bool> isSessionReplayActive() {
+    throw UnimplementedError(
+        'isSessionReplayActive() has not been implemented.');
   }
 
   // TODO: missing capture with more parameters

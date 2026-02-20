@@ -1,3 +1,4 @@
+// ignore: unnecessary_import
 import 'package:meta/meta.dart';
 
 /// A wrapper exception that carries PostHog-specific metadata

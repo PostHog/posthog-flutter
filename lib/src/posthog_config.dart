@@ -1,4 +1,14 @@
+import 'dart:async';
+
+import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+
+/// Callback to intercept and modify events before they are sent to PostHog.
+///
+/// Return a possibly modified event to send it, or return `null` to drop it.
+/// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
+typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+    PostHogEvent event);
 
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
@@ -52,12 +62,80 @@ class PostHogConfig {
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
 
+  /// Callbacks to intercept and modify events before they are sent to PostHog.
+  ///
+  /// Callbacks are invoked in order for events captured via Dart APIs:
+  /// - `Posthog().capture()` - custom events
+  /// - `Posthog().screen()` - screen events (event name will be `$screen`)
+  /// - `Posthog().captureException()` - exception events (event name will be `$exception`)
+  ///
+  /// Each callback receives the event (possibly modified by previous callbacks).
+  /// Return a possibly modified event to continue, or return `null` to drop it.
+  ///
+  /// **Example (single callback):**
+  /// ```dart
+  /// config.beforeSend = [(event) {
+  ///   // Drop specific events
+  ///   if (event.event == 'sensitive_event') {
+  ///     return null;
+  ///   }
+  ///   return event;
+  /// }];
+  /// ```
+  ///
+  /// **Example (multiple callbacks):**
+  /// ```dart
+  /// config.beforeSend = [
+  ///   // First: PII redaction
+  ///   (event) {
+  ///     event.properties?.remove('email');
+  ///     return event;
+  ///   },
+  ///   // Second: Event filtering
+  ///   (event) => event.event == 'drop me' ? null : event,
+  /// ];
+  /// ```
+  ///
+  /// **Example (async callback):**
+  /// ```dart
+  /// config.beforeSend = [
+  ///   (event) async {
+  ///     // Perform async operations
+  ///     final shouldSend = await checkIfEventAllowed(event.event);
+  ///     if (!shouldSend) {
+  ///       return null; // Drop the event
+  ///     }
+  ///     // Enrich event with async data
+  ///     final extraData = await fetchExtraContext();
+  ///     event.properties = {...?event.properties, ...extraData};
+  ///     return event;
+  ///   },
+  /// ];
+  /// ```
+  ///
+  /// **Limitations:**
+  /// - These callbacks do NOT intercept native-initiated events such as:
+  ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is enabled
+  ///   - Application lifecycle events (`Application Opened`, etc.) when `config.captureApplicationLifecycleEvents` is enabled
+  ///   - Feature flag events (`$feature_flag_called`) when `config.sendFeatureFlagEvents` is enabled
+  ///   - Identity events (`$set`) when `identify` is called
+  ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
+  /// - Only user-provided properties are available; system properties
+  ///   (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
+  ///
+  /// **Note:**
+  /// - Callbacks can be synchronous or asynchronous (via `FutureOr<PostHogEvent?>`)
+  /// - Exceptions in a callback will skip that callback and continue with the next one in the list
+  /// - If any callback returns `null`, the event is dropped and subsequent callbacks are not called.
+  List<BeforeSendCallback> beforeSend = [];
+
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
 
   PostHogConfig(
     this.apiKey, {
     this.onFeatureFlags,
-  });
+    List<BeforeSendCallback>? beforeSend,
+  }) : beforeSend = beforeSend ?? [];
 
   Map<String, dynamic> toMap() {
     return {
@@ -121,7 +199,7 @@ class PostHogErrorTrackingConfig {
   /// List of package names to be considered inApp frames for exception tracking
   ///
   /// inApp Example:
-  /// inAppIncludes = ["package:your_app", "package:your_company_utils"]
+  /// inAppIncludes.addAll(["package:your_app", "package:your_company_utils"])
   /// All exception stacktrace frames from these packages will be considered inApp
   ///
   /// This option takes precedence over inAppExcludes.
@@ -137,7 +215,7 @@ class PostHogErrorTrackingConfig {
   /// List of package names to be excluded from inApp frames for exception tracking
   ///
   /// inAppExcludes Example:
-  /// inAppExcludes = ["package:third_party_lib", "package:analytics_package"]
+  /// inAppExcludes.addAll(["package:third_party_lib", "package:analytics_package"])
   /// All exception stacktrace frames from these packages will be considered external
   ///
   /// Note: inAppIncludes takes precedence over this setting.
@@ -171,18 +249,12 @@ class PostHogErrorTrackingConfig {
   ///
   /// Controls whether `FlutterError.onError` errors are captured.
   ///
-  /// **Note:**
-  /// - Flutter web: Not supported
-  ///
   /// Default: false
   var captureFlutterErrors = false;
 
   /// Enable capturing of silent Flutter errors
   ///
   /// Controls whether Flutter errors marked as silent (FlutterErrorDetails.silent = true) are captured.
-  ///
-  /// **Note:**
-  /// - Flutter web: Not supported
   ///
   /// Default: false
   var captureSilentFlutterErrors = false;

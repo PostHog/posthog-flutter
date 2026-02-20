@@ -24,9 +24,9 @@ class ElementData {
   }
 
   List<Rect> extractMaskWidgetRects() {
-    final rects = <Rect>[];
+    final rects = <Rect>{};
     _collectMaskWidgetRects(this, rects);
-    return rects;
+    return rects.toList();
   }
 
   List<ElementData> extractRects({bool isRoot = true}) {
@@ -49,14 +49,14 @@ class ElementData {
     return rects;
   }
 
-  void _collectMaskWidgetRects(ElementData element, List<Rect> rectList) {
-    if (!rectList.contains(element.rect)) {
+  void _collectMaskWidgetRects(ElementData element, Set<Rect> rectSet) {
+    if (!rectSet.contains(element.rect)) {
       if (element.widget is PostHogMaskWidget) {
-        rectList.add(element.rect);
+        rectSet.add(element.rect);
       } else if (element.widget is TextField) {
         final textField = element.widget as TextField;
         if (textField.obscureText) {
-          rectList.add(element.rect);
+          rectSet.add(element.rect);
         }
       }
     }
@@ -64,7 +64,7 @@ class ElementData {
     final children = element.children;
     if (children != null && children.isNotEmpty) {
       for (var child in children) {
-        _collectMaskWidgetRects(child, rectList);
+        _collectMaskWidgetRects(child, rectSet);
       }
     }
   }

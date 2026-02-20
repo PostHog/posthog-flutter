@@ -32,8 +32,8 @@ class SurveyChoiceButton extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(
               color: isSelected
-                  ? Colors.black
-                  : Colors.black.withValues(alpha: 0.5),
+                  ? appearance.choiceButtonBorderColor
+                  : appearance.choiceButtonBorderColor.withValues(alpha: 0.5),
               width: 1,
             ),
             borderRadius: BorderRadius.circular(4),
@@ -50,8 +50,9 @@ class SurveyChoiceButton extends StatelessWidget {
                             '$label:',
                             style: TextStyle(
                               color: isSelected
-                                  ? Colors.black
-                                  : Colors.black.withAlpha(128),
+                                  ? appearance.choiceButtonTextColor
+                                  : appearance.choiceButtonTextColor
+                                      .withValues(alpha: 0.5),
                               fontWeight: isSelected ? FontWeight.bold : null,
                             ),
                           ),
@@ -63,13 +64,15 @@ class SurveyChoiceButton extends StatelessWidget {
                             initialValue: openChoiceInput,
                             decoration: const InputDecoration(
                               border: InputBorder.none,
+                              filled: false,
                               isDense: true,
                               contentPadding: EdgeInsets.zero,
                             ),
                             style: TextStyle(
                               color: isSelected
-                                  ? Colors.black
-                                  : Colors.black.withAlpha(128),
+                                  ? appearance.choiceButtonTextColor
+                                  : appearance.choiceButtonTextColor
+                                      .withValues(alpha: 0.5),
                               fontSize: 14,
                             ),
                           ),
@@ -80,16 +83,16 @@ class SurveyChoiceButton extends StatelessWidget {
                         style: TextStyle(
                           color: isSelected
                               ? Colors.black
-                              : Colors.black.withAlpha(128),
+                              : Colors.black.withValues(alpha: 0.5),
                           fontWeight: isSelected ? FontWeight.bold : null,
                         ),
                       ),
               ),
               if (isSelected)
-                const Icon(
+                Icon(
                   Icons.check,
                   size: 16,
-                  color: Colors.black,
+                  color: appearance.choiceButtonTextColor,
                 ),
             ],
           ),

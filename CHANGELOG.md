@@ -1,14 +1,64 @@
 ## Next
 
-# 5.11.1
+## 5.15.2
+
+### Patch Changes
+
+- c7dcd9c: test new release process, again
+
+## 5.15.1
+
+### Patch Changes
+
+- f7801dc: test new release process
+
+## 5.15.0
+
+- fix: add explicit `package:meta/meta.dart` import for `@internal` annotation ([#286](https://github.com/PostHog/posthog-flutter/issues/286))
+- feat: add `setPersonProperties` method to set person properties without requiring `identify` ([#284](https://github.com/PostHog/posthog-flutter/pull/284))
+- fix: add `filled: false` to survey open-text questions to prevent app theme from overriding survey customization values ([#285](https://github.com/PostHog/posthog-flutter/pull/285))
+
+## 5.14.0
+
+- feat: add manual session recording control APIs ([#256](https://github.com/PostHog/posthog-flutter/pull/256))
+  - `startSessionRecording({bool resumeCurrent = true})` Start session recording, optionally starting a new session
+  - `stopSessionRecording()` Stop the current session recording
+  - `isSessionReplayActive()` Check if session replay is currently active
+- feat: add `getFeatureFlagResult` API ([#279](https://github.com/PostHog/posthog-flutter/pull/279))
+
+## 5.13.0
+
+- chore: add support for thumbs up/down surveys ([#257](https://github.com/PostHog/posthog-flutter/pull/257))
+
+- perf: Optimize Screenshot diff check ([#271](https://github.com/PostHog/posthog-flutter/pull/271))
+
+- chore: improve survey color handling ([#233](https://github.com/PostHog/posthog-flutter/pull/233))
+
+- feat: add `beforeSend` callback to `PostHogConfig` for dropping or modifying events before they are sent to PostHog ([#255](https://github.com/PostHog/posthog-flutter/pull/255))
+  - **Limitation**:
+    - Does NOT intercept native-initiated events such as:
+      - Session replay events (`$snapshot`) when `config.sessionReplay` is enabled
+      - Application lifecycle events (`Application Opened`, etc.) when `config.captureApplicationLifecycleEvents` is enabled
+      - Feature flag events (`$feature_flag_called`) when `config.sendFeatureFlagEvents` is enabled
+      - Identity events (`$set`) when `identify` is called
+      - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
+    - Only user-provided properties are available; system properties (like `$device_type`, `$session_id`) are added by the native SDK at a later stage.
+- perf: Optimize mask widget rect collection to O(N) ([#269](https://github.com/PostHog/posthog-flutter/pull/269))
+
+## 5.12.0
+
+- feat: flutter error tracking support for web ([#243](https://github.com/PostHog/posthog-flutter/pull/243))
+- feat: add `userProperties` and `userPropertiesSetOnce` parameters to `capture()` method ([#254](https://github.com/PostHog/posthog-flutter/pull/254))
+
+## 5.11.1
 
 - fix: RichText, SelectableText, TextField labels and hints not being masked in session replay ([#251](https://github.com/PostHog/posthog-flutter/pull/251))
 
-# 5.11.0
+## 5.11.0
 
 - chore: update languageVersion and apiVersion from 1.8 to 2.0 on Android to be compatible with Kotlin 2.3 ([#245](https://github.com/PostHog/posthog-flutter/pull/245))
 
-# 5.10.0
+## 5.10.0
 
 - feat: Add `onFeatureFlags` callback to `PostHogConfig` to get notified when feature flags are loaded. Use `Posthog().getFeatureFlag()` or `Posthog().isFeatureEnabled()` within the callback to access fresh flag values. ([#224](https://github.com/PostHog/posthog-flutter/pull/224))
 
@@ -30,7 +80,7 @@
 ## 5.8.0
 
 - feat: surveys GA ([#215](https://github.com/PostHog/posthog-flutter/pull/215))
-> Note: Surveys are now enabled by default.
+  > Note: Surveys are now enabled by default.
 
 ## 5.7.0
 

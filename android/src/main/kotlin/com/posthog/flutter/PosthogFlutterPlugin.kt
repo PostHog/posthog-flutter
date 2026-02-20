@@ -94,6 +94,10 @@ class PosthogFlutterPlugin :
                 identify(call, result)
             }
 
+            "setPersonProperties" -> {
+                setPersonProperties(call, result)
+            }
+
             "capture" -> {
                 capture(call, result)
             }
@@ -146,6 +150,10 @@ class PosthogFlutterPlugin :
                 getFeatureFlagPayload(call, result)
             }
 
+            "getFeatureFlagResult" -> {
+                getFeatureFlagResult(call, result)
+            }
+
             "register" -> {
                 register(call, result)
             }
@@ -173,6 +181,12 @@ class PosthogFlutterPlugin :
             "isSessionReplayActive" -> {
                 result.success(isSessionReplayActive())
             }
+            "startSessionRecording" -> {
+                startSessionRecording(call, result)
+            }
+            "stopSessionRecording" -> {
+                stopSessionRecording(result)
+            }
             "getSessionId" -> {
                 getSessionId(result)
             }
@@ -189,6 +203,20 @@ class PosthogFlutterPlugin :
     }
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
+
+    private fun startSessionRecording(
+        call: MethodCall,
+        result: Result,
+    ) {
+        val resumeCurrent = call.arguments as? Boolean ?: true
+        PostHog.startSessionReplay(resumeCurrent)
+        result.success(null)
+    }
+
+    private fun stopSessionRecording(result: Result) {
+        PostHog.stopSessionReplay()
+        result.success(null)
+    }
 
     private fun handleMetaEvent(
         call: MethodCall,
@@ -367,6 +395,36 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun getFeatureFlagResult(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val featureFlagKey = call.argument<String>("key")
+            if (featureFlagKey.isNullOrEmpty()) {
+                result.error("PosthogFlutterException", "Missing argument: key", null)
+                return
+            }
+            val sendEvent: Boolean = call.argument("sendEvent") ?: true
+            val flagResult = PostHog.getFeatureFlagResult(featureFlagKey, sendEvent)
+
+            if (flagResult != null) {
+                result.success(
+                    mapOf(
+                        "key" to flagResult.key,
+                        "enabled" to flagResult.enabled,
+                        "variant" to flagResult.variant,
+                        "payload" to flagResult.payload,
+                    ),
+                )
+            } else {
+                result.success(null)
+            }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
     private fun identify(
         call: MethodCall,
         result: Result,
@@ -382,6 +440,20 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun setPersonProperties(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val userPropertiesToSet: Map<String, Any>? = call.argument("userPropertiesToSet")
+            val userPropertiesToSetOnce: Map<String, Any>? = call.argument("userPropertiesToSetOnce")
+            PostHog.setPersonProperties(userPropertiesToSet, userPropertiesToSetOnce)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
     private fun capture(
         call: MethodCall,
         result: Result,
@@ -389,7 +461,14 @@ class PosthogFlutterPlugin :
         try {
             val eventName: String = call.argument("eventName")!!
             val properties: Map<String, Any>? = call.argument("properties")
-            PostHog.capture(eventName, properties = properties)
+            val userProperties: Map<String, Any>? = call.argument("userProperties")
+            val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
+            PostHog.capture(
+                eventName,
+                properties = properties,
+                userProperties = userProperties,
+                userPropertiesSetOnce = userPropertiesSetOnce,
+            )
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

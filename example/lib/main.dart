@@ -1,24 +1,47 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter_example/error_example.dart';
 
 import 'masking_tests_screen.dart';
 
 Future<void> main() async {
-  // // init WidgetsFlutterBinding if not yet
-
-  WidgetsFlutterBinding.ensureInitialized();
   final config =
-      PostHogConfig('phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D');
+      PostHogConfig('phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06');
   config.onFeatureFlags = () {
     debugPrint('[PostHog] Feature flags loaded!');
   };
+
+  // Configure beforeSend callbacks to filter/modify events
+  config.beforeSend = [
+    (event) {
+      debugPrint('[beforeSend] Event: ${event.event}');
+
+      // Test case 1: Drop specific events
+      if (event.event == 'drop me') {
+        debugPrint('[beforeSend] Dropping event: ${event.event}');
+        return null;
+      }
+
+      // Test case 2: Modify event properties
+      if (event.event == 'modify me') {
+        event.properties ??= {};
+        event.properties?['modified_by_before_send'] = true;
+        debugPrint('[beforeSend] Modified event: ${event.event}');
+      }
+
+      // Pass through all other events unchanged
+      return event;
+    },
+  ];
+
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
-  config.surveys = true;
-  config.sessionReplay = true;
+  config.surveys = false;
+  config.sessionReplay = false;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
   config.sessionReplayConfig.throttleDelay = const Duration(milliseconds: 1000);
@@ -32,8 +55,20 @@ Future<void> main() async {
   config.errorTrackingConfig.captureIsolateErrors =
       true; // Capture isolate errors
 
-  await Posthog().setup(config);
+  if (kIsWeb) {
+    runZonedGuarded(
+      () async => await _initAndRun(config),
+      (error, stackTrace) async => await Posthog()
+          .captureRunZonedGuardedError(error: error, stackTrace: stackTrace),
+    );
+  } else {
+    await _initAndRun(config);
+  }
+}
 
+Future<void> _initAndRun(PostHogConfig config) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Posthog().setup(config);
   runApp(const MyApp());
 }
 
@@ -56,6 +91,9 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp(
         navigatorObservers: [PosthogObserver()],
         title: 'Flutter App',
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        themeMode: ThemeMode.system,
         home: const InitialScreen(),
       ),
     );
@@ -144,6 +182,10 @@ class InitialScreenState extends State<InitialScreen> {
                         _posthogFlutterPlugin
                             .capture(eventName: "eventName", properties: {
                           "foo": "bar",
+                        }, userProperties: {
+                          "user_foo": "user_bar",
+                        }, userPropertiesSetOnce: {
+                          "user_foo_once": "user_bar_once",
                         });
                       },
                       child: const Text("Capture Event"),
@@ -274,61 +316,105 @@ class InitialScreenState extends State<InitialScreen> {
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
+                    "Session Recording",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                      ),
+                      onPressed: () async {
+                        await _posthogFlutterPlugin.startSessionRecording();
+                        if (mounted && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Session recording started (resume current)'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text("Start Recording"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                      ),
+                      onPressed: () async {
+                        await _posthogFlutterPlugin.startSessionRecording(
+                            resumeCurrent: false);
+                        if (mounted && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Session recording started (new session)'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text("Start New Session"),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                      onPressed: () async {
+                        await _posthogFlutterPlugin.stopSessionRecording();
+                        if (mounted && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Session recording stopped'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text("Stop Recording"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                      ),
+                      onPressed: () async {
+                        final isActive =
+                            await _posthogFlutterPlugin.isSessionReplayActive();
+                        if (mounted && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Session replay active: $isActive'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text("Check Active"),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
                     "Error Tracking - Manual",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    try {
-                      // Simulate an exception in main isolate
-                      // throw 'a custom error string';
-                      // throw 333;
-                      throw CustomException(
-                        'This is a custom exception with additional context',
-                        code: 'DEMO_ERROR_001',
-                        additionalData: {
-                          'user_action': 'button_press',
-                          'timestamp': DateTime.now().millisecondsSinceEpoch,
-                          'feature_enabled': true,
-                        },
-                      );
-                    } catch (e, stack) {
-                      await Posthog().captureException(
-                        error: e,
-                        stackTrace: stack,
-                        properties: {
-                          'test_type': 'main_isolate_exception',
-                          'button_pressed': 'capture_exception_main',
-                          'exception_category': 'custom',
-                        },
-                      );
-
-                      if (mounted && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Main isolate exception captured successfully! Check PostHog.'),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
-                      }
-                    }
+                    await ErrorExample().causeHandledDivisionError();
                   },
                   child: const Text("Capture Exception"),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                  ),
-                  onPressed: () async {
-                    await Posthog().captureException(
-                      error: 'No Stack Trace Error',
-                      properties: {'test_type': 'no_stack_trace'},
-                    );
-                  },
-                  child: const Text("Capture Exception (Missing Stack)"),
                 ),
                 const Divider(),
                 const Padding(
@@ -343,7 +429,7 @@ class InitialScreenState extends State<InitialScreen> {
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -356,10 +442,7 @@ class InitialScreenState extends State<InitialScreen> {
                     }
 
                     // Test Flutter error handler by throwing in widget context
-                    throw const CustomException(
-                        'Test Flutter error for autocapture',
-                        code: 'FlutterErrorTest',
-                        additionalData: {'test_type': 'flutter_error'});
+                    await ErrorExample().causeHandledDivisionError();
                   },
                   child: const Text("Test Flutter Error Handler"),
                 ),
@@ -368,18 +451,10 @@ class InitialScreenState extends State<InitialScreen> {
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
-                    // Test PlatformDispatcher error handler with Future
-                    Future.delayed(Duration.zero, () {
-                      throw const CustomException(
-                          'Test PlatformDispatcher error for autocapture',
-                          code: 'PlatformDispatcherTest',
-                          additionalData: {
-                            'test_type': 'platform_dispatcher_error'
-                          });
-                    });
+                  onPressed: () async {
+                    await ErrorExample().throwWithinDelayed();
 
-                    if (mounted) {
+                    if (mounted && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
@@ -397,19 +472,11 @@ class InitialScreenState extends State<InitialScreen> {
                     backgroundColor: Colors.purple,
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     // Test isolate error listener by throwing in an async callback
-                    Timer(Duration.zero, () {
-                      throw const CustomException(
-                        'Isolate error for testing',
-                        code: 'IsolateHandlerTest',
-                        additionalData: {
-                          'test_type': 'isolate_error_listener_timer',
-                        },
-                      );
-                    });
+                    await ErrorExample().throwWithinTimer();
 
-                    if (mounted) {
+                    if (mounted && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content:
@@ -421,6 +488,79 @@ class InitialScreenState extends State<InitialScreen> {
                     }
                   },
                   child: const Text("Test Isolate Error Handler"),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "beforeSend Tests",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        _posthogFlutterPlugin.capture(
+                          eventName: 'normal_event',
+                          properties: {'test': 'pass_through'},
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Normal event sent (should appear in PostHog)'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Text("Normal Event"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        _posthogFlutterPlugin.capture(
+                          eventName: 'drop me',
+                          properties: {'should_be': 'dropped'},
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Drop event sent (should NOT appear in PostHog)'),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Text("Drop Event"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        _posthogFlutterPlugin.capture(
+                          eventName: 'modify me',
+                          properties: {'original': true},
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Modify event sent (check for modified_by_before_send property)'),
+                            backgroundColor: Colors.orange,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Text("Modify Event"),
+                    ),
+                  ],
                 ),
                 const Divider(),
                 const Padding(
@@ -459,6 +599,16 @@ class InitialScreenState extends State<InitialScreen> {
                     });
                   },
                   child: const Text("getFeatureFlagPayload"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final result = await _posthogFlutterPlugin
+                        .getFeatureFlagResult("feature_name");
+                    setState(() {
+                      _result = result?.toString();
+                    });
+                  },
+                  child: const Text("getFeatureFlagResult"),
                 ),
                 ElevatedButton(
                   onPressed: () async {

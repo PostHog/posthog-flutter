@@ -1,3 +1,5 @@
+import 'dart:math' show sqrt;
+
 import 'package:flutter/material.dart';
 import 'posthog_display_survey_appearance.dart';
 
@@ -5,55 +7,119 @@ import 'posthog_display_survey_appearance.dart';
 @immutable
 class SurveyAppearance {
   const SurveyAppearance({
-    this.backgroundColor,
+    this.backgroundColor = Colors.white,
     this.submitButtonColor = Colors.black,
     this.submitButtonText = 'Submit',
     this.submitButtonTextColor = Colors.white,
-    this.descriptionTextColor,
-    this.ratingButtonColor,
-    this.ratingButtonActiveColor,
+    this.descriptionTextColor = Colors.black,
+    this.questionTextColor = Colors.black,
+    this.closeButtonColor = Colors.black,
+    this.ratingButtonColor = const Color(0xFFEEEEEE),
+    this.ratingButtonActiveColor = Colors.black,
+    this.ratingButtonSelectedTextColor = Colors.white,
+    this.ratingButtonUnselectedTextColor = const Color(0x80000000),
     this.displayThankYouMessage = true,
     this.thankYouMessageHeader = 'Thank you for your feedback!',
     this.thankYouMessageDescription,
     this.thankYouMessageCloseButtonText = 'Close',
-    this.borderColor,
+    this.borderColor = const Color(0xFFBDBDBD),
+    this.inputBackgroundColor = Colors.white,
+    this.inputTextColor = Colors.black,
+    this.inputPlaceholderColor = const Color(0xFF757575),
+    this.choiceButtonBorderColor = Colors.black,
+    this.choiceButtonTextColor = Colors.black,
   });
 
-  final Color? backgroundColor;
+  final Color backgroundColor;
   final Color submitButtonColor;
   final String submitButtonText;
   final Color submitButtonTextColor;
-  final Color? descriptionTextColor;
-  final Color? ratingButtonColor;
-  final Color? ratingButtonActiveColor;
+  final Color descriptionTextColor;
+  final Color questionTextColor;
+  final Color closeButtonColor;
+  final Color ratingButtonColor;
+  final Color ratingButtonActiveColor;
+  final Color ratingButtonSelectedTextColor;
+  final Color ratingButtonUnselectedTextColor;
   final bool displayThankYouMessage;
   final String thankYouMessageHeader;
   final String? thankYouMessageDescription;
   final String thankYouMessageCloseButtonText;
-  final Color? borderColor;
+  final Color borderColor;
+  final Color inputBackgroundColor;
+  final Color inputTextColor;
+  final Color inputPlaceholderColor;
+  final Color choiceButtonBorderColor;
+  final Color choiceButtonTextColor;
 
   /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance]
   static SurveyAppearance fromPostHog(
       PostHogDisplaySurveyAppearance? appearance) {
+    final backgroundColor =
+        _colorFromHex(appearance?.backgroundColor) ?? Colors.white;
+    final submitButtonColor =
+        _colorFromHex(appearance?.submitButtonColor) ?? Colors.black;
+    final ratingButtonColor =
+        _colorFromHex(appearance?.ratingButtonColor) ?? const Color(0xFFEEEEEE);
+    final ratingButtonActiveColor =
+        _colorFromHex(appearance?.ratingButtonActiveColor) ?? Colors.black;
+
+    // Input background: use override, or slight adjustment for high luminance backgrounds
+    final inputBackgroundColor = _colorFromHex(appearance?.inputBackground) ??
+        (backgroundColor.computeLuminance() > 0.95
+            ? const Color(0xFFF8F8F8)
+            : backgroundColor);
+
+    // Primary text color: use textColor override if provided, otherwise auto-contrast
+    final primaryTextColor = _colorFromHex(appearance?.textColor) ??
+        _getContrastingTextColor(backgroundColor);
+
+    // Input text color: use override if provided, otherwise auto-contrast from input background
+    final inputTextColor = _colorFromHex(appearance?.inputTextColor) ??
+        _getContrastingTextColor(inputBackgroundColor);
+
     return SurveyAppearance(
-      backgroundColor: _colorFromHex(appearance?.backgroundColor),
-      submitButtonColor:
-          _colorFromHex(appearance?.submitButtonColor) ?? Colors.black,
+      backgroundColor: backgroundColor,
+      submitButtonColor: submitButtonColor,
       submitButtonText: appearance?.submitButtonText ?? 'Submit',
-      submitButtonTextColor:
-          _colorFromHex(appearance?.submitButtonTextColor) ?? Colors.white,
-      descriptionTextColor: _colorFromHex(appearance?.descriptionTextColor),
-      ratingButtonColor: _colorFromHex(appearance?.ratingButtonColor),
-      ratingButtonActiveColor:
-          _colorFromHex(appearance?.ratingButtonActiveColor),
+      submitButtonTextColor: _colorFromHex(appearance?.submitButtonTextColor) ??
+          _getContrastingTextColor(submitButtonColor),
+      descriptionTextColor:
+          _colorFromHex(appearance?.descriptionTextColor) ?? primaryTextColor,
+      questionTextColor: primaryTextColor,
+      closeButtonColor: primaryTextColor,
+      ratingButtonColor: ratingButtonColor,
+      ratingButtonActiveColor: ratingButtonActiveColor,
+      ratingButtonSelectedTextColor:
+          _getContrastingTextColor(ratingButtonActiveColor),
+      ratingButtonUnselectedTextColor: inputTextColor.withAlpha(128),
       displayThankYouMessage: appearance?.displayThankYouMessage ?? true,
       thankYouMessageHeader:
           appearance?.thankYouMessageHeader ?? 'Thank you for your feedback!',
       thankYouMessageDescription: appearance?.thankYouMessageDescription,
       thankYouMessageCloseButtonText:
           appearance?.thankYouMessageCloseButtonText ?? 'Close',
-      borderColor: _colorFromHex(appearance?.borderColor),
+      borderColor:
+          _colorFromHex(appearance?.borderColor) ?? const Color(0xFFBDBDBD),
+      inputBackgroundColor: inputBackgroundColor,
+      inputTextColor: inputTextColor,
+      inputPlaceholderColor: inputTextColor.withAlpha(153),
+      choiceButtonBorderColor: primaryTextColor,
+      choiceButtonTextColor: primaryTextColor,
     );
+  }
+
+  /// Returns black or white text color based on the perceived brightness of the background.
+  /// Uses the HSP (Highly Sensitive Perceived) color model for perceived brightness.
+  /// This matches the algorithm used in posthog-js.
+  static Color _getContrastingTextColor(Color color) {
+    final r = (color.r * 255.0).round().clamp(0, 255);
+    final g = (color.g * 255.0).round().clamp(0, 255);
+    final b = (color.b * 255.0).round().clamp(0, 255);
+    // HSP equation for perceived brightness
+    final hsp = sqrt(0.299 * (r * r) + 0.587 * (g * g) + 0.114 * (b * b));
+    // Using 127.5 as threshold (same as JS)
+    return hsp > 127.5 ? Colors.black : Colors.white;
   }
 
   static Color? _colorFromHex(String? colorString) {

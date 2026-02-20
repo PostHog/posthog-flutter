@@ -66,8 +66,8 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
                 minHeight: 80,
               ),
               decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.grey.shade400),
+                color: widget.appearance.inputBackgroundColor,
+                border: Border.all(color: widget.appearance.borderColor),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: SingleChildScrollView(
@@ -77,10 +77,13 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
                   textAlignVertical: TextAlignVertical.top,
                   decoration: InputDecoration(
                     hintText: 'Start typing...',
-                    hintStyle: TextStyle(color: Colors.grey.shade600),
+                    hintStyle: TextStyle(
+                        color: widget.appearance.inputPlaceholderColor),
                     contentPadding: const EdgeInsets.all(12),
                     border: InputBorder.none,
+                    filled: false,
                   ),
+                  style: TextStyle(color: widget.appearance.inputTextColor),
                   onChanged: (value) {
                     setState(() {
                       _response = value;

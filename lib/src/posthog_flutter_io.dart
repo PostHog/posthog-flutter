@@ -10,9 +10,13 @@ import 'package:posthog_flutter/src/util/logging.dart';
 import 'surveys/models/posthog_display_survey.dart' as models;
 import 'surveys/models/survey_callbacks.dart';
 import 'error_tracking/dart_exception_processor.dart';
+import 'utils/capture_utils.dart';
 import 'utils/property_normalizer.dart';
 
+import 'feature_flag_result.dart';
 import 'posthog_config.dart';
+import 'posthog_constants.dart';
+import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
@@ -28,6 +32,51 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
+
+  /// Stored beforeSend callbacks for dropping/modifying events
+  List<BeforeSendCallback> _beforeSendCallbacks = [];
+
+  /// Applies the beforeSend callbacks to an event in order.
+  /// Returns the possibly modified event, or null if any callback drops it.
+  Future<PostHogEvent?> _runBeforeSend(
+    String eventName,
+    Map<String, Object>? properties, {
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+  }) async {
+    var event = PostHogEvent(
+      event: eventName,
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+
+    if (_beforeSendCallbacks.isEmpty) return event;
+
+    for (final callback in _beforeSendCallbacks) {
+      final result = await _applyBeforeSendCallback(callback, event);
+      if (result == null) return null;
+      event = result;
+    }
+    return event;
+  }
+
+  /// Applies a single beforeSend callback safely.
+  /// Returns null if event should be dropped, otherwise returns the (possibly modified) event.
+  /// Handles both synchronous and asynchronous callbacks via FutureOr.
+  Future<PostHogEvent?> _applyBeforeSendCallback(
+      BeforeSendCallback callback, PostHogEvent event) async {
+    try {
+      final callbackResult = callback(event);
+      if (callbackResult is Future<PostHogEvent?>) {
+        return await callbackResult;
+      }
+      return callbackResult;
+    } catch (e) {
+      printIfDebug('[PostHog] beforeSend callback threw exception: $e');
+      return event;
+    }
+  }
 
   /// Native plugin calls to Flutter
   ///
@@ -133,6 +182,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     _onFeatureFlagsCallback = config.onFeatureFlags;
+    _beforeSendCallbacks = config.beforeSend;
 
     try {
       await _methodChannel.invokeMethod('setup', config.toMap());
@@ -172,21 +222,87 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> capture({
-    required String eventName,
-    Map<String, Object>? properties,
+  Future<void> setPersonProperties({
+    Map<String, Object>? userPropertiesToSet,
+    Map<String, Object>? userPropertiesToSetOnce,
   }) async {
     if (!isSupportedPlatform()) {
       return;
     }
 
     try {
-      final normalizedProperties =
-          properties != null ? PropertyNormalizer.normalize(properties) : null;
+      final normalizedUserPropertiesToSet = userPropertiesToSet != null
+          ? PropertyNormalizer.normalize(userPropertiesToSet)
+          : null;
+      final normalizedUserPropertiesToSetOnce = userPropertiesToSetOnce != null
+          ? PropertyNormalizer.normalize(userPropertiesToSetOnce)
+          : null;
+
+      await _methodChannel.invokeMethod('setPersonProperties', {
+        if (normalizedUserPropertiesToSet != null)
+          'userPropertiesToSet': normalizedUserPropertiesToSet,
+        if (normalizedUserPropertiesToSetOnce != null)
+          'userPropertiesToSetOnce': normalizedUserPropertiesToSetOnce,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on setPersonProperties: $exception');
+    }
+  }
+
+  @override
+  Future<void> capture({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    // Apply beforeSend callback
+    final processedEvent = await _runBeforeSend(
+      eventName,
+      properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+
+    if (processedEvent == null) {
+      printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
+      return;
+    }
+
+    try {
+      // Use processed event properties (potentially modified by beforeSend)
+      final extracted = CaptureUtils.extractUserProperties(
+        properties: processedEvent.properties,
+        userProperties: processedEvent.userProperties,
+        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
+      );
+
+      final extractedProperties = extracted.properties;
+      final extractedUserProperties = extracted.userProperties;
+      final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
+
+      final normalizedProperties = extractedProperties != null
+          ? PropertyNormalizer.normalize(extractedProperties)
+          : null;
+      final normalizedUserProperties = extractedUserProperties != null
+          ? PropertyNormalizer.normalize(extractedUserProperties)
+          : null;
+      final normalizedUserPropertiesSetOnce =
+          extractedUserPropertiesSetOnce != null
+              ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+              : null;
 
       await _methodChannel.invokeMethod('capture', {
-        'eventName': eventName,
+        'eventName': processedEvent.event,
         if (normalizedProperties != null) 'properties': normalizedProperties,
+        if (normalizedUserProperties != null)
+          'userProperties': normalizedUserProperties,
+        if (normalizedUserPropertiesSetOnce != null)
+          'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on capture: $exception');
@@ -202,12 +318,44 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
+    // Add screenName as $screen_name property for beforeSend
+    final propsWithScreenName = <String, Object>{
+      PostHogPropertyName.screenName: screenName,
+      ...?properties,
+    };
+
+    // Apply beforeSend callback - screen events are captured as $screen
+    final processedEvent =
+        await _runBeforeSend(PostHogEventName.screen, propsWithScreenName);
+    if (processedEvent == null) {
+      printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
+      return;
+    }
+
+    // If event name was changed, use regular capture() instead
+    if (processedEvent.event != PostHogEventName.screen) {
+      await capture(
+        eventName: processedEvent.event,
+        properties: processedEvent.properties?.cast<String, Object>(),
+      );
+      return;
+    }
+
+    // Get the (possibly modified) screen name from properties and remove it
+    final finalScreenName =
+        processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
+            screenName;
+    // It will be added back by native sdk
+    processedEvent.properties?.remove(PostHogPropertyName.screenName);
+
     try {
-      final normalizedProperties =
-          properties != null ? PropertyNormalizer.normalize(properties) : null;
+      final normalizedProperties = processedEvent.properties?.isNotEmpty == true
+          ? PropertyNormalizer.normalize(
+              processedEvent.properties!.cast<String, Object>())
+          : null;
 
       await _methodChannel.invokeMethod('screen', {
-        'screenName': screenName,
+        'screenName': finalScreenName,
         if (normalizedProperties != null) 'properties': normalizedProperties,
       });
     } on PlatformException catch (exception) {
@@ -407,6 +555,29 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
+    required String key,
+    bool sendEvent = true,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return null;
+    }
+
+    try {
+      final result = await _methodChannel.invokeMethod('getFeatureFlagResult', {
+        'key': key,
+        'sendEvent': sendEvent,
+      });
+
+      // Native returns: { key, enabled, variant, payload }
+      return PostHogFeatureFlagResult.fromMap(result, key);
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on getFeatureFlagResult: $exception');
+      return null;
+    }
+  }
+
+  @override
   Future<void> register(String key, Object value) async {
     if (!isSupportedPlatform()) {
       return;
@@ -456,7 +627,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      final exceptionData = DartExceptionProcessor.processException(
+      final exceptionProps = DartExceptionProcessor.processException(
         error: error,
         stackTrace: stackTrace,
         properties: properties,
@@ -465,10 +636,30 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
+      // Apply beforeSend callback - exception events are captured as $exception
+      final processedEvent = await _runBeforeSend(
+          PostHogEventName.exception, exceptionProps.cast<String, Object>());
+      if (processedEvent == null) {
+        printIfDebug(
+            '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}');
+        return;
+      }
+
+      // If event name was changed, use capture() instead
+      if (processedEvent.event != PostHogEventName.exception) {
+        await capture(
+          eventName: processedEvent.event,
+          properties: processedEvent.properties?.cast<String, Object>(),
+        );
+        return;
+      }
+
       // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final normalizedData =
-          PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
+      final normalizedData = processedEvent.properties != null
+          ? PropertyNormalizer.normalize(
+              processedEvent.properties!.cast<String, Object>())
+          : <String, Object>{};
 
       await _methodChannel.invokeMethod('captureException',
           {'timestamp': timestamp, 'properties': normalizedData});
@@ -517,6 +708,47 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       await _methodChannel.invokeMethod('openUrl', url);
     } on PlatformException catch (exception) {
       printIfDebug('Exception on openUrl: $exception');
+    }
+  }
+
+  @override
+  Future<void> startSessionRecording({bool resumeCurrent = true}) async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('startSessionRecording', resumeCurrent);
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on startSessionRecording: $exception');
+    }
+  }
+
+  @override
+  Future<void> stopSessionRecording() async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('stopSessionRecording');
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on stopSessionRecording: $exception');
+    }
+  }
+
+  @override
+  Future<bool> isSessionReplayActive() async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      return false;
+    }
+
+    try {
+      final result = await _methodChannel.invokeMethod('isSessionReplayActive');
+      return result as bool? ?? false;
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on isSessionReplayActive: $exception');
+      return false;
     }
   }
 }

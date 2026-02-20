@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 import 'replay/change_detector.dart';
@@ -31,17 +32,50 @@ class PostHogWidgetState extends State<PostHogWidget> {
     super.initState();
 
     final config = Posthog().config;
-    if (config == null || !config.sessionReplay) {
+    if (config == null) {
       return;
     }
 
-    _throttleDuration = config.sessionReplayConfig.throttleDelay;
+    if (config.sessionReplay) {
+      _initComponents(config);
+      _changeDetector?.start();
+    }
 
+    // start listening for session recording toggles
+    PostHogInternalEvents.sessionRecordingActive
+        .addListener(_onSessionRecordingChanged);
+  }
+
+  void _initComponents(PostHogConfig config) {
+    _throttleDuration = config.sessionReplayConfig.throttleDelay;
     _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
-
     _changeDetector = ChangeDetector(_onChangeDetected);
+  }
+
+  void _onSessionRecordingChanged() {
+    if (PostHogInternalEvents.sessionRecordingActive.value) {
+      _startRecording();
+    } else {
+      _stopRecording();
+    }
+  }
+
+  void _startRecording() {
+    final config = Posthog().config;
+    if (config == null) {
+      return;
+    }
+
+    if (_changeDetector == null) {
+      _initComponents(config);
+    }
+
     _changeDetector?.start();
+  }
+
+  void _stopRecording() {
+    _changeDetector?.stop();
   }
 
   // This works as onRootViewsChangedListeners
@@ -97,6 +131,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   @override
   void dispose() {
+    PostHogInternalEvents.sessionRecordingActive
+        .removeListener(_onSessionRecordingChanged);
+
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _changeDetector?.stop();

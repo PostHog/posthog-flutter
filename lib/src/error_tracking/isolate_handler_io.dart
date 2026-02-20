@@ -1,5 +1,6 @@
 import 'dart:isolate';
 
+// ignore: unnecessary_import
 import 'package:meta/meta.dart';
 
 /// Native platform implementation of isolate error handling
