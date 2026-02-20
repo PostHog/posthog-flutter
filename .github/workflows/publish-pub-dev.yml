@@ -116,7 +116,7 @@ jobs:
 
       - name: Restore Slack thread_ts from cache
         id: restore-thread-ts
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .slack-thread-ts
           key: slack-thread-ts-${{ steps.get-version.outputs.version }}
