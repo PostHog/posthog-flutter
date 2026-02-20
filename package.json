@@ -1,6 +1,6 @@
 {
   "name": "posthog_flutter",
-  "version": "5.15.0",
+  "version": "5.15.2",
   "private": true,
   "description": "Version tracking for changesets - the canonical version is in pubspec.yaml",
   "packageManager": "pnpm@10.29.3",
