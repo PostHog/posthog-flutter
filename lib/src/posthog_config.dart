@@ -10,23 +10,107 @@ import 'posthog_flutter_platform_interface.dart';
 typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
     PostHogEvent event);
 
-enum PostHogPersonProfiles { never, always, identifiedOnly }
+/// Controls when person profiles are created in PostHog.
+///
+/// Person profiles allow you to associate events with specific users and
+/// view their properties and event history in the PostHog UI.
+enum PostHogPersonProfiles {
+  /// Never create person profiles. All events are anonymous.
+  never,
 
-enum PostHogDataMode { wifi, cellular, any }
+  /// Always create person profiles for every event.
+  always,
 
+  /// Only create person profiles when [Posthog.identify] is called.
+  identifiedOnly,
+}
+
+/// Controls which network types are allowed for sending analytics data.
+///
+/// iOS only.
+enum PostHogDataMode {
+  /// Only send data over Wi-Fi connections.
+  wifi,
+
+  /// Only send data over cellular connections.
+  cellular,
+
+  /// Send data over any available network connection.
+  any,
+}
+
+/// Configuration for the PostHog SDK.
+///
+/// Pass an instance of this class to [Posthog.setup] to initialize the SDK.
+///
+/// Only [apiKey] is required; all other properties have sensible defaults.
+///
+/// ```dart
+/// final config = PostHogConfig('YOUR_API_KEY');
+/// config.host = 'https://eu.i.posthog.com';
+/// config.debug = true;
+/// await Posthog().setup(config);
+/// ```
 class PostHogConfig {
+  /// The project API key used to authenticate with your PostHog instance.
   final String apiKey;
+
+  /// The URL of your PostHog instance.
+  ///
+  /// Defaults to `https://us.i.posthog.com`.
   var host = 'https://us.i.posthog.com';
+
+  /// The number of queued events that triggers an automatic flush.
+  ///
+  /// Defaults to 20.
   var flushAt = 20;
+
+  /// The maximum number of events to keep in the local queue.
+  ///
+  /// Events captured after the queue is full will be dropped.
+  /// Defaults to 1000.
   var maxQueueSize = 1000;
+
+  /// The maximum number of events sent in a single batch request.
+  ///
+  /// Defaults to 50.
   var maxBatchSize = 50;
+
+  /// The interval at which queued events are automatically flushed.
+  ///
+  /// Defaults to 30 seconds.
   var flushInterval = const Duration(seconds: 30);
+
+  /// Whether to automatically send a `$feature_flag_called` event when
+  /// a feature flag is evaluated.
+  ///
+  /// Defaults to `true`.
   var sendFeatureFlagEvents = true;
+
+  /// Whether to automatically load feature flags when the SDK is initialized.
+  ///
+  /// Defaults to `true`.
   var preloadFeatureFlags = true;
+
+  /// Whether to automatically capture application lifecycle events such as
+  /// `Application Opened`, `Application Backgrounded`, and `Application Installed`.
+  ///
+  /// Defaults to `false`.
   var captureApplicationLifecycleEvents = false;
 
+  /// Whether to enable verbose debug logging for the SDK.
+  ///
+  /// Defaults to `false`.
   var debug = false;
+
+  /// Whether the user has opted out of analytics tracking.
+  ///
+  /// When `true`, no events are captured. Defaults to `false`.
   var optOut = false;
+
+  /// Controls when person profiles are created.
+  ///
+  /// Defaults to [PostHogPersonProfiles.identifiedOnly].
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
 
   /// Enable Recording of Session replay for Android and iOS.
@@ -160,6 +244,10 @@ class PostHogConfig {
   }
 }
 
+/// Configuration options for session replay recording.
+///
+/// Adjust these settings to control what is captured and how often
+/// snapshots are taken. Set via [PostHogConfig.sessionReplayConfig].
 class PostHogSessionReplayConfig {
   /// Enable masking of all text and text input fields.
   /// Default: true.
@@ -195,6 +283,10 @@ class PostHogSessionReplayConfig {
   }
 }
 
+/// Configuration for automatic error and exception capture.
+///
+/// Controls which error sources are automatically captured and how
+/// stack trace frames are classified. Set via [PostHogConfig.errorTrackingConfig].
 class PostHogErrorTrackingConfig {
   /// List of package names to be considered inApp frames for exception tracking
   ///

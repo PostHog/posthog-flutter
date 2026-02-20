@@ -10,6 +10,18 @@ import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
 
+/// The main entry point for the PostHog Flutter SDK.
+///
+/// Use the singleton instance via `Posthog()` to capture events, manage
+/// feature flags, identify users, and control session replay.
+///
+/// Call [setup] before using any other methods.
+///
+/// ```dart
+/// final config = PostHogConfig('YOUR_API_KEY');
+/// await Posthog().setup(config);
+/// await Posthog().capture(eventName: 'app_started');
+/// ```
 class Posthog {
   static PosthogFlutterPlatformInterface get _posthog =>
       PosthogFlutterPlatformInterface.instance;
@@ -310,6 +322,7 @@ class Posthog {
   Future<Object?> getFeatureFlagPayload(String key) =>
       _posthog.getFeatureFlagPayload(key: key);
 
+  /// Flushes all queued events to PostHog immediately.
   Future<void> flush() => _posthog.flush();
 
   /// Captures exceptions with optional custom properties

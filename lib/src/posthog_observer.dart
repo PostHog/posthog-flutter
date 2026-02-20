@@ -4,6 +4,10 @@ import 'package:meta/meta.dart';
 
 import 'posthog.dart';
 
+/// Extracts a screen name from [RouteSettings].
+///
+/// Used by [PosthogObserver] to determine the screen name sent with
+/// `$screen` events. Return `null` to skip tracking for a given route.
 typedef ScreenNameExtractor = String? Function(RouteSettings settings);
 
 /// [PostHogRouteFilter] allows to filter out routes that should not be tracked.
@@ -11,10 +15,27 @@ typedef ScreenNameExtractor = String? Function(RouteSettings settings);
 /// By default, only [PageRoute]s are tracked.
 typedef PostHogRouteFilter = bool Function(Route<dynamic>? route);
 
+/// The default [ScreenNameExtractor], which returns [RouteSettings.name].
 String? defaultNameExtractor(RouteSettings settings) => settings.name;
 
+/// The default [PostHogRouteFilter], which only tracks [PageRoute]s.
 bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
 
+/// A [NavigatorObserver] that automatically captures screen view events
+/// whenever the navigation stack changes.
+///
+/// Add an instance to your app's `navigatorObservers` so PostHog records
+/// screen views on push, pop, and replace:
+///
+/// ```dart
+/// MaterialApp(
+///   navigatorObservers: [PosthogObserver()],
+/// );
+/// ```
+///
+/// By default, screen names are taken from [RouteSettings.name] and only
+/// [PageRoute]s are tracked. Customise this with [nameExtractor] and
+/// [routeFilter].
 class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   PosthogObserver(
       {ScreenNameExtractor nameExtractor = defaultNameExtractor,

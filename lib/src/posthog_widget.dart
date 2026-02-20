@@ -9,6 +9,17 @@ import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
 import 'replay/screenshot/screenshot_capturer.dart';
 
+/// A widget that enables PostHog session replay for your application.
+///
+/// Wrap your app's root widget with [PostHogWidget] to capture screenshots
+/// for session replay. Session replay must also be enabled via
+/// [PostHogConfig.sessionReplay].
+///
+/// ```dart
+/// PostHogWidget(
+///   child: MyApp(),
+/// );
+/// ```
 class PostHogWidget extends StatefulWidget {
   final Widget child;
 

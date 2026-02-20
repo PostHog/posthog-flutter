@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
 
+/// A widget that masks its child's content in session replay recordings.
+///
+/// Wrap any widget with [PostHogMaskWidget] to ensure its content is
+/// hidden in session replays, useful for sensitive information that should
+/// not be recorded.
+///
+/// ```dart
+/// PostHogMaskWidget(
+///   child: Text('Sensitive data'),
+/// );
+/// ```
 class PostHogMaskWidget extends StatefulWidget {
   final Widget child;
 
