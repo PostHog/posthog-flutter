@@ -311,6 +311,12 @@ class PosthogFlutterPlugin :
 
                 this.sessionReplayConfig.captureLogcat = false
 
+                posthogConfig.getIfNotNull<Map<String, Any>>("sessionReplayConfig") { replayConfig ->
+                    replayConfig.getIfNotNull<Double>("sampleRate") {
+                        this.sessionReplayConfig.sampleRate = it
+                    }
+                }
+
                 // Configure surveys
                 posthogConfig.getIfNotNull<Boolean>("surveys") {
                     surveys = it

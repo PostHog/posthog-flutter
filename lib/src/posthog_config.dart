@@ -186,11 +186,17 @@ class PostHogSessionReplayConfig {
   /// Defaults to 1s.
   var throttleDelay = const Duration(seconds: 1);
 
+  /// Session replay sample rate between 0 and 1.
+  /// Local config has precedence over remote config when both are set.
+  /// If null, sampling is controlled by remote config (when available).
+  double? sampleRate;
+
   Map<String, dynamic> toMap() {
     return {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
+      if (sampleRate != null) 'sampleRate': sampleRate,
     };
   }
 }
