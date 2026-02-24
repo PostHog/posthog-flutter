@@ -30,17 +30,17 @@ class RenderEditableParser extends ElementParser {
 
     // Use preferredLineHeight instead of size.height because RenderEditable's
     // layout height can be much smaller than the actual rendered text height
-    final double textHeight = renderObject.preferredLineHeight;
-    final double width = renderObject.size.width;
+    final textHeight = renderObject.preferredLineHeight;
+    final width = renderObject.size.width;
 
     // Account for multiline TextFields
-    final int lines = renderObject.maxLines ?? 1;
-    final double height = textHeight * lines;
+    final lines = renderObject.maxLines ?? 1;
+    final height = textHeight * lines;
 
-    final Rect localRect = Rect.fromLTWH(0, 0, width, height);
+    final localRect = Rect.fromLTWH(0, 0, width, height);
     final ancestor = PostHogMaskController.instance.containerKey.currentContext
         ?.findRenderObject();
-    final Matrix4 transform = renderObject.getTransformTo(ancestor);
+    final transform = renderObject.getTransformTo(ancestor);
 
     return (rect: localRect, transform: transform);
   }

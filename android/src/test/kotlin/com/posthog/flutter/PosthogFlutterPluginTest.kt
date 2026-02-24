@@ -51,7 +51,7 @@ internal class PosthogFlutterPluginTest {
         Mockito.verify(mockResult).error(
             Mockito.eq("PosthogFlutterException"),
             Mockito.eq("Missing argument: key"),
-            Mockito.isNull()
+            Mockito.isNull(),
         )
     }
 }

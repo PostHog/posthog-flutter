@@ -13,7 +13,7 @@ class ElementObjectParser {
     Element element,
   ) {
     if (element.widget is PostHogMaskWidget) {
-      final elementData = _elementParser.relate(element, activeElementData);
+      final elementData = _elementParser.relate(element);
 
       if (elementData != null) {
         activeElementData.addChildren(elementData);
@@ -22,7 +22,7 @@ class ElementObjectParser {
     }
 
     if (element.widget is Text) {
-      final elementData = _elementParser.relate(element, activeElementData);
+      final elementData = _elementParser.relate(element);
 
       if (elementData != null) {
         activeElementData.addChildren(elementData);
@@ -50,7 +50,7 @@ class ElementObjectParser {
       final shouldMask = !maskAllTexts && isObscured;
 
       if (shouldMask) {
-        final elementData = _elementParser.relate(element, activeElementData);
+        final elementData = _elementParser.relate(element);
 
         if (elementData != null) {
           activeElementData.addChildren(elementData);
@@ -64,7 +64,7 @@ class ElementObjectParser {
 
       final parser = PostHogMaskController.instance.parsers[dataType];
       if (parser != null) {
-        final elementData = parser.relate(element, activeElementData);
+        final elementData = parser.relate(element);
 
         if (elementData != null) {
           activeElementData.addChildren(elementData);
@@ -79,7 +79,7 @@ class ElementObjectParser {
 
       final parser = PostHogMaskController.instance.parsers[dataType];
       if (parser != null) {
-        final elementData = parser.relate(element, activeElementData);
+        final elementData = parser.relate(element);
 
         if (elementData != null) {
           activeElementData.addChildren(elementData);

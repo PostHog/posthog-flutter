@@ -7,10 +7,7 @@ import 'package:posthog_flutter/src/replay/size_extension.dart';
 class ElementParser {
   ElementParser();
 
-  ElementData? relate(
-    Element element,
-    ElementData parentElementData,
-  ) {
+  ElementData? relate(Element element) {
     final result = buildElementData(element);
     if (result == null) {
       return null;
@@ -34,7 +31,7 @@ class ElementParser {
       // Use paintBounds to capture the actual painted area
       // This is important for text with ScreenUtil scaling where the painted
       // text can be larger than the logical layout bounds
-      final Rect localRect = renderObject.paintBounds;
+      final localRect = renderObject.paintBounds;
 
       // Get the transform relative to the screenshot container (RepaintBoundary)
       // Using the container's RenderObject as ancestor ensures transforms are in
@@ -42,7 +39,7 @@ class ElementParser {
       final ancestor = PostHogMaskController
           .instance.containerKey.currentContext
           ?.findRenderObject();
-      final Matrix4 transform = renderObject.getTransformTo(ancestor);
+      final transform = renderObject.getTransformTo(ancestor);
 
       return (rect: localRect, transform: transform);
     }

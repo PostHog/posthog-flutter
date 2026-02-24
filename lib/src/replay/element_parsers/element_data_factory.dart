@@ -11,13 +11,13 @@ class ElementDataFactory {
         renderObject.hasSize &&
         renderObject.size.isValidSize) {
       // Use paintBounds to capture the actual painted area
-      final Rect localRect = renderObject.paintBounds;
+      final localRect = renderObject.paintBounds;
 
       // Get the transform relative to the screenshot container (RepaintBoundary)
       final ancestor = PostHogMaskController
           .instance.containerKey.currentContext
           ?.findRenderObject();
-      final Matrix4 transform = renderObject.getTransformTo(ancestor);
+      final transform = renderObject.getTransformTo(ancestor);
 
       return ElementData(
         type: type,
