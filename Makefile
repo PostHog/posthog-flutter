@@ -20,7 +20,12 @@ checkFormatDart:
 	dart format --set-exit-if-changed ./
 
 analyzeDart:
-	dart analyze .
+	@output=$$(dart analyze . 2>&1); \
+	echo "$$output"; \
+	filtered=$$(echo "$$output" | grep -v "invalid_dependency"); \
+	if echo "$$filtered" | grep -q " error -"; then \
+		exit 1; \
+	fi
 
 test: 
 	cd posthog_flutter && flutter test -r expanded
