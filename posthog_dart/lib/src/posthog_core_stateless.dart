@@ -58,7 +58,6 @@ abstract class PostHogCoreStateless {
   @protected
   bool disabled;
 
-
   final bool _defaultOptIn;
   final int _fetchRetryCount;
   final int _fetchRetryDelay;
@@ -210,7 +209,6 @@ abstract class PostHogCoreStateless {
   }
 
   ///
- 
 
   @protected
   void identifyStateless(
@@ -291,7 +289,6 @@ abstract class PostHogCoreStateless {
   }
 
   ///
- 
 
   @protected
   Future<PostHogRemoteConfig?> getRemoteConfig() async {
@@ -323,7 +320,6 @@ abstract class PostHogCoreStateless {
   }
 
   ///
- 
 
   @protected
   Future<GetFlagsResult> getFlags(
@@ -372,8 +368,7 @@ abstract class PostHogCoreStateless {
   FeatureFlagRequestError _categorizeRequestError(Object error) {
     if (error is PostHogFetchHttpError) {
       return FeatureFlagRequestError(
-          type: FeatureFlagRequestErrorType.apiError,
-          statusCode: error.status);
+          type: FeatureFlagRequestErrorType.apiError, statusCode: error.status);
     }
     if (error is PostHogFetchNetworkError) {
       if (error.cause is TimeoutException) {
@@ -419,7 +414,6 @@ abstract class PostHogCoreStateless {
   }
 
   ///
- 
 
   Map<String, Object?>? _props;
 
@@ -451,7 +445,6 @@ abstract class PostHogCoreStateless {
   }
 
   ///
- 
 
   /// Hook for subclasses to transform or filter a message before queueing.
   @protected
@@ -473,9 +466,9 @@ abstract class PostHogCoreStateless {
       prepared = processBeforeEnqueue(prepared);
       if (prepared == null) return;
 
-      final queue = getPersistedProperty<List<Object?>>(
-              PostHogPersistedProperty.queue) ??
-          [];
+      final queue =
+          getPersistedProperty<List<Object?>>(PostHogPersistedProperty.queue) ??
+              [];
 
       final mutableQueue = List<Object?>.from(queue);
       if (mutableQueue.length >= _maxQueueSize) {
@@ -510,8 +503,8 @@ abstract class PostHogCoreStateless {
       'type': type,
       'library': getLibraryId(),
       'library_version': getLibraryVersion(),
-      'timestamp': options?.timestamp?.toUtc().toIso8601String() ??
-          currentISOTime(),
+      'timestamp':
+          options?.timestamp?.toUtc().toIso8601String() ?? currentISOTime(),
       'uuid': options?.uuid ?? generateUuidV7(),
     };
 

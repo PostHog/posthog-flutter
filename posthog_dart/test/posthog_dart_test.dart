@@ -198,8 +198,8 @@ void main() {
     });
 
     test('should set person properties for flags', () {
-      posthog.setPersonPropertiesForFlags({'role': 'admin'},
-          reloadFlags: false);
+      posthog
+          .setPersonPropertiesForFlags({'role': 'admin'}, reloadFlags: false);
 
       final stored = storage.getProperty<Map<String, Object?>>(
           PostHogPersistedProperty.personProperties);
@@ -216,8 +216,8 @@ void main() {
     });
 
     test('should handle group identification', () {
-      posthog.group('company', 'company-123',
-          groupProperties: {'name': 'Acme'});
+      posthog
+          .group('company', 'company-123', groupProperties: {'name': 'Acme'});
 
       final queue = getQueue(storage);
       expect(queue, isNotEmpty);
@@ -269,8 +269,7 @@ void main() {
 
       // Should have made a fetch call
       expect(posthog.fetchCalls.length, 1);
-      expect(posthog.fetchCalls[0].url,
-          'https://us.i.posthog.com/batch/');
+      expect(posthog.fetchCalls[0].url, 'https://us.i.posthog.com/batch/');
     });
 
     test('should respect before_send hook', () {
@@ -358,8 +357,7 @@ void main() {
     test('should store and retrieve values', () {
       final storage = InMemoryStorage();
       storage.setProperty(PostHogPersistedProperty.distinctId, 'user-1');
-      expect(
-          storage.getProperty<String>(PostHogPersistedProperty.distinctId),
+      expect(storage.getProperty<String>(PostHogPersistedProperty.distinctId),
           'user-1');
     });
 
@@ -367,8 +365,7 @@ void main() {
       final storage = InMemoryStorage();
       storage.setProperty(PostHogPersistedProperty.distinctId, 'user-1');
       storage.setProperty(PostHogPersistedProperty.distinctId, null);
-      expect(
-          storage.getProperty<String>(PostHogPersistedProperty.distinctId),
+      expect(storage.getProperty<String>(PostHogPersistedProperty.distinctId),
           isNull);
     });
   });
@@ -420,8 +417,8 @@ void main() {
 
     test('should get flag value from detail', () {
       expect(
-        getFeatureFlagValue(const FeatureFlagDetail(
-            key: 'test', enabled: true, variant: 'a')),
+        getFeatureFlagValue(
+            const FeatureFlagDetail(key: 'test', enabled: true, variant: 'a')),
         'a',
       );
       expect(

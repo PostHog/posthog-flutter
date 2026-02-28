@@ -68,8 +68,7 @@ class PostHog extends PostHogCore {
             body: compressed,
           );
         } else {
-          response =
-              await _httpClient.post(uri, headers: options.headers);
+          response = await _httpClient.post(uri, headers: options.headers);
         }
       default:
         throw ArgumentError('Unsupported HTTP method: ${options.method}');

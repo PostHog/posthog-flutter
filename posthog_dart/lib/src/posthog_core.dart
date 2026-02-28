@@ -158,8 +158,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     }
 
     return {
-      ...maybeAdd(r'$active_feature_flags',
-          featureFlags?.keys.toList()),
+      ...maybeAdd(r'$active_feature_flags', featureFlags?.keys.toList()),
       ...featureVariantProperties,
       ...super.getCommonEventProperties(),
     };
@@ -196,8 +195,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         sessionStartDif > _sessionMaxLengthSeconds * 1000) {
       sessionId = generateUuidV7();
       setPersistedProperty(PostHogPersistedProperty.sessionId, sessionId);
-      setPersistedProperty(
-          PostHogPersistedProperty.sessionStartTimestamp, now);
+      setPersistedProperty(PostHogPersistedProperty.sessionStartTimestamp, now);
     }
     setPersistedProperty(PostHogPersistedProperty.sessionLastTimestamp, now);
 
@@ -208,8 +206,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   void resetSessionId() {
     wrap(() {
       setPersistedProperty(PostHogPersistedProperty.sessionId, null);
-      setPersistedProperty(
-          PostHogPersistedProperty.sessionLastTimestamp, null);
+      setPersistedProperty(PostHogPersistedProperty.sessionLastTimestamp, null);
       setPersistedProperty(
           PostHogPersistedProperty.sessionStartTimestamp, null);
     });
@@ -247,8 +244,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
     _sessionProps.remove(property);
   }
 
- 
-
   /// Identifies a user with a distinct ID and optional properties.
   void identify(String? distinctId,
       {Map<String, Object?>? properties, PostHogCaptureOptions? options}) {
@@ -276,10 +271,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (distinctId != previousDistinctId) {
         setPersistedProperty(
             PostHogPersistedProperty.anonymousId, previousDistinctId);
-        setPersistedProperty(
-            PostHogPersistedProperty.distinctId, distinctId);
-        setPersistedProperty(
-            PostHogPersistedProperty.personMode, 'identified');
+        setPersistedProperty(PostHogPersistedProperty.distinctId, distinctId);
+        setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
         reloadFeatureFlags();
 
         identifyStateless(distinctId!,
@@ -336,20 +329,18 @@ abstract class PostHogCore extends PostHogCoreStateless {
     });
   }
 
- 
-
   /// Sets group memberships for the current user.
   void _setGroups(Map<String, Object> groupProps) {
     if (!_requirePersonProcessing('posthog.group')) return;
 
-    final existingGroups =
-        (props[r'$groups'] as Map<String, Object?>?) ?? {};
+    final existingGroups = (props[r'$groups'] as Map<String, Object?>?) ?? {};
 
     register({
       r'$groups': {...existingGroups, ...groupProps},
     });
 
-    if (groupProps.keys.any((type) => existingGroups[type] != groupProps[type])) {
+    if (groupProps.keys
+        .any((type) => existingGroups[type] != groupProps[type])) {
       reloadFeatureFlags();
     }
   }
@@ -383,8 +374,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
     });
   }
 
- 
-
   /// Sets person properties for feature flag evaluation.
   void setPersonPropertiesForFlags(Map<String, Object?> properties,
       {bool reloadFlags = true}) {
@@ -408,8 +397,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   /// Sets group properties for feature flag evaluation.
-  void setGroupPropertiesForFlags(
-      Map<String, Map<String, String>> properties) {
+  void setGroupPropertiesForFlags(Map<String, Map<String, String>> properties) {
     wrap(() {
       final existing = getPersistedProperty<Map<String, Object?>>(
               PostHogPersistedProperty.groupProperties) ??
@@ -438,8 +426,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
       setPersistedProperty(PostHogPersistedProperty.groupProperties, null);
     });
   }
-
- 
 
   Future<PostHogFlagsResponse?> _flagsAsync(
       [_FlagsAsyncOptions? options]) async {
@@ -477,22 +463,20 @@ abstract class PostHogCore extends PostHogCoreStateless {
       final personProperties = getPersistedProperty<Map<String, Object?>>(
               PostHogPersistedProperty.personProperties) ??
           {};
-      final groupProperties =
-          getPersistedProperty<Map<String, Object?>>(
-                  PostHogPersistedProperty.groupProperties) ??
-              {};
+      final groupProperties = getPersistedProperty<Map<String, Object?>>(
+              PostHogPersistedProperty.groupProperties) ??
+          {};
 
       final extraProperties = <String, Object?>{
-        if (options.sendAnonDistinctId)
-          r'$anon_distinct_id': getAnonymousId(),
+        if (options.sendAnonDistinctId) r'$anon_distinct_id': getAnonymousId(),
       };
 
       final result = await getFlags(
         distinctId,
         groups: groupsMap.cast<String, Object>(),
         personProperties: personProperties.cast<String, String>(),
-        groupProperties: groupProperties.map(
-            (k, v) => MapEntry(k, (v as Map).cast<String, String>())),
+        groupProperties: groupProperties
+            .map((k, v) => MapEntry(k, (v as Map).cast<String, String>())),
         extraPayload: extraProperties,
       );
 
@@ -513,8 +497,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
           flags: _getKnownFeatureFlagDetails()?.flags ?? {},
           quotaLimited: res.quotaLimited,
         ));
-        logger.warn(
-            '[FEATURE FLAGS] Feature flags quota limit exceeded.');
+        logger.warn('[FEATURE FLAGS] Feature flags quota limit exceeded.');
         completer.complete(res);
         return res;
       }
@@ -580,8 +563,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   void _setKnownFeatureFlagDetails(PostHogFlagsStorageFormat? details) {
     wrap(() {
       setPersistedProperty(
-          PostHogPersistedProperty.featureFlagDetails,
-          details?.toJson());
+          PostHogPersistedProperty.featureFlagDetails, details?.toJson());
 
       final flagValues = details != null
           ? PostHogFlagsResponse(flags: details.flags).featureFlags
@@ -612,8 +594,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   void _setBootstrappedFeatureFlagDetails(PostHogFlagsResponse details) {
-    setPersistedProperty(
-        PostHogPersistedProperty.bootstrapFeatureFlagDetails, {
+    setPersistedProperty(PostHogPersistedProperty.bootstrapFeatureFlagDetails, {
       'flags': details.flags.map((k, v) => MapEntry(k, v.toJson())),
       if (details.requestId != null) 'requestId': details.requestId,
     });
@@ -641,11 +622,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }) {
     final storedDetails = _getStoredFlagDetails();
     final details = getFeatureFlagDetails();
-    final isQuotaLimited =
-        storedDetails?.quotaLimited?.contains(QuotaLimitedFeature.featureFlags) == true;
+    final isQuotaLimited = storedDetails?.quotaLimited
+            ?.contains(QuotaLimitedFeature.featureFlags) ==
+        true;
     final featureFlag = details?.flags[key];
-    final shouldSendEvent =
-        (sendEvent ?? _sendFeatureFlagEvent) && !(_flagCallReported[key] ?? false);
+    final shouldSendEvent = (sendEvent ?? _sendFeatureFlagEvent) &&
+        !(_flagCallReported[key] ?? false);
     final flagValue = getFeatureFlagValue(featureFlag);
 
     if (shouldSendEvent) {
@@ -677,8 +659,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
       final bootstrappedResponse = _getBootstrappedFeatureFlags()?[key];
       final bootstrappedPayload = _getBootstrappedFeatureFlagPayloads()?[key];
-      final featureFlagError =
-          errors.isNotEmpty ? errors.join(',') : null;
+      final featureFlagError = errors.isNotEmpty ? errors.join(',') : null;
 
       _flagCallReported[key] = true;
 
@@ -687,14 +668,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
         r'$feature_flag_response': flagValue,
         ...maybeAdd(r'$feature_flag_id', featureFlag?.metadata?.id),
         ...maybeAdd(r'$feature_flag_version', featureFlag?.metadata?.version),
-        ...maybeAdd(
-            r'$feature_flag_reason',
-            featureFlag?.reason?.description ??
-                featureFlag?.reason?.code),
+        ...maybeAdd(r'$feature_flag_reason',
+            featureFlag?.reason?.description ?? featureFlag?.reason?.code),
         ...maybeAdd(
             r'$feature_flag_bootstrapped_response', bootstrappedResponse),
-        ...maybeAdd(
-            r'$feature_flag_bootstrapped_payload', bootstrappedPayload),
+        ...maybeAdd(r'$feature_flag_bootstrapped_payload', bootstrappedPayload),
         r'$used_bootstrap_value': !(getPersistedProperty<bool>(
                 PostHogPersistedProperty.flagsEndpointWasHit) ??
             false),
@@ -710,7 +688,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       switch (missingFlagBehavior) {
         case _MissingFlagBehavior.getFeatureFlag:
           return details != null && details.flags.isNotEmpty
-              ? PostHogFeatureFlagResult(key: key, enabled: false, payload: null)
+              ? PostHogFeatureFlagResult(
+                  key: key, enabled: false, payload: null)
               : null;
         case null:
           return null;
@@ -730,8 +709,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// Gets a feature flag value.
   FeatureFlagValue? getFeatureFlag(String key) {
     if (!isInitialized) return null;
-    final result =
-        _getFeatureFlagResult(key, missingFlagBehavior: _MissingFlagBehavior.getFeatureFlag);
+    final result = _getFeatureFlagResult(key,
+        missingFlagBehavior: _MissingFlagBehavior.getFeatureFlag);
     if (result == null) return null;
     return (result.variant as Object?) ?? result.enabled;
   }
@@ -757,8 +736,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (entry.value == false || entry.value == null) {
         defaultFlags.remove(entry.key);
       } else {
-        defaultFlags[entry.key] =
-            updateFlagValue(defaultFlags[entry.key], entry.value as FeatureFlagValue);
+        defaultFlags[entry.key] = updateFlagValue(
+            defaultFlags[entry.key], entry.value as FeatureFlagValue);
       }
     }
 
@@ -783,8 +762,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       {void Function(Object? error, Map<String, FeatureFlagValue>? flags)?
           callback}) {
     if (!isInitialized) return;
-    _flagsAsync(const _FlagsAsyncOptions(sendAnonDistinctId: true))
-        .then((res) {
+    _flagsAsync(const _FlagsAsyncOptions(sendAnonDistinctId: true)).then((res) {
       callback?.call(null, res?.featureFlags);
     }).catchError((Object e) {
       callback?.call(e, null);
@@ -830,13 +808,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// Overrides feature flags locally.
   void overrideFeatureFlag(Map<String, FeatureFlagValue>? flags) {
     wrap(() {
-      setPersistedProperty(PostHogPersistedProperty.overrideFeatureFlags,
-          flags);
+      setPersistedProperty(
+          PostHogPersistedProperty.overrideFeatureFlags, flags);
     });
   }
-
-
-
 
   bool _isIdentified() {
     final personMode =
@@ -882,8 +857,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       return false;
     }
 
-    setPersistedProperty(
-        PostHogPersistedProperty.enablePersonProcessing, true);
+    setPersistedProperty(PostHogPersistedProperty.enablePersonProcessing, true);
     return true;
   }
 
@@ -923,8 +897,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         ...(userPropertiesToSetOnce ?? {}),
         ...(userPropertiesToSet ?? {}),
       };
-      setPersonPropertiesForFlags(mergedProperties,
-          reloadFlags: reloadFlags);
+      setPersonPropertiesForFlags(mergedProperties, reloadFlags: reloadFlags);
 
       capture(r'$set', properties: {
         r'$set': userPropertiesToSet ?? {},
@@ -940,8 +913,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   Map<String, Object?>? processBeforeEnqueue(Map<String, Object?> message) {
     if (_beforeSend == null || _beforeSend.isEmpty) return message;
 
-    final props =
-        (message['properties'] as Map<String, Object?>?) ?? {};
+    final props = (message['properties'] as Map<String, Object?>?) ?? {};
     final timestamp = message['timestamp'];
     final captureEvent = CaptureEvent(
       uuid: message['uuid'] as String,

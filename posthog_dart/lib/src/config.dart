@@ -190,4 +190,3 @@ class CaptureEvent {
     this.timestamp,
   });
 }
-

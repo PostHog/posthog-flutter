@@ -105,7 +105,8 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
       );
 
       if (config.debug) {
-        printIfDebug('[PostHog] Dart SDK initialized for ${Platform.operatingSystem}');
+        printIfDebug(
+            '[PostHog] Dart SDK initialized for ${Platform.operatingSystem}');
       }
 
       // Listen for feature flag updates
@@ -217,8 +218,7 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
 
       final allProps = <String, Object?>{
         ...?normalizedProperties?.cast<String, Object?>(),
-        if (normalizedUserProperties != null)
-          r'$set': normalizedUserProperties,
+        if (normalizedUserProperties != null) r'$set': normalizedUserProperties,
         if (normalizedUserPropertiesSetOnce != null)
           r'$set_once': normalizedUserPropertiesSetOnce,
       };
@@ -421,7 +421,8 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
 
     try {
       final result = client.getFeatureFlagResult(key,
-          options: const dart_sdk.PostHogFeatureFlagResultOptions(sendEvent: false));
+          options:
+              const dart_sdk.PostHogFeatureFlagResultOptions(sendEvent: false));
       return result?.payload;
     } catch (e) {
       printIfDebug('[PostHog] Exception on getFeatureFlagPayload: $e');
@@ -439,7 +440,8 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
 
     try {
       return client.getFeatureFlagResult(key,
-          options: dart_sdk.PostHogFeatureFlagResultOptions(sendEvent: sendEvent));
+          options:
+              dart_sdk.PostHogFeatureFlagResultOptions(sendEvent: sendEvent));
     } catch (e) {
       printIfDebug('[PostHog] Exception on getFeatureFlagResult: $e');
       return null;
@@ -562,13 +564,15 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
   @override
   Future<void> openUrl(String url) async {
     // Not directly supported on Linux/Windows via posthog_dart
-    printIfDebug('[PostHog] openUrl is not supported on ${Platform.operatingSystem}');
+    printIfDebug(
+        '[PostHog] openUrl is not supported on ${Platform.operatingSystem}');
   }
 
   @override
   Future<void> showSurvey(Map<String, dynamic> survey) async {
     // Surveys are not yet supported on Linux/Windows
-    printIfDebug('[PostHog] Surveys are not supported on ${Platform.operatingSystem}');
+    printIfDebug(
+        '[PostHog] Surveys are not supported on ${Platform.operatingSystem}');
   }
 
   @override

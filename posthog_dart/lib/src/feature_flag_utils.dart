@@ -6,8 +6,8 @@ import 'feature_flags.dart';
 PostHogFlagsResponse parseFlagsResponse(Map<String, Object?> response) {
   final flagsRaw = response['flags'] as Map<String, Object?>? ?? {};
   final flags = flagsRaw.map(
-    (k, v) => MapEntry(
-        k, FeatureFlagDetail.fromJson(v as Map<String, Object?>)),
+    (k, v) =>
+        MapEntry(k, FeatureFlagDetail.fromJson(v as Map<String, Object?>)),
   );
 
   return PostHogFlagsResponse(
