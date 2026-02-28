@@ -154,8 +154,8 @@ class BootstrapConfig {
 
 /// Capture options for individual events.
 class PostHogCaptureOptions {
-  /// If provided overrides the auto-generated event ID.
-  final String? uuid;
+  /// The event ID.
+  final String uuid;
 
   /// If provided overrides the auto-generated timestamp.
   final DateTime? timestamp;
@@ -164,7 +164,7 @@ class PostHogCaptureOptions {
   final bool? disableGeoip;
 
   const PostHogCaptureOptions({
-    this.uuid,
+    required this.uuid,
     this.timestamp,
     this.disableGeoip,
   });
