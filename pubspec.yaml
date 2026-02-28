@@ -2,8 +2,10 @@ name: _
 publish_to: none
 
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.11.0
 
 workspace:
+  - posthog_dart
   - posthog_flutter
-  - example
+  - examples/flutter_example
+  - examples/dart_example

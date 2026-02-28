@@ -1,0 +1,27 @@
+name: posthog_dart
+description: PostHog analytics SDK for Dart - core package for product analytics and feature flags.
+version: 0.1.0
+repository: https://github.com/PostHog/posthog-flutter
+
+resolution: workspace
+
+platforms:
+  android:
+  ios:
+  macos:
+  linux:
+  windows:
+  web:
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  http: ^1.4.0
+  meta: ^1.16.0
+  path: ^1.9.0
+  uuid: ^4.5.1
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.6

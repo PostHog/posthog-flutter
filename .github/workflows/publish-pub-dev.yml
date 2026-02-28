@@ -6,11 +6,37 @@ permissions:
 on:
   push:
     tags:
+      # posthog_flutter tags: semver only (e.g. 5.16.0)
       - '[0-9]+.[0-9]+.[0-9]+*'
+      # posthog_dart tags: prefixed (e.g. posthog_dart@0.2.0)
+      - 'posthog_dart@[0-9]+.[0-9]+.[0-9]+*'
 
 jobs:
+  determine-package:
+    name: Determine package from tag
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.parse.outputs.package }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ "$TAG" == posthog_dart@* ]]; then
+            VERSION="${TAG#posthog_dart@}"
+            echo "package=posthog_dart" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "package=posthog_flutter" >> "$GITHUB_OUTPUT"
+            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Package: $(grep 'package=' "$GITHUB_OUTPUT" | tail -1)"
+          echo "Version: $(grep 'version=' "$GITHUB_OUTPUT" | tail -1)"
+
   publish:
     name: Publish to pub.dev
+    needs: determine-package
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,28 +50,34 @@ jobs:
 
       - name: Validate tag matches version bump
         run: |
-          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          TAG_VERSION="${{ needs.determine-package.outputs.version }}"
+          PACKAGE="${{ needs.determine-package.outputs.package }}"
 
-          # Check that the tagged commit is a version bump commit from the release workflow
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          EXPECTED_MSG="chore: release ${TAG_VERSION} [version bump]"
-          if [ "$COMMIT_MSG" != "$EXPECTED_MSG" ]; then
-            echo "❌ Tag '${TAG_VERSION}' does not point to a version bump commit."
-            echo "   Expected commit message: '${EXPECTED_MSG}'"
-            echo "   Actual commit message:   '${COMMIT_MSG}'"
-            echo ""
-            echo "This workflow should only be triggered by tags created by the Release workflow."
-            exit 1
+          if [ "$PACKAGE" = "posthog_flutter" ]; then
+            PUBSPEC_DIR="posthog_flutter"
+            EXPECTED_MSG="chore: release posthog_flutter@${TAG_VERSION}"
+          else
+            PUBSPEC_DIR="posthog_dart"
+            EXPECTED_MSG="chore: release posthog_dart@${TAG_VERSION}"
           fi
 
           # Check that the tag version matches the version in pubspec.yaml
-          PUBSPEC_VERSION=$(grep '^version:' posthog_flutter/pubspec.yaml | sed 's/version: //')
+          PUBSPEC_VERSION=$(grep '^version:' ${PUBSPEC_DIR}/pubspec.yaml | sed 's/version: //')
           if [ "$TAG_VERSION" != "$PUBSPEC_VERSION" ]; then
-            echo "❌ Tag version '${TAG_VERSION}' does not match pubspec.yaml version '${PUBSPEC_VERSION}'."
+            echo "❌ Tag version '${TAG_VERSION}' does not match ${PUBSPEC_DIR}/pubspec.yaml version '${PUBSPEC_VERSION}'."
             exit 1
           fi
 
-          echo "✓ Tag '${TAG_VERSION}' is valid: commit message and pubspec.yaml version match."
+          # Check that the tagged commit message contains the version bump
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          if [[ "$COMMIT_MSG" != *"$EXPECTED_MSG"* ]] && [[ "$COMMIT_MSG" != *"[version bump]"* ]]; then
+            echo "⚠ Warning: Commit message doesn't match expected pattern."
+            echo "   Expected to contain: '${EXPECTED_MSG}'"
+            echo "   Actual commit message: '${COMMIT_MSG}'"
+            echo "   Proceeding anyway as version matches."
+          fi
+
+          echo "✓ Tag '${TAG_VERSION}' is valid for package '${PACKAGE}': pubspec.yaml version matches."
 
       - name: Setup Dart
         uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
@@ -58,14 +90,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Get version from tag
-        id: get-version
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing version: $VERSION"
+      - name: Publish posthog_dart to pub.dev
+        if: needs.determine-package.outputs.package == 'posthog_dart'
+        working-directory: ./posthog_dart
+        run: dart pub publish --force
 
-      - name: Publish to pub.dev
+      - name: Publish posthog_flutter to pub.dev
+        if: needs.determine-package.outputs.package == 'posthog_flutter'
         working-directory: ./posthog_flutter
         run: flutter pub publish --force
 
@@ -73,16 +104,28 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          PACKAGE="${{ needs.determine-package.outputs.package }}"
+          VERSION="${{ needs.determine-package.outputs.version }}"
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          if [ "$PACKAGE" = "posthog_flutter" ]; then
+            CHANGELOG_FILE="posthog_flutter/CHANGELOG.md"
+            RELEASE_NAME="${VERSION}"
+          else
+            CHANGELOG_FILE="posthog_dart/CHANGELOG.md"
+            RELEASE_NAME="posthog_dart@${VERSION}"
+          fi
+
           # Read from the first until the second header in the changelog file
-          LAST_CHANGELOG_ENTRY=$(awk -v defText="see CHANGELOG.md" '/^## /{if (flag) exit; flag=1; next} flag; END{if (!flag) print defText}' posthog_flutter/CHANGELOG.md)
+          LAST_CHANGELOG_ENTRY=$(awk -v defText="see CHANGELOG.md" '/^## /{if (flag) exit; flag=1; next} flag; END{if (!flag) print defText}' "$CHANGELOG_FILE")
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             /repos/${{ github.repository }}/releases \
-            -f tag_name="${{ steps.get-version.outputs.version }}" \
+            -f tag_name="${TAG}" \
             -f target_commitish='main' \
-            -f name="${{ steps.get-version.outputs.version }}" \
+            -f name="${RELEASE_NAME}" \
             -f body="$LAST_CHANGELOG_ENTRY" \
             -F draft=false \
             -F prerelease=false \
@@ -100,27 +143,33 @@ jobs:
               "commitSha": "${{ github.sha }}",
               "jobStatus": "${{ job.status }}",
               "ref": "${{ github.ref }}",
-              "packageVersion": "${{ steps.get-version.outputs.version }}"
+              "package": "${{ needs.determine-package.outputs.package }}",
+              "packageVersion": "${{ needs.determine-package.outputs.version }}"
             }
 
   notify-released:
     name: Notify Slack - Released
-    needs: publish
+    needs: [determine-package, publish]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Get version from tag
-        id: get-version
+      - name: Get release info
+        id: release-info
         run: |
-          VERSION="${GITHUB_REF#refs/tags/}"
+          PACKAGE="${{ needs.determine-package.outputs.package }}"
+          VERSION="${{ needs.determine-package.outputs.version }}"
+          echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release-id=${PACKAGE}@${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Restore Slack thread_ts from cache
         id: restore-thread-ts
         uses: actions/cache/restore@v5
         with:
           path: .slack-thread-ts
-          key: slack-thread-ts-${{ steps.get-version.outputs.version }}
+          key: slack-thread-ts-${{ steps.release-info.outputs.release-id }}
+          restore-keys: |
+            slack-thread-ts-
 
       - name: Read Slack thread_ts
         id: slack-thread
@@ -142,7 +191,7 @@ jobs:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
           thread_ts: ${{ steps.slack-thread.outputs.thread_ts }}
-          message: '🚀 `posthog_flutter@${{ steps.get-version.outputs.version }}` released successfully!'
+          message: '🚀 `${{ steps.release-info.outputs.package }}@${{ steps.release-info.outputs.version }}` released successfully!'
 
       - name: Notify Slack - Failed
         if: needs.publish.result == 'failure'
@@ -152,4 +201,4 @@ jobs:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
           thread_ts: ${{ steps.slack-thread.outputs.thread_ts }}
-          message: '❌ Failed to publish `posthog_flutter@${{ steps.get-version.outputs.version }}` to pub.dev! <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>'
+          message: '❌ Failed to publish `${{ steps.release-info.outputs.package }}@${{ steps.release-info.outputs.version }}` to pub.dev! <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>'

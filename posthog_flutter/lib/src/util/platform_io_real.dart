@@ -5,7 +5,11 @@ bool isSupportedPlatform() {
   if (Platform.environment.containsKey('FLUTTER_TEST')) {
     return true;
   }
-  return !(Platform.isLinux || Platform.isWindows);
+  // All platforms are now supported:
+  // iOS, Android, macOS use native method channels
+  // Web uses JS interop
+  // Linux and Windows use posthog_dart SDK
+  return true;
 }
 
 bool isMacOS() {

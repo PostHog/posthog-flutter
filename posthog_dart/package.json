@@ -1,0 +1,6 @@
+{
+  "name": "posthog_dart",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Version tracking for changesets - the canonical version is in pubspec.yaml"
+}
