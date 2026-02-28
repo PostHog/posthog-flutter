@@ -48,6 +48,7 @@ jobs:
         run: flutter pub get
 
       - name: Test
+        working-directory: ./posthog_flutter
         run: flutter test
 
   # Apple builds (iOS and macOS)
@@ -74,10 +75,7 @@ jobs:
           xcode-version: '16.4'
 
       - name: Install dependencies
-        run: |
-          flutter pub get
-          cd example
-          flutter pub get
+        run: flutter pub get
 
       - name: Build ${{ matrix.target }}
         working-directory: ./example
@@ -100,10 +98,7 @@ jobs:
           channel: 'stable'
 
       - name: Install dependencies
-        run: |
-          flutter pub get
-          cd example
-          flutter pub get
+        run: flutter pub get
 
       - name: Build Android
         working-directory: ./example
@@ -120,10 +115,7 @@ jobs:
           channel: 'stable'
 
       - name: Install dependencies
-        run: |
-          flutter pub get
-          cd example
-          flutter pub get
+        run: flutter pub get
 
       - name: Build Web
         working-directory: ./example

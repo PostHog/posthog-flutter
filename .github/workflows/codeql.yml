@@ -46,10 +46,7 @@ jobs:
 
       - name: Install dependencies (Swift)
         if: matrix.language == 'swift'
-        run: |
-          flutter pub get
-          cd example
-          flutter pub get
+        run: flutter pub get
 
       - name: Setup Java (Java/Kotlin)
         if: matrix.language == 'java-kotlin'
@@ -66,10 +63,7 @@ jobs:
 
       - name: Install dependencies (Java/Kotlin)
         if: matrix.language == 'java-kotlin'
-        run: |
-          flutter pub get
-          cd example
-          flutter pub get
+        run: flutter pub get
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
