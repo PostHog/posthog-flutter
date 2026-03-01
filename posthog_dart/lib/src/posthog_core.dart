@@ -950,8 +950,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       'uuid': result.uuid,
       'event': result.event,
       'properties': resultProps,
-      if (result.timestamp != null)
-        'timestamp': result.timestamp!.toUtc().toIso8601String(),
+      'timestamp': result.timestamp.toUtc().toIso8601String(),
     };
   }
 

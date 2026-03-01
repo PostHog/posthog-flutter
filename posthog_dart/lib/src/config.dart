@@ -168,8 +168,8 @@ class PostHogEvent {
   /// User properties to set only once on the user profile ($set_once).
   Map<String, Object?>? userPropertiesSetOnce;
 
-  /// If provided overrides the auto-generated timestamp.
-  DateTime? timestamp;
+  /// The event timestamp. Defaults to `DateTime.now()` if not provided.
+  DateTime timestamp;
 
   PostHogEvent({
     String? uuid,
@@ -177,8 +177,9 @@ class PostHogEvent {
     this.properties,
     this.userProperties,
     this.userPropertiesSetOnce,
-    this.timestamp,
-  }) : uuid = uuid ?? generateUuidV7();
+    DateTime? timestamp,
+  })  : uuid = uuid ?? generateUuidV7(),
+        timestamp = timestamp ?? DateTime.now();
 
   @override
   String toString() {
