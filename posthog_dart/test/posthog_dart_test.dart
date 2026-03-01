@@ -248,7 +248,7 @@ void main() {
       final client = TestPostHogClient(
         'test-key',
         options: const PostHogConfig(
-          disabled: true,
+          optOut: true,
           preloadFeatureFlags: false,
         ),
         storage: InMemoryStorage(),

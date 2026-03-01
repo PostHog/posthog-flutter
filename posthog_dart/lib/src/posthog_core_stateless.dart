@@ -102,7 +102,7 @@ abstract class PostHogCoreStateless {
             : options.flushAt,
         _flushInterval = options.flushInterval,
         preloadFeatureFlags = options.preloadFeatureFlags,
-        _defaultOptIn = options.defaultOptIn,
+        _defaultOptIn = !options.optOut,
         _fetchRetryCount = options.fetchRetryCount,
         _fetchRetryDelay = options.fetchRetryDelay,
         _requestTimeout = options.requestTimeout,
@@ -110,11 +110,14 @@ abstract class PostHogCoreStateless {
             options.featureFlagsRequestTimeoutMs ?? 3000,
         _remoteConfigRequestTimeoutMs = options.remoteConfigRequestTimeoutMs,
         _disableGeoip = options.disableGeoip ?? true,
-        disabled = options.disabled,
+        disabled = options.optOut,
         _evaluationContexts = options.evaluationContexts {
     assertNotEmpty(apiKey, "You must pass your PostHog project's api key.");
     logger = PostHogLogger('[PostHog]', _logMsgIfDebug);
     isInitialized = true;
+    if (options.debug) {
+      debug();
+    }
   }
 
   void _logMsgIfDebug(void Function() fn) {

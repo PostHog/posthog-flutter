@@ -23,11 +23,12 @@ class PostHogConfig {
   /// The maximum number of cached messages either in memory or on the local storage.
   final int maxQueueSize;
 
-  /// If set to true the SDK is essentially disabled.
-  final bool disabled;
+  /// If set to true the SDK is essentially disabled (opted out).
+  final bool optOut;
 
-  /// If set to false the SDK will not track until the `optIn` function is called.
-  final bool defaultOptIn;
+  /// Enable debug logging.
+  /// When enabled, the SDK will log events and other debug information.
+  final bool debug;
 
   /// Whether to track that `getFeatureFlag` was called (used by Experiments).
   final bool sendFeatureFlagEvent;
@@ -74,8 +75,8 @@ class PostHogConfig {
     this.flushInterval = 10000,
     this.maxBatchSize = 100,
     this.maxQueueSize = 1000,
-    this.disabled = false,
-    this.defaultOptIn = true,
+    this.optOut = false,
+    this.debug = false,
     this.sendFeatureFlagEvent = true,
     this.preloadFeatureFlags = true,
     this.bootstrap,
@@ -105,8 +106,8 @@ class PostHogConfig {
       flushInterval: flushInterval,
       maxBatchSize: maxBatchSize,
       maxQueueSize: maxQueueSize,
-      disabled: disabled,
-      defaultOptIn: defaultOptIn,
+      optOut: optOut,
+      debug: debug,
       sendFeatureFlagEvent: sendFeatureFlagEvent,
       preloadFeatureFlags: preloadFeatureFlags,
       bootstrap: bootstrap,

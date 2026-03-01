@@ -142,7 +142,7 @@ class PostHogFlutterConfig {
   /// - If any callback returns `null`, the event is dropped and subsequent callbacks are not called.
   List<BeforeSendCallback> beforeSend = [];
 
-  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
+  // TODO: missing getAnonymousId, captureDeepLinks integrations
 
   PostHogFlutterConfig(
     this.apiKey, {
@@ -183,8 +183,8 @@ class PostHogFlutterConfig {
       maxBatchSize: maxBatchSize,
       sendFeatureFlagEvent: sendFeatureFlagEvents,
       preloadFeatureFlags: preloadFeatureFlags,
-      disabled: optOut,
-      defaultOptIn: !optOut,
+      optOut: optOut,
+      debug: debug,
       personProfiles: personProfiles,
     );
   }
