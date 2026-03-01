@@ -170,10 +170,10 @@ class PostHogFlutterConfig {
     return dart_sdk.PostHogConfig(
       host: host,
       flushAt: flushAt,
-      flushInterval: flushInterval.inMilliseconds,
+      flushInterval: flushInterval,
       maxQueueSize: maxQueueSize,
       maxBatchSize: maxBatchSize,
-      sendFeatureFlagEvent: sendFeatureFlagEvents,
+      sendFeatureFlagEvents: sendFeatureFlagEvents,
       preloadFeatureFlags: preloadFeatureFlags,
       optOut: optOut,
       debug: debug,

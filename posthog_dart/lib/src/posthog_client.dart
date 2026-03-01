@@ -91,8 +91,9 @@ class PostHog extends PostHogCore {
 
   /// Shuts down the client, flushing pending events and closing the HTTP client.
   @override
-  Future<void> shutdown({int timeoutMs = 30000}) async {
-    await super.shutdown(timeoutMs: timeoutMs);
+  Future<void> shutdown(
+      {Duration timeout = const Duration(seconds: 30)}) async {
+    await super.shutdown(timeout: timeout);
     if (_ownClient) {
       _httpClient.close();
     }

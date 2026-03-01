@@ -49,10 +49,10 @@ abstract class PostHogCoreStateless {
   final bool preloadFeatureFlags;
   int _maxBatchSize;
   final int _maxQueueSize;
-  final int _flushInterval;
-  final int _requestTimeout;
-  final int _featureFlagsRequestTimeoutMs;
-  final int _remoteConfigRequestTimeoutMs;
+  final Duration _flushInterval;
+  final Duration _requestTimeout;
+  final Duration _featureFlagsRequestTimeout;
+  final Duration _remoteConfigRequestTimeout;
   final bool _disableGeoip;
   final List<String>? _evaluationContexts;
   @protected
@@ -60,7 +60,7 @@ abstract class PostHogCoreStateless {
 
   final bool _defaultOptIn;
   final int _fetchRetryCount;
-  final int _fetchRetryDelay;
+  final Duration _fetchRetryDelay;
 
   // internal
   @protected
@@ -106,9 +106,9 @@ abstract class PostHogCoreStateless {
         _fetchRetryCount = options.fetchRetryCount,
         _fetchRetryDelay = options.fetchRetryDelay,
         _requestTimeout = options.requestTimeout,
-        _featureFlagsRequestTimeoutMs =
-            options.featureFlagsRequestTimeoutMs ?? 3000,
-        _remoteConfigRequestTimeoutMs = options.remoteConfigRequestTimeoutMs,
+        _featureFlagsRequestTimeout =
+            options.featureFlagsRequestTimeout ?? const Duration(seconds: 3),
+        _remoteConfigRequestTimeout = options.remoteConfigRequestTimeout,
         _disableGeoip = options.disableGeoip ?? true,
         disabled = options.optOut,
         _evaluationContexts = options.evaluationContexts {
@@ -311,7 +311,7 @@ abstract class PostHogCoreStateless {
           headers: {..._getCustomHeaders(), 'Content-Type': 'application/json'},
         ),
         retryCount: 0,
-        timeoutMs: _remoteConfigRequestTimeoutMs,
+        timeout: _remoteConfigRequestTimeout,
       );
       final json = jsonDecode(response.body) as Map<String, Object?>;
       return PostHogRemoteConfig.fromJson(json);
@@ -358,7 +358,7 @@ abstract class PostHogCoreStateless {
           body: jsonEncode(requestData),
         ),
         retryCount: 0,
-        timeoutMs: _featureFlagsRequestTimeoutMs,
+        timeout: _featureFlagsRequestTimeout,
       );
       final json = jsonDecode(response.body) as Map<String, Object?>;
       return GetFlagsSuccess(parseFlagsResponse(json));
@@ -497,8 +497,8 @@ abstract class PostHogCoreStateless {
       _flushBackground();
     }
 
-    if (_flushInterval > 0 && _flushTimer == null) {
-      _flushTimer = Timer(Duration(milliseconds: _flushInterval), () {
+    if (_flushInterval > Duration.zero && _flushTimer == null) {
+      _flushTimer = Timer(_flushInterval, () {
         _flushBackground();
       });
     }
@@ -639,14 +639,14 @@ abstract class PostHogCoreStateless {
     String url,
     PostHogFetchOptions options, {
     int? retryCount,
-    int? timeoutMs,
+    Duration? timeout,
   }) async {
     return retriable(
       () async {
         PostHogFetchResponse response;
         try {
-          response = await fetch(url, options)
-              .timeout(Duration(milliseconds: timeoutMs ?? _requestTimeout));
+          response =
+              await fetch(url, options).timeout(timeout ?? _requestTimeout);
         } catch (e) {
           throw PostHogFetchNetworkError(e);
         }
@@ -667,11 +667,12 @@ abstract class PostHogCoreStateless {
   }
 
   /// Shuts down the PostHog instance and ensures all events are sent.
-  Future<void> shutdown({int timeoutMs = 30000}) async {
+  Future<void> shutdown(
+      {Duration timeout = const Duration(seconds: 30)}) async {
     _clearFlushTimer();
 
     await flush().timeout(
-      Duration(milliseconds: timeoutMs),
+      timeout,
       onTimeout: () {
         logger.error('Timed out while shutting down PostHog');
       },

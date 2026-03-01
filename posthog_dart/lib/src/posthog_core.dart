@@ -38,14 +38,14 @@ class _PendingFlagsRequest extends _FlagsAsyncOptions {
 /// and [getCustomUserAgent].
 abstract class PostHogCore extends PostHogCoreStateless {
   // options
-  final bool _sendFeatureFlagEvent;
+  final bool _sendFeatureFlagEvents;
   final Map<String, bool> _flagCallReported = {};
   final List<BeforeSendCallback>? _beforeSend;
 
   // internal
   Future<PostHogFlagsResponse?>? _flagsResponseFuture;
-  final int _sessionExpirationTimeSeconds;
-  static const int _sessionMaxLengthSeconds = 24 * 60 * 60; // 24 hours
+  final Duration _sessionExpiration;
+  static const Duration _sessionMaxLength = Duration(hours: 24);
   Map<String, Object?> _sessionProps = {};
 
   _PendingFlagsRequest? _pendingFlagsRequest;
@@ -60,15 +60,15 @@ abstract class PostHogCore extends PostHogCoreStateless {
     super.apiKey, {
     PostHogConfig options = const PostHogConfig(),
     super.storage,
-  })  : _sendFeatureFlagEvent = options.sendFeatureFlagEvent,
-        _sessionExpirationTimeSeconds = options.sessionExpirationTimeSeconds,
+  })  : _sendFeatureFlagEvents = options.sendFeatureFlagEvents,
+        _sessionExpiration = options.sessionExpiration,
         _personProfiles = options.personProfiles,
         _beforeSend = options.beforeSend,
         super(
           options: options.withDefaults(
             disableGeoip: options.disableGeoip ?? false,
-            featureFlagsRequestTimeoutMs:
-                options.featureFlagsRequestTimeoutMs ?? 10000,
+            featureFlagsRequestTimeout: options.featureFlagsRequestTimeout ??
+                const Duration(seconds: 10),
           ),
         ) {
     _setupBootstrap(options);
@@ -191,8 +191,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
     final sessionStartDif = now - sessionStartTimestamp;
 
     if (sessionId == null ||
-        sessionLastDif > _sessionExpirationTimeSeconds * 1000 ||
-        sessionStartDif > _sessionMaxLengthSeconds * 1000) {
+        sessionLastDif > _sessionExpiration.inMilliseconds ||
+        sessionStartDif > _sessionMaxLength.inMilliseconds) {
       sessionId = generateUuidV7();
       setPersistedProperty(PostHogPersistedProperty.sessionId, sessionId);
       setPersistedProperty(PostHogPersistedProperty.sessionStartTimestamp, now);
@@ -503,7 +503,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       }
 
       if (res.flags.isNotEmpty) {
-        if (_sendFeatureFlagEvent) {
+        if (_sendFeatureFlagEvents) {
           _flagCallReported.clear();
         }
 
@@ -626,7 +626,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
             ?.contains(QuotaLimitedFeature.featureFlags) ==
         true;
     final featureFlag = details?.flags[key];
-    final shouldSendEvent = (sendEvent ?? _sendFeatureFlagEvent) &&
+    final shouldSendEvent = (sendEvent ?? _sendFeatureFlagEvents) &&
         !(_flagCallReported[key] ?? false);
     final flagValue = getFeatureFlagValue(featureFlag);
 

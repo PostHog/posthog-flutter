@@ -20,14 +20,14 @@ String currentISOTime() => DateTime.now().toUtc().toIso8601String();
 Future<T> retriable<T>(
   Future<T> Function() fn, {
   required int retryCount,
-  required int retryDelay,
+  required Duration retryDelay,
   required bool Function(Object) retryCheck,
 }) async {
   Object? lastError;
 
   for (var i = 0; i < retryCount + 1; i++) {
     if (i > 0) {
-      await Future.delayed(Duration(milliseconds: retryDelay));
+      await Future.delayed(retryDelay);
     }
 
     try {

@@ -17,8 +17,9 @@ class PostHogConfig {
   /// The number of events to queue before sending to PostHog (flushing).
   final int flushAt;
 
-  /// The interval in milliseconds between periodic flushes.
-  final int flushInterval;
+  /// The interval between periodic flushes.
+  /// Defaults to 10 seconds.
+  final Duration flushInterval;
 
   /// The maximum number of queued messages to be flushed as part of a single batch.
   final int maxBatchSize;
@@ -34,7 +35,7 @@ class PostHogConfig {
   final bool debug;
 
   /// Whether to track that `getFeatureFlag` was called (used by Experiments).
-  final bool sendFeatureFlagEvent;
+  final bool sendFeatureFlagEvents;
 
   /// Whether to load feature flags when initialized or not.
   final bool preloadFeatureFlags;
@@ -45,20 +46,25 @@ class PostHogConfig {
   /// How many times we will retry HTTP requests.
   final int fetchRetryCount;
 
-  /// The delay between HTTP request retries in milliseconds.
-  final int fetchRetryDelay;
+  /// The delay between HTTP request retries.
+  /// Defaults to 3 seconds.
+  final Duration fetchRetryDelay;
 
-  /// Timeout in milliseconds for any calls.
-  final int requestTimeout;
+  /// Timeout for any calls.
+  /// Defaults to 10 seconds.
+  final Duration requestTimeout;
 
-  /// Timeout in milliseconds for feature flag calls.
-  final int? featureFlagsRequestTimeoutMs;
+  /// Timeout for feature flag calls.
+  /// Defaults to 10 seconds (set internally if not provided).
+  final Duration? featureFlagsRequestTimeout;
 
-  /// Timeout in milliseconds for remote config calls.
-  final int remoteConfigRequestTimeoutMs;
+  /// Timeout for remote config calls.
+  /// Defaults to 3 seconds.
+  final Duration remoteConfigRequestTimeout;
 
-  /// For Session Analysis how long before we expire a session (in seconds).
-  final int sessionExpirationTimeSeconds;
+  /// For Session Analysis how long before we expire a session.
+  /// Defaults to 30 minutes.
+  final Duration sessionExpiration;
 
   /// Whether to disable GeoIP.
   final bool? disableGeoip;
@@ -75,20 +81,20 @@ class PostHogConfig {
   const PostHogConfig({
     this.host = 'https://us.i.posthog.com',
     this.flushAt = 20,
-    this.flushInterval = 10000,
+    this.flushInterval = const Duration(seconds: 10),
     this.maxBatchSize = 100,
     this.maxQueueSize = 1000,
     this.optOut = false,
     this.debug = false,
-    this.sendFeatureFlagEvent = true,
+    this.sendFeatureFlagEvents = true,
     this.preloadFeatureFlags = true,
     this.bootstrap,
     this.fetchRetryCount = 3,
-    this.fetchRetryDelay = 3000,
-    this.requestTimeout = 10000,
-    this.featureFlagsRequestTimeoutMs,
-    this.remoteConfigRequestTimeoutMs = 3000,
-    this.sessionExpirationTimeSeconds = 1800,
+    this.fetchRetryDelay = const Duration(seconds: 3),
+    this.requestTimeout = const Duration(seconds: 10),
+    this.featureFlagsRequestTimeout,
+    this.remoteConfigRequestTimeout = const Duration(seconds: 3),
+    this.sessionExpiration = const Duration(minutes: 30),
     this.disableGeoip,
     this.evaluationContexts,
     this.personProfiles = PostHogPersonProfiles.identifiedOnly,
@@ -101,7 +107,7 @@ class PostHogConfig {
   /// needs to override when calling `super()`.
   PostHogConfig withDefaults({
     bool? disableGeoip,
-    int? featureFlagsRequestTimeoutMs,
+    Duration? featureFlagsRequestTimeout,
   }) {
     return PostHogConfig(
       host: host,
@@ -111,16 +117,16 @@ class PostHogConfig {
       maxQueueSize: maxQueueSize,
       optOut: optOut,
       debug: debug,
-      sendFeatureFlagEvent: sendFeatureFlagEvent,
+      sendFeatureFlagEvents: sendFeatureFlagEvents,
       preloadFeatureFlags: preloadFeatureFlags,
       bootstrap: bootstrap,
       fetchRetryCount: fetchRetryCount,
       fetchRetryDelay: fetchRetryDelay,
       requestTimeout: requestTimeout,
-      featureFlagsRequestTimeoutMs:
-          featureFlagsRequestTimeoutMs ?? this.featureFlagsRequestTimeoutMs,
-      remoteConfigRequestTimeoutMs: remoteConfigRequestTimeoutMs,
-      sessionExpirationTimeSeconds: sessionExpirationTimeSeconds,
+      featureFlagsRequestTimeout:
+          featureFlagsRequestTimeout ?? this.featureFlagsRequestTimeout,
+      remoteConfigRequestTimeout: remoteConfigRequestTimeout,
+      sessionExpiration: sessionExpiration,
       disableGeoip: disableGeoip ?? this.disableGeoip,
       evaluationContexts: evaluationContexts,
       personProfiles: personProfiles,
