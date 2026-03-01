@@ -1,20 +1,25 @@
-import 'dart:async';
+import 'package:posthog_dart/posthog_dart.dart' as dart_sdk;
+import 'package:posthog_dart/posthog_dart.dart'
+    show PostHogPersonProfiles, BeforeSendCallback;
 
-import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
-/// Callback to intercept and modify events before they are sent to PostHog.
-///
-/// Return a possibly modified event to send it, or return `null` to drop it.
-/// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
-    PostHogEvent event);
+/// Re-export shared types from the core posthog_dart package.
+export 'package:posthog_dart/posthog_dart.dart'
+    show PostHogPersonProfiles, BeforeSendCallback, PostHogEvent;
 
-enum PostHogPersonProfiles { never, always, identifiedOnly }
+/// Backwards-compatible typedef so existing code using `PostHogConfig` continues to work.
+typedef PostHogConfig = PostHogFlutterConfig;
 
 enum PostHogDataMode { wifi, cellular, any }
 
-class PostHogConfig {
+/// Flutter-specific PostHog configuration.
+///
+/// Extends the core [dart_sdk.PostHogConfig] options with Flutter-specific
+/// settings like session replay, surveys, error tracking autocapture, etc.
+///
+/// Use `PostHogConfig` (a typedef for this class) for backwards compatibility.
+class PostHogFlutterConfig {
   final String apiKey;
   var host = 'https://us.i.posthog.com';
   var flushAt = 20;
@@ -129,9 +134,9 @@ class PostHogConfig {
   /// - If any callback returns `null`, the event is dropped and subsequent callbacks are not called.
   List<BeforeSendCallback> beforeSend = [];
 
-  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
+  // TODO: missing getAnonymousId, captureDeepLinks integrations
 
-  PostHogConfig(
+  PostHogFlutterConfig(
     this.apiKey, {
     this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
@@ -157,6 +162,23 @@ class PostHogConfig {
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
     };
+  }
+
+  /// Converts this Flutter config to a core [dart_sdk.PostHogConfig] for use
+  /// with the posthog_dart SDK (Linux/Windows).
+  dart_sdk.PostHogConfig toCoreConfig() {
+    return dart_sdk.PostHogConfig(
+      host: host,
+      flushAt: flushAt,
+      flushInterval: flushInterval,
+      maxQueueSize: maxQueueSize,
+      maxBatchSize: maxBatchSize,
+      sendFeatureFlagEvents: sendFeatureFlagEvents,
+      preloadFeatureFlags: preloadFeatureFlags,
+      optOut: optOut,
+      debug: debug,
+      personProfiles: personProfiles,
+    );
   }
 }
 

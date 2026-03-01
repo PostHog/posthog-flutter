@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
-import 'package:posthog_flutter/src/posthog_event.dart';
+
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
 
 // Simplified void callback for feature flags

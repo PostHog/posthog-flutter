@@ -34,8 +34,8 @@ jobs:
           make formatKotlin
           make formatSwift
 
-  # Unit tests
-  test:
+  # Unit tests for posthog_flutter
+  test-flutter:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -47,9 +47,28 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Test
+      - name: Test posthog_flutter
         working-directory: ./posthog_flutter
         run: flutter test
+
+  # Unit tests for posthog_dart
+  test-dart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c # v1.7.1
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Test posthog_dart
+        working-directory: ./posthog_dart
+        run: dart test
 
   # Apple builds (iOS and macOS)
   build-apple:
@@ -78,7 +97,7 @@ jobs:
         run: flutter pub get
 
       - name: Build ${{ matrix.target }}
-        working-directory: ./example
+        working-directory: ./examples/flutter_example
         run: ${{ matrix.build_command }}
 
   # Android build
@@ -101,7 +120,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Android
-        working-directory: ./example
+        working-directory: ./examples/flutter_example
         run: flutter build apk
 
   # Web build
@@ -118,5 +137,44 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        working-directory: ./example
+        working-directory: ./examples/flutter_example
         run: flutter build web
+
+  # Linux build
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Linux
+        working-directory: ./examples/flutter_example
+        run: flutter build linux
+
+  # Windows build
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows
+        working-directory: ./examples/flutter_example
+        run: flutter build windows

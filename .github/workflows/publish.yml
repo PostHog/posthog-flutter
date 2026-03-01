@@ -94,7 +94,7 @@ jobs:
       contents: write
     outputs:
       committed: ${{ steps.commit-version-bump.outputs.committed }}
-      new-version: ${{ steps.apply-changesets.outputs.new-version }}
+      released-packages: ${{ steps.apply-changesets.outputs.released-packages }}
     steps:
       - name: Notify Slack - Approved
         continue-on-error: true
@@ -128,16 +128,52 @@ jobs:
       - name: Setup environment
         uses: ./.github/actions/setup
 
-      - name: Apply changesets and update version
+      - name: Apply changesets and update versions
         id: apply-changesets
         run: |
-          pnpm changeset version
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "new-version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "New version: $NEW_VERSION"
+          # Get versions before changeset
+          FLUTTER_VERSION_BEFORE=$(node -p "require('./package.json').version")
+          DART_VERSION_BEFORE=$(node -p "require('./posthog_dart/package.json').version")
 
-      - name: Sync version to all platform files
-        run: ./scripts/bump-version.sh ${{ steps.apply-changesets.outputs.new-version }}
+          pnpm changeset version
+
+          FLUTTER_VERSION_AFTER=$(node -p "require('./package.json').version")
+          DART_VERSION_AFTER=$(node -p "require('./posthog_dart/package.json').version")
+
+          # Determine which packages were released
+          RELEASED_PACKAGES=""
+          RELEASE_SUMMARY=""
+
+          if [ "$FLUTTER_VERSION_BEFORE" != "$FLUTTER_VERSION_AFTER" ]; then
+            RELEASED_PACKAGES="posthog_flutter"
+            RELEASE_SUMMARY="posthog_flutter@${FLUTTER_VERSION_AFTER}"
+            echo "posthog_flutter: $FLUTTER_VERSION_BEFORE -> $FLUTTER_VERSION_AFTER"
+          fi
+
+          if [ "$DART_VERSION_BEFORE" != "$DART_VERSION_AFTER" ]; then
+            if [ -n "$RELEASED_PACKAGES" ]; then
+              RELEASED_PACKAGES="${RELEASED_PACKAGES},posthog_dart"
+              RELEASE_SUMMARY="${RELEASE_SUMMARY}, posthog_dart@${DART_VERSION_AFTER}"
+            else
+              RELEASED_PACKAGES="posthog_dart"
+              RELEASE_SUMMARY="posthog_dart@${DART_VERSION_AFTER}"
+            fi
+            echo "posthog_dart: $DART_VERSION_BEFORE -> $DART_VERSION_AFTER"
+          fi
+
+          echo "released-packages=$RELEASED_PACKAGES" >> "$GITHUB_OUTPUT"
+          echo "flutter-version=$FLUTTER_VERSION_AFTER" >> "$GITHUB_OUTPUT"
+          echo "dart-version=$DART_VERSION_AFTER" >> "$GITHUB_OUTPUT"
+          echo "release-summary=$RELEASE_SUMMARY" >> "$GITHUB_OUTPUT"
+          echo "Released packages: $RELEASED_PACKAGES"
+
+      - name: Sync posthog_flutter version to platform files
+        if: contains(steps.apply-changesets.outputs.released-packages, 'posthog_flutter')
+        run: ./scripts/bump-version.sh posthog_flutter ${{ steps.apply-changesets.outputs.flutter-version }}
+
+      - name: Sync posthog_dart version to platform files
+        if: contains(steps.apply-changesets.outputs.released-packages, 'posthog_dart')
+        run: ./scripts/bump-version.sh posthog_dart ${{ steps.apply-changesets.outputs.dart-version }}
 
       - name: Commit version bump
         id: commit-version-bump
@@ -147,7 +183,7 @@ jobs:
             echo "No changes to commit"
             echo "committed=false" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "chore: release ${{ steps.apply-changesets.outputs.new-version }} [version bump]"
+            git commit -m "chore: release ${{ steps.apply-changesets.outputs.release-summary }} [version bump]"
             git push origin main
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
@@ -163,13 +199,21 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: .slack-thread-ts
-          key: slack-thread-ts-${{ steps.apply-changesets.outputs.new-version }}
+          key: slack-thread-ts-${{ steps.apply-changesets.outputs.release-summary }}
 
-      - name: Tag and push
-        if: steps.commit-version-bump.outputs.committed == 'true'
+      - name: Tag posthog_flutter
+        if: steps.commit-version-bump.outputs.committed == 'true' && contains(steps.apply-changesets.outputs.released-packages, 'posthog_flutter')
         run: |
-          git tag -a "${{ steps.apply-changesets.outputs.new-version }}" -m "${{ steps.apply-changesets.outputs.new-version }}"
-          git push origin "${{ steps.apply-changesets.outputs.new-version }}"
+          git tag -a "${{ steps.apply-changesets.outputs.flutter-version }}" -m "posthog_flutter@${{ steps.apply-changesets.outputs.flutter-version }}"
+          git push origin "${{ steps.apply-changesets.outputs.flutter-version }}"
+        env:
+          GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
+
+      - name: Tag posthog_dart
+        if: steps.commit-version-bump.outputs.committed == 'true' && contains(steps.apply-changesets.outputs.released-packages, 'posthog_dart')
+        run: |
+          git tag -a "posthog_dart@${{ steps.apply-changesets.outputs.dart-version }}" -m "posthog_dart@${{ steps.apply-changesets.outputs.dart-version }}"
+          git push origin "posthog_dart@${{ steps.apply-changesets.outputs.dart-version }}"
         env:
           GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
 

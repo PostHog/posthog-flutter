@@ -22,6 +22,8 @@ dependencies:
   meta: ^1.3.0
   stack_trace: ^1.12.0
   web: ^1.1.0
+  path: ^1.9.0
+  posthog_dart: ^0.1.0
 
 dev_dependencies:
   flutter_lints: ^5.0.0
@@ -55,6 +57,10 @@ flutter:
       web:
         pluginClass: PosthogFlutterWeb
         fileName: posthog_flutter_web.dart
+      linux:
+        dartPluginClass: PosthogFlutterDart
+      windows:
+        dartPluginClass: PosthogFlutterDart
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

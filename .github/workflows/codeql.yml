@@ -74,12 +74,12 @@ jobs:
 
       - name: Build Android (Java/Kotlin)
         if: matrix.language == 'java-kotlin'
-        working-directory: ./example
+        working-directory: ./examples/flutter_example
         run: flutter build apk
 
       - name: Build iOS (Swift)
         if: matrix.language == 'swift'
-        working-directory: ./example
+        working-directory: ./examples/flutter_example
         run: |
           flutter build ios --simulator --no-codesign --config-only
           cd ios

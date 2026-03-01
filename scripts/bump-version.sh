@@ -1,20 +1,34 @@
 #!/bin/bash
 
-# ./scripts/bump-version.sh <new version>
-# eg ./scripts/bump-version.sh "3.0.0-alpha.1"
+# ./scripts/bump-version.sh <package> <new version>
+# eg ./scripts/bump-version.sh posthog_flutter "5.16.0"
+# eg ./scripts/bump-version.sh posthog_dart "0.2.0"
 
 set -eux
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $SCRIPT_DIR/..
 
-NEW_VERSION="$1"
+PACKAGE="$1"
+NEW_VERSION="$2"
 
-# Replace iOS `postHogFlutterVersion` with the given version
-perl -pi -e "s/postHogFlutterVersion = \".*\"/postHogFlutterVersion = \"$NEW_VERSION\"/" posthog_flutter/ios/Classes/PostHogFlutterVersion.swift
+if [ "$PACKAGE" = "posthog_flutter" ]; then
+  # Replace iOS `postHogFlutterVersion` with the given version
+  perl -pi -e "s/postHogFlutterVersion = \".*\"/postHogFlutterVersion = \"$NEW_VERSION\"/" posthog_flutter/ios/Classes/PostHogFlutterVersion.swift
 
-# Replace Android `postHogVersion` with the given version
-perl -pi -e "s/postHogVersion = \".*\"/postHogVersion = \"$NEW_VERSION\"/" posthog_flutter/android/src/main/kotlin/com/posthog/flutter/PostHogVersion.kt
+  # Replace Android `postHogVersion` with the given version
+  perl -pi -e "s/postHogVersion = \".*\"/postHogVersion = \"$NEW_VERSION\"/" posthog_flutter/android/src/main/kotlin/com/posthog/flutter/PostHogVersion.kt
 
-# Replace Flutter `version` with the given version
-perl -pi -e "s/^version: .*/version: $NEW_VERSION/" posthog_flutter/pubspec.yaml
+  # Replace Flutter `version` with the given version
+  perl -pi -e "s/^version: .*/version: $NEW_VERSION/" posthog_flutter/pubspec.yaml
+elif [ "$PACKAGE" = "posthog_dart" ]; then
+  # Replace Dart `version` with the given version in pubspec.yaml
+  perl -pi -e "s/^version: .*/version: $NEW_VERSION/" posthog_dart/pubspec.yaml
+
+  # Replace Dart `sdkVersion` with the given version in version.dart
+  perl -pi -e "s/sdkVersion = '.*'/sdkVersion = '$NEW_VERSION'/" posthog_dart/lib/src/version.dart
+else
+  echo "Unknown package: $PACKAGE"
+  echo "Usage: $0 <posthog_flutter|posthog_dart> <version>"
+  exit 1
+fi

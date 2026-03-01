@@ -1,6 +1,9 @@
 # Releasing
 
-This repository uses [Changesets](https://github.com/changesets/changesets) for version management and an automated GitHub Actions workflow for releases.
+This repository uses [Changesets](https://github.com/changesets/changesets) for version management and an automated GitHub Actions workflow for releases. It is a multi-package monorepo containing:
+
+- **posthog_flutter** — Flutter plugin for iOS, Android, macOS, Web, Linux, and Windows
+- **posthog_dart** — Pure Dart PostHog SDK (used by posthog_flutter on Linux/Windows)
 
 ## How to Release
 
@@ -13,7 +16,8 @@ pnpm changeset
 ```
 
 This will prompt you to:
-- Select the type of version bump (patch, minor, major)
+- Select the package(s) affected (posthog_flutter, posthog_dart, or both)
+- Select the type of version bump (patch, minor, major) for each
 - Write a summary of the changes
 
 The changeset file will be created in the `.changeset/` directory.
@@ -34,12 +38,12 @@ When the PR is merged to `main`, the release workflow will automatically:
 2. Notify the client libraries team in Slack for approval
 3. Wait for approval from a maintainer (via GitHub environment protection)
 4. Once approved:
-   - Apply changesets and bump the version
-   - Update the CHANGELOG.md
-   - Sync the version to `pubspec.yaml`, iOS (`PostHogFlutterVersion.swift`), and Android (`PostHogVersion.kt`)
-   - Commit the version bump to `main`
-   - Publish the package to pub.dev
-   - Create a git tag and GitHub release
+   - Apply changesets and bump the version(s) for affected packages
+   - Update the CHANGELOG.md for each released package
+   - Sync versions to platform-specific files (pubspec.yaml, iOS, Android, version.dart)
+   - Commit the version bump(s) to `main`
+   - Create git tags and publish to pub.dev
+   - Create GitHub releases
 
 ### Manual Trigger
 
@@ -68,9 +72,15 @@ To exit pre-release mode:
 pnpm changeset pre exit
 ```
 
-## pub.dev Package
+## pub.dev Packages
 
-The package is published as [`posthog_flutter`](https://pub.dev/packages/posthog_flutter) on pub.dev.
+- [`posthog_flutter`](https://pub.dev/packages/posthog_flutter)
+- [`posthog_dart`](https://pub.dev/packages/posthog_dart)
+
+## Tag Convention
+
+- **posthog_flutter**: Tags use bare semver (e.g., `5.16.0`)
+- **posthog_dart**: Tags use the prefix `posthog_dart@` (e.g., `posthog_dart@0.2.0`)
 
 ## Troubleshooting
 
@@ -88,8 +98,14 @@ In case of automation failure, you can manually publish:
 
 ```bash
 flutter pub get
+
+# For posthog_flutter
 cd posthog_flutter
 flutter pub publish --force
+
+# For posthog_dart
+cd posthog_dart
+dart pub publish --force
 ```
 
-You'll need to be authenticated with pub.dev and have publish access to the package.
+You'll need to be authenticated with pub.dev and have publish access to the packages.

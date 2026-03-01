@@ -16,7 +16,6 @@ import 'utils/property_normalizer.dart';
 import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
-import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
@@ -100,11 +99,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> showSurvey(Map<String, dynamic> survey) async {
-    if (!isSupportedPlatform()) {
-      printIfDebug('Cannot show survey: Platform is not supported');
-      return;
-    }
-
     final widget = PosthogFlutterPlatformInterface.instance;
     if (widget is! PosthogFlutterIO) {
       printIfDebug(
@@ -162,11 +156,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// Cleans up any active surveys when the survey feature is stopped
   Future<void> cleanupSurveys() async {
-    if (!isSupportedPlatform()) {
-      printIfDebug('Cannot cleanup surveys: Platform is not supported');
-      return;
-    }
-
     SurveyService().hideSurvey();
   }
 
@@ -176,10 +165,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> setup(PostHogConfig config) async {
     // Store config for later use in exception processing
     _config = config;
-
-    if (!isSupportedPlatform()) {
-      return;
-    }
 
     _onFeatureFlagsCallback = config.onFeatureFlags;
     _beforeSendCallbacks = config.beforeSend;
@@ -197,10 +182,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       final normalizedUserProperties = userProperties != null
           ? PropertyNormalizer.normalize(userProperties)
@@ -226,10 +207,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
   }) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       final normalizedUserPropertiesToSet = userPropertiesToSet != null
           ? PropertyNormalizer.normalize(userPropertiesToSet)
@@ -256,10 +233,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     // Apply beforeSend callback
     final processedEvent = await _runBeforeSend(
       eventName,
@@ -314,10 +287,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String screenName,
     Map<String, Object>? properties,
   }) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     // Add screenName as $screen_name property for beforeSend
     final propsWithScreenName = <String, Object>{
       PostHogPropertyName.screenName: screenName,
@@ -336,7 +305,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (processedEvent.event != PostHogEventName.screen) {
       await capture(
         eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
+        properties: processedEvent.properties,
       );
       return;
     }
@@ -350,8 +319,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     try {
       final normalizedProperties = processedEvent.properties?.isNotEmpty == true
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+          ? PropertyNormalizer.normalize(processedEvent.properties!)
           : null;
 
       await _methodChannel.invokeMethod('screen', {
@@ -367,10 +335,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> alias({
     required String alias,
   }) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       await _methodChannel.invokeMethod('alias', {
         'alias': alias,
@@ -382,10 +346,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<String> getDistinctId() async {
-    if (!isSupportedPlatform()) {
-      return "";
-    }
-
     try {
       return await _methodChannel.invokeMethod('distinctId');
     } on PlatformException catch (exception) {
@@ -396,10 +356,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reset() async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       await _methodChannel.invokeMethod('reset');
     } on PlatformException catch (exception) {
@@ -409,10 +365,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> disable() async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       await _methodChannel.invokeMethod('disable');
     } on PlatformException catch (exception) {
@@ -422,10 +374,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> enable() async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       await _methodChannel.invokeMethod('enable');
     } on PlatformException catch (exception) {
@@ -435,10 +383,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isOptOut() async {
-    if (!isSupportedPlatform()) {
-      return true;
-    }
-
     try {
       final result = await _methodChannel.invokeMethod('isOptOut');
       return result as bool? ?? true;
@@ -450,10 +394,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> debug(bool enabled) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       await _methodChannel.invokeMethod('debug', {
         'debug': enabled,
@@ -465,10 +405,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key) async {
-    if (!isSupportedPlatform()) {
-      return false;
-    }
-
     try {
       return await _methodChannel.invokeMethod('isFeatureEnabled', {
         'key': key,
@@ -481,10 +417,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reloadFeatureFlags() async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       await _methodChannel.invokeMethod('reloadFeatureFlags');
     } on PlatformException catch (exception) {
@@ -498,10 +430,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String groupKey,
     Map<String, Object>? groupProperties,
   }) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       final normalizedGroupProperties = groupProperties != null
           ? PropertyNormalizer.normalize(groupProperties)
@@ -522,10 +450,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<Object?> getFeatureFlag({
     required String key,
   }) async {
-    if (!isSupportedPlatform()) {
-      return null;
-    }
-
     try {
       return await _methodChannel.invokeMethod('getFeatureFlag', {
         'key': key,
@@ -540,10 +464,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<Object?> getFeatureFlagPayload({
     required String key,
   }) async {
-    if (!isSupportedPlatform()) {
-      return null;
-    }
-
     try {
       return await _methodChannel.invokeMethod('getFeatureFlagPayload', {
         'key': key,
@@ -559,10 +479,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String key,
     bool sendEvent = true,
   }) async {
-    if (!isSupportedPlatform()) {
-      return null;
-    }
-
     try {
       final result = await _methodChannel.invokeMethod('getFeatureFlagResult', {
         'key': key,
@@ -579,10 +495,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> register(String key, Object value) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       return await _methodChannel
           .invokeMethod('register', {'key': key, 'value': value});
@@ -593,10 +505,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> unregister(String key) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       return await _methodChannel.invokeMethod('unregister', {'key': key});
     } on PlatformException catch (exception) {
@@ -606,10 +514,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> flush() async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       return await _methodChannel.invokeMethod('flush');
     } on PlatformException catch (exception) {
@@ -622,10 +526,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       {required Object error,
       StackTrace? stackTrace,
       Map<String, Object>? properties}) async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       final exceptionProps = DartExceptionProcessor.processException(
         error: error,
@@ -649,7 +549,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       if (processedEvent.event != PostHogEventName.exception) {
         await capture(
           eventName: processedEvent.event,
-          properties: processedEvent.properties?.cast<String, Object>(),
+          properties: processedEvent.properties,
         );
         return;
       }
@@ -657,8 +557,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final normalizedData = processedEvent.properties != null
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+          ? PropertyNormalizer.normalize(processedEvent.properties!)
           : <String, Object>{};
 
       await _methodChannel.invokeMethod('captureException',
@@ -670,10 +569,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> close() async {
-    if (!isSupportedPlatform()) {
-      return;
-    }
-
     try {
       return await _methodChannel.invokeMethod('close');
     } on PlatformException catch (exception) {
@@ -683,10 +578,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<String?> getSessionId() async {
-    if (!isSupportedPlatform()) {
-      return null;
-    }
-
     try {
       final sessionId = await _methodChannel.invokeMethod('getSessionId');
       return sessionId;
@@ -699,11 +590,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   // For internal use
   @override
   Future<void> openUrl(String url) async {
-    if (!isSupportedPlatform()) {
-      printIfDebug('Cannot open url $url: Platform is not supported');
-      return;
-    }
-
     try {
       await _methodChannel.invokeMethod('openUrl', url);
     } on PlatformException catch (exception) {
@@ -713,7 +599,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
-    if (!isSupportedPlatform() || isMacOS()) {
+    if (isMacOS()) {
       return;
     }
 
@@ -726,7 +612,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> stopSessionRecording() async {
-    if (!isSupportedPlatform() || isMacOS()) {
+    if (isMacOS()) {
       return;
     }
 
@@ -739,7 +625,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isSessionReplayActive() async {
-    if (!isSupportedPlatform() || isMacOS()) {
+    if (isMacOS()) {
       return false;
     }
 
