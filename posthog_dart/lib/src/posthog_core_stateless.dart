@@ -451,49 +451,57 @@ abstract class PostHogCoreStateless {
 
   /// Hook for subclasses to transform or filter a message before queueing.
   @protected
-  Map<String, Object?>? processBeforeEnqueue(Map<String, Object?> message) {
+  FutureOr<Map<String, Object?>?> processBeforeEnqueue(
+      Map<String, Object?> message) {
     return message;
   }
 
   @protected
   void enqueue(String type, Map<String, Object?> message,
       {PostHogCaptureOptions? options}) {
-    wrap(() {
-      if (optedOut) {
-        events.emit(type,
-            'Library is disabled. Not sending event. To re-enable, call posthog.optIn()');
-        return;
-      }
+    if (disabled || !isInitialized) return;
+    if (optedOut) {
+      events.emit(type,
+          'Library is disabled. Not sending event. To re-enable, call posthog.optIn()');
+      return;
+    }
 
-      Map<String, Object?>? prepared = _prepareMessage(type, message, options);
-      prepared = processBeforeEnqueue(prepared);
-      if (prepared == null) return;
+    final prepared = _prepareMessage(type, message, options);
+    final result = processBeforeEnqueue(prepared);
+    if (result is Future<Map<String, Object?>?>) {
+      result.then((resolved) {
+        if (resolved != null) _enqueueMessage(type, resolved);
+      });
+    } else {
+      if (result != null) _enqueueMessage(type, result);
+    }
+  }
 
-      final queue =
-          getPersistedProperty<List<Object?>>(PostHogPersistedProperty.queue) ??
-              [];
+  void _enqueueMessage(String type, Map<String, Object?> prepared) {
+    final queue =
+        getPersistedProperty<List<Object?>>(PostHogPersistedProperty.queue) ??
+            [];
 
-      final mutableQueue = List<Object?>.from(queue);
-      if (mutableQueue.length >= _maxQueueSize) {
-        mutableQueue.removeAt(0);
-        logger.info('Queue is full, the oldest event is dropped.');
-      }
+    final mutableQueue = List<Object?>.from(queue);
+    if (mutableQueue.length >= _maxQueueSize) {
+      mutableQueue.removeAt(0);
+      logger.info('Queue is full, the oldest event is dropped.');
+    }
 
-      mutableQueue.add({'message': prepared});
-      setPersistedProperty(PostHogPersistedProperty.queue, mutableQueue);
+    mutableQueue.add({'message': prepared});
+    setPersistedProperty(PostHogPersistedProperty.queue, mutableQueue);
 
-      events.emit(type, prepared);
+    events.emit(type, prepared);
 
-      if (mutableQueue.length >= flushAt) {
+    if (mutableQueue.length >= flushAt) {
+      _flushBackground();
+    }
+
+    if (_flushInterval > 0 && _flushTimer == null) {
+      _flushTimer = Timer(Duration(milliseconds: _flushInterval), () {
         _flushBackground();
-      }
-
-      if (_flushInterval > 0 && _flushTimer == null) {
-        _flushTimer = Timer(Duration(milliseconds: _flushInterval), () {
-          _flushBackground();
-        });
-      }
-    });
+      });
+    }
   }
 
   Map<String, Object?> _prepareMessage(

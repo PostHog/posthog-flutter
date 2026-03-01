@@ -1,20 +1,12 @@
-import 'dart:async';
-
 import 'package:posthog_dart/posthog_dart.dart' as dart_sdk;
-import 'package:posthog_dart/posthog_dart.dart' show PostHogPersonProfiles;
+import 'package:posthog_dart/posthog_dart.dart'
+    show PostHogPersonProfiles, BeforeSendCallback;
 
-import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
-/// Re-export [PostHogPersonProfiles] from the core posthog_dart package.
-export 'package:posthog_dart/posthog_dart.dart' show PostHogPersonProfiles;
-
-/// Callback to intercept and modify events before they are sent to PostHog.
-///
-/// Return a possibly modified event to send it, or return `null` to drop it.
-/// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
-    PostHogEvent event);
+/// Re-export shared types from the core posthog_dart package.
+export 'package:posthog_dart/posthog_dart.dart'
+    show PostHogPersonProfiles, BeforeSendCallback, PostHogEvent;
 
 /// Backwards-compatible typedef so existing code using `PostHogConfig` continues to work.
 typedef PostHogConfig = PostHogFlutterConfig;

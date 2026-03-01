@@ -1,10 +1,13 @@
 import 'feature_flags.dart';
 
-/// Function type for the `beforeSend` hook.
-/// Receives an event and can return a modified event or null to drop the event.
-/// Receives an event before it's queued. Return the (possibly modified) event,
-/// or `null` to drop it.
-typedef BeforeSendFn = CaptureEvent? Function(CaptureEvent event);
+import 'dart:async';
+
+/// Callback to intercept and modify events before they are sent to PostHog.
+///
+/// Return a possibly modified event to send it, or return `null` to drop it.
+/// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
+typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+    PostHogEvent event);
 
 /// Configuration options for the PostHog SDK.
 class PostHogConfig {
@@ -67,7 +70,7 @@ class PostHogConfig {
   final PostHogPersonProfiles personProfiles;
 
   /// Allows modification or dropping of events before they're sent to PostHog.
-  final List<BeforeSendFn>? beforeSend;
+  final List<BeforeSendCallback>? beforeSend;
 
   const PostHogConfig({
     this.host = 'https://us.i.posthog.com',
@@ -173,21 +176,37 @@ class PostHogCaptureOptions {
 
 /// Represents an event before it's sent to PostHog.
 ///
-/// Exposed to the [BeforeSendFn] hook for modification or filtering.
-class CaptureEvent {
-  String uuid;
+/// Exposed to the [BeforeSendCallback] hook for modification or filtering.
+class PostHogEvent {
+  /// The event ID.
+  String? uuid;
+
+  /// The name of the event (e.g., 'button_clicked', '$screen', '$exception').
   String event;
+
+  /// User-provided properties for this event.
   Map<String, Object?>? properties;
-  Map<String, Object?>? set;
-  Map<String, Object?>? setOnce;
+
+  /// User properties to set on the user profile ($set).
+  Map<String, Object?>? userProperties;
+
+  /// User properties to set only once on the user profile ($set_once).
+  Map<String, Object?>? userPropertiesSetOnce;
+
+  /// If provided overrides the auto-generated timestamp.
   DateTime? timestamp;
 
-  CaptureEvent({
-    required this.uuid,
+  PostHogEvent({
+    this.uuid,
     required this.event,
     this.properties,
-    this.set,
-    this.setOnce,
+    this.userProperties,
+    this.userPropertiesSetOnce,
     this.timestamp,
   });
+
+  @override
+  String toString() {
+    return 'PostHogEvent(event: $event, properties: $properties, userProperties: $userProperties, userPropertiesSetOnce: $userPropertiesSetOnce)';
+  }
 }

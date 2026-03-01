@@ -16,8 +16,8 @@ export 'src/config.dart'
         PostHogCaptureOptions,
         BootstrapConfig,
         PostHogPersonProfiles,
-        BeforeSendFn,
-        CaptureEvent;
+        BeforeSendCallback,
+        PostHogEvent;
 export 'src/feature_flags.dart'
     show
         FeatureFlagValue,

@@ -7,7 +7,6 @@ import 'package:posthog_dart/posthog_dart.dart' as dart_sdk;
 import 'src/error_tracking/dart_exception_processor.dart';
 import 'src/feature_flag_result.dart';
 import 'src/posthog_config.dart';
-import 'src/posthog_event.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/util/logging.dart';
 import 'src/utils/property_normalizer.dart';
@@ -176,9 +175,10 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
 
     try {
       final extracted = CaptureUtils.extractUserProperties(
-        properties: processedEvent.properties,
-        userProperties: processedEvent.userProperties,
-        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
+        properties: processedEvent.properties?.cast<String, Object>(),
+        userProperties: processedEvent.userProperties?.cast<String, Object>(),
+        userPropertiesSetOnce:
+            processedEvent.userPropertiesSetOnce?.cast<String, Object>(),
       );
 
       final normalizedProperties = extracted.properties != null

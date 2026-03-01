@@ -40,7 +40,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   // options
   final bool _sendFeatureFlagEvent;
   final Map<String, bool> _flagCallReported = {};
-  final List<BeforeSendFn>? _beforeSend;
+  final List<BeforeSendCallback>? _beforeSend;
 
   // internal
   Future<PostHogFlagsResponse?>? _flagsResponseFuture;
@@ -910,40 +910,50 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   /// Override processBeforeEnqueue to run before_send hooks.
   @override
-  Map<String, Object?>? processBeforeEnqueue(Map<String, Object?> message) {
+  FutureOr<Map<String, Object?>?> processBeforeEnqueue(
+      Map<String, Object?> message) {
     if (_beforeSend == null || _beforeSend.isEmpty) return message;
 
     final props = (message['properties'] as Map<String, Object?>?) ?? {};
     final timestamp = message['timestamp'];
-    final captureEvent = CaptureEvent(
+    final event = PostHogEvent(
       uuid: message['uuid'] as String,
       event: message['event'] as String,
       properties: Map<String, Object?>.from(props),
-      set: props[r'$set'] as Map<String, Object?>?,
-      setOnce: props[r'$set_once'] as Map<String, Object?>?,
+      userProperties: props[r'$set'] as Map<String, Object?>?,
+      userPropertiesSetOnce: props[r'$set_once'] as Map<String, Object?>?,
       timestamp: timestamp is String ? DateTime.parse(timestamp) : null,
     );
 
-    final result = _runBeforeSend(captureEvent);
+    final beforeSendResult = _runBeforeSend(event);
+    if (beforeSendResult is Future<PostHogEvent?>) {
+      return beforeSendResult
+          .then((result) => _applyBeforeSendResult(result, message, props));
+    }
+    return _applyBeforeSendResult(beforeSendResult, message, props);
+  }
+
+  Map<String, Object?>? _applyBeforeSendResult(PostHogEvent? result,
+      Map<String, Object?> message, Map<String, Object?> props) {
     if (result == null) return null;
 
     final resultProps = <String, Object?>{
       ...(result.properties ?? props),
     };
-    if (result.set != null) {
-      resultProps[r'$set'] = result.set;
+    if (result.userProperties != null) {
+      resultProps[r'$set'] = result.userProperties;
     } else {
       resultProps.remove(r'$set');
     }
-    if (result.setOnce != null) {
-      resultProps[r'$set_once'] = result.setOnce;
+    if (result.userPropertiesSetOnce != null) {
+      resultProps[r'$set_once'] = result.userPropertiesSetOnce;
     } else {
       resultProps.remove(r'$set_once');
     }
 
     return {
       ...message,
-      'uuid': result.uuid,
+      if (result.uuid != null) 'uuid': result.uuid,
       'event': result.event,
       'properties': resultProps,
       if (result.timestamp != null)
@@ -951,22 +961,52 @@ abstract class PostHogCore extends PostHogCoreStateless {
     };
   }
 
-  CaptureEvent? _runBeforeSend(CaptureEvent captureEvent) {
-    if (_beforeSend == null) return captureEvent;
+  FutureOr<PostHogEvent?> _runBeforeSend(PostHogEvent event) {
+    if (_beforeSend == null) return event;
 
-    CaptureEvent? result = captureEvent;
+    PostHogEvent? result = event;
+    bool hasAsync = false;
+
+    // Check if any callback returns a Future
     for (final fn in _beforeSend) {
       try {
-        result = fn(result!);
+        final fnResult = fn(result!);
+        if (fnResult is Future<PostHogEvent?>) {
+          hasAsync = true;
+          break;
+        }
+        result = fnResult;
         if (result == null) {
           logger.info(
-              "Event '${captureEvent.event}' was rejected in before_send function");
+              "Event '${event.event}' was rejected in beforeSend callback");
           return null;
         }
       } catch (e) {
         logger.error(
-            "Error in before_send function for event '${captureEvent.event}':",
-            e);
+            "Error in beforeSend callback for event '${event.event}':", e);
+      }
+    }
+
+    if (!hasAsync) return result;
+
+    // Re-run with async handling
+    return _runBeforeSendAsync(event);
+  }
+
+  Future<PostHogEvent?> _runBeforeSendAsync(PostHogEvent event) async {
+    PostHogEvent? result = event;
+    for (final fn in _beforeSend!) {
+      try {
+        final fnResult = fn(result!);
+        result = fnResult is Future<PostHogEvent?> ? await fnResult : fnResult;
+        if (result == null) {
+          logger.info(
+              "Event '${event.event}' was rejected in beforeSend callback");
+          return null;
+        }
+      } catch (e) {
+        logger.error(
+            "Error in beforeSend callback for event '${event.event}':", e);
       }
     }
     return result;

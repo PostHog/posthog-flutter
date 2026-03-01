@@ -16,7 +16,6 @@ import 'utils/property_normalizer.dart';
 import 'feature_flag_result.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
-import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
@@ -250,9 +249,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       // Use processed event properties (potentially modified by beforeSend)
       final extracted = CaptureUtils.extractUserProperties(
-        properties: processedEvent.properties,
-        userProperties: processedEvent.userProperties,
-        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
+        properties: processedEvent.properties?.cast<String, Object>(),
+        userProperties: processedEvent.userProperties?.cast<String, Object>(),
+        userPropertiesSetOnce:
+            processedEvent.userPropertiesSetOnce?.cast<String, Object>(),
       );
 
       final extractedProperties = extracted.properties;
