@@ -7,7 +7,7 @@ import 'feature_flags.dart';
 typedef BeforeSendFn = CaptureEvent? Function(CaptureEvent event);
 
 /// Configuration options for the PostHog SDK.
-class PostHogCoreOptions {
+class PostHogConfig {
   /// PostHog API host, usually 'https://us.i.posthog.com' or 'https://eu.i.posthog.com'.
   final String host;
 
@@ -63,12 +63,12 @@ class PostHogCoreOptions {
   final List<String>? evaluationContexts;
 
   /// Determines when to create Person Profiles for users.
-  final PersonProfiles personProfiles;
+  final PostHogPersonProfiles personProfiles;
 
   /// Allows modification or dropping of events before they're sent to PostHog.
   final List<BeforeSendFn>? beforeSend;
 
-  const PostHogCoreOptions({
+  const PostHogConfig({
     this.host = 'https://us.i.posthog.com',
     this.flushAt = 20,
     this.flushInterval = 10000,
@@ -87,7 +87,7 @@ class PostHogCoreOptions {
     this.sessionExpirationTimeSeconds = 1800,
     this.disableGeoip,
     this.evaluationContexts,
-    this.personProfiles = PersonProfiles.identifiedOnly,
+    this.personProfiles = PostHogPersonProfiles.identifiedOnly,
     this.beforeSend,
   });
 
@@ -95,11 +95,11 @@ class PostHogCoreOptions {
   ///
   /// This is intentionally limited to the fields that [PostHogCore]
   /// needs to override when calling `super()`.
-  PostHogCoreOptions withDefaults({
+  PostHogConfig withDefaults({
     bool? disableGeoip,
     int? featureFlagsRequestTimeoutMs,
   }) {
-    return PostHogCoreOptions(
+    return PostHogConfig(
       host: host,
       flushAt: flushAt,
       flushInterval: flushInterval,
@@ -126,7 +126,7 @@ class PostHogCoreOptions {
 }
 
 /// Determines when to create Person Profiles for users.
-enum PersonProfiles {
+enum PostHogPersonProfiles {
   /// Always create a person profile for every user.
   always,
 

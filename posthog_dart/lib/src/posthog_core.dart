@@ -51,14 +51,14 @@ abstract class PostHogCore extends PostHogCoreStateless {
   _PendingFlagsRequest? _pendingFlagsRequest;
 
   // person profiles
-  final PersonProfiles _personProfiles;
+  final PostHogPersonProfiles _personProfiles;
 
   // cache for person properties to avoid duplicate $set events
   String? _cachedPersonProperties;
 
   PostHogCore(
     super.apiKey, {
-    PostHogCoreOptions options = const PostHogCoreOptions(),
+    PostHogConfig options = const PostHogConfig(),
     super.storage,
   })  : _sendFeatureFlagEvent = options.sendFeatureFlagEvent,
         _sessionExpirationTimeSeconds = options.sessionExpirationTimeSeconds,
@@ -74,7 +74,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     _setupBootstrap(options);
   }
 
-  void _setupBootstrap(PostHogCoreOptions options) {
+  void _setupBootstrap(PostHogConfig options) {
     final bootstrap = options.bootstrap;
     if (bootstrap == null) return;
 
@@ -838,8 +838,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   bool _hasPersonProcessing() {
-    if (_personProfiles == PersonProfiles.always) return true;
-    if (_personProfiles == PersonProfiles.never) return false;
+    if (_personProfiles == PostHogPersonProfiles.always) return true;
+    if (_personProfiles == PostHogPersonProfiles.never) return false;
 
     final isIdentified = _isIdentified();
     final hasGroups = _getGroups().isNotEmpty;
@@ -851,7 +851,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   bool _requirePersonProcessing(String functionName) {
-    if (_personProfiles == PersonProfiles.never) {
+    if (_personProfiles == PostHogPersonProfiles.never) {
       logger.error(
           '$functionName was called, but personProfiles is set to "never". This call will be ignored.');
       return false;

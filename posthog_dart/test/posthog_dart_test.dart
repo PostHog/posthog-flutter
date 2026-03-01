@@ -71,7 +71,7 @@ void main() {
       storage = InMemoryStorage();
       posthog = TestPostHogClient(
         'test-api-key',
-        options: const PostHogCoreOptions(
+        options: const PostHogConfig(
           host: 'https://us.i.posthog.com',
           flushAt: 100, // High so we don't auto-flush
           preloadFeatureFlags: false,
@@ -231,8 +231,8 @@ void main() {
     test('should not process person calls when personProfiles is never', () {
       final client = TestPostHogClient(
         'test-key',
-        options: const PostHogCoreOptions(
-          personProfiles: PersonProfiles.never,
+        options: const PostHogConfig(
+          personProfiles: PostHogPersonProfiles.never,
           preloadFeatureFlags: false,
         ),
         storage: InMemoryStorage(),
@@ -247,7 +247,7 @@ void main() {
     test('should handle disabled state', () {
       final client = TestPostHogClient(
         'test-key',
-        options: const PostHogCoreOptions(
+        options: const PostHogConfig(
           disabled: true,
           preloadFeatureFlags: false,
         ),
@@ -276,7 +276,7 @@ void main() {
       final clientStorage = InMemoryStorage();
       final client = TestPostHogClient(
         'test-key',
-        options: PostHogCoreOptions(
+        options: PostHogConfig(
           preloadFeatureFlags: false,
           beforeSend: [
             (event) {
@@ -447,7 +447,7 @@ void main() {
       final storage = InMemoryStorage();
       final client = TestPostHogClient(
         'test-key',
-        options: const PostHogCoreOptions(
+        options: const PostHogConfig(
           preloadFeatureFlags: false,
           bootstrap: BootstrapConfig(
             flags: {
@@ -469,7 +469,7 @@ void main() {
       final storage = InMemoryStorage();
       final client = TestPostHogClient(
         'test-key',
-        options: const PostHogCoreOptions(
+        options: const PostHogConfig(
           preloadFeatureFlags: false,
           bootstrap: BootstrapConfig(
             distinctId: 'bootstrap-user',

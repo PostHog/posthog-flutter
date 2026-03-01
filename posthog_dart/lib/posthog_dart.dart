@@ -12,10 +12,10 @@ export 'src/posthog_client.dart' show PostHog;
 export 'src/storage.dart' show PostHogStorage, InMemoryStorage;
 export 'src/config.dart'
     show
-        PostHogCoreOptions,
+        PostHogConfig,
         PostHogCaptureOptions,
         BootstrapConfig,
-        PersonProfiles,
+        PostHogPersonProfiles,
         BeforeSendFn,
         CaptureEvent;
 export 'src/feature_flags.dart'

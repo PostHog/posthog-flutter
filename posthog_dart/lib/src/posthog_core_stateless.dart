@@ -89,7 +89,7 @@ abstract class PostHogCoreStateless {
 
   PostHogCoreStateless(
     this.apiKey, {
-    PostHogCoreOptions options = const PostHogCoreOptions(),
+    PostHogConfig options = const PostHogConfig(),
     PostHogStorage? storage,
   })  : storage = storage ?? InMemoryStorage(),
         host = removeTrailingSlash(options.host),

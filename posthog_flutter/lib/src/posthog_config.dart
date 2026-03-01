@@ -1,7 +1,13 @@
 import 'dart:async';
 
+import 'package:posthog_dart/posthog_dart.dart' as dart_sdk;
+import 'package:posthog_dart/posthog_dart.dart' show PostHogPersonProfiles;
+
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+
+/// Re-export [PostHogPersonProfiles] from the core posthog_dart package.
+export 'package:posthog_dart/posthog_dart.dart' show PostHogPersonProfiles;
 
 /// Callback to intercept and modify events before they are sent to PostHog.
 ///
@@ -10,11 +16,18 @@ import 'posthog_flutter_platform_interface.dart';
 typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
     PostHogEvent event);
 
-enum PostHogPersonProfiles { never, always, identifiedOnly }
+/// Backwards-compatible typedef so existing code using `PostHogConfig` continues to work.
+typedef PostHogConfig = PostHogFlutterConfig;
 
 enum PostHogDataMode { wifi, cellular, any }
 
-class PostHogConfig {
+/// Flutter-specific PostHog configuration.
+///
+/// Extends the core [dart_sdk.PostHogConfig] options with Flutter-specific
+/// settings like session replay, surveys, error tracking autocapture, etc.
+///
+/// Use `PostHogConfig` (a typedef for this class) for backwards compatibility.
+class PostHogFlutterConfig {
   final String apiKey;
   var host = 'https://us.i.posthog.com';
   var flushAt = 20;
@@ -131,7 +144,7 @@ class PostHogConfig {
 
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
 
-  PostHogConfig(
+  PostHogFlutterConfig(
     this.apiKey, {
     this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
@@ -157,6 +170,23 @@ class PostHogConfig {
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
     };
+  }
+
+  /// Converts this Flutter config to a core [dart_sdk.PostHogConfig] for use
+  /// with the posthog_dart SDK (Linux/Windows).
+  dart_sdk.PostHogConfig toCoreConfig() {
+    return dart_sdk.PostHogConfig(
+      host: host,
+      flushAt: flushAt,
+      flushInterval: flushInterval.inMilliseconds,
+      maxQueueSize: maxQueueSize,
+      maxBatchSize: maxBatchSize,
+      sendFeatureFlagEvent: sendFeatureFlagEvents,
+      preloadFeatureFlags: preloadFeatureFlags,
+      disabled: optOut,
+      defaultOptIn: !optOut,
+      personProfiles: personProfiles,
+    );
   }
 }
 

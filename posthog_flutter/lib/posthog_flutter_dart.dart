@@ -59,17 +59,6 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
     return event;
   }
 
-  dart_sdk.PersonProfiles _mapPersonProfiles(PostHogPersonProfiles profiles) {
-    switch (profiles) {
-      case PostHogPersonProfiles.always:
-        return dart_sdk.PersonProfiles.always;
-      case PostHogPersonProfiles.never:
-        return dart_sdk.PersonProfiles.never;
-      case PostHogPersonProfiles.identifiedOnly:
-        return dart_sdk.PersonProfiles.identifiedOnly;
-    }
-  }
-
   @override
   Future<void> setup(PostHogConfig config) async {
     _config = config;
@@ -85,22 +74,9 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
         '.posthog',
       );
 
-      final options = dart_sdk.PostHogCoreOptions(
-        host: config.host,
-        flushAt: config.flushAt,
-        flushInterval: config.flushInterval.inMilliseconds,
-        maxQueueSize: config.maxQueueSize,
-        maxBatchSize: config.maxBatchSize,
-        sendFeatureFlagEvent: config.sendFeatureFlagEvents,
-        preloadFeatureFlags: config.preloadFeatureFlags,
-        disabled: config.optOut,
-        defaultOptIn: !config.optOut,
-        personProfiles: _mapPersonProfiles(config.personProfiles),
-      );
-
       _client = dart_sdk.PostHog(
         config.apiKey,
-        options: options,
+        options: config.toCoreConfig(),
         storage: dart_sdk.FileStorage(storagePath),
       );
 
