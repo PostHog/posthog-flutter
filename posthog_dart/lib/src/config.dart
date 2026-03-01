@@ -55,8 +55,8 @@ class PostHogConfig {
   final Duration requestTimeout;
 
   /// Timeout for feature flag calls.
-  /// Defaults to 10 seconds (set internally if not provided).
-  final Duration? featureFlagsRequestTimeout;
+  /// Defaults to 10 seconds.
+  final Duration featureFlagsRequestTimeout;
 
   /// Timeout for remote config calls.
   /// Defaults to 3 seconds.
@@ -67,7 +67,8 @@ class PostHogConfig {
   final Duration sessionExpiration;
 
   /// Whether to disable GeoIP.
-  final bool? disableGeoip;
+  /// Defaults to false.
+  final bool disableGeoip;
 
   /// Evaluation contexts for feature flags.
   final List<String>? evaluationContexts;
@@ -92,47 +93,14 @@ class PostHogConfig {
     this.fetchRetryCount = 3,
     this.fetchRetryDelay = const Duration(seconds: 3),
     this.requestTimeout = const Duration(seconds: 10),
-    this.featureFlagsRequestTimeout,
+    this.featureFlagsRequestTimeout = const Duration(seconds: 10),
     this.remoteConfigRequestTimeout = const Duration(seconds: 3),
     this.sessionExpiration = const Duration(minutes: 30),
-    this.disableGeoip,
+    this.disableGeoip = false,
     this.evaluationContexts,
     this.personProfiles = PostHogPersonProfiles.identifiedOnly,
     this.beforeSend,
   });
-
-  /// Returns a copy with overridden defaults for the stateless base class.
-  ///
-  /// This is intentionally limited to the fields that [PostHogCore]
-  /// needs to override when calling `super()`.
-  PostHogConfig withDefaults({
-    bool? disableGeoip,
-    Duration? featureFlagsRequestTimeout,
-  }) {
-    return PostHogConfig(
-      host: host,
-      flushAt: flushAt,
-      flushInterval: flushInterval,
-      maxBatchSize: maxBatchSize,
-      maxQueueSize: maxQueueSize,
-      optOut: optOut,
-      debug: debug,
-      sendFeatureFlagEvents: sendFeatureFlagEvents,
-      preloadFeatureFlags: preloadFeatureFlags,
-      bootstrap: bootstrap,
-      fetchRetryCount: fetchRetryCount,
-      fetchRetryDelay: fetchRetryDelay,
-      requestTimeout: requestTimeout,
-      featureFlagsRequestTimeout:
-          featureFlagsRequestTimeout ?? this.featureFlagsRequestTimeout,
-      remoteConfigRequestTimeout: remoteConfigRequestTimeout,
-      sessionExpiration: sessionExpiration,
-      disableGeoip: disableGeoip ?? this.disableGeoip,
-      evaluationContexts: evaluationContexts,
-      personProfiles: personProfiles,
-      beforeSend: beforeSend,
-    );
-  }
 }
 
 /// Determines when to create Person Profiles for users.

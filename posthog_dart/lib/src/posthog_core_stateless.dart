@@ -106,10 +106,9 @@ abstract class PostHogCoreStateless {
         _fetchRetryCount = options.fetchRetryCount,
         _fetchRetryDelay = options.fetchRetryDelay,
         _requestTimeout = options.requestTimeout,
-        _featureFlagsRequestTimeout =
-            options.featureFlagsRequestTimeout ?? const Duration(seconds: 3),
+        _featureFlagsRequestTimeout = options.featureFlagsRequestTimeout,
         _remoteConfigRequestTimeout = options.remoteConfigRequestTimeout,
-        _disableGeoip = options.disableGeoip ?? true,
+        _disableGeoip = options.disableGeoip,
         disabled = options.optOut,
         _evaluationContexts = options.evaluationContexts {
     assertNotEmpty(apiKey, "You must pass your PostHog project's api key.");

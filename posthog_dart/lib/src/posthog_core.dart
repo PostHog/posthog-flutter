@@ -64,13 +64,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         _sessionExpiration = options.sessionExpiration,
         _personProfiles = options.personProfiles,
         _beforeSend = options.beforeSend,
-        super(
-          options: options.withDefaults(
-            disableGeoip: options.disableGeoip ?? false,
-            featureFlagsRequestTimeout: options.featureFlagsRequestTimeout ??
-                const Duration(seconds: 10),
-          ),
-        ) {
+        super(options: options) {
     _setupBootstrap(options);
   }
 
