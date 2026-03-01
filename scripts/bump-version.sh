@@ -21,17 +21,6 @@ if [ "$PACKAGE" = "posthog_flutter" ]; then
 
   # Replace Flutter `version` with the given version
   perl -pi -e "s/^version: .*/version: $NEW_VERSION/" posthog_flutter/pubspec.yaml
-
-  # Update posthog_dart dependency from path to version constraint for publishing
-  # Get the current posthog_dart version
-  DART_VERSION=$(grep '^version:' posthog_dart/pubspec.yaml | sed 's/version: //')
-  # Replace the path dependency block with a version dependency
-  # The pubspec has:
-  #   posthog_dart:
-  #     path: ../posthog_dart
-  # Replace with:
-  #   posthog_dart: ^<version>
-  perl -0pi -e "s/  posthog_dart:\n    path: ..\/posthog_dart/  posthog_dart: ^$DART_VERSION/" posthog_flutter/pubspec.yaml
 elif [ "$PACKAGE" = "posthog_dart" ]; then
   # Replace Dart `version` with the given version in pubspec.yaml
   perl -pi -e "s/^version: .*/version: $NEW_VERSION/" posthog_dart/pubspec.yaml
