@@ -175,10 +175,9 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
 
     try {
       final extracted = CaptureUtils.extractUserProperties(
-        properties: processedEvent.properties?.cast<String, Object>(),
-        userProperties: processedEvent.userProperties?.cast<String, Object>(),
-        userPropertiesSetOnce:
-            processedEvent.userPropertiesSetOnce?.cast<String, Object>(),
+        properties: processedEvent.properties,
+        userProperties: processedEvent.userProperties,
+        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
       );
 
       final normalizedProperties = extracted.properties != null
@@ -231,15 +230,14 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
     if (processedEvent.event != PostHogEventName.screen) {
       await capture(
         eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
+        properties: processedEvent.properties,
       );
       return;
     }
 
     try {
       final normalizedProperties = processedEvent.properties?.isNotEmpty == true
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+          ? PropertyNormalizer.normalize(processedEvent.properties!)
           : null;
 
       client.capture(
@@ -490,14 +488,13 @@ class PosthogFlutterDart extends PosthogFlutterPlatformInterface {
       if (processedEvent.event != PostHogEventName.exception) {
         await capture(
           eventName: processedEvent.event,
-          properties: processedEvent.properties?.cast<String, Object>(),
+          properties: processedEvent.properties,
         );
         return;
       }
 
       final normalizedData = processedEvent.properties != null
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+          ? PropertyNormalizer.normalize(processedEvent.properties!)
           : <String, Object>{};
 
       client.capture(

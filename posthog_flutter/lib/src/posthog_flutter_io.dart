@@ -249,10 +249,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       // Use processed event properties (potentially modified by beforeSend)
       final extracted = CaptureUtils.extractUserProperties(
-        properties: processedEvent.properties?.cast<String, Object>(),
-        userProperties: processedEvent.userProperties?.cast<String, Object>(),
-        userPropertiesSetOnce:
-            processedEvent.userPropertiesSetOnce?.cast<String, Object>(),
+        properties: processedEvent.properties,
+        userProperties: processedEvent.userProperties,
+        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
       );
 
       final extractedProperties = extracted.properties;
@@ -306,7 +305,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (processedEvent.event != PostHogEventName.screen) {
       await capture(
         eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
+        properties: processedEvent.properties,
       );
       return;
     }
@@ -320,8 +319,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     try {
       final normalizedProperties = processedEvent.properties?.isNotEmpty == true
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+          ? PropertyNormalizer.normalize(processedEvent.properties!)
           : null;
 
       await _methodChannel.invokeMethod('screen', {
@@ -551,7 +549,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       if (processedEvent.event != PostHogEventName.exception) {
         await capture(
           eventName: processedEvent.event,
-          properties: processedEvent.properties?.cast<String, Object>(),
+          properties: processedEvent.properties,
         );
         return;
       }
@@ -559,8 +557,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final normalizedData = processedEvent.properties != null
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+          ? PropertyNormalizer.normalize(processedEvent.properties!)
           : <String, Object>{};
 
       await _methodChannel.invokeMethod('captureException',

@@ -160,13 +160,13 @@ class PostHogEvent {
   String event;
 
   /// User-provided properties for this event.
-  Map<String, Object?>? properties;
+  Map<String, Object>? properties;
 
   /// User properties to set on the user profile ($set).
-  Map<String, Object?>? userProperties;
+  Map<String, Object>? userProperties;
 
   /// User properties to set only once on the user profile ($set_once).
-  Map<String, Object?>? userPropertiesSetOnce;
+  Map<String, Object>? userPropertiesSetOnce;
 
   /// The event timestamp. Defaults to `DateTime.now()` if not provided.
   DateTime timestamp;

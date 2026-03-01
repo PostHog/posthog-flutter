@@ -913,9 +913,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
     final event = PostHogEvent(
       uuid: message['uuid'] as String,
       event: message['event'] as String,
-      properties: Map<String, Object?>.from(props),
-      userProperties: props[r'$set'] as Map<String, Object?>?,
-      userPropertiesSetOnce: props[r'$set_once'] as Map<String, Object?>?,
+      properties: Map<String, Object>.from(props),
+      userProperties: props[r'$set'] as Map<String, Object>?,
+      userPropertiesSetOnce: props[r'$set_once'] as Map<String, Object>?,
       timestamp: timestamp is String ? DateTime.parse(timestamp) : null,
     );
 
