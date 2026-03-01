@@ -1,0 +1,4 @@
+# Files not needed in the published package
+package.json
+test/
+.gitignore
