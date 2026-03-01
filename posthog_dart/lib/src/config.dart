@@ -1,6 +1,7 @@
-import 'feature_flags.dart';
-
 import 'dart:async';
+
+import 'feature_flags.dart';
+import 'uuid.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
 ///
@@ -152,8 +153,8 @@ class PostHogCaptureOptions {
 ///
 /// Exposed to the [BeforeSendCallback] hook for modification or filtering.
 class PostHogEvent {
-  /// The event ID.
-  String? uuid;
+  /// The event ID. Auto-generated as a UUIDv7 if not provided.
+  String uuid;
 
   /// The name of the event (e.g., 'button_clicked', '$screen', '$exception').
   String event;
@@ -171,13 +172,13 @@ class PostHogEvent {
   DateTime? timestamp;
 
   PostHogEvent({
-    this.uuid,
+    String? uuid,
     required this.event,
     this.properties,
     this.userProperties,
     this.userPropertiesSetOnce,
     this.timestamp,
-  });
+  }) : uuid = uuid ?? generateUuidV7();
 
   @override
   String toString() {

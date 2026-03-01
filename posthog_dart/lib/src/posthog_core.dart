@@ -947,7 +947,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
     return {
       ...message,
-      if (result.uuid != null) 'uuid': result.uuid,
+      'uuid': result.uuid,
       'event': result.event,
       'properties': resultProps,
       if (result.timestamp != null)
