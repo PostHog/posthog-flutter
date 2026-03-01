@@ -82,8 +82,8 @@ class PostHogConfig {
   const PostHogConfig({
     this.host = 'https://us.i.posthog.com',
     this.flushAt = 20,
-    this.flushInterval = const Duration(seconds: 10),
-    this.maxBatchSize = 100,
+    this.flushInterval = const Duration(seconds: 30),
+    this.maxBatchSize = 50,
     this.maxQueueSize = 1000,
     this.optOut = false,
     this.debug = false,
