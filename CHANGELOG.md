@@ -1,7 +1,5 @@
-# posthog_flutter
+PostHog Flutter is a mono-repo. The changelogs are in the individual packages
 
-## 5.17.0
+# Packages
 
-### Minor Changes
-
-- 5b84f8b: **Breaking**: Minimum Dart SDK version is now 3.6.0 and minimum Flutter version is now 3.27.0. Migrate to pub workspace structure.
+- [posthog_flutter](./posthog_flutter/CHANGELOG.md)
