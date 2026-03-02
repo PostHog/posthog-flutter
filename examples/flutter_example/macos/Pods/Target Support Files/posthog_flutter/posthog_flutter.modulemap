@@ -1,6 +1,0 @@
-framework module posthog_flutter {
-  umbrella header "posthog_flutter-umbrella.h"
-
-  export *
-  module * { export * }
-}

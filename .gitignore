@@ -636,3 +636,6 @@ Podfile.lock
 
 # https://nightshift.haplab.com/
 PLAN.md
+
+# Examples build artifacts
+examples/
