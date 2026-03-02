@@ -151,7 +151,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             config.sessionReplayConfig.captureNetworkTelemetry = false
 
             if let sessionReplayConfigMap = posthogConfig["sessionReplayConfig"] as? [String: Any],
-               let sampleRate = sessionReplayConfigMap["sampleRate"] as? Double {
+               let sampleRate = sessionReplayConfigMap["sampleRate"] as? NSNumber {
                 config.sessionReplayConfig.sampleRate = sampleRate
             }
 
