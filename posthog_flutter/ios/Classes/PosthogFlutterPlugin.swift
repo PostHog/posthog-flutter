@@ -150,6 +150,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
             config.sessionReplayConfig.captureNetworkTelemetry = false
 
+            if let sessionReplayConfigMap = posthogConfig["sessionReplayConfig"] as? [String: Any],
+               let sampleRate = sessionReplayConfigMap["sampleRate"] as? NSNumber {
+                config.sessionReplayConfig.sampleRate = sampleRate
+            }
+
             // configure surveys
             if #available(iOS 15.0, *) {
                 let surveys: Bool = posthogConfig["surveys"] as? Bool ?? false
