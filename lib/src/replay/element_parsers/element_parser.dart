@@ -4,6 +4,8 @@ import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
 
+typedef ElementGeometry = ({Rect rect, Matrix4 transform});
+
 class ElementParser {
   ElementParser();
 
@@ -22,8 +24,8 @@ class ElementParser {
     return thisElementData;
   }
 
-  /// Returns a record containing the local rect and transform for the element
-  ({Rect rect, Matrix4 transform})? buildElementData(Element element) {
+  /// Returns the local rect and transform for the element
+  ElementGeometry? buildElementData(Element element) {
     final renderObject = element.renderObject;
     if (renderObject is RenderBox &&
         renderObject.hasSize &&

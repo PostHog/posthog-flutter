@@ -20,7 +20,7 @@ import 'package:posthog_flutter/src/replay/size_extension.dart';
 /// of the font scaling mechanism used (ScreenUtil, MediaQuery.textScaleFactor, etc.).
 class RenderEditableParser extends ElementParser {
   @override
-  ({Rect rect, Matrix4 transform})? buildElementData(Element element) {
+  ElementGeometry? buildElementData(Element element) {
     final renderObject = element.renderObject;
     if (renderObject is! RenderEditable ||
         !renderObject.hasSize ||

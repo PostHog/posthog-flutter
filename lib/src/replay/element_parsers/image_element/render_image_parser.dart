@@ -19,7 +19,7 @@ class RenderImageParser extends ElementParser {
         _positionCalculator = positionCalculator;
 
   @override
-  ({Rect rect, Matrix4 transform})? buildElementData(Element element) {
+  ElementGeometry? buildElementData(Element element) {
     final renderImage = element.renderObject as RenderImage;
     final image = renderImage.image;
     if (!renderImage.hasSize ||
