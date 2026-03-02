@@ -581,7 +581,7 @@ extension PosthogFlutterPlugin {
                     "key": flagResult.key,
                     "enabled": flagResult.enabled,
                     "variant": flagResult.variant as Any,
-                    "payload": flagResult.payload as Any
+                    "payload": flagResult.payload as Any,
                 ])
             } else {
                 result(nil)
