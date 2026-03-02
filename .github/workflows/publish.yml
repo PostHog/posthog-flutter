@@ -132,7 +132,7 @@ jobs:
         id: apply-changesets
         run: |
           pnpm changeset version
-          NEW_VERSION=$(node -p "require('./package.json').version")
+          NEW_VERSION=$(node -p "require('./posthog_flutter/package.json').version")
           echo "new-version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
 
