@@ -1,0 +1,50 @@
+{
+  "name": "posthog_flutter",
+  "version": "0.0.1",
+  "summary": "The hassle-free way to add posthog to your Flutter app.",
+  "description": "Postog flutter plugin",
+  "homepage": "https://posthog.com/",
+  "license": {
+    "file": "../LICENSE"
+  },
+  "authors": {
+    "PostHog": "engineering@posthog.com"
+  },
+  "source": {
+    "path": "."
+  },
+  "social_media_url": "https://twitter.com/PostHog",
+  "source_files": "Classes/**/*",
+  "resource_bundles": {
+    "PostHogFlutter": "Resources/PrivacyInfo.xcprivacy"
+  },
+  "ios": {
+    "dependencies": {
+      "Flutter": []
+    },
+    "pod_target_xcconfig": {
+      "DEFINES_MODULE": "YES",
+      "EXCLUDED_ARCHS[sdk=iphonesimulator*]": "i386"
+    }
+  },
+  "osx": {
+    "dependencies": {
+      "FlutterMacOS": []
+    },
+    "pod_target_xcconfig": {
+      "DEFINES_MODULE": "YES"
+    }
+  },
+  "dependencies": {
+    "PostHog": [
+      ">= 3.40.0",
+      "< 4.0.0"
+    ]
+  },
+  "platforms": {
+    "ios": "13.0",
+    "osx": "10.15"
+  },
+  "swift_versions": "5.3",
+  "swift_version": "5.3"
+}

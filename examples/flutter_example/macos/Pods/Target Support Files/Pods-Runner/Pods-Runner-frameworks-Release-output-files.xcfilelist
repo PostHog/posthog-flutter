@@ -1,0 +1,2 @@
+${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/PostHog.framework
+${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/posthog_flutter.framework
