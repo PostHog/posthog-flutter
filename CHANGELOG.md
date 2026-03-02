@@ -1,5 +1,11 @@
 ## Next
 
+## 5.15.3
+
+### Patch Changes
+
+- 541b280: fix: textfield masking and element transform positioning in session replay
+
 ## 5.15.2
 
 ### Patch Changes
