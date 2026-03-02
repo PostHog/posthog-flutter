@@ -27,6 +27,9 @@ void main() {
       if (methodCall.method == 'isFeatureEnabled') {
         return true;
       }
+      if (methodCall.method == 'distinctId') {
+        return 'test-distinct-id';
+      }
       // Simulate setup call success
       if (methodCall.method == 'setup') {
         return null;

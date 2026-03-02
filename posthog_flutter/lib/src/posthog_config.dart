@@ -62,6 +62,13 @@ class PostHogConfig {
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
 
+  /// Callback to be invoked when feature flags are loaded, receiving the
+  /// full flag data as a map.
+  ///
+  /// You can also use [Posthog.isFeatureEnabledSync] or
+  /// [Posthog.getFeatureFlagSync] to read flag values synchronously.
+  OnFeatureFlagsLoadedCallback? onFeatureFlagsLoaded;
+
   /// Callbacks to intercept and modify events before they are sent to PostHog.
   ///
   /// Callbacks are invoked in order for events captured via Dart APIs:
