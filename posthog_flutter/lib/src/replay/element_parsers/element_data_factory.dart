@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
 
 class ElementDataFactory {
@@ -9,15 +10,19 @@ class ElementDataFactory {
     if (renderObject is RenderBox &&
         renderObject.hasSize &&
         renderObject.size.isValidSize) {
-      final offset = renderObject.localToGlobal(Offset.zero);
+      // Use paintBounds to capture the actual painted area
+      final localRect = renderObject.paintBounds;
+
+      // Get the transform relative to the screenshot container (RepaintBoundary)
+      final ancestor = PostHogMaskController
+          .instance.containerKey.currentContext
+          ?.findRenderObject();
+      final transform = renderObject.getTransformTo(ancestor);
+
       return ElementData(
         type: type,
-        rect: Rect.fromLTWH(
-          offset.dx,
-          offset.dy,
-          renderObject.size.width,
-          renderObject.size.height,
-        ),
+        rect: localRect,
+        transform: transform,
       );
     }
     return null;

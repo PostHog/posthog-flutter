@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
 import 'package:posthog_flutter/src/replay/image_extension.dart';
 
@@ -18,8 +19,8 @@ class RenderImageParser extends ElementParser {
         _positionCalculator = positionCalculator;
 
   @override
-  Rect? buildElementRect(Element element, Rect? parentRect) {
-    final RenderImage renderImage = element.renderObject as RenderImage;
+  ElementGeometry? buildElementData(Element element) {
+    final renderImage = element.renderObject as RenderImage;
     final image = renderImage.image;
     if (!renderImage.hasSize ||
         !renderImage.size.isValidSize ||
@@ -28,10 +29,9 @@ class RenderImageParser extends ElementParser {
       return null;
     }
 
-    final offset = renderImage.localToGlobal(Offset.zero);
-    final BoxFit fit = renderImage.fit ?? BoxFit.scaleDown;
+    final fit = renderImage.fit ?? BoxFit.scaleDown;
 
-    final Size size = _scaler.getScaledSize(
+    final size = _scaler.getScaledSize(
       image.width.toDouble(),
       image.height.toDouble(),
       renderImage.size,
@@ -42,13 +42,22 @@ class RenderImageParser extends ElementParser {
       return null;
     }
 
-    final AlignmentGeometry alignment = renderImage.alignment;
+    final alignment = renderImage.alignment;
 
-    final double left = _positionCalculator.calculateLeftPosition(
-        alignment, offset, renderImage.size.width, size.width);
-    final double top = _positionCalculator.calculateTopPosition(
-        alignment, offset, renderImage.size.height, size.height);
+    // Calculate position within the container in local coordinates
+    final left = _positionCalculator.calculateLeftPosition(
+        alignment, Offset.zero, renderImage.size.width, size.width);
+    final top = _positionCalculator.calculateTopPosition(
+        alignment, Offset.zero, renderImage.size.height, size.height);
 
-    return Rect.fromLTWH(left, top, size.width, size.height);
+    // Store rect in local coordinates - transform handles global positioning
+    final localRect = Rect.fromLTWH(left, top, size.width, size.height);
+
+    // Get the transform relative to the screenshot container (RepaintBoundary)
+    final ancestor = PostHogMaskController.instance.containerKey.currentContext
+        ?.findRenderObject();
+    final transform = renderImage.getTransformTo(ancestor);
+
+    return (rect: localRect, transform: transform);
   }
 }
