@@ -1,5 +1,11 @@
 ## Next
 
+## 5.16.0
+
+### Minor Changes
+
+- e703672: feat: add sampleRate support
+
 ## 5.15.3
 
 ### Patch Changes
