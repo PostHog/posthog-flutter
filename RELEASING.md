@@ -88,6 +88,7 @@ In case of automation failure, you can manually publish:
 
 ```bash
 flutter pub get
+cd posthog_flutter
 flutter pub publish --force
 ```
 

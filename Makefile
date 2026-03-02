@@ -7,11 +7,11 @@ installLinters:
 	brew install swiftformat
 
 formatKotlin:
-	ktlint --format --baseline=ktlint-baseline.xml
+	ktlint --format --baseline=posthog_flutter/ktlint-baseline.xml posthog_flutter/android/**/*.kt
 
 # swiftlint ios/Classes --fix conflicts with swiftformat
 formatSwift:
-	swiftformat ios/Classes --swiftversion 5.3
+	swiftformat posthog_flutter/ios/Classes --swiftversion 5.3
 
 formatDart:
 	dart format .
@@ -23,4 +23,4 @@ analyzeDart:
 	dart analyze .
 
 test: 
-	flutter test -r expanded
+	cd posthog_flutter && flutter test -r expanded
