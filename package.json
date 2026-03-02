@@ -1,8 +1,7 @@
 {
-  "name": "posthog_flutter",
-  "version": "5.16.0",
+  "name": "posthog-flutter-workspace",
   "private": true,
-  "description": "Version tracking for changesets - the canonical version is in pubspec.yaml",
+  "description": "Workspace root for changesets",
   "packageManager": "pnpm@10.29.3",
   "devDependencies": {
     "@changesets/cli": "^2.27.0"
