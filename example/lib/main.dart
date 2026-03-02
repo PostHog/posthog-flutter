@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter_example/error_example.dart';
 
+import 'masking_tests_screen.dart';
+
 Future<void> main() async {
   final config =
       PostHogConfig('phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06');
@@ -140,6 +142,21 @@ class InitialScreenState extends State<InitialScreen> {
                       'Go to Second Route',
                     ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const MaskingTestsScreen(),
+                          settings: const RouteSettings(name: 'masking_tests')),
+                    );
+                  },
+                  child: const Text('Masking Tests'),
                 ),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
@@ -576,9 +593,9 @@ class InitialScreenState extends State<InitialScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     final result = await _posthogFlutterPlugin
-                        .getFeatureFlagPayload("feature_name");
+                        .getFeatureFlagResult("feature_name");
                     setState(() {
-                      _result = result;
+                      _result = result?.payload?.toString();
                     });
                   },
                   child: const Text("getFeatureFlagPayload"),
