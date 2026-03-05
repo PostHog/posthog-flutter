@@ -1,5 +1,11 @@
 ## Next
 
+## 5.17.1
+
+### Patch Changes
+
+- e4b9224: fix: bump iOS SDK minimum to 3.43.0 to fix feature flags race condition between preload and identify
+
 ## 5.17.0
 
 ### Minor Changes
