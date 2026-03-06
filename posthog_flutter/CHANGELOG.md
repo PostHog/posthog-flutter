@@ -1,5 +1,11 @@
 ## Next
 
+## 5.18.0
+
+### Minor Changes
+
+- 12a378f: feat(surveys): support survey schedule 'always' to show every time and survey wait period filtering (seenSurveyWaitPeriodInDays)
+
 ## 5.17.1
 
 ### Patch Changes
