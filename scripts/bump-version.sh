@@ -11,7 +11,7 @@ cd $SCRIPT_DIR/..
 NEW_VERSION="$1"
 
 # Replace iOS `postHogFlutterVersion` with the given version
-perl -pi -e "s/postHogFlutterVersion = \".*\"/postHogFlutterVersion = \"$NEW_VERSION\"/" posthog_flutter/ios/Classes/PostHogFlutterVersion.swift
+perl -pi -e "s/postHogFlutterVersion = \".*\"/postHogFlutterVersion = \"$NEW_VERSION\"/" posthog_flutter/ios/posthog_flutter/Sources/posthog_flutter/PostHogFlutterVersion.swift
 
 # Replace Android `postHogVersion` with the given version
 perl -pi -e "s/postHogVersion = \".*\"/postHogVersion = \"$NEW_VERSION\"/" posthog_flutter/android/src/main/kotlin/com/posthog/flutter/PostHogVersion.kt
