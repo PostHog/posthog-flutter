@@ -16,11 +16,11 @@ String? defaultNameExtractor(RouteSettings settings) => settings.name;
 bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
 
 class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
-  PosthogObserver(
-      {ScreenNameExtractor nameExtractor = defaultNameExtractor,
-      PostHogRouteFilter routeFilter = defaultPostHogRouteFilter})
-      : _nameExtractor = nameExtractor,
-        _routeFilter = routeFilter;
+  PosthogObserver({
+    ScreenNameExtractor nameExtractor = defaultNameExtractor,
+    PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
+  }) : _nameExtractor = nameExtractor,
+       _routeFilter = routeFilter;
 
   /// The current navigation context, which can be used for showing modals
   /// This is updated whenever routes change (push, pop, replace)

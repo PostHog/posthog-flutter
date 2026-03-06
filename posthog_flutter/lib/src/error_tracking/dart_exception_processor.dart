@@ -74,7 +74,7 @@ class DartExceptionProcessor {
         'handled': handled,
         'synthetic': isSynthetic,
         'type': mechanismType,
-      }
+      },
     };
 
     // Add exception message, if available
@@ -85,10 +85,7 @@ class DartExceptionProcessor {
 
     // Add stacktrace, if any frames are available
     if (frames.isNotEmpty) {
-      exceptionData['stacktrace'] = {
-        'frames': frames,
-        'type': 'raw',
-      };
+      exceptionData['stacktrace'] = {'frames': frames, 'type': 'raw'};
     }
 
     // Add thread ID, if available
@@ -117,7 +114,7 @@ class DartExceptionProcessor {
     'platform': 'dart',
     'abs_path': '<asynchronous suspension>',
     'in_app': false,
-    'synthetic': true
+    'synthetic': true,
   };
 
   /// Parses stack trace into PostHog format

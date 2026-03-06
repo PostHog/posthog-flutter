@@ -16,10 +16,11 @@ class ElementParser {
     }
 
     final thisElementData = ElementData(
-        type: element.widget.runtimeType.toString(),
-        rect: result.rect,
-        widget: element.widget,
-        transform: result.transform);
+      type: element.widget.runtimeType.toString(),
+      rect: result.rect,
+      widget: element.widget,
+      transform: result.transform,
+    );
 
     return thisElementData;
   }
@@ -39,7 +40,9 @@ class ElementParser {
       // Using the container's RenderObject as ancestor ensures transforms are in
       // the screenshot's coordinate space, not absolute screen coordinates
       final ancestor = PostHogMaskController
-          .instance.containerKey.currentContext
+          .instance
+          .containerKey
+          .currentContext
           ?.findRenderObject();
       final transform = renderObject.getTransformTo(ancestor);
 

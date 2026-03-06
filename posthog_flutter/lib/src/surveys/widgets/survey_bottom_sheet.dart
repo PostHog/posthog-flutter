@@ -187,9 +187,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.only(
-              bottom: mediaQuery.viewInsets.bottom,
-            ),
+            padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -201,8 +199,10 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.close,
-                            color: widget.appearance.closeButtonColor),
+                        icon: Icon(
+                          Icons.close,
+                          color: widget.appearance.closeButtonColor,
+                        ),
                         onPressed: () => _handleClose(),
                       ),
                     ],
@@ -223,7 +223,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                             ConfirmationMessage(
                               onClose: _handleClose,
                               appearance: widget.appearance,
-                              thankYouMessageDescriptionContentType: widget
+                              thankYouMessageDescriptionContentType:
+                                  widget
                                       .survey
                                       .appearance
                                       ?.thankYouMessageDescriptionContentType ??

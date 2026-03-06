@@ -15,8 +15,8 @@ class RenderImageParser extends ElementParser {
   RenderImageParser({
     required Scaler scaler,
     required PositionCalculator positionCalculator,
-  })  : _scaler = scaler,
-        _positionCalculator = positionCalculator;
+  }) : _scaler = scaler,
+       _positionCalculator = positionCalculator;
 
   @override
   ElementGeometry? buildElementData(Element element) {
@@ -46,9 +46,17 @@ class RenderImageParser extends ElementParser {
 
     // Calculate position within the container in local coordinates
     final left = _positionCalculator.calculateLeftPosition(
-        alignment, Offset.zero, renderImage.size.width, size.width);
+      alignment,
+      Offset.zero,
+      renderImage.size.width,
+      size.width,
+    );
     final top = _positionCalculator.calculateTopPosition(
-        alignment, Offset.zero, renderImage.size.height, size.height);
+      alignment,
+      Offset.zero,
+      renderImage.size.height,
+      size.height,
+    );
 
     // Store rect in local coordinates - transform handles global positioning
     final localRect = Rect.fromLTWH(left, top, size.width, size.height);

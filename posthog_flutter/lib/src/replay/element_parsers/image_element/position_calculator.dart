@@ -1,17 +1,29 @@
 import 'package:flutter/rendering.dart';
 
 abstract class PositionCalculator {
-  double calculateLeftPosition(AlignmentGeometry alignment, Offset offset,
-      double containerWidth, double renderBoxWidth);
+  double calculateLeftPosition(
+    AlignmentGeometry alignment,
+    Offset offset,
+    double containerWidth,
+    double renderBoxWidth,
+  );
 
-  double calculateTopPosition(AlignmentGeometry alignment, Offset offset,
-      double containerHeight, double renderBoxHeight);
+  double calculateTopPosition(
+    AlignmentGeometry alignment,
+    Offset offset,
+    double containerHeight,
+    double renderBoxHeight,
+  );
 }
 
 class DefaultPositionCalculator implements PositionCalculator {
   @override
-  double calculateLeftPosition(AlignmentGeometry alignment, Offset offset,
-      double containerWidth, double renderBoxWidth) {
+  double calculateLeftPosition(
+    AlignmentGeometry alignment,
+    Offset offset,
+    double containerWidth,
+    double renderBoxWidth,
+  ) {
     if (alignment == Alignment.centerLeft ||
         alignment == Alignment.bottomLeft ||
         alignment == Alignment.topLeft) {
@@ -26,8 +38,12 @@ class DefaultPositionCalculator implements PositionCalculator {
   }
 
   @override
-  double calculateTopPosition(AlignmentGeometry alignment, Offset offset,
-      double containerHeight, double renderBoxHeight) {
+  double calculateTopPosition(
+    AlignmentGeometry alignment,
+    Offset offset,
+    double containerHeight,
+    double renderBoxHeight,
+  ) {
     if (alignment == Alignment.topLeft ||
         alignment == Alignment.topCenter ||
         alignment == Alignment.topRight) {

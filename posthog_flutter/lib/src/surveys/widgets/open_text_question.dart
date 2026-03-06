@@ -41,7 +41,8 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final mediaQuery = MediaQuery.of(context);
-        final availableHeight = mediaQuery.size.height -
+        final availableHeight =
+            mediaQuery.size.height -
             mediaQuery.viewInsets.bottom -
             mediaQuery.padding.bottom;
 
@@ -78,7 +79,8 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
                   decoration: InputDecoration(
                     hintText: 'Start typing...',
                     hintStyle: TextStyle(
-                        color: widget.appearance.inputPlaceholderColor),
+                      color: widget.appearance.inputPlaceholderColor,
+                    ),
                     contentPadding: const EdgeInsets.all(12),
                     border: InputBorder.none,
                     filled: false,

@@ -42,7 +42,9 @@ void main() {
       expect(result.containsKey('\$exception_level'), isTrue);
       expect(result.containsKey('\$exception_list'), isTrue);
       expect(
-          result.containsKey('custom_key'), isTrue); // Properties are in root
+        result.containsKey('custom_key'),
+        isTrue,
+      ); // Properties are in root
 
       // Verify custom properties are preserved
       expect(result['custom_key'], equals('custom_value'));
@@ -57,11 +59,13 @@ void main() {
       // Verify main exception structure
       expect(mainExceptionData['type'], equals('StateError'));
       expect(
-          mainExceptionData['value'],
-          equals(
-              'Bad state: Test exception message')); // StateError adds prefix
-      expect(mainExceptionData['thread_id'],
-          isA<int>()); // Should be hash-based thread ID
+        mainExceptionData['value'],
+        equals('Bad state: Test exception message'),
+      ); // StateError adds prefix
+      expect(
+        mainExceptionData['thread_id'],
+        isA<int>(),
+      ); // Should be hash-based thread ID
 
       // Verify mechanism structure
       final mechanism = mainExceptionData['mechanism'] as Map<String, dynamic>;
@@ -118,13 +122,15 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames = exceptionData.first['stacktrace']['frames']
-          as List<Map<String, dynamic>>;
+      final frames =
+          exceptionData.first['stacktrace']['frames']
+              as List<Map<String, dynamic>>;
 
       // Find frames by package
       final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
-      final thirdPartyFrame =
-          frames.firstWhere((f) => f['package'] == 'third_party');
+      final thirdPartyFrame = frames.firstWhere(
+        (f) => f['package'] == 'third_party',
+      );
 
       // Verify inApp detection
       expect(myAppFrame['in_app'], isTrue); // Explicitly included
@@ -150,15 +156,18 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames = exceptionData.first['stacktrace']['frames']
-          as List<Map<String, dynamic>>;
+      final frames =
+          exceptionData.first['stacktrace']['frames']
+              as List<Map<String, dynamic>>;
 
       // Find frames by package
       final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
-      final analyticsFrame =
-          frames.firstWhere((f) => f['package'] == 'analytics_lib');
-      final helperFrame =
-          frames.firstWhere((f) => f['package'] == 'helper_lib');
+      final analyticsFrame = frames.firstWhere(
+        (f) => f['package'] == 'analytics_lib',
+      );
+      final helperFrame = frames.firstWhere(
+        (f) => f['package'] == 'helper_lib',
+      );
 
       // Verify inApp detection
       expect(myAppFrame['in_app'], isTrue); // Default true, not excluded
@@ -169,8 +178,9 @@ void main() {
     test('gives precedence to inAppIncludes over inAppExcludes', () {
       // Test the precedence logic directly with a simple scenario
       final exception = Exception('Test exception');
-      final stackTrace =
-          StackTrace.fromString('#0 test (package:test_package/test.dart:1:1)');
+      final stackTrace = StackTrace.fromString(
+        '#0 test (package:test_package/test.dart:1:1)',
+      );
 
       final result = DartExceptionProcessor.processException(
         error: exception,
@@ -183,8 +193,9 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames = exceptionData.first['stacktrace']['frames']
-          as List<Map<String, dynamic>>;
+      final frames =
+          exceptionData.first['stacktrace']['frames']
+              as List<Map<String, dynamic>>;
 
       // Find any frame from test_package
       final testFrame = frames.firstWhere(
@@ -194,8 +205,11 @@ void main() {
 
       // If we found the frame, test precedence
       if (testFrame.isNotEmpty) {
-        expect(testFrame['in_app'], isTrue,
-            reason: 'inAppIncludes should take precedence over inAppExcludes');
+        expect(
+          testFrame['in_app'],
+          isTrue,
+          reason: 'inAppIncludes should take precedence over inAppExcludes',
+        );
       } else {
         // Just verify that the configuration was processed without error
         expect(frames, isA<List>());
@@ -207,19 +221,19 @@ void main() {
         // Real Exception/Error objects
         {
           'exception': Exception('Exception test'),
-          'expectedType': '_Exception'
+          'expectedType': '_Exception',
         },
         {
           'exception': StateError('StateError test'),
-          'expectedType': 'StateError'
+          'expectedType': 'StateError',
         },
         {
           'exception': ArgumentError('ArgumentError test'),
-          'expectedType': 'ArgumentError'
+          'expectedType': 'ArgumentError',
         },
         {
           'exception': FormatException('FormatException test'),
-          'expectedType': 'FormatException'
+          'expectedType': 'FormatException',
         },
         // Primitive types
         {'exception': 'Plain string error', 'expectedType': 'String'},
@@ -229,7 +243,7 @@ void main() {
         {'exception': [], 'expectedType': 'List<dynamic>'},
         {
           'exception': ['some', 'error'],
-          'expectedType': 'List<String>'
+          'expectedType': 'List<String>',
         },
         {'exception': {}, 'expectedType': '_Map<dynamic, dynamic>'},
       ];
@@ -248,8 +262,11 @@ void main() {
             result['\$exception_list'] as List<Map<String, dynamic>>;
         final exceptionData = exceptionList.first;
 
-        expect(exceptionData['type'], equals(expectedType),
-            reason: 'Exception type mismatch for: $exception');
+        expect(
+          exceptionData['type'],
+          equals(expectedType),
+          reason: 'Exception type mismatch for: $exception',
+        );
 
         // Verify the exception value is present and is a string
         expect(exceptionData['value'], isA<String>());
@@ -375,26 +392,28 @@ void main() {
       expect(exceptionData.first['mechanism']['synthetic'], isTrue);
     });
 
-    test('does not mark exceptions as synthetic when stack trace is provided',
-        () {
-      final realExceptions = [
-        Exception('Real exception'),
-        StateError('Real error'),
-        ArgumentError('Real argument error'),
-      ];
+    test(
+      'does not mark exceptions as synthetic when stack trace is provided',
+      () {
+        final realExceptions = [
+          Exception('Real exception'),
+          StateError('Real error'),
+          ArgumentError('Real argument error'),
+        ];
 
-      for (final exception in realExceptions) {
-        final result = DartExceptionProcessor.processException(
-          error: exception,
-          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
-        );
+        for (final exception in realExceptions) {
+          final result = DartExceptionProcessor.processException(
+            error: exception,
+            stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+          );
 
-        final exceptionData =
-            result['\$exception_list'] as List<Map<String, dynamic>>;
+          final exceptionData =
+              result['\$exception_list'] as List<Map<String, dynamic>>;
 
-        expect(exceptionData.first['mechanism']['synthetic'], isFalse);
-      }
-    });
+          expect(exceptionData.first['mechanism']['synthetic'], isFalse);
+        }
+      },
+    );
 
     test('allows user properties to override system properties', () {
       final exception = Exception('Test exception');
@@ -435,8 +454,9 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames = exceptionData.first['stacktrace']['frames']
-          as List<Map<String, dynamic>>;
+      final frames =
+          exceptionData.first['stacktrace']['frames']
+              as List<Map<String, dynamic>>;
 
       // Look for asynchronous gap frames
       final gapFrames = frames
@@ -444,8 +464,11 @@ void main() {
           .toList();
 
       // Should have at least one gap frame in an async stack trace
-      expect(gapFrames, isNotEmpty,
-          reason: 'Async stack traces should contain gap frames');
+      expect(
+        gapFrames,
+        isNotEmpty,
+        reason: 'Async stack traces should contain gap frames',
+      );
 
       // Verify gap frame structure
       final gapFrame = gapFrames.first;
@@ -479,54 +502,63 @@ void main() {
             (result['\$exception_list'] as List).first as Map<String, dynamic>;
 
         expect(
-            exceptionData['mechanism']['type'], equals(testCase['mechanism']));
+          exceptionData['mechanism']['type'],
+          equals(testCase['mechanism']),
+        );
         expect(
-            exceptionData['mechanism']['handled'], equals(testCase['handled']));
+          exceptionData['mechanism']['handled'],
+          equals(testCase['handled']),
+        );
         expect(exceptionData['type'], equals('StateError'));
       }
     });
 
     test(
-        'uses original error for stack trace processing when wrapped in PostHogException',
-        () {
-      // Create an Error (not Exception) so it has a built-in stackTrace
-      late Error originalError;
+      'uses original error for stack trace processing when wrapped in PostHogException',
+      () {
+        // Create an Error (not Exception) so it has a built-in stackTrace
+        late Error originalError;
 
-      try {
-        throw StateError('Original error with stack trace');
-      } catch (error) {
-        originalError = error as Error;
-      }
+        try {
+          throw StateError('Original error with stack trace');
+        } catch (error) {
+          originalError = error as Error;
+        }
 
-      // Wrap in PostHogException
-      final postHogException = PostHogException(
-        source: originalError,
-        mechanism: 'test_mechanism',
-        handled: true,
-      );
+        // Wrap in PostHogException
+        final postHogException = PostHogException(
+          source: originalError,
+          mechanism: 'test_mechanism',
+          handled: true,
+        );
 
-      // Process without providing external stack trace - should use original error's stackTrace
-      final result = DartExceptionProcessor.processException(
-        error: postHogException,
-        // No stackTrace provided - should extract from original error
-      );
+        // Process without providing external stack trace - should use original error's stackTrace
+        final result = DartExceptionProcessor.processException(
+          error: postHogException,
+          // No stackTrace provided - should extract from original error
+        );
 
-      final exceptionData =
-          (result['\$exception_list'] as List).first as Map<String, dynamic>;
+        final exceptionData =
+            (result['\$exception_list'] as List).first as Map<String, dynamic>;
 
-      // Verify it used the original error for processing
-      expect(exceptionData['type'], equals('StateError'));
-      expect(exceptionData['value'],
-          equals('Bad state: Original error with stack trace'));
-      expect(exceptionData['mechanism']['type'], equals('test_mechanism'));
-      expect(exceptionData['mechanism']['handled'], equals(true));
+        // Verify it used the original error for processing
+        expect(exceptionData['type'], equals('StateError'));
+        expect(
+          exceptionData['value'],
+          equals('Bad state: Original error with stack trace'),
+        );
+        expect(exceptionData['mechanism']['type'], equals('test_mechanism'));
+        expect(exceptionData['mechanism']['handled'], equals(true));
 
-      // Should have stacktrace frames from the original error
-      expect(exceptionData['stacktrace'], isNotNull);
-      expect(exceptionData['stacktrace']['frames'], isA<List>());
-      expect(
-          (exceptionData['stacktrace']['frames'] as List).isNotEmpty, isTrue);
-    });
+        // Should have stacktrace frames from the original error
+        expect(exceptionData['stacktrace'], isNotNull);
+        expect(exceptionData['stacktrace']['frames'], isA<List>());
+        expect(
+          (exceptionData['stacktrace']['frames'] as List).isNotEmpty,
+          isTrue,
+        );
+      },
+    );
 
     test('processes original error type correctly when wrapped', () {
       final testErrorTypes = [
