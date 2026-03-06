@@ -1,24 +1,22 @@
 import 'dart:async';
 
-import 'util/platform_io_stub.dart'
-    if (dart.library.io) 'util/platform_io_real.dart';
-
 import 'package:flutter/services.dart';
-
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
-import 'surveys/models/posthog_display_survey.dart' as models;
-import 'surveys/models/survey_callbacks.dart';
-import 'error_tracking/dart_exception_processor.dart';
-import 'feature_flags/posthog_feature_flags.dart';
-import 'utils/capture_utils.dart';
-import 'utils/property_normalizer.dart';
 
+import 'error_tracking/dart_exception_processor.dart';
 import 'feature_flag_result.dart';
+import 'feature_flags/posthog_feature_flags.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'surveys/models/posthog_display_survey.dart' as models;
+import 'surveys/models/survey_callbacks.dart';
+import 'util/platform_io_stub.dart'
+    if (dart.library.io) 'util/platform_io_real.dart';
+import 'utils/capture_utils.dart';
+import 'utils/property_normalizer.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
@@ -97,10 +95,13 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         await cleanupSurveys();
         return null;
       case 'onFeatureFlagsCallback':
-        // Fire legacy callback immediately (backward compat)
-        _onFeatureFlagsCallback?.call();
-        // Also reload Dart-side flags; onFeatureFlagsLoaded fires when done
-        _reloadDartFlags();
+        if (_featureFlags != null) {
+          // Sync mode: reload Dart-side flags; both callbacks fire on completion
+          _reloadDartFlags();
+        } else {
+          // Default mode: fire native callback directly (unchanged behavior)
+          _onFeatureFlagsCallback?.call();
+        }
         break;
       default:
         printIfDebug(
@@ -196,23 +197,33 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     _onFeatureFlagsLoadedCallback = config.onFeatureFlagsLoaded;
     _beforeSendCallbacks = config.beforeSend;
 
-    // Create Dart-side feature flags manager
-    _featureFlags = PostHogFeatureFlags(
-      apiKey: config.apiKey,
-      host: config.host,
-    );
-    _featureFlags!.onFeatureFlags = (flags) {
-      _onFeatureFlagsLoadedCallback?.call(flags);
-    };
+    if (config.enableSyncFeatureFlags) {
+      // Create Dart-side feature flags manager (opt-in)
+      _featureFlags = PostHogFeatureFlags(
+        apiKey: config.apiKey,
+        host: config.host,
+      );
+      _featureFlags!.onFeatureFlags = (flags) {
+        // Fire both callbacks from the Dart reload
+        _onFeatureFlagsCallback?.call();
+        _onFeatureFlagsLoadedCallback?.call(flags);
+      };
+    }
+
+    // When Dart handles flags, suppress native preload to avoid duplicate HTTP calls
+    final nativeConfig = config.toMap();
+    if (_featureFlags != null) {
+      nativeConfig['preloadFeatureFlags'] = false;
+    }
 
     try {
-      await _methodChannel.invokeMethod('setup', config.toMap());
+      await _methodChannel.invokeMethod('setup', nativeConfig);
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on setup: $exception');
     }
 
-    // Also load flags on the Dart side for sync reads
-    if (config.preloadFeatureFlags) {
+    // Load flags on the Dart side for sync reads
+    if (_featureFlags != null && config.preloadFeatureFlags) {
       _reloadDartFlags();
     }
   }
@@ -493,6 +504,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key) async {
+    final ff = _featureFlags;
+    if (ff != null) {
+      return ff.isFeatureEnabled(key);
+    }
+
     if (!isSupportedPlatform()) {
       return false;
     }
@@ -509,17 +525,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reloadFeatureFlags() async {
+    if (_featureFlags != null) {
+      // Sync mode: only reload Dart-side flags (skip native call)
+      await _reloadDartFlags();
+      return;
+    }
+
     if (!isSupportedPlatform()) {
       return;
     }
 
-    // Reload both native and Dart-side flags
     try {
       await _methodChannel.invokeMethod('reloadFeatureFlags');
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reloadFeatureFlags: $exception');
     }
-    _reloadDartFlags();
   }
 
   @override
@@ -552,6 +572,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<Object?> getFeatureFlag({
     required String key,
   }) async {
+    final ff = _featureFlags;
+    if (ff != null) {
+      return ff.getFeatureFlag(key);
+    }
+
     if (!isSupportedPlatform()) {
       return null;
     }
@@ -570,6 +595,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<Object?> getFeatureFlagPayload({
     required String key,
   }) async {
+    final ff = _featureFlags;
+    if (ff != null) {
+      return ff.getFeatureFlagPayload(key);
+    }
+
     if (!isSupportedPlatform()) {
       return null;
     }
@@ -589,6 +619,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String key,
     bool sendEvent = true,
   }) async {
+    final ff = _featureFlags;
+    if (ff != null) {
+      return ff.getFeatureFlagResult(key);
+    }
+
     if (!isSupportedPlatform()) {
       return null;
     }

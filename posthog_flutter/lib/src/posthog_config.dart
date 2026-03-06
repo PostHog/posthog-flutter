@@ -25,6 +25,18 @@ class PostHogConfig {
   var preloadFeatureFlags = true;
   var captureApplicationLifecycleEvents = false;
 
+  /// Enable Dart-side feature flag cache for synchronous reads.
+  ///
+  /// When `false` (default), feature flags are managed entirely by the native
+  /// iOS/Android SDK. The sync methods ([Posthog.isFeatureEnabledSync],
+  /// [Posthog.getFeatureFlagSync], etc.) will return `false`/`null`/`{}`.
+  ///
+  /// When `true`, the SDK fetches flags via a Dart HTTP call and caches them
+  /// locally. This enables synchronous reads from the Dart-side cache, and
+  /// the async feature flag methods also read from this cache. The native
+  /// SDK's own flag fetching is suppressed to avoid duplicate HTTP calls.
+  var enableSyncFeatureFlags = false;
+
   var debug = false;
   var optOut = false;
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
