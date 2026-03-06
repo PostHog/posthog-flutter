@@ -15,8 +15,8 @@ Postog flutter plugin
   s.source           = { :path => '.' }
   s.social_media_url = 'https://twitter.com/PostHog'
 
-  s.source_files = 'Classes/**/*'
-  s.resource_bundles = { "PostHogFlutter" => "Resources/PrivacyInfo.xcprivacy" }
+  s.source_files = 'posthog_flutter/Sources/posthog_flutter/**/*'
+  s.resource_bundles = { "PostHogFlutter" => "posthog_flutter/Sources/posthog_flutter/PrivacyInfo.xcprivacy" }
   
   s.ios.dependency 'Flutter'
   s.osx.dependency 'FlutterMacOS'

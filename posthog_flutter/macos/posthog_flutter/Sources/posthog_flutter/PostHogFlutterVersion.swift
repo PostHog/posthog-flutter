@@ -1,0 +1,1 @@
+../../../../ios/posthog_flutter/Sources/posthog_flutter/PostHogFlutterVersion.swift
