@@ -51,12 +51,13 @@ jobs:
         working-directory: ./posthog_flutter
         run: flutter test
 
-  # Apple builds (iOS and macOS)
+  # Apple builds (iOS and macOS) with CocoaPods and Swift Package Manager
   build-apple:
     runs-on: macos-latest
     strategy:
       matrix:
         target: [ios, macos]
+        package_manager: [cocoapods, spm]
         include:
           - target: ios
             build_command: flutter build ios --simulator --no-codesign
@@ -74,10 +75,14 @@ jobs:
         with:
           xcode-version: '16.4'
 
+      - name: Enable Swift Package Manager
+        if: matrix.package_manager == 'spm'
+        run: flutter config --enable-swift-package-manager
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build ${{ matrix.target }}
+      - name: Build ${{ matrix.target }} (${{ matrix.package_manager }})
         working-directory: ./example
         run: ${{ matrix.build_command }}
 
