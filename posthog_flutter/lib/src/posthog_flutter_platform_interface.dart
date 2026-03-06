@@ -10,6 +10,15 @@ import 'posthog_flutter_io.dart';
 /// callback to access the loaded flag values.
 typedef OnFeatureFlagsCallback = void Function();
 
+/// Defines the callback signature for when feature flags are loaded,
+/// receiving the full flag data.
+///
+/// The [flags] parameter contains all currently loaded feature flags.
+/// You can also use [Posthog.isFeatureEnabledSync] or
+/// [Posthog.getFeatureFlagSync] to read flag values synchronously.
+typedef OnFeatureFlagsLoadedCallback = void Function(
+    Map<String, PostHogFeatureFlagResult> flags);
+
 abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PosthogFlutterPlatform.
   PosthogFlutterPlatformInterface() : super(token: _token);

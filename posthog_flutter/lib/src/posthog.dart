@@ -6,6 +6,7 @@ import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autoca
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'feature_flag_result.dart';
 import 'posthog_config.dart';
+import 'posthog_flutter_io.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
@@ -37,6 +38,10 @@ class Posthog {
   /// config.host = 'YOUR_POSTHOG_HOST';
   /// config.onFeatureFlags = () {
   ///   // Feature flags are now loaded, you can read flag values here
+  /// };
+  /// // Or use the new callback with flag data:
+  /// config.onFeatureFlagsLoaded = (flags) {
+  ///   // flags contains all loaded feature flags
   /// };
   /// await Posthog().setup(config);
   /// ```
@@ -239,14 +244,20 @@ class Posthog {
   /// [key] the Key
   Future<void> unregister(String key) => _posthog.unregister(key);
 
-  /// Returns if a feature flag is enabled, the feature flag must be a Boolean
+  /// Returns if a feature flag is enabled via the native SDK.
+  ///
+  /// This is an async call that reads from the native iOS/Android SDK cache.
+  /// For synchronous reads from the Dart-side cache, use [isFeatureEnabledSync].
   ///
   /// Docs https://posthog.com/docs/feature-flags and https://posthog.com/docs/experiments
   ///
   /// - [key] the Key of the feature
   Future<bool> isFeatureEnabled(String key) => _posthog.isFeatureEnabled(key);
 
-  /// Reloads the feature flags
+  /// Reloads feature flags from both the native SDK and the Dart-side cache.
+  ///
+  /// After completion, both the native async methods and the Dart sync methods
+  /// will reflect the updated flag values.
   Future<void> reloadFeatureFlags() => _posthog.reloadFeatureFlags();
 
   /// Creates a group.
@@ -276,7 +287,10 @@ class Posthog {
         groupProperties: groupProperties,
       );
 
-  /// Returns the feature flag value for the given key.
+  /// Returns the feature flag value via the native SDK.
+  ///
+  /// This is an async call that reads from the native iOS/Android SDK cache.
+  /// For synchronous reads from the Dart-side cache, use [getFeatureFlagSync].
   ///
   /// Returns `null` if the flag doesn't exist.
   /// For boolean flags, returns `true` or `false`.
@@ -284,9 +298,13 @@ class Posthog {
   Future<Object?> getFeatureFlag(String key) =>
       _posthog.getFeatureFlag(key: key);
 
-  /// Returns the full feature flag result including value and payload.
+  /// Returns the full feature flag result via the native SDK, including
+  /// value and payload.
   ///
-  /// This is the canonical method for getting feature flag data.
+  /// This is an async call that reads from the native iOS/Android SDK cache.
+  /// For synchronous reads from the Dart-side cache, use
+  /// [getFeatureFlagResultSync].
+  ///
   /// Returns `null` if the flag doesn't exist.
   ///
   /// Set [sendEvent] to `false` to suppress the `$feature_flag_called` event.
@@ -304,11 +322,88 @@ class Posthog {
           {bool sendEvent = true}) =>
       _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
 
-  /// Returns the payload for a feature flag.
+  /// Returns the payload for a feature flag via the native SDK.
   @Deprecated(
       'Use getFeatureFlagResult instead, which returns both value and payload.')
   Future<Object?> getFeatureFlagPayload(String key) =>
       _posthog.getFeatureFlagPayload(key: key);
+
+  // ---------------------------------------------------------------------------
+  // Sync feature flag API — reads directly from Dart-side cache
+  // ---------------------------------------------------------------------------
+
+  /// Returns `true` if the feature flag is enabled, `false` otherwise.
+  ///
+  /// This is a **synchronous** read from the Dart-side cache — safe to call
+  /// directly inside `build()` methods without `FutureBuilder`. Flags are
+  /// loaded automatically during [setup] (when `preloadFeatureFlags: true`)
+  /// and updated via [reloadFeatureFlags].
+  ///
+  /// See also [isFeatureEnabled] for the async native SDK equivalent.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// if (Posthog().isFeatureEnabledSync('new-onboarding')) {
+  ///   // Show new onboarding flow
+  /// }
+  /// ```
+  bool isFeatureEnabledSync(String key) {
+    final io = _posthog;
+    if (io is PosthogFlutterIO) {
+      return io.featureFlags?.isFeatureEnabled(key) ?? false;
+    }
+    return false;
+  }
+
+  /// Returns the feature flag value synchronously from the Dart-side cache.
+  ///
+  /// Safe to call directly inside `build()` methods.
+  /// For boolean flags, returns `true` or `false`.
+  /// For multivariate flags, returns the variant string.
+  /// Returns `null` if the flag doesn't exist in the cache.
+  ///
+  /// See also [getFeatureFlag] for the async native SDK equivalent.
+  Object? getFeatureFlagSync(String key) {
+    final io = _posthog;
+    if (io is PosthogFlutterIO) {
+      return io.featureFlags?.getFeatureFlag(key);
+    }
+    return null;
+  }
+
+  /// Returns the full feature flag result synchronously from the Dart-side
+  /// cache, including payload.
+  ///
+  /// Safe to call directly inside `build()` methods.
+  /// Returns `null` if the flag doesn't exist in the cache.
+  ///
+  /// See also [getFeatureFlagResult] for the async native SDK equivalent.
+  PostHogFeatureFlagResult? getFeatureFlagResultSync(String key) {
+    final io = _posthog;
+    if (io is PosthogFlutterIO) {
+      return io.featureFlags?.getFeatureFlagResult(key);
+    }
+    return null;
+  }
+
+  /// Returns all currently cached feature flag results from the Dart-side cache.
+  Map<String, PostHogFeatureFlagResult> getAllFeatureFlagResults() {
+    final io = _posthog;
+    if (io is PosthogFlutterIO) {
+      return io.featureFlags?.getAllFlags() ?? {};
+    }
+    return {};
+  }
+
+  /// Returns whether the Dart-side feature flag cache has been loaded
+  /// at least once.
+  bool get isFeatureFlagsLoaded {
+    final io = _posthog;
+    if (io is PosthogFlutterIO) {
+      return io.featureFlags?.isLoaded ?? false;
+    }
+    return false;
+  }
 
   Future<void> flush() => _posthog.flush();
 

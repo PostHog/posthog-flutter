@@ -27,6 +27,9 @@ void main() {
       if (methodCall.method == 'isFeatureEnabled') {
         return true;
       }
+      if (methodCall.method == 'distinctId') {
+        return 'test-distinct-id';
+      }
       // Simulate setup call success
       if (methodCall.method == 'setup') {
         return null;
@@ -204,6 +207,162 @@ void main() {
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args['userPropertiesToSet'], {'name': 'John Doe'});
       expect(args['userPropertiesToSetOnce'], {'created_at': '2024-03-01'});
+    });
+  });
+
+  group('PosthogFlutterIO enableSyncFeatureFlags', () {
+    test('native config has preloadFeatureFlags=false when sync flags enabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      testConfig.enableSyncFeatureFlags = true;
+      await posthogFlutterIO.setup(testConfig);
+
+      final setupCall = log.firstWhere((c) => c.method == 'setup');
+      final args = Map<String, dynamic>.from(setupCall.arguments as Map);
+      expect(args['preloadFeatureFlags'], isFalse);
+    });
+
+    test('native config preserves preloadFeatureFlags when sync flags disabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      // enableSyncFeatureFlags defaults to false
+      await posthogFlutterIO.setup(testConfig);
+
+      final setupCall = log.firstWhere((c) => c.method == 'setup');
+      final args = Map<String, dynamic>.from(setupCall.arguments as Map);
+      expect(args['preloadFeatureFlags'], isTrue);
+    });
+
+    test(
+        'async isFeatureEnabled does NOT call native when sync flags enabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      testConfig.enableSyncFeatureFlags = true;
+      testConfig.preloadFeatureFlags = false;
+      await posthogFlutterIO.setup(testConfig);
+
+      log.clear();
+      await posthogFlutterIO.isFeatureEnabled('test-flag');
+
+      // Should not have called native isFeatureEnabled
+      expect(log.any((c) => c.method == 'isFeatureEnabled'), isFalse);
+    });
+
+    test(
+        'async getFeatureFlag does NOT call native when sync flags enabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      testConfig.enableSyncFeatureFlags = true;
+      testConfig.preloadFeatureFlags = false;
+      await posthogFlutterIO.setup(testConfig);
+
+      log.clear();
+      await posthogFlutterIO.getFeatureFlag(key: 'test-flag');
+
+      expect(log.any((c) => c.method == 'getFeatureFlag'), isFalse);
+    });
+
+    test(
+        'async getFeatureFlagPayload does NOT call native when sync flags enabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      testConfig.enableSyncFeatureFlags = true;
+      testConfig.preloadFeatureFlags = false;
+      await posthogFlutterIO.setup(testConfig);
+
+      log.clear();
+      await posthogFlutterIO.getFeatureFlagPayload(key: 'test-flag');
+
+      expect(log.any((c) => c.method == 'getFeatureFlagPayload'), isFalse);
+    });
+
+    test(
+        'async getFeatureFlagResult does NOT call native when sync flags enabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      testConfig.enableSyncFeatureFlags = true;
+      testConfig.preloadFeatureFlags = false;
+      await posthogFlutterIO.setup(testConfig);
+
+      log.clear();
+      await posthogFlutterIO.getFeatureFlagResult(key: 'test-flag');
+
+      expect(log.any((c) => c.method == 'getFeatureFlagResult'), isFalse);
+    });
+
+    test(
+        'reloadFeatureFlags does NOT call native when sync flags enabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      testConfig.enableSyncFeatureFlags = true;
+      testConfig.preloadFeatureFlags = false;
+      await posthogFlutterIO.setup(testConfig);
+
+      log.clear();
+      await posthogFlutterIO.reloadFeatureFlags();
+
+      // Should call distinctId (for Dart reload) but NOT native reloadFeatureFlags
+      expect(log.any((c) => c.method == 'reloadFeatureFlags'), isFalse);
+    });
+
+    test('reloadFeatureFlags calls native when sync flags disabled', () async {
+      testConfig = PostHogConfig('test_api_key');
+      // enableSyncFeatureFlags defaults to false
+      await posthogFlutterIO.setup(testConfig);
+
+      log.clear();
+      await posthogFlutterIO.reloadFeatureFlags();
+
+      expect(log.any((c) => c.method == 'reloadFeatureFlags'), isTrue);
+    });
+
+    test('onFeatureFlagsCallback fires legacy callback directly when sync flags disabled',
+        () async {
+      bool callbackInvoked = false;
+      testConfig = PostHogConfig('test_api_key',
+          onFeatureFlags: () {
+        callbackInvoked = true;
+      });
+      await posthogFlutterIO.setup(testConfig);
+
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec
+            .encodeMethodCall(const MethodCall('onFeatureFlagsCallback', {})),
+        (ByteData? data) {},
+      );
+
+      expect(callbackInvoked, isTrue);
+    });
+
+    test('featureFlags is null when sync flags disabled', () async {
+      testConfig = PostHogConfig('test_api_key');
+      await posthogFlutterIO.setup(testConfig);
+
+      expect(posthogFlutterIO.featureFlags, isNull);
+    });
+
+    test('featureFlags is created when sync flags enabled', () async {
+      testConfig = PostHogConfig('test_api_key');
+      testConfig.enableSyncFeatureFlags = true;
+      testConfig.preloadFeatureFlags = false;
+      await posthogFlutterIO.setup(testConfig);
+
+      expect(posthogFlutterIO.featureFlags, isNotNull);
+    });
+
+    test(
+        'async isFeatureEnabled calls native when sync flags disabled',
+        () async {
+      testConfig = PostHogConfig('test_api_key');
+      await posthogFlutterIO.setup(testConfig);
+
+      log.clear();
+      final result = await posthogFlutterIO.isFeatureEnabled('test-flag');
+
+      expect(log.any((c) => c.method == 'isFeatureEnabled'), isTrue);
+      expect(result, isTrue); // mock returns true
     });
   });
 
