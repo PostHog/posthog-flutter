@@ -103,6 +103,34 @@ jobs:
               "packageVersion": "${{ steps.get-version.outputs.version }}"
             }
 
+      - name: Restore Slack thread_ts from cache
+        if: ${{ failure() }}
+        id: restore-thread-ts-for-failure
+        uses: actions/cache/restore@v5
+        with:
+          path: .slack-thread-ts
+          key: slack-thread-ts-${{ steps.get-version.outputs.version }}
+
+      - name: Read Slack thread_ts for failure
+        if: ${{ failure() }}
+        id: slack-thread-for-failure
+        run: |
+          if [ -f .slack-thread-ts ]; then
+            THREAD_TS=$(cat .slack-thread-ts)
+            echo "thread_ts=$THREAD_TS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack - Failed
+        continue-on-error: true
+        if: ${{ failure() && steps.slack-thread-for-failure.outputs.thread_ts != '' }}
+        uses: PostHog/.github/.github/actions/slack-thread-reply@main
+        with:
+          slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
+          slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
+          thread_ts: ${{ steps.slack-thread-for-failure.outputs.thread_ts }}
+          message: '❌ Failed to publish `posthog_flutter@${{ steps.get-version.outputs.version }}` to pub.dev! <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>'
+          emoji_reaction: 'x'
+
   notify-released:
     name: Notify Slack - Released
     needs: publish
