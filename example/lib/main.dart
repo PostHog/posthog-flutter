@@ -104,7 +104,7 @@ class _MyAppState extends State<MyApp> {
 }
 
 class InitialScreen extends StatefulWidget {
-  const InitialScreen({Key? key}) : super(key: key);
+  const InitialScreen({super.key});
 
   @override
   InitialScreenState createState() => InitialScreenState();
