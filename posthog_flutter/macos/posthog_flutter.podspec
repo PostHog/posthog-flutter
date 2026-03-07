@@ -1,1 +1,0 @@
-../ios/posthog_flutter.podspec

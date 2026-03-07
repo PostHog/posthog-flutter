@@ -9,9 +9,9 @@ installLinters:
 formatKotlin:
 	ktlint --format --baseline=posthog_flutter/ktlint-baseline.xml posthog_flutter/android/**/*.kt
 
-# swiftlint ios/Classes --fix conflicts with swiftformat
+# swiftlint darwin/posthog_flutter/Sources --fix conflicts with swiftformat
 formatSwift:
-	swiftformat posthog_flutter/ios/posthog_flutter/Sources/posthog_flutter --swiftversion 5.3
+	swiftformat posthog_flutter/darwin/posthog_flutter/Sources/posthog_flutter --swiftversion 5.3
 
 formatDart:
 	dart format .
