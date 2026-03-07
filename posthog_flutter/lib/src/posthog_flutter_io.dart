@@ -65,7 +65,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// Returns null if event should be dropped, otherwise returns the (possibly modified) event.
   /// Handles both synchronous and asynchronous callbacks via FutureOr.
   Future<PostHogEvent?> _applyBeforeSendCallback(
-      BeforeSendCallback callback, PostHogEvent event) async {
+    BeforeSendCallback callback,
+    PostHogEvent event,
+  ) async {
     try {
       final callbackResult = callback(event);
       if (callbackResult is Future<PostHogEvent?>) {
@@ -93,7 +95,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         break;
       default:
         printIfDebug(
-            '[PostHog] ${call.method} not implemented in PosthogFlutterPlatformInterface');
+          '[PostHog] ${call.method} not implemented in PosthogFlutterPlatformInterface',
+        );
         return null;
     }
   }
@@ -108,7 +111,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     final widget = PosthogFlutterPlatformInterface.instance;
     if (widget is! PosthogFlutterIO) {
       printIfDebug(
-          'Cannot show survey: PosthogFlutterPlatformInterface instance is not PosthogFlutterIO');
+        'Cannot show survey: PosthogFlutterPlatformInterface instance is not PosthogFlutterIO',
+      );
       return;
     }
 
@@ -132,11 +136,13 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         bool isSurveyCompleted = false;
 
         try {
-          final result = await _methodChannel.invokeMethod('surveyAction', {
-            'type': 'response',
-            'index': index,
-            'response': response,
-          }) as Map;
+          final result =
+              await _methodChannel.invokeMethod('surveyAction', {
+                    'type': 'response',
+                    'index': index,
+                    'response': response,
+                  })
+                  as Map;
           nextIndex = (result['nextIndex'] as num).toInt();
           isSurveyCompleted = result['isSurveyCompleted'] as bool;
         } on PlatformException catch (exception) {
@@ -293,8 +299,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           : null;
       final normalizedUserPropertiesSetOnce =
           extractedUserPropertiesSetOnce != null
-              ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
-              : null;
+          ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+          : null;
 
       await _methodChannel.invokeMethod('capture', {
         'eventName': processedEvent.event,
@@ -325,8 +331,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     };
 
     // Apply beforeSend callback - screen events are captured as $screen
-    final processedEvent =
-        await _runBeforeSend(PostHogEventName.screen, propsWithScreenName);
+    final processedEvent = await _runBeforeSend(
+      PostHogEventName.screen,
+      propsWithScreenName,
+    );
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
       return;
@@ -344,14 +352,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     // Get the (possibly modified) screen name from properties and remove it
     final finalScreenName =
         processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
-            screenName;
+        screenName;
     // It will be added back by native sdk
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
 
     try {
       final normalizedProperties = processedEvent.properties?.isNotEmpty == true
           ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+              processedEvent.properties!.cast<String, Object>(),
+            )
           : null;
 
       await _methodChannel.invokeMethod('screen', {
@@ -364,17 +373,13 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> alias({
-    required String alias,
-  }) async {
+  Future<void> alias({required String alias}) async {
     if (!isSupportedPlatform()) {
       return;
     }
 
     try {
-      await _methodChannel.invokeMethod('alias', {
-        'alias': alias,
-      });
+      await _methodChannel.invokeMethod('alias', {'alias': alias});
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on alias: $exception');
     }
@@ -455,9 +460,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      await _methodChannel.invokeMethod('debug', {
-        'debug': enabled,
-      });
+      await _methodChannel.invokeMethod('debug', {'debug': enabled});
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on debug: $exception');
     }
@@ -519,17 +522,13 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlag({
-    required String key,
-  }) async {
+  Future<Object?> getFeatureFlag({required String key}) async {
     if (!isSupportedPlatform()) {
       return null;
     }
 
     try {
-      return await _methodChannel.invokeMethod('getFeatureFlag', {
-        'key': key,
-      });
+      return await _methodChannel.invokeMethod('getFeatureFlag', {'key': key});
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on getFeatureFlag: $exception');
       return null;
@@ -537,9 +536,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlagPayload({
-    required String key,
-  }) async {
+  Future<Object?> getFeatureFlagPayload({required String key}) async {
     if (!isSupportedPlatform()) {
       return null;
     }
@@ -584,8 +581,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      return await _methodChannel
-          .invokeMethod('register', {'key': key, 'value': value});
+      return await _methodChannel.invokeMethod('register', {
+        'key': key,
+        'value': value,
+      });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on register: $exception');
     }
@@ -618,10 +617,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> captureException(
-      {required Object error,
-      StackTrace? stackTrace,
-      Map<String, Object>? properties}) async {
+  Future<void> captureException({
+    required Object error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+  }) async {
     if (!isSupportedPlatform()) {
       return;
     }
@@ -638,10 +638,13 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
       // Apply beforeSend callback - exception events are captured as $exception
       final processedEvent = await _runBeforeSend(
-          PostHogEventName.exception, exceptionProps.cast<String, Object>());
+        PostHogEventName.exception,
+        exceptionProps.cast<String, Object>(),
+      );
       if (processedEvent == null) {
         printIfDebug(
-            '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}');
+          '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
+        );
         return;
       }
 
@@ -658,11 +661,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final normalizedData = processedEvent.properties != null
           ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>())
+              processedEvent.properties!.cast<String, Object>(),
+            )
           : <String, Object>{};
 
-      await _methodChannel.invokeMethod('captureException',
-          {'timestamp': timestamp, 'properties': normalizedData});
+      await _methodChannel.invokeMethod('captureException', {
+        'timestamp': timestamp,
+        'properties': normalizedData,
+      });
     } on PlatformException catch (exception) {
       printIfDebug('Exception in captureException: $exception');
     }

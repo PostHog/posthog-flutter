@@ -47,7 +47,8 @@ class SurveyService {
 
     // If we can't show the survey, log an error
     printIfDebug(
-        '[PostHog] Cannot show survey: No valid context found. To fix this make sure that you have installed PosthogObserver correctly in your app.');
+      '[PostHog] Cannot show survey: No valid context found. To fix this make sure that you have installed PosthogObserver correctly in your app.',
+    );
   }
 
   /// Shows a survey using a navigator context
@@ -65,16 +66,12 @@ class SurveyService {
         context: context,
         isScrollControlled: true,
         isDismissible: false,
-        builder: (context) => _buildSurveyWidget(
-          survey,
-          onShown,
-          onResponse,
-          (s) {
-            _isShowingSurvey = false;
-            _currentSurveyContext = null;
-            onClosed(s);
-          },
-        ),
+        builder: (context) =>
+            _buildSurveyWidget(survey, onShown, onResponse, (s) {
+              _isShowingSurvey = false;
+              _currentSurveyContext = null;
+              onClosed(s);
+            }),
       );
     } catch (e) {
       printIfDebug('[PostHog] Error showing survey: $e');

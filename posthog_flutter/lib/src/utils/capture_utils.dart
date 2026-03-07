@@ -30,8 +30,9 @@ class CaptureUtils {
     Map<String, Object>? userPropertiesSetOnce,
   }) {
     // Create a mutable copy of properties to extract $set and $set_once
-    final propertiesCopy =
-        properties != null ? Map<String, Object>.from(properties) : null;
+    final propertiesCopy = properties != null
+        ? Map<String, Object>.from(properties)
+        : null;
 
     // Extract $set and $set_once from properties for backward compatibility
     Map<String, Object>? legacyUserProperties;
@@ -39,13 +40,15 @@ class CaptureUtils {
 
     if (propertiesCopy != null) {
       if (propertiesCopy['\$set'] is Map<String, Object>) {
-        legacyUserProperties =
-            Map<String, Object>.from(propertiesCopy['\$set'] as Map);
+        legacyUserProperties = Map<String, Object>.from(
+          propertiesCopy['\$set'] as Map,
+        );
         propertiesCopy.remove('\$set');
       }
       if (propertiesCopy['\$set_once'] is Map<String, Object>) {
-        legacyUserPropertiesSetOnce =
-            Map<String, Object>.from(propertiesCopy['\$set_once'] as Map);
+        legacyUserPropertiesSetOnce = Map<String, Object>.from(
+          propertiesCopy['\$set_once'] as Map,
+        );
         propertiesCopy.remove('\$set_once');
       }
     }
@@ -62,8 +65,9 @@ class CaptureUtils {
 
     return ExtractedCaptureProperties(
       properties: propertiesCopy,
-      userProperties:
-          mergedUserProperties.isNotEmpty ? mergedUserProperties : null,
+      userProperties: mergedUserProperties.isNotEmpty
+          ? mergedUserProperties
+          : null,
       userPropertiesSetOnce: mergedUserPropertiesSetOnce.isNotEmpty
           ? mergedUserPropertiesSetOnce
           : null,

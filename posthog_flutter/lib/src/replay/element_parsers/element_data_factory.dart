@@ -15,15 +15,13 @@ class ElementDataFactory {
 
       // Get the transform relative to the screenshot container (RepaintBoundary)
       final ancestor = PostHogMaskController
-          .instance.containerKey.currentContext
+          .instance
+          .containerKey
+          .currentContext
           ?.findRenderObject();
       final transform = renderObject.getTransformTo(ancestor);
 
-      return ElementData(
-        type: type,
-        rect: localRect,
-        transform: transform,
-      );
+      return ElementData(type: type, rect: localRect, transform: transform);
     }
     return null;
   }

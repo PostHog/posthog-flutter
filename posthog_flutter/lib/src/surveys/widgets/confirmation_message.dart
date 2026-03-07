@@ -14,7 +14,7 @@ class ConfirmationMessage extends StatelessWidget {
   final VoidCallback onClose;
   final SurveyAppearance appearance;
   final PostHogDisplaySurveyTextContentType?
-      thankYouMessageDescriptionContentType;
+  thankYouMessageDescriptionContentType;
 
   @override
   Widget build(BuildContext context) {

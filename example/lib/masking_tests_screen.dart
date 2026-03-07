@@ -25,9 +25,7 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Masking Tests'),
-      ),
+      appBar: AppBar(title: const Text('Masking Tests')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -229,8 +227,10 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
                     hintText: 'Dense input field...',
                     isDense: true,
                     border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                 ),
               ),

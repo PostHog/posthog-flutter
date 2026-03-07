@@ -42,6 +42,6 @@ class PostHogDisplaySurveyAppearance {
   final String? thankYouMessageHeader;
   final String? thankYouMessageDescription;
   final PostHogDisplaySurveyTextContentType?
-      thankYouMessageDescriptionContentType;
+  thankYouMessageDescriptionContentType;
   final String? thankYouMessageCloseButtonText;
 }

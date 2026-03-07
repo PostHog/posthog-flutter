@@ -44,7 +44,7 @@ void main() {
         'mixed_list': [1, 'hello', true],
         '2d_list': [
           [1, 2],
-          ['a', 'b']
+          ['a', 'b'],
         ],
       };
 
@@ -56,11 +56,12 @@ void main() {
       expect(mixedList[1], equals('hello'));
       expect(mixedList[2], equals(true));
       expect(
-          result['2d_list'],
-          equals([
-            [1, 2],
-            ['a', 'b']
-          ]));
+        result['2d_list'],
+        equals([
+          [1, 2],
+          ['a', 'b'],
+        ]),
+      );
     });
 
     test('normalizes nested maps', () {
@@ -69,10 +70,7 @@ void main() {
           'inner_string': 'value',
           'inner_number': 123,
           'deeply_nested': {
-            'level2': {
-              'level3': 'deep_value',
-              1: 'deep_value',
-            },
+            'level2': {'level3': 'deep_value', 1: 'deep_value'},
           },
         },
       };
@@ -91,10 +89,7 @@ void main() {
 
     test('handles maps with non-string keys', () {
       final properties = {
-        'map_with_int_keys': {
-          1: 'one',
-          2: 'two',
-        },
+        'map_with_int_keys': {1: 'one', 2: 'two'},
       };
 
       final result = PropertyNormalizer.normalize(properties);

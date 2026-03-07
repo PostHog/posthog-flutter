@@ -172,10 +172,7 @@ void main() {
 
     test('ignores \$set if not a Map', () {
       final result = CaptureUtils.extractUserProperties(
-        properties: {
-          'event_key': 'event_value',
-          '\$set': 'not a map',
-        },
+        properties: {'event_key': 'event_value', '\$set': 'not a map'},
         userProperties: null,
         userPropertiesSetOnce: null,
       );
@@ -190,10 +187,7 @@ void main() {
 
     test('ignores \$set_once if not a Map', () {
       final result = CaptureUtils.extractUserProperties(
-        properties: {
-          'event_key': 'event_value',
-          '\$set_once': 123,
-        },
+        properties: {'event_key': 'event_value', '\$set_once': 123},
         userProperties: null,
         userPropertiesSetOnce: null,
       );
@@ -236,14 +230,11 @@ void main() {
         userProperties: {'b': 20, 'd': 4}, // b overrides, d is new
         userPropertiesSetOnce: {
           'x': 'new_x',
-          'z': 'new_z'
+          'z': 'new_z',
         }, // x overrides, z is new
       );
 
-      expect(result.properties, {
-        'event_key': 'event_value',
-        'other_key': 123,
-      });
+      expect(result.properties, {'event_key': 'event_value', 'other_key': 123});
       expect(result.userProperties, {
         'a': 1,
         'b': 20, // overridden

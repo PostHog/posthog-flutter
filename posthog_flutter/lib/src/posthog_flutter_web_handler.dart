@@ -12,7 +12,10 @@ class PostHog {}
 
 extension PostHogExtension on PostHog {
   external JSAny? identify(
-      JSAny userId, JSAny properties, JSAny propertiesSetOnce);
+    JSAny userId,
+    JSAny properties,
+    JSAny propertiesSetOnce,
+  );
   external JSAny? capture(JSAny eventName, JSAny? properties, JSAny? options);
   external JSAny? alias(JSAny alias);
   // ignore: non_constant_identifier_names
@@ -23,7 +26,9 @@ extension PostHogExtension on PostHog {
   external void group(JSAny type, JSAny key, JSAny properties);
   external void reloadFeatureFlags();
   external void setPersonProperties(
-      JSAny? userPropertiesToSet, JSAny? userPropertiesToSetOnce);
+    JSAny? userPropertiesToSet,
+    JSAny? userPropertiesToSetOnce,
+  );
   // ignore: non_constant_identifier_names
   external void opt_in_capturing();
   // ignore: non_constant_identifier_names
@@ -81,7 +86,8 @@ Map<String, dynamic> safeMapConversion(dynamic mapData) {
 
   if (mapData is Map) {
     return Map<String, dynamic>.from(
-        mapData.map((key, value) => MapEntry(key.toString(), value)));
+      mapData.map((key, value) => MapEntry(key.toString(), value)),
+    );
   }
 
   return {};
@@ -118,15 +124,19 @@ class StackFrame {
 typedef StackLineParser = StackFrame? Function(String line, String platform);
 
 // Global regex patterns (compiled once)
-final _chromeRegexNoFnName =
-    RegExp(r'^\s*at\s+(\S+?)\s*:\s*(\d+)\s*:\s*(\d+)\s*$');
+final _chromeRegexNoFnName = RegExp(
+  r'^\s*at\s+(\S+?)\s*:\s*(\d+)\s*:\s*(\d+)\s*$',
+);
 final _chromeRegex = RegExp(
-    r'^\s*at\s+(?:(.+?)\s+)?\((?:address\s+at\s+)?(?:async\s+)?((?:<anonymous>|[-a-z]+:|.*bundle|\/)?.*?)(?::(\d+))?(?::(\d+))?\)?\s*$');
+  r'^\s*at\s+(?:(.+?)\s+)?\((?:address\s+at\s+)?(?:async\s+)?((?:<anonymous>|[-a-z]+:|.*bundle|\/)?.*?)(?::(\d+))?(?::(\d+))?\)?\s*$',
+);
 final _chromeEvalRegex = RegExp(r'\((\S*)(?::(\d+))(?::(\d+))\)');
 final _geckoRegex = RegExp(
-    r'^\s*(.*?)(?:\((.*?)\))?(?:^|@)?((?:[-a-z]+)?:\/.*?|\[native code\]|[^@]*(?:bundle|\d+\.js)|\/[\w\-\.\ \/=]+)(?::(\d+))?(?::(\d+))?\s*$');
-final _geckoEvalRegex =
-    RegExp(r'(\S+)\s+line\s+(\d+)(?:\s+>\s+eval\s+line\s+\d+)*\s+>\s+eval');
+  r'^\s*(.*?)(?:\((.*?)\))?(?:^|@)?((?:[-a-z]+)?:\/.*?|\[native code\]|[^@]*(?:bundle|\d+\.js)|\/[\w\-\.\ \/=]+)(?::(\d+))?(?::(\d+))?\s*$',
+);
+final _geckoEvalRegex = RegExp(
+  r'(\S+)\s+line\s+(\d+)(?:\s+>\s+eval\s+line\s+\d+)*\s+>\s+eval',
+);
 final _errorWrapperRegex = RegExp(r'\(error: (.*)\)');
 final _errorLineRegex = RegExp(r'\S*Error: ');
 
@@ -163,7 +173,9 @@ StackFrame? chromeStackLineParser(String line, String platform) {
 
     // Extract safari extension details
     final safariDetails = extractSafariExtensionDetails(
-        functionName ?? '<anonymous>', filename ?? '');
+      functionName ?? '<anonymous>',
+      filename ?? '',
+    );
     functionName = safariDetails[0];
     filename = safariDetails[1];
 
@@ -202,7 +214,9 @@ StackFrame? geckoStackLineParser(String line, String platform) {
 
     // Extract safari extension details
     final safariDetails = extractSafariExtensionDetails(
-        functionName ?? '<anonymous>', filename ?? '');
+      functionName ?? '<anonymous>',
+      filename ?? '',
+    );
     functionName = safariDetails[0];
     filename = safariDetails[1];
 
@@ -219,15 +233,19 @@ StackFrame? geckoStackLineParser(String line, String platform) {
 
 // Extract Safari extension details (ported from JS)
 List<String> extractSafariExtensionDetails(
-    String functionName, String filename) {
+  String functionName,
+  String filename,
+) {
   final isSafariExtension = filename.contains('safari-extension');
   final isSafariWebExtension = filename.contains('safari-web-extension');
 
   if (isSafariExtension || isSafariWebExtension) {
-    final extractedFunction =
-        filename.contains('@') ? filename.split('@')[0] : '<anonymous>';
-    final prefix =
-        isSafariExtension ? 'safari-extension:' : 'safari-web-extension:';
+    final extractedFunction = filename.contains('@')
+        ? filename.split('@')[0]
+        : '<anonymous>';
+    final prefix = isSafariExtension
+        ? 'safari-extension:'
+        : 'safari-web-extension:';
     return [extractedFunction, '$prefix$filename'];
   }
 
@@ -236,7 +254,9 @@ List<String> extractSafariExtensionDetails(
 
 // Create stack parser function
 List<StackFrame> Function(String, [int]) createStackParser(
-    String platform, List<StackLineParser> lineParsers) {
+  String platform,
+  List<StackLineParser> lineParsers,
+) {
   return (String stack, [int skipLines = 0]) {
     final lines = stack.split('\n');
     final frames = <StackFrame>[];
@@ -288,8 +308,10 @@ List<StackFrame> Function(String, [int]) createStackParser(
 
 // Create default stack parser
 List<StackFrame> Function(String, [int]) createDefaultStackParser() {
-  return createStackParser(
-      'web:javascript', [chromeStackLineParser, geckoStackLineParser]);
+  return createStackParser('web:javascript', [
+    chromeStackLineParser,
+    geckoStackLineParser,
+  ]);
 }
 
 int _lastKeysCount = 0;
@@ -304,8 +326,9 @@ void _buildFilenameToDebugIdMapDart(
     final String stackKeyStr = debugIdMapEntry.key.toString();
     final String debugIdStr = debugIdMapEntry.value.toString();
 
-    final debugIdHasCachedFilename =
-        _chunkIdsWithFilenames.contains(debugIdStr);
+    final debugIdHasCachedFilename = _chunkIdsWithFilenames.contains(
+      debugIdStr,
+    );
 
     if (!debugIdHasCachedFilename) {
       final parsedStack = stackParser(stackKeyStr);
@@ -335,10 +358,7 @@ Map<String, String>? getPosthogChunkIds() {
   final stackParser = createDefaultStackParser();
 
   if (debugIdMap.keys.length != _lastKeysCount) {
-    _buildFilenameToDebugIdMapDart(
-      debugIdMap,
-      stackParser,
-    );
+    _buildFilenameToDebugIdMapDart(debugIdMap, stackParser);
     _lastKeysCount = debugIdMap.keys.length;
   }
 
@@ -355,8 +375,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'identify':
       final userId = args['userId'] as String;
       final userProperties = safeMapConversion(args['userProperties']);
-      final userPropertiesSetOnce =
-          safeMapConversion(args['userPropertiesSetOnce']);
+      final userPropertiesSetOnce = safeMapConversion(
+        args['userPropertiesSetOnce'],
+      );
 
       posthog?.identify(
         stringToJSAny(userId),
@@ -365,10 +386,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       );
       break;
     case 'setPersonProperties':
-      final userPropertiesToSet =
-          safeMapConversion(args['userPropertiesToSet']);
-      final userPropertiesToSetOnce =
-          safeMapConversion(args['userPropertiesToSetOnce']);
+      final userPropertiesToSet = safeMapConversion(
+        args['userPropertiesToSet'],
+      );
+      final userPropertiesToSetOnce = safeMapConversion(
+        args['userPropertiesToSetOnce'],
+      );
 
       posthog?.setPersonProperties(
         userPropertiesToSet.isNotEmpty ? mapToJSAny(userPropertiesToSet) : null,
@@ -381,8 +404,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
       final userProperties = safeMapConversion(args['userProperties']);
-      final userPropertiesSetOnce =
-          safeMapConversion(args['userPropertiesSetOnce']);
+      final userPropertiesSetOnce = safeMapConversion(
+        args['userPropertiesSetOnce'],
+      );
 
       // Build options object for posthog-js capture with $set and $set_once
       // See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
@@ -405,18 +429,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
 
-      posthog?.capture(
-        stringToJSAny('\$screen'),
-        mapToJSAny(properties),
-        null,
-      );
+      posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
       break;
     case 'alias':
       final alias = args['alias'] as String;
 
-      posthog?.alias(
-        stringToJSAny(alias),
-      );
+      posthog?.alias(stringToJSAny(alias));
       break;
     case 'distinctId':
       final distinctId = posthog?.get_distinct_id();
@@ -430,11 +448,8 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'isFeatureEnabled':
       final key = args['key'] as String;
-      final isFeatureEnabled = posthog
-              ?.isFeatureEnabled(
-                stringToJSAny(key),
-              )
-              ?.dartify() as bool? ??
+      final isFeatureEnabled =
+          posthog?.isFeatureEnabled(stringToJSAny(key))?.dartify() as bool? ??
           false;
       return isFeatureEnabled;
     case 'group':
@@ -462,16 +477,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'getFeatureFlag':
       final key = args['key'] as String;
 
-      final featureFlag = posthog?.getFeatureFlag(
-        stringToJSAny(key),
-      );
+      final featureFlag = posthog?.getFeatureFlag(stringToJSAny(key));
       return featureFlag?.dartify();
     case 'getFeatureFlagPayload':
       final key = args['key'] as String;
 
-      final featureFlag = posthog?.getFeatureFlagPayload(
-        stringToJSAny(key),
-      );
+      final featureFlag = posthog?.getFeatureFlagPayload(stringToJSAny(key));
       return featureFlag?.dartify();
     case 'getFeatureFlagResult':
       final key = args['key'] as String;
@@ -487,16 +498,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final value = args['value'];
       final properties = {key: value};
 
-      posthog?.register(
-        mapToJSAny(properties),
-      );
+      posthog?.register(mapToJSAny(properties));
       break;
     case 'unregister':
       final key = args['key'] as String;
 
-      posthog?.unregister(
-        stringToJSAny(key),
-      );
+      posthog?.unregister(stringToJSAny(key));
       break;
     case 'getSessionId':
       final sessionId = posthog?.get_session_id()?.dartify() as String?;

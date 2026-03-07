@@ -75,11 +75,7 @@ class NumberRatingButton extends StatelessWidget {
             ),
           ),
           if (!isLastItem)
-            Container(
-              height: 45,
-              width: 1,
-              color: appearance.borderColor,
-            ),
+            Container(height: 45, width: 1, color: appearance.borderColor),
         ],
       ),
     );

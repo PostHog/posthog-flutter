@@ -3,7 +3,10 @@ import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 
 class ImageMaskPainter {
   void drawMaskedImage(
-      Canvas canvas, List<ElementData> items, double pixelRatio) {
+    Canvas canvas,
+    List<ElementData> items,
+    double pixelRatio,
+  ) {
     final paint = Paint()..style = PaintingStyle.fill;
 
     for (var elementData in items) {
@@ -16,9 +19,11 @@ class ImageMaskPainter {
         canvas.save();
 
         // Scale the transform by pixelRatio for the output image
-        final scaledTransform =
-            Matrix4.diagonal3Values(pixelRatio, pixelRatio, 1.0)
-              ..multiply(transform);
+        final scaledTransform = Matrix4.diagonal3Values(
+          pixelRatio,
+          pixelRatio,
+          1.0,
+        )..multiply(transform);
         canvas.transform(scaledTransform.storage);
 
         // Draw the rect in local coordinates (transform positions it correctly)
@@ -27,25 +32,30 @@ class ImageMaskPainter {
       } else {
         // Fallback: no transform, use simple scaling
         final scaled = Rect.fromLTRB(
-            elementData.rect.left * pixelRatio,
-            elementData.rect.top * pixelRatio,
-            elementData.rect.right * pixelRatio,
-            elementData.rect.bottom * pixelRatio);
+          elementData.rect.left * pixelRatio,
+          elementData.rect.top * pixelRatio,
+          elementData.rect.right * pixelRatio,
+          elementData.rect.bottom * pixelRatio,
+        );
         canvas.drawRect(scaled, paint);
       }
     }
   }
 
   void drawMaskedImageWrapper(
-      Canvas canvas, List<Rect> items, double pixelRatio) {
+    Canvas canvas,
+    List<Rect> items,
+    double pixelRatio,
+  ) {
     final paint = Paint()..style = PaintingStyle.fill;
     for (var rect in items) {
       paint.color = Colors.black;
       final scaled = Rect.fromLTRB(
-          rect.left * pixelRatio,
-          rect.top * pixelRatio,
-          rect.right * pixelRatio,
-          rect.bottom * pixelRatio);
+        rect.left * pixelRatio,
+        rect.top * pixelRatio,
+        rect.right * pixelRatio,
+        rect.bottom * pixelRatio,
+      );
       canvas.drawRect(scaled, paint);
     }
   }

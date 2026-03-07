@@ -2,7 +2,11 @@ import 'package:flutter/rendering.dart';
 
 abstract class Scaler {
   Size getScaledSize(
-      double originalWidth, double originalHeight, Size targetSize, BoxFit fit);
+    double originalWidth,
+    double originalHeight,
+    Size targetSize,
+    BoxFit fit,
+  );
 }
 
 class ImageScaler implements Scaler {
@@ -13,8 +17,12 @@ class ImageScaler implements Scaler {
   }
 
   @override
-  Size getScaledSize(double originalWidth, double originalHeight,
-      Size targetSize, BoxFit fit) {
+  Size getScaledSize(
+    double originalWidth,
+    double originalHeight,
+    Size targetSize,
+    BoxFit fit,
+  ) {
     final double aspectRatio = _getRatio(originalWidth, originalHeight);
 
     switch (fit) {
@@ -40,7 +48,11 @@ class ImageScaler implements Scaler {
         if (originalWidth > targetSize.width ||
             originalHeight > targetSize.height) {
           return getScaledSize(
-              originalWidth, originalHeight, targetSize, BoxFit.contain);
+            originalWidth,
+            originalHeight,
+            targetSize,
+            BoxFit.contain,
+          );
         }
         return Size(originalWidth, originalHeight);
     }

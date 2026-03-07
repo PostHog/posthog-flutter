@@ -13,8 +13,10 @@ class SnapshotManager {
     _snapshotStatuses = Expando();
   }
 
-  void updateStatus(RenderObject renderObject,
-      {required bool shouldSendMetaEvent}) {
+  void updateStatus(
+    RenderObject renderObject, {
+    required bool shouldSendMetaEvent,
+  }) {
     final status = getStatus(renderObject);
     if (shouldSendMetaEvent) {
       status.sentMetaEvent = true;

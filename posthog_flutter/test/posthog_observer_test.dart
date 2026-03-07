@@ -9,9 +9,9 @@ import 'posthog_flutter_platform_interface_fake.dart';
 
 void main() {
   PageRoute<dynamic> route(RouteSettings? settings) => PageRouteBuilder<void>(
-        pageBuilder: (_, __, ___) => Container(),
-        settings: settings,
-      );
+    pageBuilder: (_, __, ___) => Container(),
+    settings: settings,
+  );
 
   final fake = PosthogFlutterPlatformFake();
 
@@ -25,11 +25,14 @@ void main() {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
   });
 
-  PosthogObserver getSut(
-      {ScreenNameExtractor nameExtractor = defaultNameExtractor,
-      PostHogRouteFilter routeFilter = defaultPostHogRouteFilter}) {
+  PosthogObserver getSut({
+    ScreenNameExtractor nameExtractor = defaultNameExtractor,
+    PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
+  }) {
     return PosthogObserver(
-        nameExtractor: nameExtractor, routeFilter: routeFilter);
+      nameExtractor: nameExtractor,
+      routeFilter: routeFilter,
+    );
   }
 
   test('returns current route name', () {

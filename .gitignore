@@ -637,5 +637,9 @@ Podfile.lock
 # https://nightshift.haplab.com/
 PLAN.md
 
+# Swift Package Manager
+.build/
+.swiftpm/
+
 # Examples build artifacts
 examples/

@@ -115,10 +115,7 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
         ),
         // Scrollable choices - use full screen height minus insets
         ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: availableHeight,
-            minHeight: 0,
-          ),
+          constraints: BoxConstraints(maxHeight: availableHeight, minHeight: 0),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.max,
@@ -153,8 +150,9 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
                       appearance: widget.appearance,
                       isOpenChoice: isOpenChoice,
                       openChoiceInput: _openChoiceInput,
-                      onOpenChoiceChanged:
-                          isOpenChoice ? _handleOpenChoiceInput : null,
+                      onOpenChoiceChanged: isOpenChoice
+                          ? _handleOpenChoiceInput
+                          : null,
                     ),
                   );
                 }),

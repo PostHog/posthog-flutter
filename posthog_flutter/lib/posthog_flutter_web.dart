@@ -76,8 +76,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       // We ignore the JS parameters and just invoke the void callback
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        dartCallback();
-      }.toJS;
+            dartCallback();
+          }.toJS;
 
       ph.onFeatureFlags(jsCallback);
     }
@@ -89,12 +89,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
-    return handleWebMethodCall(MethodCall('identify', {
-      'userId': userId,
-      if (userProperties != null) 'userProperties': userProperties,
-      if (userPropertiesSetOnce != null)
-        'userPropertiesSetOnce': userPropertiesSetOnce,
-    }));
+    return handleWebMethodCall(
+      MethodCall('identify', {
+        'userId': userId,
+        if (userProperties != null) 'userProperties': userProperties,
+        if (userPropertiesSetOnce != null)
+          'userPropertiesSetOnce': userPropertiesSetOnce,
+      }),
+    );
   }
 
   @override
@@ -107,12 +109,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       return;
     }
 
-    return handleWebMethodCall(MethodCall('setPersonProperties', {
-      if (userPropertiesToSet != null)
-        'userPropertiesToSet': userPropertiesToSet,
-      if (userPropertiesToSetOnce != null)
-        'userPropertiesToSetOnce': userPropertiesToSetOnce,
-    }));
+    return handleWebMethodCall(
+      MethodCall('setPersonProperties', {
+        if (userPropertiesToSet != null)
+          'userPropertiesToSet': userPropertiesToSet,
+        if (userPropertiesToSetOnce != null)
+          'userPropertiesToSetOnce': userPropertiesToSetOnce,
+      }),
+    );
   }
 
   @override
@@ -140,17 +144,19 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         : null;
     final normalizedUserPropertiesSetOnce =
         extractedUserPropertiesSetOnce != null
-            ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
-            : null;
+        ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+        : null;
 
-    return handleWebMethodCall(MethodCall('capture', {
-      'eventName': eventName,
-      if (normalizedProperties != null) 'properties': normalizedProperties,
-      if (normalizedUserProperties != null)
-        'userProperties': normalizedUserProperties,
-      if (normalizedUserPropertiesSetOnce != null)
-        'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
-    }));
+    return handleWebMethodCall(
+      MethodCall('capture', {
+        'eventName': eventName,
+        if (normalizedProperties != null) 'properties': normalizedProperties,
+        if (normalizedUserProperties != null)
+          'userProperties': normalizedUserProperties,
+        if (normalizedUserPropertiesSetOnce != null)
+          'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
+      }),
+    );
   }
 
   @override
@@ -158,10 +164,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String screenName,
     Map<String, Object>? properties,
   }) async {
-    return handleWebMethodCall(MethodCall('screen', {
-      'screenName': screenName,
-      if (properties != null) 'properties': properties,
-    }));
+    return handleWebMethodCall(
+      MethodCall('screen', {
+        'screenName': screenName,
+        if (properties != null) 'properties': properties,
+      }),
+    );
   }
 
   @override
@@ -204,7 +212,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<void> register(String key, Object value) async {
     return handleWebMethodCall(
-        MethodCall('register', {'key': key, 'value': value}));
+      MethodCall('register', {'key': key, 'value': value}),
+    );
   }
 
   @override
@@ -214,8 +223,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key) async {
-    final result =
-        await handleWebMethodCall(MethodCall('isFeatureEnabled', {'key': key}));
+    final result = await handleWebMethodCall(
+      MethodCall('isFeatureEnabled', {'key': key}),
+    );
     return result as bool? ?? false;
   }
 
@@ -230,11 +240,13 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String groupKey,
     Map<String, Object>? groupProperties,
   }) async {
-    return handleWebMethodCall(MethodCall('group', {
-      'groupType': groupType,
-      'groupKey': groupKey,
-      if (groupProperties != null) 'groupProperties': groupProperties,
-    }));
+    return handleWebMethodCall(
+      MethodCall('group', {
+        'groupType': groupType,
+        'groupKey': groupKey,
+        if (groupProperties != null) 'groupProperties': groupProperties,
+      }),
+    );
   }
 
   @override
@@ -245,7 +257,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<Object?> getFeatureFlagPayload({required String key}) async {
     return handleWebMethodCall(
-        MethodCall('getFeatureFlagPayload', {'key': key}));
+      MethodCall('getFeatureFlagPayload', {'key': key}),
+    );
   }
 
   @override
@@ -253,8 +266,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String key,
     bool sendEvent = true,
   }) async {
-    final result = await handleWebMethodCall(MethodCall(
-        'getFeatureFlagResult', {'key': key, 'sendEvent': sendEvent}));
+    final result = await handleWebMethodCall(
+      MethodCall('getFeatureFlagResult', {'key': key, 'sendEvent': sendEvent}),
+    );
 
     // Web SDK returns: { key, enabled, variant, payload }
     return PostHogFeatureFlagResult.fromMap(result, key);
@@ -302,12 +316,13 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-      final normalizedData =
-          PropertyNormalizer.normalize(exceptionData.cast<String, Object>());
+      final normalizedData = PropertyNormalizer.normalize(
+        exceptionData.cast<String, Object>(),
+      );
 
-      return handleWebMethodCall(MethodCall('captureException', {
-        'properties': normalizedData,
-      }));
+      return handleWebMethodCall(
+        MethodCall('captureException', {'properties': normalizedData}),
+      );
     } on Exception catch (exception) {
       printIfDebug('Exception in captureException: $exception');
     }
@@ -315,9 +330,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
-    return handleWebMethodCall(MethodCall('startSessionRecording', {
-      'resumeCurrent': resumeCurrent,
-    }));
+    return handleWebMethodCall(
+      MethodCall('startSessionRecording', {'resumeCurrent': resumeCurrent}),
+    );
   }
 
   @override
@@ -327,8 +342,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isSessionReplayActive() async {
-    final result =
-        await handleWebMethodCall(const MethodCall('isSessionReplayActive'));
+    final result = await handleWebMethodCall(
+      const MethodCall('isSessionReplayActive'),
+    );
     return result as bool? ?? false;
   }
 }

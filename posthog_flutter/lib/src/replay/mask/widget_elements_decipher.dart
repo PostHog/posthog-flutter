@@ -15,42 +15,35 @@ class WidgetElementsDecipher {
     required ElementDataFactory elementDataFactory,
     required ElementObjectParser elementObjectParser,
     required RootElementProvider rootElementProvider,
-  })  : _elementDataFactory = elementDataFactory,
-        _elementObjectParser = elementObjectParser,
-        _rootElementProvider = rootElementProvider;
+  }) : _elementDataFactory = elementDataFactory,
+       _elementObjectParser = elementObjectParser,
+       _rootElementProvider = rootElementProvider;
 
-  ElementData? parseRenderTree(
-    BuildContext context,
-  ) {
+  ElementData? parseRenderTree(BuildContext context) {
     final rootElement = _rootElementProvider.getRootElement(context);
     if (rootElement == null) return null;
 
-    final rootElementData =
-        _elementDataFactory.createFromElement(rootElement, "Root");
+    final rootElementData = _elementDataFactory.createFromElement(
+      rootElement,
+      "Root",
+    );
     if (rootElementData == null) return null;
 
     _rootElementData = rootElementData;
 
-    _parseAllElements(
-      _rootElementData,
-      rootElement,
-    );
+    _parseAllElements(_rootElementData, rootElement);
 
     return _rootElementData;
   }
 
-  void _parseAllElements(
-    ElementData activeElementData,
-    Element element,
-  ) {
-    ElementData? newElementData =
-        _elementObjectParser.relateRenderObject(activeElementData, element);
+  void _parseAllElements(ElementData activeElementData, Element element) {
+    ElementData? newElementData = _elementObjectParser.relateRenderObject(
+      activeElementData,
+      element,
+    );
 
     element.debugVisitOnstageChildren((childElement) {
-      _parseAllElements(
-        newElementData ?? activeElementData,
-        childElement,
-      );
+      _parseAllElements(newElementData ?? activeElementData, childElement);
     });
   }
 }

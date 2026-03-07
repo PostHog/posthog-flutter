@@ -54,7 +54,8 @@ class SurveyAppearance {
 
   /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance]
   static SurveyAppearance fromPostHog(
-      PostHogDisplaySurveyAppearance? appearance) {
+    PostHogDisplaySurveyAppearance? appearance,
+  ) {
     final backgroundColor =
         _colorFromHex(appearance?.backgroundColor) ?? Colors.white;
     final submitButtonColor =
@@ -65,24 +66,28 @@ class SurveyAppearance {
         _colorFromHex(appearance?.ratingButtonActiveColor) ?? Colors.black;
 
     // Input background: use override, or slight adjustment for high luminance backgrounds
-    final inputBackgroundColor = _colorFromHex(appearance?.inputBackground) ??
+    final inputBackgroundColor =
+        _colorFromHex(appearance?.inputBackground) ??
         (backgroundColor.computeLuminance() > 0.95
             ? const Color(0xFFF8F8F8)
             : backgroundColor);
 
     // Primary text color: use textColor override if provided, otherwise auto-contrast
-    final primaryTextColor = _colorFromHex(appearance?.textColor) ??
+    final primaryTextColor =
+        _colorFromHex(appearance?.textColor) ??
         _getContrastingTextColor(backgroundColor);
 
     // Input text color: use override if provided, otherwise auto-contrast from input background
-    final inputTextColor = _colorFromHex(appearance?.inputTextColor) ??
+    final inputTextColor =
+        _colorFromHex(appearance?.inputTextColor) ??
         _getContrastingTextColor(inputBackgroundColor);
 
     return SurveyAppearance(
       backgroundColor: backgroundColor,
       submitButtonColor: submitButtonColor,
       submitButtonText: appearance?.submitButtonText ?? 'Submit',
-      submitButtonTextColor: _colorFromHex(appearance?.submitButtonTextColor) ??
+      submitButtonTextColor:
+          _colorFromHex(appearance?.submitButtonTextColor) ??
           _getContrastingTextColor(submitButtonColor),
       descriptionTextColor:
           _colorFromHex(appearance?.descriptionTextColor) ?? primaryTextColor,
@@ -90,8 +95,9 @@ class SurveyAppearance {
       closeButtonColor: primaryTextColor,
       ratingButtonColor: ratingButtonColor,
       ratingButtonActiveColor: ratingButtonActiveColor,
-      ratingButtonSelectedTextColor:
-          _getContrastingTextColor(ratingButtonActiveColor),
+      ratingButtonSelectedTextColor: _getContrastingTextColor(
+        ratingButtonActiveColor,
+      ),
       ratingButtonUnselectedTextColor: inputTextColor.withAlpha(128),
       displayThankYouMessage: appearance?.displayThankYouMessage ?? true,
       thankYouMessageHeader:

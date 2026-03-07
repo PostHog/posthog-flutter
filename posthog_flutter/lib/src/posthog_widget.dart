@@ -42,8 +42,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
     }
 
     // start listening for session recording toggles
-    PostHogInternalEvents.sessionRecordingActive
-        .addListener(_onSessionRecordingChanged);
+    PostHogInternalEvents.sessionRecordingActive.addListener(
+      _onSessionRecordingChanged,
+    );
   }
 
   void _initComponents(PostHogConfig config) {
@@ -108,13 +109,18 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
     if (imageInfo.shouldSendMetaEvent) {
       await _nativeCommunicator?.sendMetaEvent(
-          width: imageInfo.width,
-          height: imageInfo.height,
-          screen: Posthog().currentScreen);
+        width: imageInfo.width,
+        height: imageInfo.height,
+        screen: Posthog().currentScreen,
+      );
     }
 
-    await _nativeCommunicator?.sendFullSnapshot(imageInfo.imageBytes,
-        id: imageInfo.id, x: imageInfo.x, y: imageInfo.y);
+    await _nativeCommunicator?.sendFullSnapshot(
+      imageInfo.imageBytes,
+      id: imageInfo.id,
+      x: imageInfo.x,
+      y: imageInfo.y,
+    );
   }
 
   @override
@@ -122,17 +128,16 @@ class PostHogWidgetState extends State<PostHogWidget> {
     return RepaintBoundary(
       key: PostHogMaskController.instance.containerKey,
       child: Column(
-        children: [
-          Expanded(child: Container(child: widget.child)),
-        ],
+        children: [Expanded(child: Container(child: widget.child))],
       ),
     );
   }
 
   @override
   void dispose() {
-    PostHogInternalEvents.sessionRecordingActive
-        .removeListener(_onSessionRecordingChanged);
+    PostHogInternalEvents.sessionRecordingActive.removeListener(
+      _onSessionRecordingChanged,
+    );
 
     _throttleTimer?.cancel();
     _throttleTimer = null;
