@@ -150,9 +150,8 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
                       appearance: widget.appearance,
                       isOpenChoice: isOpenChoice,
                       openChoiceInput: _openChoiceInput,
-                      onOpenChoiceChanged: isOpenChoice
-                          ? _handleOpenChoiceInput
-                          : null,
+                      onOpenChoiceChanged:
+                          isOpenChoice ? _handleOpenChoiceInput : null,
                     ),
                   );
                 }),

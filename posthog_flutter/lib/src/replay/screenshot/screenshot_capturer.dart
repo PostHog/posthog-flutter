@@ -114,22 +114,22 @@ class ScreenshotCapturer {
 
       final replayConfig = _config.sessionReplayConfig;
 
-      final postHogWidgetWrapperElements = PostHogMaskController.instance
-          .getPostHogWidgetWrapperElements();
+      final postHogWidgetWrapperElements =
+          PostHogMaskController.instance.getPostHogWidgetWrapperElements();
 
       // call getCurrentScreenRects if really necessary
       List<ElementData>? elementsDataWidgets;
       if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
-        elementsDataWidgets = PostHogMaskController.instance
-            .getCurrentWidgetsElements();
+        elementsDataWidgets =
+            PostHogMaskController.instance.getCurrentWidgetsElements();
       }
 
       /// we firstly get current image (syncImage) and masks
       /// (postHogWidgetWrapperElements, elementsDataWidgets) synchronously and
       /// then executed the main process asynchronous
       Future(() async {
-        final isSessionReplayActive = await _nativeCommunicator
-            .isSessionReplayActive();
+        final isSessionReplayActive =
+            await _nativeCommunicator.isSessionReplayActive();
 
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;

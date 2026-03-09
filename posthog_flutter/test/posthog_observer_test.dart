@@ -9,9 +9,9 @@ import 'posthog_flutter_platform_interface_fake.dart';
 
 void main() {
   PageRoute<dynamic> route(RouteSettings? settings) => PageRouteBuilder<void>(
-    pageBuilder: (_, __, ___) => Container(),
-    settings: settings,
-  );
+        pageBuilder: (_, __, ___) => Container(),
+        settings: settings,
+      );
 
   final fake = PosthogFlutterPlatformFake();
 

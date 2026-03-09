@@ -166,8 +166,7 @@ void main() {
       expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
       expect(
         fakePlatformInterface
-            .setPersonPropertiesCalls
-            .last['userPropertiesToSet'],
+            .setPersonPropertiesCalls.last['userPropertiesToSet'],
         {'name': 'John Doe', 'email': 'john@example.com'},
       );
     });
@@ -180,8 +179,7 @@ void main() {
       expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
       expect(
         fakePlatformInterface
-            .setPersonPropertiesCalls
-            .last['userPropertiesToSetOnce'],
+            .setPersonPropertiesCalls.last['userPropertiesToSetOnce'],
         {'date_of_first_login': '2024-03-01'},
       );
     });

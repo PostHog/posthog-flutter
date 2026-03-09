@@ -97,11 +97,12 @@ class Posthog {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
-  }) => _posthog.identify(
-    userId: userId,
-    userProperties: userProperties,
-    userPropertiesSetOnce: userPropertiesSetOnce,
-  );
+  }) =>
+      _posthog.identify(
+        userId: userId,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+      );
 
   /// Sets person properties for the current user without requiring identify.
   ///
@@ -122,10 +123,11 @@ class Posthog {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
-  }) => _posthog.setPersonProperties(
-    userPropertiesToSet: userPropertiesToSet,
-    userPropertiesToSetOnce: userPropertiesToSetOnce,
-  );
+  }) =>
+      _posthog.setPersonProperties(
+        userPropertiesToSet: userPropertiesToSet,
+        userPropertiesToSetOnce: userPropertiesToSetOnce,
+      );
 
   /// Captures events.
   /// Docs https://posthog.com/docs/product-analytics/user-properties
@@ -260,11 +262,12 @@ class Posthog {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
-  }) => _posthog.group(
-    groupType: groupType,
-    groupKey: groupKey,
-    groupProperties: groupProperties,
-  );
+  }) =>
+      _posthog.group(
+        groupType: groupType,
+        groupKey: groupKey,
+        groupProperties: groupProperties,
+      );
 
   /// Returns the feature flag value for the given key.
   ///
@@ -293,7 +296,8 @@ class Posthog {
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult(
     String key, {
     bool sendEvent = true,
-  }) => _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
+  }) =>
+      _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
 
   /// Returns the payload for a feature flag.
   @Deprecated(
@@ -313,11 +317,12 @@ class Posthog {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
-  }) => _posthog.captureException(
-    error: error,
-    stackTrace: stackTrace,
-    properties: properties,
-  );
+  }) =>
+      _posthog.captureException(
+        error: error,
+        stackTrace: stackTrace,
+        properties: properties,
+      );
 
   /// Captures runZonedGuarded exceptions with optional custom properties
   /// https://api.flutter.dev/flutter/dart-async/runZonedGuarded.html

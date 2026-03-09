@@ -15,8 +15,8 @@ class RenderImageParser extends ElementParser {
   RenderImageParser({
     required Scaler scaler,
     required PositionCalculator positionCalculator,
-  }) : _scaler = scaler,
-       _positionCalculator = positionCalculator;
+  })  : _scaler = scaler,
+        _positionCalculator = positionCalculator;
 
   @override
   ElementGeometry? buildElementData(Element element) {

@@ -40,9 +40,7 @@ class ElementParser {
       // Using the container's RenderObject as ancestor ensures transforms are in
       // the screenshot's coordinate space, not absolute screen coordinates
       final ancestor = PostHogMaskController
-          .instance
-          .containerKey
-          .currentContext
+          .instance.containerKey.currentContext
           ?.findRenderObject();
       final transform = renderObject.getTransformTo(ancestor);
 

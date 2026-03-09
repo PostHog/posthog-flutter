@@ -76,8 +76,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       // We ignore the JS parameters and just invoke the void callback
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-            dartCallback();
-          }.toJS;
+        dartCallback();
+      }.toJS;
 
       ph.onFeatureFlags(jsCallback);
     }
@@ -144,8 +144,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         : null;
     final normalizedUserPropertiesSetOnce =
         extractedUserPropertiesSetOnce != null
-        ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
-        : null;
+            ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+            : null;
 
     return handleWebMethodCall(
       MethodCall('capture', {

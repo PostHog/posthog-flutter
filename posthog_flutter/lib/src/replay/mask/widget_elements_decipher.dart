@@ -15,9 +15,9 @@ class WidgetElementsDecipher {
     required ElementDataFactory elementDataFactory,
     required ElementObjectParser elementObjectParser,
     required RootElementProvider rootElementProvider,
-  }) : _elementDataFactory = elementDataFactory,
-       _elementObjectParser = elementObjectParser,
-       _rootElementProvider = rootElementProvider;
+  })  : _elementDataFactory = elementDataFactory,
+        _elementObjectParser = elementObjectParser,
+        _rootElementProvider = rootElementProvider;
 
   ElementData? parseRenderTree(BuildContext context) {
     final rootElement = _rootElementProvider.getRootElement(context);

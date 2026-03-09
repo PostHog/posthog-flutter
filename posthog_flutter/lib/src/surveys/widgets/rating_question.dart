@@ -173,9 +173,8 @@ class _RatingQuestionState extends State<RatingQuestion> {
             mainAxisAlignment: isThumbSurvey
                 ? MainAxisAlignment.spaceAround
                 : MainAxisAlignment.spaceBetween,
-            children: _ratingRange
-                .map((value) => _buildRatingButton(value))
-                .toList(),
+            children:
+                _ratingRange.map((value) => _buildRatingButton(value)).toList(),
           )
         else
           Container(

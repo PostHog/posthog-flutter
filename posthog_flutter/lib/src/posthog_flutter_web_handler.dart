@@ -240,12 +240,10 @@ List<String> extractSafariExtensionDetails(
   final isSafariWebExtension = filename.contains('safari-web-extension');
 
   if (isSafariExtension || isSafariWebExtension) {
-    final extractedFunction = filename.contains('@')
-        ? filename.split('@')[0]
-        : '<anonymous>';
-    final prefix = isSafariExtension
-        ? 'safari-extension:'
-        : 'safari-web-extension:';
+    final extractedFunction =
+        filename.contains('@') ? filename.split('@')[0] : '<anonymous>';
+    final prefix =
+        isSafariExtension ? 'safari-extension:' : 'safari-web-extension:';
     return [extractedFunction, '$prefix$filename'];
   }
 
@@ -450,7 +448,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final key = args['key'] as String;
       final isFeatureEnabled =
           posthog?.isFeatureEnabled(stringToJSAny(key))?.dartify() as bool? ??
-          false;
+              false;
       return isFeatureEnabled;
     case 'group':
       final groupType = args['groupType'] as String;

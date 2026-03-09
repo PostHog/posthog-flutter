@@ -7,8 +7,8 @@ import 'posthog_flutter_platform_interface.dart';
 ///
 /// Return a possibly modified event to send it, or return `null` to drop it.
 /// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback =
-    FutureOr<PostHogEvent?> Function(PostHogEvent event);
+typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+    PostHogEvent event);
 
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 

@@ -31,8 +31,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   PostHogErrorTrackingAutoCaptureIntegration._({
     required PostHogErrorTrackingConfig config,
     required PosthogFlutterPlatformInterface posthog,
-  }) : _config = config,
-       _posthog = posthog;
+  })  : _config = config,
+        _posthog = posthog;
 
   /// Install the autocapture integration (can only be installed once)
   static PostHogErrorTrackingAutoCaptureIntegration? install({

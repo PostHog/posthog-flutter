@@ -64,6 +64,7 @@ class PostHogFlutterSurveysDelegate(
             "shown" -> {
                 onSurveyShownCallback?.invoke(survey)
             }
+
             "response" -> {
                 val index = payload?.get("index") as? Int
                 val responsePayload = payload?.get("response")
@@ -79,11 +80,13 @@ class PostHogFlutterSurveysDelegate(
                                 val boolValue = responsePayload as? Boolean ?: false
                                 PostHogSurveyResponse.Link(boolValue)
                             }
+
                             is PostHogDisplayRatingQuestion -> {
                                 // For rating questions
                                 val ratingValue = responsePayload as? Int
                                 PostHogSurveyResponse.Rating(ratingValue)
                             }
+
                             is PostHogDisplayChoiceQuestion -> {
                                 // For single/multiple choice questions
                                 if (question.isMultipleChoice) {
@@ -98,6 +101,7 @@ class PostHogFlutterSurveysDelegate(
                                     PostHogSurveyResponse.SingleChoice(firstOption)
                                 }
                             }
+
                             else -> {
                                 // Default to open text question
                                 val textValue = responsePayload as? String
@@ -119,6 +123,7 @@ class PostHogFlutterSurveysDelegate(
                     return
                 }
             }
+
             "closed" -> {
                 onSurveyClosedCallback?.invoke(survey)
                 // Clear the callbacks after survey is closed

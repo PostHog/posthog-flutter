@@ -23,16 +23,16 @@ void main() {
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-          log.add(methodCall);
-          if (methodCall.method == 'isFeatureEnabled') {
-            return true;
-          }
-          // Simulate setup call success
-          if (methodCall.method == 'setup') {
-            return null;
-          }
-          return null;
-        });
+      log.add(methodCall);
+      if (methodCall.method == 'isFeatureEnabled') {
+        return true;
+      }
+      // Simulate setup call success
+      if (methodCall.method == 'setup') {
+        return null;
+      }
+      return null;
+    });
   });
 
   tearDown(() {
@@ -58,12 +58,12 @@ void main() {
         // To verify handler is set, we trigger the callback from native side
         await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .handlePlatformMessage(
-              channel.name,
-              channel.codec.encodeMethodCall(
-                const MethodCall('onFeatureFlagsCallback', {}),
-              ),
-              (ByteData? data) {},
-            );
+          channel.name,
+          channel.codec.encodeMethodCall(
+            const MethodCall('onFeatureFlagsCallback', {}),
+          ),
+          (ByteData? data) {},
+        );
         expect(callbackInvoked, isTrue);
         expect(log.any((call) => call.method == 'setup'), isTrue);
       },
@@ -89,12 +89,12 @@ void main() {
 
         await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .handlePlatformMessage(
-              channel.name,
-              channel.codec.encodeMethodCall(
-                MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-              ),
-              (ByteData? data) {},
-            );
+          channel.name,
+          channel.codec.encodeMethodCall(
+            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
+          ),
+          (ByteData? data) {},
+        );
 
         expect(callbackInvoked, isTrue);
       },
@@ -120,12 +120,12 @@ void main() {
 
         await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .handlePlatformMessage(
-              channel.name,
-              channel.codec.encodeMethodCall(
-                MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-              ),
-              (ByteData? data) {},
-            );
+          channel.name,
+          channel.codec.encodeMethodCall(
+            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
+          ),
+          (ByteData? data) {},
+        );
 
         expect(callbackInvoked, isTrue);
       },
@@ -148,12 +148,12 @@ void main() {
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
-            channel.name,
-            channel.codec.encodeMethodCall(
-              MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed),
-            ),
-            (ByteData? data) {},
-          );
+        channel.name,
+        channel.codec.encodeMethodCall(
+          MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed),
+        ),
+        (ByteData? data) {},
+      );
 
       expect(callbackInvoked, isTrue);
     });
@@ -166,12 +166,12 @@ void main() {
       // This should not throw - just silently do nothing
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
-            channel.name,
-            channel.codec.encodeMethodCall(
-              const MethodCall('onFeatureFlagsCallback', {}),
-            ),
-            (ByteData? data) {},
-          );
+        channel.name,
+        channel.codec.encodeMethodCall(
+          const MethodCall('onFeatureFlagsCallback', {}),
+        ),
+        (ByteData? data) {},
+      );
 
       // If we get here without exception, the test passes
       expect(true, isTrue);

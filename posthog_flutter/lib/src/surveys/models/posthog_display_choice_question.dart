@@ -17,10 +17,10 @@ class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
     super.optional,
     super.buttonText,
   }) : super(
-         type: isMultipleChoice
-             ? PostHogSurveyQuestionType.multipleChoice
-             : PostHogSurveyQuestionType.singleChoice,
-       );
+          type: isMultipleChoice
+              ? PostHogSurveyQuestionType.multipleChoice
+              : PostHogSurveyQuestionType.singleChoice,
+        );
 
   final List<String> choices;
   final bool isMultipleChoice;

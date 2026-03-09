@@ -136,13 +136,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         bool isSurveyCompleted = false;
 
         try {
-          final result =
-              await _methodChannel.invokeMethod('surveyAction', {
-                    'type': 'response',
-                    'index': index,
-                    'response': response,
-                  })
-                  as Map;
+          final result = await _methodChannel.invokeMethod('surveyAction', {
+            'type': 'response',
+            'index': index,
+            'response': response,
+          }) as Map;
           nextIndex = (result['nextIndex'] as num).toInt();
           isSurveyCompleted = result['isSurveyCompleted'] as bool;
         } on PlatformException catch (exception) {
@@ -299,8 +297,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           : null;
       final normalizedUserPropertiesSetOnce =
           extractedUserPropertiesSetOnce != null
-          ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
-          : null;
+              ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
+              : null;
 
       await _methodChannel.invokeMethod('capture', {
         'eventName': processedEvent.event,
@@ -352,7 +350,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     // Get the (possibly modified) screen name from properties and remove it
     final finalScreenName =
         processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
-        screenName;
+            screenName;
     // It will be added back by native sdk
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
 

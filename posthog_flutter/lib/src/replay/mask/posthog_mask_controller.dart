@@ -18,11 +18,11 @@ class PostHogMaskController {
   final WidgetElementsDecipher _widgetScraper;
 
   PostHogMaskController._privateConstructor(PostHogSessionReplayConfig? config)
-    : _widgetScraper = WidgetElementsDecipher(
-        elementDataFactory: ElementDataFactory(),
-        elementObjectParser: ElementObjectParser(),
-        rootElementProvider: RootElementProvider(),
-      ) {
+      : _widgetScraper = WidgetElementsDecipher(
+          elementDataFactory: ElementDataFactory(),
+          elementObjectParser: ElementObjectParser(),
+          rootElementProvider: RootElementProvider(),
+        ) {
     parsers = ElementParsersConst(
       DefaultElementParserFactory(),
       config,
@@ -31,8 +31,8 @@ class PostHogMaskController {
 
   static final PostHogMaskController instance =
       PostHogMaskController._privateConstructor(
-        Posthog().config?.sessionReplayConfig,
-      );
+    Posthog().config?.sessionReplayConfig,
+  );
 
   /// Extracts a flattened list of [ElementData] objects representing the
   /// renderable elements in the widget tree.

@@ -122,9 +122,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Find frames by package
       final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
@@ -156,9 +155,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Find frames by package
       final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
@@ -193,9 +191,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Find any frame from test_package
       final testFrame = frames.firstWhere(
@@ -454,9 +451,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Look for asynchronous gap frames
       final gapFrames = frames

@@ -68,10 +68,10 @@ class SurveyService {
         isDismissible: false,
         builder: (context) =>
             _buildSurveyWidget(survey, onShown, onResponse, (s) {
-              _isShowingSurvey = false;
-              _currentSurveyContext = null;
-              onClosed(s);
-            }),
+          _isShowingSurvey = false;
+          _currentSurveyContext = null;
+          onClosed(s);
+        }),
       );
     } catch (e) {
       printIfDebug('[PostHog] Error showing survey: $e');

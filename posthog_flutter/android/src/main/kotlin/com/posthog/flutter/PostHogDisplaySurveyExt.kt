@@ -33,6 +33,7 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                             questionMap["type"] = "link"
                             questionMap["link"] = question.link
                         }
+
                         is PostHogDisplayRatingQuestion -> {
                             questionMap["type"] = "rating"
                             questionMap["ratingType"] = question.ratingType.value
@@ -41,12 +42,14 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                             questionMap["lowerBoundLabel"] = question.lowerBoundLabel
                             questionMap["upperBoundLabel"] = question.upperBoundLabel
                         }
+
                         is PostHogDisplayChoiceQuestion -> {
                             questionMap["type"] = if (question.isMultipleChoice) "multiple_choice" else "single_choice"
                             questionMap["choices"] = question.choices
                             questionMap["hasOpenChoice"] = question.hasOpenChoice
                             questionMap["shuffleOptions"] = question.shuffleOptions
                         }
+
                         else -> {
                             questionMap["type"] = "open"
                         }

@@ -223,8 +223,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                             ConfirmationMessage(
                               onClose: _handleClose,
                               appearance: widget.appearance,
-                              thankYouMessageDescriptionContentType:
-                                  widget
+                              thankYouMessageDescriptionContentType: widget
                                       .survey
                                       .appearance
                                       ?.thankYouMessageDescriptionContentType ??
