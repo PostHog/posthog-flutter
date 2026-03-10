@@ -137,26 +137,31 @@ jobs:
           echo "New version: $NEW_VERSION"
 
       - name: Sync version to all platform files
-        run: ./scripts/bump-version.sh ${{ steps.apply-changesets.outputs.new-version }}
+        env:
+          NEW_VERSION: ${{ steps.apply-changesets.outputs.new-version }}
+        run: ./scripts/bump-version.sh "$NEW_VERSION"
 
       - name: Commit version bump
         id: commit-version-bump
+        env:
+          GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
+          NEW_VERSION: ${{ steps.apply-changesets.outputs.new-version }}
         run: |
           git add -A
           if git diff --staged --quiet; then
             echo "No changes to commit"
             echo "committed=false" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "chore: release ${{ steps.apply-changesets.outputs.new-version }} [version bump]"
+            git commit -m "chore: release $NEW_VERSION [version bump]"
             git push origin main
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
-        env:
-          GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
 
       - name: Save Slack thread_ts to cache
         if: steps.commit-version-bump.outputs.committed == 'true'
-        run: echo "${{ needs.notify-approval-needed.outputs.slack_ts }}" > .slack-thread-ts
+        env:
+          SLACK_THREAD_TS: ${{ needs.notify-approval-needed.outputs.slack_ts }}
+        run: echo "$SLACK_THREAD_TS" > .slack-thread-ts
 
       - name: Cache Slack thread_ts for publish workflow
         if: steps.commit-version-bump.outputs.committed == 'true'
@@ -167,11 +172,12 @@ jobs:
 
       - name: Tag and push
         if: steps.commit-version-bump.outputs.committed == 'true'
-        run: |
-          git tag -a "${{ steps.apply-changesets.outputs.new-version }}" -m "${{ steps.apply-changesets.outputs.new-version }}"
-          git push origin "${{ steps.apply-changesets.outputs.new-version }}"
         env:
           GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
+          NEW_VERSION: ${{ steps.apply-changesets.outputs.new-version }}
+        run: |
+          git tag -a "$NEW_VERSION" -m "$NEW_VERSION"
+          git push origin "$NEW_VERSION"
 
       - name: Notify Slack - Failed
         continue-on-error: true
