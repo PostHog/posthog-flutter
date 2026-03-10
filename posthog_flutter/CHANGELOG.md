@@ -1,5 +1,11 @@
 ## Next
 
+## 5.19.0
+
+### Minor Changes
+
+- 8f6b291: Add Swift Package Manager support for iOS and macOS
+
 ## 5.18.0
 
 ### Minor Changes
