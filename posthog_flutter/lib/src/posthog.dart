@@ -99,9 +99,10 @@ class Posthog {
     Map<String, Object>? userPropertiesSetOnce,
   }) =>
       _posthog.identify(
-          userId: userId,
-          userProperties: userProperties,
-          userPropertiesSetOnce: userPropertiesSetOnce);
+        userId: userId,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+      );
 
   /// Sets person properties for the current user without requiring identify.
   ///
@@ -182,22 +183,14 @@ class Posthog {
     Map<String, Object>? properties,
   }) {
     _currentScreen = screenName;
-    return _posthog.screen(
-      screenName: screenName,
-      properties: properties,
-    );
+    return _posthog.screen(screenName: screenName, properties: properties);
   }
 
   /// Creates an alias for the user.
   /// Docs https://posthog.com/docs/product-analytics/identify#alias-assigning-multiple-distinct-ids-to-the-same-user
   ///
   /// - [alias] the alias
-  Future<void> alias({
-    required String alias,
-  }) =>
-      _posthog.alias(
-        alias: alias,
-      );
+  Future<void> alias({required String alias}) => _posthog.alias(alias: alias);
 
   /// Returns the registered `distinctId` property
   Future<String> getDistinctId() => _posthog.getDistinctId();
@@ -300,13 +293,16 @@ class Posthog {
   ///   final payload = result.payload; // Associated payload data
   /// }
   /// ```
-  Future<PostHogFeatureFlagResult?> getFeatureFlagResult(String key,
-          {bool sendEvent = true}) =>
+  Future<PostHogFeatureFlagResult?> getFeatureFlagResult(
+    String key, {
+    bool sendEvent = true,
+  }) =>
       _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
 
   /// Returns the payload for a feature flag.
   @Deprecated(
-      'Use getFeatureFlagResult instead, which returns both value and payload.')
+    'Use getFeatureFlagResult instead, which returns both value and payload.',
+  )
   Future<Object?> getFeatureFlagPayload(String key) =>
       _posthog.getFeatureFlagPayload(key: key);
 
@@ -317,12 +313,16 @@ class Posthog {
   /// - [error] - The error/exception to capture
   /// - [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
   /// - [properties] - Optional custom properties to attach to the exception event
-  Future<void> captureException(
-          {required Object error,
-          StackTrace? stackTrace,
-          Map<String, Object>? properties}) =>
+  Future<void> captureException({
+    required Object error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+  }) =>
       _posthog.captureException(
-          error: error, stackTrace: stackTrace, properties: properties);
+        error: error,
+        stackTrace: stackTrace,
+        properties: properties,
+      );
 
   /// Captures runZonedGuarded exceptions with optional custom properties
   /// https://api.flutter.dev/flutter/dart-async/runZonedGuarded.html
@@ -330,14 +330,21 @@ class Posthog {
   /// - [error] - The error/exception to capture
   /// - [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
   /// - [properties] - Optional custom properties to attach to the exception event
-  Future<void> captureRunZonedGuardedError(
-      {required Object error,
-      StackTrace? stackTrace,
-      Map<String, Object>? properties}) async {
+  Future<void> captureRunZonedGuardedError({
+    required Object error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+  }) async {
     final wrappedError = PostHogException(
-        source: error, mechanism: 'runZonedGuarded', handled: false);
+      source: error,
+      mechanism: 'runZonedGuarded',
+      handled: false,
+    );
     await _posthog.captureException(
-        error: wrappedError, stackTrace: stackTrace, properties: properties);
+      error: wrappedError,
+      stackTrace: stackTrace,
+      properties: properties,
+    );
   }
 
   /// Closes the PostHog SDK and cleans up resources.

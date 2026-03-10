@@ -12,7 +12,5 @@ class PostHogDisplayOpenQuestion extends PostHogDisplaySurveyQuestion {
     super.descriptionContentType,
     super.optional,
     super.buttonText,
-  }) : super(
-          type: PostHogSurveyQuestionType.openText,
-        );
+  }) : super(type: PostHogSurveyQuestionType.openText);
 }

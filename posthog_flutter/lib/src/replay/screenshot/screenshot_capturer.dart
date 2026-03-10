@@ -24,8 +24,15 @@ class ImageInfo {
   final bool shouldSendMetaEvent;
   final Uint8List imageBytes;
 
-  ImageInfo(this.id, this.x, this.y, this.width, this.height,
-      this.shouldSendMetaEvent, this.imageBytes);
+  ImageInfo(
+    this.id,
+    this.x,
+    this.y,
+    this.width,
+    this.height,
+    this.shouldSendMetaEvent,
+    this.imageBytes,
+  );
 }
 
 class ViewTreeSnapshotStatus {
@@ -54,8 +61,10 @@ class ScreenshotCapturer {
     return min(width / srcWidth, height / srcHeight);
   }
 
-  Future<Uint8List?> _getImageBytes(ui.Image img,
-      {ui.ImageByteFormat format = ui.ImageByteFormat.png}) async {
+  Future<Uint8List?> _getImageBytes(
+    ui.Image img, {
+    ui.ImageByteFormat format = ui.ImageByteFormat.png,
+  }) async {
     try {
       final ByteData? byteData = await img.toByteData(format: format);
       if (byteData == null || byteData.lengthInBytes == 0) {
@@ -96,8 +105,10 @@ class ScreenshotCapturer {
     try {
       final srcWidth = renderObject.size.width;
       final srcHeight = renderObject.size.height;
-      final pixelRatio =
-          _getPixelRatio(srcWidth: srcWidth, srcHeight: srcHeight);
+      final pixelRatio = _getPixelRatio(
+        srcWidth: srcWidth,
+        srcHeight: srcHeight,
+      );
 
       final syncImage = renderObject.toImage(pixelRatio: pixelRatio);
 
@@ -134,11 +145,14 @@ class ScreenshotCapturer {
         final canvas = Canvas(recorder);
 
         // using rawRgba for the diff check because it is faster than png encoding
-        Uint8List? imageBytes =
-            await _getImageBytes(image, format: ui.ImageByteFormat.rawRgba);
+        Uint8List? imageBytes = await _getImageBytes(
+          image,
+          format: ui.ImageByteFormat.rawRgba,
+        );
         if (imageBytes == null || imageBytes.isEmpty) {
           printIfDebug(
-              'Error: Failed to convert image byte data to Uint8List.');
+            'Error: Failed to convert image byte data to Uint8List.',
+          );
           recorder.endRecording().dispose();
           image.dispose();
           completer.complete(null);
@@ -147,7 +161,8 @@ class ScreenshotCapturer {
 
         if (const PHListEquality().equals(imageBytes, statusView.imageBytes)) {
           printIfDebug(
-              'Debug: Snapshot is the same as the last one, nothing changed, do nothing.');
+            'Debug: Snapshot is the same as the last one, nothing changed, do nothing.',
+          );
           recorder.endRecording().dispose();
           image.dispose();
           completer.complete(null);
@@ -165,14 +180,19 @@ class ScreenshotCapturer {
         if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
           if (elementsDataWidgets != null && elementsDataWidgets.isNotEmpty) {
             _imageMaskPainter.drawMaskedImage(
-                canvas, elementsDataWidgets, pixelRatio);
+              canvas,
+              elementsDataWidgets,
+              pixelRatio,
+            );
           }
 
           final picture = recorder.endRecording();
 
           try {
-            final finalImage =
-                await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
+            final finalImage = await picture.toImage(
+              srcWidth.toInt(),
+              srcHeight.toInt(),
+            );
 
             if (!finalImage.isValidSize) {
               finalImage.dispose();
@@ -199,8 +219,10 @@ class ScreenshotCapturer {
                 shouldSendMetaEvent,
                 maskedImagePngBytes,
               );
-              _snapshotManager.updateStatus(renderObject,
-                  shouldSendMetaEvent: shouldSendMetaEvent);
+              _snapshotManager.updateStatus(
+                renderObject,
+                shouldSendMetaEvent: shouldSendMetaEvent,
+              );
               completer.complete(imageInfo);
             } finally {
               finalImage.dispose();
@@ -212,14 +234,19 @@ class ScreenshotCapturer {
           if (postHogWidgetWrapperElements != null &&
               postHogWidgetWrapperElements.isNotEmpty) {
             _imageMaskPainter.drawMaskedImageWrapper(
-                canvas, postHogWidgetWrapperElements, pixelRatio);
+              canvas,
+              postHogWidgetWrapperElements,
+              pixelRatio,
+            );
           }
 
           final picture = recorder.endRecording();
 
           try {
-            final finalImage =
-                await picture.toImage(srcWidth.toInt(), srcHeight.toInt());
+            final finalImage = await picture.toImage(
+              srcWidth.toInt(),
+              srcHeight.toInt(),
+            );
 
             if (!finalImage.isValidSize) {
               finalImage.dispose();
@@ -246,8 +273,10 @@ class ScreenshotCapturer {
                 shouldSendMetaEvent,
                 pngBytes,
               );
-              _snapshotManager.updateStatus(renderObject,
-                  shouldSendMetaEvent: shouldSendMetaEvent);
+              _snapshotManager.updateStatus(
+                renderObject,
+                shouldSendMetaEvent: shouldSendMetaEvent,
+              );
               completer.complete(imageInfo);
             } finally {
               finalImage.dispose();

@@ -19,11 +19,7 @@ class ElementDataFactory {
           ?.findRenderObject();
       final transform = renderObject.getTransformTo(ancestor);
 
-      return ElementData(
-        type: type,
-        rect: localRect,
-        transform: transform,
-      );
+      return ElementData(type: type, rect: localRect, transform: transform);
     }
     return null;
   }

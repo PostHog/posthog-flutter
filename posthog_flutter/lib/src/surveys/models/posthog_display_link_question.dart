@@ -13,9 +13,7 @@ class PostHogDisplayLinkQuestion extends PostHogDisplaySurveyQuestion {
     super.descriptionContentType,
     super.optional,
     super.buttonText,
-  }) : super(
-          type: PostHogSurveyQuestionType.link,
-        );
+  }) : super(type: PostHogSurveyQuestionType.link);
 
   final String link;
 }

@@ -701,145 +701,547 @@ class MyPainter extends CustomPainter {
     paint.color = Color(0xffffffff).withValues(alpha: 0);
     path = Path();
     path.lineTo(size.width * 0.6, -0.33);
-    path.cubicTo(size.width * 0.65, -0.33, size.width * 0.69, -0.34,
-        size.width * 0.73, -0.36);
-    path.cubicTo(size.width * 0.77, -0.38, size.width * 0.81, -0.41,
-        size.width * 0.83, -0.45);
-    path.cubicTo(size.width * 0.84, -0.46, size.width * 0.83, -0.47,
-        size.width * 0.83, -0.48);
-    path.cubicTo(size.width * 0.82, -0.49, size.width * 0.82, -0.49,
-        size.width * 0.8, -0.49);
-    path.cubicTo(size.width * 0.8, -0.49, size.width * 0.4, -0.49,
-        size.width * 0.4, -0.49);
-    path.cubicTo(size.width * 0.38, -0.49, size.width * 0.38, -0.49,
-        size.width * 0.37, -0.48);
-    path.cubicTo(size.width * 0.37, -0.47, size.width * 0.37, -0.46,
-        size.width * 0.37, -0.45);
-    path.cubicTo(size.width * 0.4, -0.41, size.width * 0.43, -0.38,
-        size.width * 0.47, -0.36);
-    path.cubicTo(size.width * 0.51, -0.34, size.width * 0.55, -0.33,
-        size.width * 0.6, -0.33);
-    path.cubicTo(size.width * 0.6, -0.33, size.width * 0.6, -0.33,
-        size.width * 0.6, -0.33);
+    path.cubicTo(
+      size.width * 0.65,
+      -0.33,
+      size.width * 0.69,
+      -0.34,
+      size.width * 0.73,
+      -0.36,
+    );
+    path.cubicTo(
+      size.width * 0.77,
+      -0.38,
+      size.width * 0.81,
+      -0.41,
+      size.width * 0.83,
+      -0.45,
+    );
+    path.cubicTo(
+      size.width * 0.84,
+      -0.46,
+      size.width * 0.83,
+      -0.47,
+      size.width * 0.83,
+      -0.48,
+    );
+    path.cubicTo(
+      size.width * 0.82,
+      -0.49,
+      size.width * 0.82,
+      -0.49,
+      size.width * 0.8,
+      -0.49,
+    );
+    path.cubicTo(
+      size.width * 0.8,
+      -0.49,
+      size.width * 0.4,
+      -0.49,
+      size.width * 0.4,
+      -0.49,
+    );
+    path.cubicTo(
+      size.width * 0.38,
+      -0.49,
+      size.width * 0.38,
+      -0.49,
+      size.width * 0.37,
+      -0.48,
+    );
+    path.cubicTo(
+      size.width * 0.37,
+      -0.47,
+      size.width * 0.37,
+      -0.46,
+      size.width * 0.37,
+      -0.45,
+    );
+    path.cubicTo(
+      size.width * 0.4,
+      -0.41,
+      size.width * 0.43,
+      -0.38,
+      size.width * 0.47,
+      -0.36,
+    );
+    path.cubicTo(
+      size.width * 0.51,
+      -0.34,
+      size.width * 0.55,
+      -0.33,
+      size.width * 0.6,
+      -0.33,
+    );
+    path.cubicTo(
+      size.width * 0.6,
+      -0.33,
+      size.width * 0.6,
+      -0.33,
+      size.width * 0.6,
+      -0.33,
+    );
     path.lineTo(size.width * 0.43, -0.72);
-    path.cubicTo(size.width * 0.43, -0.72, size.width * 0.47, -0.69,
-        size.width * 0.47, -0.69);
-    path.cubicTo(size.width * 0.47, -0.68, size.width * 0.48, -0.68,
-        size.width * 0.49, -0.68);
-    path.cubicTo(size.width / 2, -0.68, size.width * 0.51, -0.68,
-        size.width * 0.51, -0.69);
-    path.cubicTo(size.width * 0.52, -0.7, size.width * 0.52, -0.7,
-        size.width * 0.52, -0.71);
-    path.cubicTo(size.width * 0.52, -0.72, size.width * 0.52, -0.73,
-        size.width * 0.51, -0.73);
-    path.cubicTo(size.width * 0.51, -0.73, size.width * 0.46, -0.79,
-        size.width * 0.46, -0.79);
-    path.cubicTo(size.width * 0.45, -0.79, size.width * 0.44, -0.8,
-        size.width * 0.43, -0.8);
-    path.cubicTo(size.width * 0.42, -0.8, size.width * 0.42, -0.79,
-        size.width * 0.41, -0.79);
-    path.cubicTo(size.width * 0.41, -0.79, size.width * 0.36, -0.73,
-        size.width * 0.36, -0.73);
-    path.cubicTo(size.width * 0.35, -0.73, size.width * 0.35, -0.72,
-        size.width * 0.35, -0.71);
-    path.cubicTo(size.width * 0.35, -0.7, size.width * 0.35, -0.7,
-        size.width * 0.36, -0.69);
-    path.cubicTo(size.width * 0.36, -0.68, size.width * 0.37, -0.68,
-        size.width * 0.38, -0.68);
-    path.cubicTo(size.width * 0.39, -0.68, size.width * 0.39, -0.68,
-        size.width * 0.4, -0.69);
-    path.cubicTo(size.width * 0.4, -0.69, size.width * 0.43, -0.72,
-        size.width * 0.43, -0.72);
-    path.cubicTo(size.width * 0.43, -0.72, size.width * 0.43, -0.72,
-        size.width * 0.43, -0.72);
+    path.cubicTo(
+      size.width * 0.43,
+      -0.72,
+      size.width * 0.47,
+      -0.69,
+      size.width * 0.47,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.47,
+      -0.68,
+      size.width * 0.48,
+      -0.68,
+      size.width * 0.49,
+      -0.68,
+    );
+    path.cubicTo(
+      size.width / 2,
+      -0.68,
+      size.width * 0.51,
+      -0.68,
+      size.width * 0.51,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.52,
+      -0.7,
+      size.width * 0.52,
+      -0.7,
+      size.width * 0.52,
+      -0.71,
+    );
+    path.cubicTo(
+      size.width * 0.52,
+      -0.72,
+      size.width * 0.52,
+      -0.73,
+      size.width * 0.51,
+      -0.73,
+    );
+    path.cubicTo(
+      size.width * 0.51,
+      -0.73,
+      size.width * 0.46,
+      -0.79,
+      size.width * 0.46,
+      -0.79,
+    );
+    path.cubicTo(
+      size.width * 0.45,
+      -0.79,
+      size.width * 0.44,
+      -0.8,
+      size.width * 0.43,
+      -0.8,
+    );
+    path.cubicTo(
+      size.width * 0.42,
+      -0.8,
+      size.width * 0.42,
+      -0.79,
+      size.width * 0.41,
+      -0.79,
+    );
+    path.cubicTo(
+      size.width * 0.41,
+      -0.79,
+      size.width * 0.36,
+      -0.73,
+      size.width * 0.36,
+      -0.73,
+    );
+    path.cubicTo(
+      size.width * 0.35,
+      -0.73,
+      size.width * 0.35,
+      -0.72,
+      size.width * 0.35,
+      -0.71,
+    );
+    path.cubicTo(
+      size.width * 0.35,
+      -0.7,
+      size.width * 0.35,
+      -0.7,
+      size.width * 0.36,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.36,
+      -0.68,
+      size.width * 0.37,
+      -0.68,
+      size.width * 0.38,
+      -0.68,
+    );
+    path.cubicTo(
+      size.width * 0.39,
+      -0.68,
+      size.width * 0.39,
+      -0.68,
+      size.width * 0.4,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.4,
+      -0.69,
+      size.width * 0.43,
+      -0.72,
+      size.width * 0.43,
+      -0.72,
+    );
+    path.cubicTo(
+      size.width * 0.43,
+      -0.72,
+      size.width * 0.43,
+      -0.72,
+      size.width * 0.43,
+      -0.72,
+    );
     path.lineTo(size.width * 0.77, -0.72);
-    path.cubicTo(size.width * 0.77, -0.72, size.width * 0.8, -0.69,
-        size.width * 0.8, -0.69);
-    path.cubicTo(size.width * 0.81, -0.68, size.width * 0.82, -0.68,
-        size.width * 0.82, -0.68);
-    path.cubicTo(size.width * 0.83, -0.68, size.width * 0.84, -0.68,
-        size.width * 0.85, -0.69);
-    path.cubicTo(size.width * 0.85, -0.7, size.width * 0.86, -0.7,
-        size.width * 0.86, -0.71);
-    path.cubicTo(size.width * 0.86, -0.72, size.width * 0.85, -0.73,
-        size.width * 0.85, -0.73);
-    path.cubicTo(size.width * 0.85, -0.73, size.width * 0.79, -0.79,
-        size.width * 0.79, -0.79);
-    path.cubicTo(size.width * 0.79, -0.79, size.width * 0.78, -0.8,
-        size.width * 0.77, -0.8);
-    path.cubicTo(size.width * 0.76, -0.8, size.width * 0.75, -0.79,
-        size.width * 0.74, -0.79);
-    path.cubicTo(size.width * 0.74, -0.79, size.width * 0.69, -0.73,
-        size.width * 0.69, -0.73);
-    path.cubicTo(size.width * 0.68, -0.73, size.width * 0.68, -0.72,
-        size.width * 0.68, -0.71);
-    path.cubicTo(size.width * 0.68, -0.7, size.width * 0.68, -0.7,
-        size.width * 0.69, -0.69);
-    path.cubicTo(size.width * 0.7, -0.68, size.width * 0.7, -0.68,
-        size.width * 0.71, -0.68);
-    path.cubicTo(size.width * 0.72, -0.68, size.width * 0.73, -0.68,
-        size.width * 0.73, -0.69);
-    path.cubicTo(size.width * 0.73, -0.69, size.width * 0.77, -0.72,
-        size.width * 0.77, -0.72);
-    path.cubicTo(size.width * 0.77, -0.72, size.width * 0.77, -0.72,
-        size.width * 0.77, -0.72);
+    path.cubicTo(
+      size.width * 0.77,
+      -0.72,
+      size.width * 0.8,
+      -0.69,
+      size.width * 0.8,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.81,
+      -0.68,
+      size.width * 0.82,
+      -0.68,
+      size.width * 0.82,
+      -0.68,
+    );
+    path.cubicTo(
+      size.width * 0.83,
+      -0.68,
+      size.width * 0.84,
+      -0.68,
+      size.width * 0.85,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.85,
+      -0.7,
+      size.width * 0.86,
+      -0.7,
+      size.width * 0.86,
+      -0.71,
+    );
+    path.cubicTo(
+      size.width * 0.86,
+      -0.72,
+      size.width * 0.85,
+      -0.73,
+      size.width * 0.85,
+      -0.73,
+    );
+    path.cubicTo(
+      size.width * 0.85,
+      -0.73,
+      size.width * 0.79,
+      -0.79,
+      size.width * 0.79,
+      -0.79,
+    );
+    path.cubicTo(
+      size.width * 0.79,
+      -0.79,
+      size.width * 0.78,
+      -0.8,
+      size.width * 0.77,
+      -0.8,
+    );
+    path.cubicTo(
+      size.width * 0.76,
+      -0.8,
+      size.width * 0.75,
+      -0.79,
+      size.width * 0.74,
+      -0.79,
+    );
+    path.cubicTo(
+      size.width * 0.74,
+      -0.79,
+      size.width * 0.69,
+      -0.73,
+      size.width * 0.69,
+      -0.73,
+    );
+    path.cubicTo(
+      size.width * 0.68,
+      -0.73,
+      size.width * 0.68,
+      -0.72,
+      size.width * 0.68,
+      -0.71,
+    );
+    path.cubicTo(
+      size.width * 0.68,
+      -0.7,
+      size.width * 0.68,
+      -0.7,
+      size.width * 0.69,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.7,
+      -0.68,
+      size.width * 0.7,
+      -0.68,
+      size.width * 0.71,
+      -0.68,
+    );
+    path.cubicTo(
+      size.width * 0.72,
+      -0.68,
+      size.width * 0.73,
+      -0.68,
+      size.width * 0.73,
+      -0.69,
+    );
+    path.cubicTo(
+      size.width * 0.73,
+      -0.69,
+      size.width * 0.77,
+      -0.72,
+      size.width * 0.77,
+      -0.72,
+    );
+    path.cubicTo(
+      size.width * 0.77,
+      -0.72,
+      size.width * 0.77,
+      -0.72,
+      size.width * 0.77,
+      -0.72,
+    );
     path.lineTo(size.width * 0.6, -0.1);
-    path.cubicTo(size.width * 0.53, -0.1, size.width * 0.47, -0.11,
-        size.width * 0.41, -0.14);
-    path.cubicTo(size.width * 0.34, -0.17, size.width * 0.29, -0.2,
-        size.width / 4, -0.25);
-    path.cubicTo(size.width / 5, -0.29, size.width * 0.17, -0.34,
-        size.width * 0.14, -0.4);
-    path.cubicTo(size.width * 0.11, -0.47, size.width * 0.1, -0.53,
-        size.width * 0.1, -0.6);
-    path.cubicTo(size.width * 0.1, -0.67, size.width * 0.11, -0.73,
-        size.width * 0.14, -0.79);
     path.cubicTo(
-        size.width * 0.17, -0.86, size.width / 5, -0.91, size.width / 4, -0.95);
-    path.cubicTo(size.width * 0.29, -1, size.width * 0.34, -1.03,
-        size.width * 0.41, -1.06);
-    path.cubicTo(size.width * 0.47, -1.09, size.width * 0.53, -1.1,
-        size.width * 0.6, -1.1);
-    path.cubicTo(size.width * 0.67, -1.1, size.width * 0.73, -1.09,
-        size.width * 0.8, -1.06);
-    path.cubicTo(size.width * 0.86, -1.03, size.width * 0.91, -1,
-        size.width * 0.95, -0.95);
+      size.width * 0.53,
+      -0.1,
+      size.width * 0.47,
+      -0.11,
+      size.width * 0.41,
+      -0.14,
+    );
     path.cubicTo(
-        size.width, -0.91, size.width * 1.03, -0.86, size.width * 1.06, -0.79);
-    path.cubicTo(size.width * 1.09, -0.73, size.width * 1.1, -0.67,
-        size.width * 1.1, -0.6);
-    path.cubicTo(size.width * 1.1, -0.53, size.width * 1.09, -0.47,
-        size.width * 1.06, -0.4);
+      size.width * 0.34,
+      -0.17,
+      size.width * 0.29,
+      -0.2,
+      size.width / 4,
+      -0.25,
+    );
     path.cubicTo(
-        size.width * 1.03, -0.34, size.width, -0.29, size.width * 0.95, -0.25);
-    path.cubicTo(size.width * 0.91, -0.2, size.width * 0.86, -0.17,
-        size.width * 0.8, -0.14);
-    path.cubicTo(size.width * 0.73, -0.11, size.width * 0.67, -0.1,
-        size.width * 0.6, -0.1);
+      size.width / 5,
+      -0.29,
+      size.width * 0.17,
+      -0.34,
+      size.width * 0.14,
+      -0.4,
+    );
     path.cubicTo(
-        size.width * 0.6, -0.1, size.width * 0.6, -0.1, size.width * 0.6, -0.1);
+      size.width * 0.11,
+      -0.47,
+      size.width * 0.1,
+      -0.53,
+      size.width * 0.1,
+      -0.6,
+    );
+    path.cubicTo(
+      size.width * 0.1,
+      -0.67,
+      size.width * 0.11,
+      -0.73,
+      size.width * 0.14,
+      -0.79,
+    );
+    path.cubicTo(
+      size.width * 0.17,
+      -0.86,
+      size.width / 5,
+      -0.91,
+      size.width / 4,
+      -0.95,
+    );
+    path.cubicTo(
+      size.width * 0.29,
+      -1,
+      size.width * 0.34,
+      -1.03,
+      size.width * 0.41,
+      -1.06,
+    );
+    path.cubicTo(
+      size.width * 0.47,
+      -1.09,
+      size.width * 0.53,
+      -1.1,
+      size.width * 0.6,
+      -1.1,
+    );
+    path.cubicTo(
+      size.width * 0.67,
+      -1.1,
+      size.width * 0.73,
+      -1.09,
+      size.width * 0.8,
+      -1.06,
+    );
+    path.cubicTo(
+      size.width * 0.86,
+      -1.03,
+      size.width * 0.91,
+      -1,
+      size.width * 0.95,
+      -0.95,
+    );
+    path.cubicTo(
+      size.width,
+      -0.91,
+      size.width * 1.03,
+      -0.86,
+      size.width * 1.06,
+      -0.79,
+    );
+    path.cubicTo(
+      size.width * 1.09,
+      -0.73,
+      size.width * 1.1,
+      -0.67,
+      size.width * 1.1,
+      -0.6,
+    );
+    path.cubicTo(
+      size.width * 1.1,
+      -0.53,
+      size.width * 1.09,
+      -0.47,
+      size.width * 1.06,
+      -0.4,
+    );
+    path.cubicTo(
+      size.width * 1.03,
+      -0.34,
+      size.width,
+      -0.29,
+      size.width * 0.95,
+      -0.25,
+    );
+    path.cubicTo(
+      size.width * 0.91,
+      -0.2,
+      size.width * 0.86,
+      -0.17,
+      size.width * 0.8,
+      -0.14,
+    );
+    path.cubicTo(
+      size.width * 0.73,
+      -0.11,
+      size.width * 0.67,
+      -0.1,
+      size.width * 0.6,
+      -0.1,
+    );
+    path.cubicTo(
+      size.width * 0.6,
+      -0.1,
+      size.width * 0.6,
+      -0.1,
+      size.width * 0.6,
+      -0.1,
+    );
     path.lineTo(size.width * 0.6, -0.6);
     path.cubicTo(
-        size.width * 0.6, -0.6, size.width * 0.6, -0.6, size.width * 0.6, -0.6);
+      size.width * 0.6,
+      -0.6,
+      size.width * 0.6,
+      -0.6,
+      size.width * 0.6,
+      -0.6,
+    );
     path.lineTo(size.width * 0.6, -0.17);
-    path.cubicTo(size.width * 0.72, -0.17, size.width * 0.82, -0.22,
-        size.width * 0.9, -0.3);
-    path.cubicTo(size.width * 0.98, -0.38, size.width * 1.03, -0.48,
-        size.width * 1.03, -0.6);
-    path.cubicTo(size.width * 1.03, -0.72, size.width * 0.98, -0.82,
-        size.width * 0.9, -0.9);
-    path.cubicTo(size.width * 0.82, -0.98, size.width * 0.72, -1.02,
-        size.width * 0.6, -1.02);
-    path.cubicTo(size.width * 0.48, -1.02, size.width * 0.38, -0.98,
-        size.width * 0.3, -0.9);
-    path.cubicTo(size.width * 0.22, -0.82, size.width * 0.18, -0.72,
-        size.width * 0.18, -0.6);
-    path.cubicTo(size.width * 0.18, -0.48, size.width * 0.22, -0.38,
-        size.width * 0.3, -0.3);
-    path.cubicTo(size.width * 0.38, -0.22, size.width * 0.48, -0.17,
-        size.width * 0.6, -0.17);
-    path.cubicTo(size.width * 0.6, -0.17, size.width * 0.6, -0.17,
-        size.width * 0.6, -0.17);
+    path.cubicTo(
+      size.width * 0.72,
+      -0.17,
+      size.width * 0.82,
+      -0.22,
+      size.width * 0.9,
+      -0.3,
+    );
+    path.cubicTo(
+      size.width * 0.98,
+      -0.38,
+      size.width * 1.03,
+      -0.48,
+      size.width * 1.03,
+      -0.6,
+    );
+    path.cubicTo(
+      size.width * 1.03,
+      -0.72,
+      size.width * 0.98,
+      -0.82,
+      size.width * 0.9,
+      -0.9,
+    );
+    path.cubicTo(
+      size.width * 0.82,
+      -0.98,
+      size.width * 0.72,
+      -1.02,
+      size.width * 0.6,
+      -1.02,
+    );
+    path.cubicTo(
+      size.width * 0.48,
+      -1.02,
+      size.width * 0.38,
+      -0.98,
+      size.width * 0.3,
+      -0.9,
+    );
+    path.cubicTo(
+      size.width * 0.22,
+      -0.82,
+      size.width * 0.18,
+      -0.72,
+      size.width * 0.18,
+      -0.6,
+    );
+    path.cubicTo(
+      size.width * 0.18,
+      -0.48,
+      size.width * 0.22,
+      -0.38,
+      size.width * 0.3,
+      -0.3,
+    );
+    path.cubicTo(
+      size.width * 0.38,
+      -0.22,
+      size.width * 0.48,
+      -0.17,
+      size.width * 0.6,
+      -0.17,
+    );
+    path.cubicTo(
+      size.width * 0.6,
+      -0.17,
+      size.width * 0.6,
+      -0.17,
+      size.width * 0.6,
+      -0.17,
+    );
     canvas.drawPath(path, paint);
   }
 

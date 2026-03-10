@@ -18,9 +18,7 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
     super.descriptionContentType,
     super.optional,
     super.buttonText,
-  }) : super(
-          type: PostHogSurveyQuestionType.rating,
-        );
+  }) : super(type: PostHogSurveyQuestionType.rating);
 
   final PostHogDisplaySurveyRatingType ratingType;
   final int scaleLowerBound;

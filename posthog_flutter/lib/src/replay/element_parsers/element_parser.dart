@@ -16,10 +16,11 @@ class ElementParser {
     }
 
     final thisElementData = ElementData(
-        type: element.widget.runtimeType.toString(),
-        rect: result.rect,
-        widget: element.widget,
-        transform: result.transform);
+      type: element.widget.runtimeType.toString(),
+      rect: result.rect,
+      widget: element.widget,
+      transform: result.transform,
+    );
 
     return thisElementData;
   }

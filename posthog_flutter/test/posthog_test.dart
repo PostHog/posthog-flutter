@@ -16,21 +16,24 @@ void main() {
     });
 
     test(
-        'setup passes config and onFeatureFlags callback to platform interface',
-        () async {
-      void testCallback() {}
+      'setup passes config and onFeatureFlags callback to platform interface',
+      () async {
+        void testCallback() {}
 
-      final config = PostHogConfig(
-        'test_api_key',
-        onFeatureFlags: testCallback,
-      );
+        final config = PostHogConfig(
+          'test_api_key',
+          onFeatureFlags: testCallback,
+        );
 
-      await Posthog().setup(config);
+        await Posthog().setup(config);
 
-      expect(fakePlatformInterface.receivedConfig, equals(config));
-      expect(fakePlatformInterface.registeredOnFeatureFlagsCallback,
-          equals(testCallback));
-    });
+        expect(fakePlatformInterface.receivedConfig, equals(config));
+        expect(
+          fakePlatformInterface.registeredOnFeatureFlagsCallback,
+          equals(testCallback),
+        );
+      },
+    );
   });
 
   group('getFeatureFlagResult', () {
@@ -102,7 +105,7 @@ void main() {
       fakePlatformInterface.featureFlagPayloads['multi-with-payload'] = [
         1,
         2,
-        3
+        3,
       ];
 
       final result = await Posthog().getFeatureFlagResult('multi-with-payload');
@@ -129,8 +132,10 @@ void main() {
 
       await Posthog().getFeatureFlagResult('test');
 
-      expect(fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
-          isTrue);
+      expect(
+        fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
+        isTrue,
+      );
     });
 
     test('passes sendEvent=false when specified', () async {
@@ -138,8 +143,10 @@ void main() {
 
       await Posthog().getFeatureFlagResult('test', sendEvent: false);
 
-      expect(fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
-          isFalse);
+      expect(
+        fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
+        isFalse,
+      );
     });
   });
 
@@ -235,7 +242,8 @@ void main() {
       expect(
         result.toString(),
         equals(
-            'PostHogFeatureFlagResult(key: my-flag, enabled: true, variant: test, payload: null)'),
+          'PostHogFeatureFlagResult(key: my-flag, enabled: true, variant: test, payload: null)',
+        ),
       );
     });
 
@@ -267,11 +275,7 @@ void main() {
     });
 
     test('fromMap uses fallback key when map key is null', () {
-      final map = {
-        'enabled': true,
-        'variant': null,
-        'payload': null,
-      };
+      final map = {'enabled': true, 'variant': null, 'payload': null};
 
       final result = PostHogFeatureFlagResult.fromMap(map, 'fallback-key');
 
@@ -280,9 +284,7 @@ void main() {
     });
 
     test('fromMap defaults enabled to false when not in map', () {
-      final map = <String, dynamic>{
-        'key': 'my-flag',
-      };
+      final map = <String, dynamic>{'key': 'my-flag'};
 
       final result = PostHogFeatureFlagResult.fromMap(map, 'fallback');
 

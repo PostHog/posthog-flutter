@@ -53,11 +53,13 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     StackTrace? stackTrace,
     Map<String, Object>? properties,
   }) async {
-    capturedExceptions.add(CapturedExceptionCall(
-      error: error,
-      stackTrace: stackTrace,
-      properties: properties,
-    ));
+    capturedExceptions.add(
+      CapturedExceptionCall(
+        error: error,
+        stackTrace: stackTrace,
+        properties: properties,
+      ),
+    );
   }
 
   @override

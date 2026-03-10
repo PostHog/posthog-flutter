@@ -61,9 +61,9 @@ class _DefaultEquality<E> implements _Equality<E> {
 /// The [hash] of `null` is `null.hashCode`.
 class PHListEquality<E> implements _Equality<List<E>> {
   final _Equality<E> _elementEquality;
-  const PHListEquality(
-      [_Equality<E> elementEquality = const _DefaultEquality<Never>()])
-      : _elementEquality = elementEquality;
+  const PHListEquality([
+    _Equality<E> elementEquality = const _DefaultEquality<Never>(),
+  ]) : _elementEquality = elementEquality;
 
   @override
   bool equals(List<E>? list1, List<E>? list2) {

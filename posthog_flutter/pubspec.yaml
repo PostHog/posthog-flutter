@@ -50,8 +50,10 @@ flutter:
         pluginClass: PosthogFlutterPlugin
       ios:
         pluginClass: PosthogFlutterPlugin
+        sharedDarwinSource: true
       macos:
         pluginClass: PosthogFlutterPlugin
+        sharedDarwinSource: true
       web:
         pluginClass: PosthogFlutterWeb
         fileName: posthog_flutter_web.dart

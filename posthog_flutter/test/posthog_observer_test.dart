@@ -25,11 +25,14 @@ void main() {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
   });
 
-  PosthogObserver getSut(
-      {ScreenNameExtractor nameExtractor = defaultNameExtractor,
-      PostHogRouteFilter routeFilter = defaultPostHogRouteFilter}) {
+  PosthogObserver getSut({
+    ScreenNameExtractor nameExtractor = defaultNameExtractor,
+    PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
+  }) {
     return PosthogObserver(
-        nameExtractor: nameExtractor, routeFilter: routeFilter);
+      nameExtractor: nameExtractor,
+      routeFilter: routeFilter,
+    );
   }
 
   test('returns current route name', () {

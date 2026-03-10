@@ -54,7 +54,8 @@ class SurveyAppearance {
 
   /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance]
   static SurveyAppearance fromPostHog(
-      PostHogDisplaySurveyAppearance? appearance) {
+    PostHogDisplaySurveyAppearance? appearance,
+  ) {
     final backgroundColor =
         _colorFromHex(appearance?.backgroundColor) ?? Colors.white;
     final submitButtonColor =
@@ -90,8 +91,9 @@ class SurveyAppearance {
       closeButtonColor: primaryTextColor,
       ratingButtonColor: ratingButtonColor,
       ratingButtonActiveColor: ratingButtonActiveColor,
-      ratingButtonSelectedTextColor:
-          _getContrastingTextColor(ratingButtonActiveColor),
+      ratingButtonSelectedTextColor: _getContrastingTextColor(
+        ratingButtonActiveColor,
+      ),
       ratingButtonUnselectedTextColor: inputTextColor.withAlpha(128),
       displayThankYouMessage: appearance?.displayThankYouMessage ?? true,
       thankYouMessageHeader:

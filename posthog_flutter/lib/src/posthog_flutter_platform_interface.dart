@@ -35,10 +35,11 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('setup() has not been implemented.');
   }
 
-  Future<void> identify(
-      {required String userId,
-      Map<String, Object>? userProperties,
-      Map<String, Object>? userPropertiesSetOnce}) {
+  Future<void> identify({
+    required String userId,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+  }) {
     throw UnimplementedError('identify() has not been implemented.');
   }
 
@@ -70,9 +71,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('openUrl() has not been implemented.');
   }
 
-  Future<void> alias({
-    required String alias,
-  }) {
+  Future<void> alias({required String alias}) {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
@@ -128,17 +127,14 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('group() has not been implemented.');
   }
 
-  Future<Object?> getFeatureFlag({
-    required String key,
-  }) {
+  Future<Object?> getFeatureFlag({required String key}) {
     throw UnimplementedError('getFeatureFlag() has not been implemented.');
   }
 
-  Future<Object?> getFeatureFlagPayload({
-    required String key,
-  }) {
+  Future<Object?> getFeatureFlagPayload({required String key}) {
     throw UnimplementedError(
-        'getFeatureFlagPayload() has not been implemented.');
+      'getFeatureFlagPayload() has not been implemented.',
+    );
   }
 
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
@@ -146,17 +142,19 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     bool sendEvent = true,
   }) {
     throw UnimplementedError(
-        'getFeatureFlagResult() has not been implemented.');
+      'getFeatureFlagResult() has not been implemented.',
+    );
   }
 
   Future<void> flush() {
     throw UnimplementedError('flush() has not been implemented.');
   }
 
-  Future<void> captureException(
-      {required Object error,
-      StackTrace? stackTrace,
-      Map<String, Object>? properties}) {
+  Future<void> captureException({
+    required Object error,
+    StackTrace? stackTrace,
+    Map<String, Object>? properties,
+  }) {
     throw UnimplementedError('captureException() has not been implemented.');
   }
 
@@ -175,19 +173,22 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Defaults to true.
   Future<void> startSessionRecording({bool resumeCurrent = true}) {
     throw UnimplementedError(
-        'startSessionRecording() has not been implemented.');
+      'startSessionRecording() has not been implemented.',
+    );
   }
 
   /// Stops the current session recording if one is in progress.
   Future<void> stopSessionRecording() {
     throw UnimplementedError(
-        'stopSessionRecording() has not been implemented.');
+      'stopSessionRecording() has not been implemented.',
+    );
   }
 
   /// Returns whether session replay is currently active.
   Future<bool> isSessionReplayActive() {
     throw UnimplementedError(
-        'isSessionReplayActive() has not been implemented.');
+      'isSessionReplayActive() has not been implemented.',
+    );
   }
 
   // TODO: missing capture with more parameters

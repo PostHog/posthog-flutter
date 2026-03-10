@@ -39,13 +39,15 @@ class CaptureUtils {
 
     if (propertiesCopy != null) {
       if (propertiesCopy['\$set'] is Map<String, Object>) {
-        legacyUserProperties =
-            Map<String, Object>.from(propertiesCopy['\$set'] as Map);
+        legacyUserProperties = Map<String, Object>.from(
+          propertiesCopy['\$set'] as Map,
+        );
         propertiesCopy.remove('\$set');
       }
       if (propertiesCopy['\$set_once'] is Map<String, Object>) {
-        legacyUserPropertiesSetOnce =
-            Map<String, Object>.from(propertiesCopy['\$set_once'] as Map);
+        legacyUserPropertiesSetOnce = Map<String, Object>.from(
+          propertiesCopy['\$set_once'] as Map,
+        );
         propertiesCopy.remove('\$set_once');
       }
     }

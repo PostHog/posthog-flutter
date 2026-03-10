@@ -8,8 +8,9 @@ import 'package:posthog_flutter_example/error_example.dart';
 import 'masking_tests_screen.dart';
 
 Future<void> main() async {
-  final config =
-      PostHogConfig('phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06');
+  final config = PostHogConfig(
+    'phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06',
+  );
   config.onFeatureFlags = () {
     debugPrint('[PostHog] Feature flags loaded!');
   };
@@ -58,8 +59,10 @@ Future<void> main() async {
   if (kIsWeb) {
     runZonedGuarded(
       () async => await _initAndRun(config),
-      (error, stackTrace) async => await Posthog()
-          .captureRunZonedGuardedError(error: error, stackTrace: stackTrace),
+      (error, stackTrace) async => await Posthog().captureRunZonedGuardedError(
+        error: error,
+        stackTrace: stackTrace,
+      ),
     );
   } else {
     await _initAndRun(config);
@@ -101,7 +104,7 @@ class _MyAppState extends State<MyApp> {
 }
 
 class InitialScreen extends StatefulWidget {
-  const InitialScreen({Key? key}) : super(key: key);
+  const InitialScreen({super.key});
 
   @override
   InitialScreenState createState() => InitialScreenState();
@@ -119,9 +122,7 @@ class InitialScreenState extends State<InitialScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('PostHog Flutter App'),
-      ),
+      appBar: AppBar(title: const Text('PostHog Flutter App')),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -133,27 +134,25 @@ class InitialScreenState extends State<InitialScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const SecondRoute(),
-                          settings: const RouteSettings(name: 'second_route')),
+                        builder: (context) => const SecondRoute(),
+                        settings: const RouteSettings(name: 'second_route'),
+                      ),
                     );
                   },
                   child: const PostHogMaskWidget(
-                    child: Text(
-                      'Go to Second Route',
-                    ),
+                    child: Text('Go to Second Route'),
                   ),
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const MaskingTestsScreen(),
-                          settings: const RouteSettings(name: 'masking_tests')),
+                        builder: (context) => const MaskingTestsScreen(),
+                        settings: const RouteSettings(name: 'masking_tests'),
+                      ),
                     );
                   },
                   child: const Text('Masking Tests'),
@@ -170,23 +169,23 @@ class InitialScreenState extends State<InitialScreen> {
                   children: [
                     ElevatedButton(
                       onPressed: () {
-                        _posthogFlutterPlugin
-                            .screen(screenName: "my screen", properties: {
-                          "foo": "bar",
-                        });
+                        _posthogFlutterPlugin.screen(
+                          screenName: "my screen",
+                          properties: {"foo": "bar"},
+                        );
                       },
                       child: const Text("Capture Screen manually"),
                     ),
                     ElevatedButton(
                       onPressed: () {
-                        _posthogFlutterPlugin
-                            .capture(eventName: "eventName", properties: {
-                          "foo": "bar",
-                        }, userProperties: {
-                          "user_foo": "user_bar",
-                        }, userPropertiesSetOnce: {
-                          "user_foo_once": "user_bar_once",
-                        });
+                        _posthogFlutterPlugin.capture(
+                          eventName: "eventName",
+                          properties: {"foo": "bar"},
+                          userProperties: {"user_foo": "user_bar"},
+                          userPropertiesSetOnce: {
+                            "user_foo_once": "user_bar_once",
+                          },
+                        );
                       },
                       child: const Text("Capture Event"),
                     ),
@@ -228,8 +227,8 @@ class InitialScreenState extends State<InitialScreen> {
                         backgroundColor: Colors.blue,
                       ),
                       onPressed: () async {
-                        final isOptedOut =
-                            await _posthogFlutterPlugin.isOptOut();
+                        final isOptedOut = await _posthogFlutterPlugin
+                            .isOptOut();
                         if (mounted && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -258,22 +257,20 @@ class InitialScreenState extends State<InitialScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     await _posthogFlutterPlugin.group(
-                        groupType: "theType",
-                        groupKey: "theKey",
-                        groupProperties: {
-                          "foo": "bar",
-                        });
+                      groupType: "theType",
+                      groupKey: "theKey",
+                      groupProperties: {"foo": "bar"},
+                    );
                   },
                   child: const Text("Group"),
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    await _posthogFlutterPlugin
-                        .identify(userId: "myId", userProperties: {
-                      "foo": "bar",
-                    }, userPropertiesSetOnce: {
-                      "foo1": "bar1",
-                    });
+                    await _posthogFlutterPlugin.identify(
+                      userId: "myId",
+                      userProperties: {"foo": "bar"},
+                      userPropertiesSetOnce: {"foo1": "bar1"},
+                    );
                   },
                   child: const Text("Identify"),
                 ),
@@ -302,16 +299,14 @@ class InitialScreenState extends State<InitialScreen> {
                   child: const Text("Flush"),
                 ),
                 ElevatedButton(
-                    onPressed: () async {
-                      final result =
-                          await _posthogFlutterPlugin.getDistinctId();
-                      setState(() {
-                        _result = result;
-                      });
-                    },
-                    child: const PostHogMaskWidget(
-                      child: Text("distinctId"),
-                    )),
+                  onPressed: () async {
+                    final result = await _posthogFlutterPlugin.getDistinctId();
+                    setState(() {
+                      _result = result;
+                    });
+                  },
+                  child: const PostHogMaskWidget(child: Text("distinctId")),
+                ),
                 const Divider(),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
@@ -333,7 +328,8 @@ class InitialScreenState extends State<InitialScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                  'Session recording started (resume current)'),
+                                'Session recording started (resume current)',
+                              ),
                               duration: Duration(seconds: 2),
                             ),
                           );
@@ -347,12 +343,14 @@ class InitialScreenState extends State<InitialScreen> {
                       ),
                       onPressed: () async {
                         await _posthogFlutterPlugin.startSessionRecording(
-                            resumeCurrent: false);
+                          resumeCurrent: false,
+                        );
                         if (mounted && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                  'Session recording started (new session)'),
+                                'Session recording started (new session)',
+                              ),
                               duration: Duration(seconds: 2),
                             ),
                           );
@@ -387,8 +385,8 @@ class InitialScreenState extends State<InitialScreen> {
                         backgroundColor: Colors.blue,
                       ),
                       onPressed: () async {
-                        final isActive =
-                            await _posthogFlutterPlugin.isSessionReplayActive();
+                        final isActive = await _posthogFlutterPlugin
+                            .isSessionReplayActive();
                         if (mounted && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -433,8 +431,9 @@ class InitialScreenState extends State<InitialScreen> {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content:
-                              Text('Flutter error triggered! Check PostHog.'),
+                          content: Text(
+                            'Flutter error triggered! Check PostHog.',
+                          ),
                           backgroundColor: Colors.red,
                           duration: Duration(seconds: 3),
                         ),
@@ -458,7 +457,8 @@ class InitialScreenState extends State<InitialScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                              'Dart runtime error triggered! Check PostHog.'),
+                            'Dart runtime error triggered! Check PostHog.',
+                          ),
                           backgroundColor: Colors.blue,
                           duration: Duration(seconds: 3),
                         ),
@@ -479,8 +479,9 @@ class InitialScreenState extends State<InitialScreen> {
                     if (mounted && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content:
-                              Text('Isolate error triggered! Check PostHog.'),
+                          content: Text(
+                            'Isolate error triggered! Check PostHog.',
+                          ),
                           backgroundColor: Colors.purple,
                           duration: Duration(seconds: 3),
                         ),
@@ -511,7 +512,8 @@ class InitialScreenState extends State<InitialScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                                'Normal event sent (should appear in PostHog)'),
+                              'Normal event sent (should appear in PostHog)',
+                            ),
                             duration: Duration(seconds: 2),
                           ),
                         );
@@ -531,7 +533,8 @@ class InitialScreenState extends State<InitialScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                                'Drop event sent (should NOT appear in PostHog)'),
+                              'Drop event sent (should NOT appear in PostHog)',
+                            ),
                             backgroundColor: Colors.red,
                             duration: Duration(seconds: 2),
                           ),
@@ -552,7 +555,8 @@ class InitialScreenState extends State<InitialScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                                'Modify event sent (check for modified_by_before_send property)'),
+                              'Modify event sent (check for modified_by_before_send property)',
+                            ),
                             backgroundColor: Colors.orange,
                             duration: Duration(seconds: 2),
                           ),
@@ -572,8 +576,9 @@ class InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final result = await _posthogFlutterPlugin
-                        .getFeatureFlag("feature_name");
+                    final result = await _posthogFlutterPlugin.getFeatureFlag(
+                      "feature_name",
+                    );
                     setState(() {
                       _result = result;
                     });
@@ -582,8 +587,9 @@ class InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final result = await _posthogFlutterPlugin
-                        .isFeatureEnabled("feature_name");
+                    final result = await _posthogFlutterPlugin.isFeatureEnabled(
+                      "feature_name",
+                    );
                     setState(() {
                       _result = result;
                     });
@@ -615,7 +621,8 @@ class InitialScreenState extends State<InitialScreen> {
                     await _posthogFlutterPlugin.reloadFeatureFlags();
                   },
                   child: const PostHogMaskWidget(
-                      child: Text("reloadFeatureFlags")),
+                    child: Text("reloadFeatureFlags"),
+                  ),
                 ),
                 const Divider(),
                 const Padding(
@@ -682,10 +689,8 @@ class SecondRouteState extends State<SecondRoute> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 20),
               PostHogMaskWidget(
-                  child: Image.asset(
-                'assets/training_posthog.png',
-                height: 200,
-              )),
+                child: Image.asset('assets/training_posthog.png', height: 200),
+              ),
               const SizedBox(height: 20),
             ],
           ),
@@ -701,9 +706,7 @@ class ThirdRoute extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Third Route'),
-      ),
+      appBar: AppBar(title: const Text('Third Route')),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
         child: GridView.builder(
@@ -714,10 +717,7 @@ class ThirdRoute extends StatelessWidget {
           ),
           itemCount: 16,
           itemBuilder: (context, index) {
-            return Image.asset(
-              'assets/posthog_logo.png',
-              fit: BoxFit.cover,
-            );
+            return Image.asset('assets/posthog_logo.png', fit: BoxFit.cover);
           },
         ),
       ),
@@ -731,11 +731,7 @@ class CustomException implements Exception {
   final String? code;
   final Map<String, dynamic>? additionalData;
 
-  const CustomException(
-    this.message, {
-    this.code,
-    this.additionalData,
-  });
+  const CustomException(this.message, {this.code, this.additionalData});
 
   @override
   String toString() {

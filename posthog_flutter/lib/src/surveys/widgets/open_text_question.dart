@@ -78,7 +78,8 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
                   decoration: InputDecoration(
                     hintText: 'Start typing...',
                     hintStyle: TextStyle(
-                        color: widget.appearance.inputPlaceholderColor),
+                      color: widget.appearance.inputPlaceholderColor,
+                    ),
                     contentPadding: const EdgeInsets.all(12),
                     border: InputBorder.none,
                     filled: false,

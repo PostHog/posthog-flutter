@@ -45,8 +45,9 @@ class PostHogDisplaySurvey {
           return PostHogDisplayRatingQuestion(
             id: id,
             question: question,
-            ratingType:
-                PostHogDisplaySurveyRatingType.fromInt(q['ratingType'] as int),
+            ratingType: PostHogDisplaySurveyRatingType.fromInt(
+              q['ratingType'] as int,
+            ),
             scaleLowerBound: q['scaleLowerBound'] as int,
             scaleUpperBound: q['scaleUpperBound'] as int,
             lowerBoundLabel: q['lowerBoundLabel'] as String,

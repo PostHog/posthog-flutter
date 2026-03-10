@@ -23,13 +23,16 @@ class PostHogMaskController {
           elementObjectParser: ElementObjectParser(),
           rootElementProvider: RootElementProvider(),
         ) {
-    parsers =
-        ElementParsersConst(DefaultElementParserFactory(), config).parsersMap;
+    parsers = ElementParsersConst(
+      DefaultElementParserFactory(),
+      config,
+    ).parsersMap;
   }
 
   static final PostHogMaskController instance =
       PostHogMaskController._privateConstructor(
-          Posthog().config?.sessionReplayConfig);
+    Posthog().config?.sessionReplayConfig,
+  );
 
   /// Extracts a flattened list of [ElementData] objects representing the
   /// renderable elements in the widget tree.
@@ -63,7 +66,8 @@ class PostHogMaskController {
       return widgetElementsTree.extractRects();
     } catch (e) {
       printIfDebug(
-          'Error during render tree parsing or rectangle extraction: $e');
+        'Error during render tree parsing or rectangle extraction: $e',
+      );
       return null;
     }
   }
@@ -87,7 +91,8 @@ class PostHogMaskController {
       return widgetElementsTree.extractMaskWidgetRects();
     } catch (e) {
       printIfDebug(
-          'Error during render tree parsing or rectangle extraction: $e');
+        'Error during render tree parsing or rectangle extraction: $e',
+      );
       return null;
     }
   }

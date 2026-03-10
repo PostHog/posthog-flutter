@@ -4,5 +4,5 @@ enum PostHogSurveyQuestionType {
   multipleChoice,
   singleChoice,
   rating,
-  link
+  link,
 }

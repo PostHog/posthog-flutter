@@ -41,7 +41,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   }) {
     if (_instance != null) {
       debugPrint(
-          'PostHog: Error tracking autocapture integration is already installed. Call PostHogErrorTrackingAutoCaptureIntegration.uninstall() first.');
+        'PostHog: Error tracking autocapture integration is already installed. Call PostHogErrorTrackingAutoCaptureIntegration.uninstall() first.',
+      );
       return null;
     }
 
@@ -147,7 +148,10 @@ class PostHogErrorTrackingAutoCaptureIntegration {
       };
 
       final wrappedError = PostHogException(
-          source: details.exception, mechanism: 'FlutterError', handled: false);
+        source: details.exception,
+        mechanism: 'FlutterError',
+        handled: false,
+      );
 
       _captureException(
         error: wrappedError,
@@ -156,7 +160,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
       );
     } else {
       printIfDebug(
-          "Error not captured because FlutterErrorDetails.silent is true and captureSilentFlutterErrors is false");
+        "Error not captured because FlutterErrorDetails.silent is true and captureSilentFlutterErrors is false",
+      );
     }
 
     // Call the original handler, if any
@@ -248,6 +253,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     Map<String, Object>? properties,
   }) {
     return _posthog.captureException(
-        error: error, stackTrace: stackTrace, properties: properties);
+      error: error,
+      stackTrace: stackTrace,
+      properties: properties,
+    );
   }
 }

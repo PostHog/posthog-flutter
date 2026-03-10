@@ -90,6 +90,7 @@ class PosthogFlutterPlugin :
             "setup" -> {
                 setup(call, result)
             }
+
             "identify" -> {
                 identify(call, result)
             }
@@ -157,45 +158,59 @@ class PosthogFlutterPlugin :
             "register" -> {
                 register(call, result)
             }
+
             "unregister" -> {
                 unregister(call, result)
             }
+
             "debug" -> {
                 debug(call, result)
             }
+
             "flush" -> {
                 flush(result)
             }
+
             "captureException" -> {
                 captureException(call, result)
             }
+
             "close" -> {
                 close(result)
             }
+
             "sendMetaEvent" -> {
                 handleMetaEvent(call, result)
             }
+
             "sendFullSnapshot" -> {
                 handleSendFullSnapshot(call, result)
             }
+
             "isSessionReplayActive" -> {
                 result.success(isSessionReplayActive())
             }
+
             "startSessionRecording" -> {
                 startSessionRecording(call, result)
             }
+
             "stopSessionRecording" -> {
                 stopSessionRecording(result)
             }
+
             "getSessionId" -> {
                 getSessionId(result)
             }
+
             "openUrl" -> {
                 openUrl(call, result)
             }
+
             "surveyAction" -> {
                 handleSurveyAction(call, result)
             }
+
             else -> {
                 result.notImplemented()
             }

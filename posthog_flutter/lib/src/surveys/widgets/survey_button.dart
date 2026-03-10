@@ -23,13 +23,13 @@ class SurveyButton extends StatelessWidget {
         backgroundColor: appearance.submitButtonColor,
         foregroundColor: appearance.submitButtonTextColor,
         padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        disabledBackgroundColor: appearance.submitButtonColor.withValues(
+          alpha: 0.5,
         ),
-        disabledBackgroundColor:
-            appearance.submitButtonColor.withValues(alpha: 0.5),
-        disabledForegroundColor:
-            appearance.submitButtonTextColor.withValues(alpha: 0.5),
+        disabledForegroundColor: appearance.submitButtonTextColor.withValues(
+          alpha: 0.5,
+        ),
       ),
       child: Text(
         text,
