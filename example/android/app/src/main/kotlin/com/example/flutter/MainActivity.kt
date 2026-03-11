@@ -15,7 +15,7 @@ class MainActivity : FlutterActivity() {
                     // swallows exceptions from the method channel handler as
                     // a PlatformException, preventing the app from actually crashing.
                     Thread {
-                        throw RuntimeException("Test native crash from PostHog Flutter example")
+                        NativeCrashHelper().triggerCrash()
                     }.start()
                     result.success(null)
                 } else {
