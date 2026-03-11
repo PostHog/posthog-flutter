@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter_example/error_example.dart';
 
@@ -55,6 +56,8 @@ Future<void> main() async {
       true; // Capture Dart runtime errors
   config.errorTrackingConfig.captureIsolateErrors =
       true; // Capture isolate errors
+  config.errorTrackingConfig.captureNativeExceptions =
+      true; // Capture native exceptions (Android & iOS)
 
   if (kIsWeb) {
     runZonedGuarded(
@@ -489,6 +492,34 @@ class InitialScreenState extends State<InitialScreen> {
                     }
                   },
                   child: const Text("Test Isolate Error Handler"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Native crash triggered! The app will crash. '
+                            'The exception will be sent on next launch.',
+                          ),
+                          backgroundColor: Colors.deepOrange,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+
+                    // Give the snackbar time to show before crashing
+                    await Future.delayed(const Duration(seconds: 1));
+
+                    // Trigger a native crash via method channel
+                    const channel = MethodChannel('posthog_flutter_example');
+                    await channel.invokeMethod('triggerNativeCrash');
+                  },
+                  child: const Text("Test Native Crash (will crash app!)"),
                 ),
                 const Divider(),
                 const Padding(

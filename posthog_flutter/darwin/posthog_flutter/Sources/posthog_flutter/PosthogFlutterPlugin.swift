@@ -1,4 +1,4 @@
-import PostHog
+@_spi(Experimental) import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
@@ -163,6 +163,24 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 if surveys {
                     // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
                     config.surveysConfig.surveysDelegate = instance
+                }
+            }
+        #endif
+
+        // Configure error tracking
+        #if os(iOS) || os(macOS) || os(tvOS)
+            if let errorConfig = posthogConfig["errorTrackingConfig"] as? [String: Any] {
+                if let captureNativeExceptions = errorConfig["captureNativeExceptions"] as? Bool {
+                    config.errorTrackingConfig.autoCapture = captureNativeExceptions
+                }
+                if let inAppIncludes = errorConfig["inAppIncludes"] as? [String] {
+                    config.errorTrackingConfig.inAppIncludes.append(contentsOf: inAppIncludes)
+                }
+                if let inAppExcludes = errorConfig["inAppExcludes"] as? [String] {
+                    config.errorTrackingConfig.inAppExcludes.append(contentsOf: inAppExcludes)
+                }
+                if let inAppByDefault = errorConfig["inAppByDefault"] as? Bool {
+                    config.errorTrackingConfig.inAppByDefault = inAppByDefault
                 }
             }
         #endif
