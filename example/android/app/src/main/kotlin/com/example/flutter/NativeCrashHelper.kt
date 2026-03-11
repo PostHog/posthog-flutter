@@ -14,6 +14,11 @@ class PostHogExampleException(message: String) : Exception(message)
  */
 class NativeCrashHelper {
     fun triggerCrash() {
-        throw PostHogExampleException("Test native crash from PostHog Flutter example")
+        // Crash on a background thread because Flutter wraps and
+        // swallows exceptions from the method channel handler as
+        // a PlatformException, preventing the app from actually crashing.
+        Thread {
+            throw PostHogExampleException("Test native crash from PostHog Flutter example")
+        }.start()
     }
 }

@@ -11,12 +11,7 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "posthog_flutter_example")
             .setMethodCallHandler { call, result ->
                 if (call.method == "triggerNativeCrash") {
-                    // Crash on a background thread because Flutter wraps and
-                    // swallows exceptions from the method channel handler as
-                    // a PlatformException, preventing the app from actually crashing.
-                    Thread {
-                        NativeCrashHelper().triggerCrash()
-                    }.start()
+                    NativeCrashHelper().triggerCrash()
                     result.success(null)
                 } else {
                     result.notImplemented()
