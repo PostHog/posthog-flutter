@@ -277,17 +277,18 @@ class PostHogErrorTrackingConfig {
   /// Default: false
   var capturePlatformDispatcherErrors = false;
 
-  /// Enable automatic capture of exceptions in the native SDKs (Android and iOS).
+  /// Enable automatic capture of exceptions in the native SDKs
+  /// (Android and Apple platforms).
   ///
   /// Controls whether native exceptions are captured.
   ///
-  /// **iOS:**
+  /// **Apple (iOS, macOS, tvOS):**
   ///
   /// Captures Mach exceptions (e.g., EXC_BAD_ACCESS), POSIX signals
   /// (e.g., SIGSEGV, SIGABRT), and uncaught NSExceptions.
   /// Crashes are persisted to disk and sent as `$exception` events with
   /// level "fatal" on the next app launch.
-  /// Available on iOS, macOS, and tvOS only (not watchOS or visionOS).
+  /// Not available on watchOS or visionOS due to platform limitations.
   ///
   /// For symbolicated stack traces, add a build phase script to your
   /// Xcode project to upload debug symbols.

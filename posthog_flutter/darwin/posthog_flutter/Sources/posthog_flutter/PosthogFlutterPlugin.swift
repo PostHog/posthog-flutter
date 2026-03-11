@@ -168,22 +168,25 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         #endif
 
         // Configure error tracking
-        #if os(iOS) || os(macOS) || os(tvOS)
-            if let errorConfig = posthogConfig["errorTrackingConfig"] as? [String: Any] {
+        if let errorConfig = posthogConfig["errorTrackingConfig"] as? [String: Any] {
+            // autoCapture is only available on iOS, macOS, and tvOS
+            #if os(iOS) || os(macOS) || os(tvOS)
                 if let captureNativeExceptions = errorConfig["captureNativeExceptions"] as? Bool {
                     config.errorTrackingConfig.autoCapture = captureNativeExceptions
                 }
-                if let inAppIncludes = errorConfig["inAppIncludes"] as? [String] {
-                    config.errorTrackingConfig.inAppIncludes.append(contentsOf: inAppIncludes)
-                }
-                if let inAppExcludes = errorConfig["inAppExcludes"] as? [String] {
-                    config.errorTrackingConfig.inAppExcludes.append(contentsOf: inAppExcludes)
-                }
-                if let inAppByDefault = errorConfig["inAppByDefault"] as? Bool {
-                    config.errorTrackingConfig.inAppByDefault = inAppByDefault
-                }
+            #endif
+
+            // inApp configuration works across all platforms (including manual capture)
+            if let inAppIncludes = errorConfig["inAppIncludes"] as? [String] {
+                config.errorTrackingConfig.inAppIncludes.append(contentsOf: inAppIncludes)
             }
-        #endif
+            if let inAppExcludes = errorConfig["inAppExcludes"] as? [String] {
+                config.errorTrackingConfig.inAppExcludes.append(contentsOf: inAppExcludes)
+            }
+            if let inAppByDefault = errorConfig["inAppByDefault"] as? Bool {
+                config.errorTrackingConfig.inAppByDefault = inAppByDefault
+            }
+        }
 
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"

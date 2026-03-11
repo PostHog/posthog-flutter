@@ -57,7 +57,7 @@ Future<void> main() async {
   config.errorTrackingConfig.captureIsolateErrors =
       true; // Capture isolate errors
   config.errorTrackingConfig.captureNativeExceptions =
-      true; // Capture native exceptions (Android & iOS)
+      true; // Capture native exceptions (Android & Apple platforms)
 
   if (kIsWeb) {
     runZonedGuarded(
@@ -114,6 +114,7 @@ class InitialScreen extends StatefulWidget {
 }
 
 class InitialScreenState extends State<InitialScreen> {
+  static const _exampleChannel = MethodChannel('posthog_flutter_example');
   final _posthogFlutterPlugin = Posthog();
   dynamic _result = "";
 
@@ -518,8 +519,7 @@ class InitialScreenState extends State<InitialScreen> {
                     await Future.delayed(const Duration(seconds: 1));
 
                     // Trigger a native crash via method channel
-                    const channel = MethodChannel('posthog_flutter_example');
-                    await channel.invokeMethod('triggerNativeCrash');
+                    await _exampleChannel.invokeMethod('triggerNativeCrash');
                   },
                   child: const Text("Test Native Crash (will crash app!)"),
                 ),
