@@ -30,3 +30,12 @@ cd build/web
 # https://pub.dev/packages/dhttpd
 dhttpd
 ```
+
+## Running Apple example
+
+```
+# needs device pairing - enable debug mode on the device
+# make sure you have a valid team in Xcode, go to Signing & Capabilities
+flutter run --release -d Manoel --verbose
+# replace Manoel with your device's name
+```
