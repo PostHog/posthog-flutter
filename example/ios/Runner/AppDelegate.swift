@@ -14,9 +14,7 @@ import Flutter
 
     channel.setMethodCallHandler { (call, result) in
       if call.method == "triggerNativeCrash" {
-        // Trigger a native crash by index out of range
-        let array: [Int] = []
-        _ = array[99]
+        NativeCrashHelper().triggerCrash()
       } else {
         result(FlutterMethodNotImplemented)
       }
