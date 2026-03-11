@@ -2,6 +2,8 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
+    // uncomment to upload mapping files to PostHog
+    // id "com.posthog.android" version "1.0.3"
 }
 
 def localProperties = new Properties()

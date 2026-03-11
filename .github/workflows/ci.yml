@@ -84,7 +84,7 @@ jobs:
 
       - name: Enable Swift Package Manager
         if: matrix.package_manager == 'spm'
-        run: flutter config --enable-swift-package-manager
+        run: flutter config --enable-swift-package-manager # flutter config --no-enable-swift-package-manager
 
       - name: Install dependencies
         run: flutter pub get
