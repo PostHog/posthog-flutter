@@ -1,5 +1,11 @@
 ## Next
 
+## 5.20.0
+
+### Minor Changes
+
+- bba1d83: bump native sdk versions to support survey event property filters
+
 ## 5.19.0
 
 ### Minor Changes
