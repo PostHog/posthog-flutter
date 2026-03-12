@@ -7,3 +7,4 @@ environment:
 workspace:
   - posthog_flutter
   - example
+  - posthog_dio_interceptor
