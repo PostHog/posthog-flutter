@@ -4,6 +4,9 @@ import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
+import 'package:posthog_flutter/src/posthog_flutter_version.dart';
+
+import 'package:web/web.dart' as web;
 
 // Definition of the JS interface for PostHog
 @JS()
@@ -47,6 +50,8 @@ extension PostHogExtension on PostHog {
   external void stopSessionRecording();
   external bool sessionRecordingStarted();
   external SessionManager? get sessionManager;
+  // ignore: non_constant_identifier_names
+  external void _overrideSDKInfo(JSAny sdkName, JSAny sdkVersion);
 }
 
 // SessionManager JS interop
@@ -312,6 +317,34 @@ List<StackFrame> Function(String, [int]) createDefaultStackParser() {
   ]);
 }
 
+bool _sdkInfoOverridden = false;
+
+void _maybeOverrideSDKInfo() {
+  if (_sdkInfoOverridden) return;
+  _sdkInfoOverridden = true;
+  try {
+    posthog?._overrideSDKInfo(
+      stringToJSAny(postHogFlutterSdkName),
+      stringToJSAny(postHogFlutterVersion),
+    );
+  } catch (_) {
+    // The JS SDK version may not support _overrideSDKInfo yet
+  }
+}
+
+Map<String, String> _getLocationProperties() {
+  try {
+    final location = web.window.location;
+    return {
+      '\$current_url': location.href,
+      '\$host': location.host,
+      '\$pathname': location.pathname,
+    };
+  } catch (_) {
+    return {};
+  }
+}
+
 int _lastKeysCount = 0;
 final Set<String> _chunkIdsWithFilenames = {};
 final Map<String, String> _filenameToDebugIds = {};
@@ -364,6 +397,8 @@ Map<String, String>? getPosthogChunkIds() {
 }
 
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
+  _maybeOverrideSDKInfo();
+
   final args = call.arguments;
 
   switch (call.method) {
@@ -401,6 +436,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'capture':
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
+      properties.addAll(_getLocationProperties());
       final userProperties = safeMapConversion(args['userProperties']);
       final userPropertiesSetOnce = safeMapConversion(
         args['userPropertiesSetOnce'],
@@ -426,6 +462,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final screenName = args['screenName'] as String;
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
+      properties.addAll(_getLocationProperties());
 
       posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
       break;
@@ -544,6 +581,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
+      properties.addAll(_getLocationProperties());
 
       posthog?.capture(
         stringToJSAny('\$exception'),
