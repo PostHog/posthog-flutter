@@ -380,10 +380,15 @@ void _buildFilenameToDebugIdMapDart(
 
 Map<String, String>? getPosthogChunkIds() {
   final debugIdMapJS = globalThis['_posthogChunkIds'];
-  final debugIdMap = debugIdMapJS?.dartify() as Map<String, Object>?;
-  if (debugIdMap == null) {
+  final dartified = debugIdMapJS?.dartify();
+  if (dartified == null || dartified is! Map) {
     return null;
   }
+  final debugIdMap = Map<String, Object>.fromEntries(
+    dartified.entries.map(
+      (e) => MapEntry(e.key.toString(), e.value as Object),
+    ),
+  );
 
   // Use our pure Dart implementation of createDefaultStackParser
   final stackParser = createDefaultStackParser();
