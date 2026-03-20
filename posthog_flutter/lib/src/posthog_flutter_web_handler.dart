@@ -4,6 +4,7 @@ import 'dart:js_interop';
 
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'package:web/web.dart' as web;
 
@@ -104,8 +105,10 @@ void _maybeOverrideSDKInfo() {
       stringToJSAny(postHogFlutterSdkName),
       stringToJSAny(postHogFlutterVersion),
     );
-  } catch (_) {
+  } catch (error) {
     // The JS SDK version may not support _overrideSDKInfo yet
+    printIfDebug(
+        'Warning: Unable to override SDK info. Please ensure you are using posthog-js version 1.361.1 or later for better Flutter Web support., error: $error');
   }
 }
 
