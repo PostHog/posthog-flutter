@@ -1,5 +1,15 @@
 ## Next
 
+## 5.21.0
+
+### Minor Changes
+
+- 81a5883: Web: Override SDK info via \_overrideSDKInfo and set location properties on capture events
+
+### Patch Changes
+
+- 259ef67: Web: Fix dartify cast error in chunk_ids_web.dart for error tracking
+
 ## 5.20.0
 
 ### Minor Changes
