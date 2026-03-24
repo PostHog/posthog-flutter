@@ -179,7 +179,7 @@ class ScreenshotCapturer {
 
         if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
           if (elementsDataWidgets != null && elementsDataWidgets.isNotEmpty) {
-            _imageMaskPainter.drawMaskedElements(
+            _imageMaskPainter.drawMaskedImage(
               canvas,
               elementsDataWidgets,
               pixelRatio,
@@ -233,7 +233,7 @@ class ScreenshotCapturer {
         } else {
           if (postHogWidgetWrapperElements != null &&
               postHogWidgetWrapperElements.isNotEmpty) {
-            _imageMaskPainter.drawMaskedElements(
+            _imageMaskPainter.drawMaskedImage(
               canvas,
               postHogWidgetWrapperElements,
               pixelRatio,

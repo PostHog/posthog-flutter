@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 
 class ImageMaskPainter {
-  void drawMaskedElements(
+  void drawMaskedImage(
     Canvas canvas,
     List<ElementData> items,
     double pixelRatio,
