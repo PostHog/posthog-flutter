@@ -16,5 +16,8 @@ perl -pi -e "s/postHogFlutterVersion = \".*\"/postHogFlutterVersion = \"$NEW_VER
 # Replace Android `postHogVersion` with the given version
 perl -pi -e "s/postHogVersion = \".*\"/postHogVersion = \"$NEW_VERSION\"/" posthog_flutter/android/src/main/kotlin/com/posthog/flutter/PostHogVersion.kt
 
+# Replace Web (Dart) `postHogFlutterVersion` with the given version
+perl -pi -e "s/postHogFlutterVersion = '.*'/postHogFlutterVersion = '$NEW_VERSION'/" posthog_flutter/lib/src/posthog_flutter_version.dart
+
 # Replace Flutter `version` with the given version
 perl -pi -e "s/^version: .*/version: $NEW_VERSION/" posthog_flutter/pubspec.yaml

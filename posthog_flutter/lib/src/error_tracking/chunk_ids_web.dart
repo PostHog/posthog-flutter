@@ -6,11 +6,13 @@ external JSObject get globalThis;
 
 Map<String, String>? getPosthogChunkIds() {
   final debugIdMapJS = globalThis['_posthogChunkIds'];
-  final debugIdMap = debugIdMapJS?.dartify() as Map<String, Object>?;
-  if (debugIdMap == null) {
+  final debugIdMap = debugIdMapJS?.dartify();
+  if (debugIdMap == null || debugIdMap is! Map) {
     return null;
   }
-  return debugIdMap.map(
-    (key, value) => MapEntry(key.toString(), value.toString()),
+  return Map<String, String>.fromEntries(
+    debugIdMap.entries.map(
+      (e) => MapEntry(e.key.toString(), e.value.toString()),
+    ),
   );
 }
