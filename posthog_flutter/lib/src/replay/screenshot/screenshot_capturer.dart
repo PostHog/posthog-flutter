@@ -233,7 +233,7 @@ class ScreenshotCapturer {
         } else {
           if (postHogWidgetWrapperElements != null &&
               postHogWidgetWrapperElements.isNotEmpty) {
-            _imageMaskPainter.drawMaskedImageWrapper(
+            _imageMaskPainter.drawMaskedImage(
               canvas,
               postHogWidgetWrapperElements,
               pixelRatio,
