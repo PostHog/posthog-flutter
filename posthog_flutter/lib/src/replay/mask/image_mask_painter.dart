@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 
 class ImageMaskPainter {
-  void drawMaskedImage(
+  void drawMaskedElements(
     Canvas canvas,
     List<ElementData> items,
     double pixelRatio,
@@ -39,24 +39,6 @@ class ImageMaskPainter {
         );
         canvas.drawRect(scaled, paint);
       }
-    }
-  }
-
-  void drawMaskedImageWrapper(
-    Canvas canvas,
-    List<Rect> items,
-    double pixelRatio,
-  ) {
-    final paint = Paint()..style = PaintingStyle.fill;
-    for (var rect in items) {
-      paint.color = Colors.black;
-      final scaled = Rect.fromLTRB(
-        rect.left * pixelRatio,
-        rect.top * pixelRatio,
-        rect.right * pixelRatio,
-        rect.bottom * pixelRatio,
-      );
-      canvas.drawRect(scaled, paint);
     }
   }
 }
