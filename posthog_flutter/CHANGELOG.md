@@ -1,5 +1,11 @@
 ## Next
 
+## 5.22.0
+
+### Minor Changes
+
+- ca19677: Add native exception capture support for Apple platforms (iOS, macOS, tvOS)
+
 ## 5.21.1
 
 ### Patch Changes
