@@ -232,6 +232,7 @@ class PostHogErrorTrackingConfig {
   ///
   /// **Note:**
   /// - Flutter web: Not supported
+  /// - Android: Not supported
   ///
   final inAppExcludes = <String>[];
 
@@ -248,6 +249,7 @@ class PostHogErrorTrackingConfig {
   ///
   /// **Note:**
   /// - Flutter web: Not supported
+  /// - Android: Not supported
   ///
   var inAppByDefault = true;
 
@@ -275,14 +277,32 @@ class PostHogErrorTrackingConfig {
   /// Default: false
   var capturePlatformDispatcherErrors = false;
 
-  /// Enable automatic capture of exceptions in the native SDKs (Android only for now)
+  /// Enable automatic capture of exceptions in the native SDKs
+  /// (Android and Apple platforms).
   ///
   /// Controls whether native exceptions are captured.
   ///
-  /// **Note:**
-  /// - iOS: Not supported
-  /// - Android: Java/Kotlin exceptions only (no native C/C++ crashes)
-  /// - Android: No stacktrace demangling for minified builds
+  /// **Apple (iOS, macOS, tvOS):**
+  ///
+  /// Native error tracking on Apple platforms is currently experimental
+  ///
+  /// Captures Mach exceptions (e.g., EXC_BAD_ACCESS), POSIX signals
+  /// (e.g., SIGSEGV, SIGABRT), and uncaught NSExceptions.
+  /// Crashes are persisted to disk and sent as `$exception` events with
+  /// level "fatal" on the next app launch.
+  /// Not available on watchOS or visionOS due to platform limitations.
+  ///
+  /// For symbolicated stack traces, add a build phase script to your
+  /// Xcode project to upload debug symbols.
+  /// See: https://posthog.com/docs/error-tracking/upload-source-maps/ios
+  ///
+  /// **Android:**
+  ///
+  /// Captures Java/Kotlin exceptions only (no native C/C++ crashes).
+  ///
+  /// Stacktrace demangling for minified builds is supported by installing
+  /// the PostHog Gradle plugin to upload ProGuard/R8 mappings.
+  /// See: https://posthog.com/docs/error-tracking/upload-mappings/android
   ///
   /// Default: false
   var captureNativeExceptions = false;
