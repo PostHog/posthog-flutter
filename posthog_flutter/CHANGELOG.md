@@ -1,5 +1,11 @@
 ## Next
 
+## 5.21.1
+
+### Patch Changes
+
+- 85d0d6a: fix: PostHogMaskWidget mask appearing at screen origin
+
 ## 5.21.0
 
 ### Minor Changes
