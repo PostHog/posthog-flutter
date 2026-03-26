@@ -1,10 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 /// A class that detects changes in the UI and executes a callback when changes occur.
 ///
-/// The `ChangeDetector` continuously monitors the Flutter widget tree by scheduling
-/// a callback after each frame is rendered. This is useful when you need to perform
-/// an action whenever the UI updates.
+/// The `ChangeDetector` monitors the Flutter widget tree by scheduling
+/// a callback after each frame is rendered. To avoid unnecessary overhead,
+/// it only listens for frame callbacks while actively polling (controlled by
+/// a periodic timer) rather than on every single frame.
 ///
 /// **Usage:**
 /// ```dart
@@ -16,47 +19,53 @@ import 'package:flutter/widgets.dart';
 /// changeDetector.start();
 /// ```
 ///
-/// **Note:** Since the `onChange` callback is called after every frame, ensure that
+/// **Note:** Since the `onChange` callback is called periodically, ensure that
 /// the operations performed are efficient to avoid impacting app performance.
 class ChangeDetector {
   final VoidCallback onChange;
+  final Duration interval;
   bool _isRunning = false;
+  Timer? _timer;
 
   /// Creates a [ChangeDetector] with the given [onChange] callback.
-  ChangeDetector(this.onChange);
+  ///
+  /// [interval] controls how often to check for changes (defaults to 1 second).
+  ChangeDetector(this.onChange, {this.interval = const Duration(seconds: 1)});
 
   /// Starts the change detection process.
   ///
-  /// This method schedules the [_onFrameRendered] callback to be called
-  /// after each frame is rendered.
+  /// This method schedules periodic checks that trigger the [onChange] callback
+  /// after the next frame is rendered.
   void start() {
-    if (!_isRunning) {
-      _isRunning = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _onFrameRendered();
-      });
+    if (_isRunning) {
+      return;
     }
+    _isRunning = true;
+    // Fire immediately on start, then periodically
+    _scheduleFrameCallback();
+    _timer = Timer.periodic(interval, (_) {
+      _scheduleFrameCallback();
+    });
   }
 
   /// Stops the change detection process.
   ///
-  /// This prevents the [onChange] callback from being called after each frame.
+  /// This prevents the [onChange] callback from being called.
   void stop() {
     _isRunning = false;
+    _timer?.cancel();
+    _timer = null;
   }
 
-  /// Internal method called after each frame is rendered.
-  ///
-  /// Executes the [onChange] callback and schedules itself for the next frame
-  /// if the change detector is still running.
-  void _onFrameRendered() {
+  /// Schedules a single post-frame callback to invoke [onChange].
+  void _scheduleFrameCallback() {
     if (!_isRunning) {
       return;
     }
-
-    onChange();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _onFrameRendered();
+      if (_isRunning) {
+        onChange();
+      }
     });
   }
 }

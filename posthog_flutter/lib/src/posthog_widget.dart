@@ -23,9 +23,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
   ScreenshotCapturer? _screenshotCapturer;
   NativeCommunicator? _nativeCommunicator;
 
-  Timer? _throttleTimer;
-  bool _isThrottling = false;
-  Duration _throttleDuration = const Duration(milliseconds: 1000);
+  bool _isCapturing = false;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -48,10 +47,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   void _initComponents(PostHogConfig config) {
-    _throttleDuration = config.sessionReplayConfig.throttleDelay;
+    final throttleDelay = config.sessionReplayConfig.throttleDelay;
     _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
-    _changeDetector = ChangeDetector(_onChangeDetected);
+    _changeDetector = ChangeDetector(
+      _onChangeDetected,
+      interval: throttleDelay,
+    );
   }
 
   void _onSessionRecordingChanged() {
@@ -77,50 +79,56 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   void _stopRecording() {
     _changeDetector?.stop();
+    _screenshotCapturer?.cancel();
   }
 
   // This works as onRootViewsChangedListeners
   void _onChangeDetected() {
-    if (_isThrottling) {
-      // If throttling is active, ignore this call
+    // Skip if a snapshot capture is already in progress to prevent
+    // overlapping captures that leak memory (images, byte arrays, etc.)
+    if (_isCapturing) {
       return;
     }
 
-    // Start throttling
-    _isThrottling = true;
-
-    // Execute the snapshot generation
     _generateSnapshot();
-
-    _throttleTimer?.cancel();
-    // Reset throttling after the duration
-    _throttleTimer = Timer(_throttleDuration, () {
-      _isThrottling = false;
-    });
   }
 
   Future<void> _generateSnapshot() async {
-    // Ensure no asynchronous calls occur before this function,
-    // as it relies on a consistent state.
-    final imageInfo = await _screenshotCapturer?.captureScreenshot();
-    if (imageInfo == null) {
+    if (_disposed) {
       return;
     }
 
-    if (imageInfo.shouldSendMetaEvent) {
-      await _nativeCommunicator?.sendMetaEvent(
-        width: imageInfo.width,
-        height: imageInfo.height,
-        screen: Posthog().currentScreen,
-      );
-    }
+    _isCapturing = true;
 
-    await _nativeCommunicator?.sendFullSnapshot(
-      imageInfo.imageBytes,
-      id: imageInfo.id,
-      x: imageInfo.x,
-      y: imageInfo.y,
-    );
+    try {
+      // Ensure no asynchronous calls occur before this function,
+      // as it relies on a consistent state.
+      final imageInfo = await _screenshotCapturer?.captureScreenshot();
+      if (imageInfo == null || _disposed) {
+        return;
+      }
+
+      if (imageInfo.shouldSendMetaEvent) {
+        await _nativeCommunicator?.sendMetaEvent(
+          width: imageInfo.width,
+          height: imageInfo.height,
+          screen: Posthog().currentScreen,
+        );
+      }
+
+      if (_disposed) {
+        return;
+      }
+
+      await _nativeCommunicator?.sendFullSnapshot(
+        imageInfo.imageBytes,
+        id: imageInfo.id,
+        x: imageInfo.x,
+        y: imageInfo.y,
+      );
+    } finally {
+      _isCapturing = false;
+    }
   }
 
   @override
@@ -135,14 +143,15 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   @override
   void dispose() {
+    _disposed = true;
+
     PostHogInternalEvents.sessionRecordingActive.removeListener(
       _onSessionRecordingChanged,
     );
 
-    _throttleTimer?.cancel();
-    _throttleTimer = null;
     _changeDetector?.stop();
     _changeDetector = null;
+    _screenshotCapturer?.cancel();
     _screenshotCapturer = null;
     _nativeCommunicator = null;
 

@@ -12,7 +12,6 @@ import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/native_communicator.dart';
 import 'package:posthog_flutter/src/replay/screenshot/snapshot_manager.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
-import 'package:posthog_flutter/src/replay/vendor/equality.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 class ImageInfo {
@@ -37,7 +36,12 @@ class ImageInfo {
 
 class ViewTreeSnapshotStatus {
   bool sentMetaEvent = false;
-  Uint8List? imageBytes;
+
+  /// Hash of the last captured raw RGBA image bytes.
+  /// We store only a hash instead of the full byte array to avoid
+  /// holding ~8MB+ of raw pixel data in memory permanently.
+  int? imageBytesHash;
+
   ViewTreeSnapshotStatus(this.sentMetaEvent);
 }
 
@@ -47,7 +51,15 @@ class ScreenshotCapturer {
   final _nativeCommunicator = NativeCommunicator();
   final _snapshotManager = SnapshotManager();
 
+  bool _cancelled = false;
+
   ScreenshotCapturer(this._config);
+
+  /// Cancels any in-flight capture. After calling this, any ongoing
+  /// [captureScreenshot] will return null at its next await point.
+  void cancel() {
+    _cancelled = true;
+  }
 
   double _getPixelRatio({
     int? width,
@@ -78,224 +90,235 @@ class ScreenshotCapturer {
     }
   }
 
-  Future<ImageInfo?> captureScreenshot() {
+  /// Computes a fast hash of a byte array for change detection.
+  /// Uses a sampling approach for large arrays to avoid iterating every byte.
+  static int _computeImageHash(Uint8List bytes) {
+    // FNV-1a inspired hash with sampling for large buffers.
+    // For buffers > 64KB, sample every Nth byte to keep it fast.
+    const sampleThreshold = 64 * 1024;
+    var hash = 0x811c9dc5; // FNV offset basis (32-bit)
+    final length = bytes.length;
+
+    // Always include the length in the hash
+    hash ^= length;
+    hash = (hash * 0x01000193) & 0x7fffffff;
+
+    if (length <= sampleThreshold) {
+      // Small buffer: hash every byte
+      for (var i = 0; i < length; i++) {
+        hash ^= bytes[i];
+        hash = (hash * 0x01000193) & 0x7fffffff;
+      }
+    } else {
+      // Large buffer: sample bytes at regular intervals
+      // Sample ~4096 evenly-spaced bytes + first/last 512 bytes
+      final step = length ~/ 4096;
+
+      // First 512 bytes
+      final headEnd = min(512, length);
+      for (var i = 0; i < headEnd; i++) {
+        hash ^= bytes[i];
+        hash = (hash * 0x01000193) & 0x7fffffff;
+      }
+
+      // Evenly spaced samples
+      for (var i = headEnd; i < length - 512; i += step) {
+        hash ^= bytes[i];
+        hash = (hash * 0x01000193) & 0x7fffffff;
+      }
+
+      // Last 512 bytes
+      final tailStart = max(length - 512, headEnd);
+      for (var i = tailStart; i < length; i++) {
+        hash ^= bytes[i];
+        hash = (hash * 0x01000193) & 0x7fffffff;
+      }
+    }
+
+    return hash;
+  }
+
+  Future<ImageInfo?> captureScreenshot() async {
+    _cancelled = false;
+
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {
-      return Future.value(null);
+      return null;
     }
 
     final renderObject = context.findRenderObject() as RenderRepaintBoundary?;
     if (renderObject == null ||
         !renderObject.hasSize ||
         !renderObject.size.isValidSize) {
-      return Future.value(null);
+      return null;
     }
 
     final statusView = _snapshotManager.getStatus(renderObject);
-
     final shouldSendMetaEvent = !statusView.sentMetaEvent;
-
-    // Get the global position of the widget
     final globalPosition = renderObject.localToGlobal(Offset.zero);
-
     final viewId = identityHashCode(renderObject);
 
-    final Completer<ImageInfo?> completer = Completer<ImageInfo?>();
+    final srcWidth = renderObject.size.width;
+    final srcHeight = renderObject.size.height;
+    final pixelRatio = _getPixelRatio(
+      srcWidth: srcWidth,
+      srcHeight: srcHeight,
+    );
+
+    final replayConfig = _config.sessionReplayConfig;
+
+    final postHogWidgetWrapperElements =
+        PostHogMaskController.instance.getPostHogWidgetWrapperElements();
+
+    // call getCurrentScreenRects if really necessary
+    List<ElementData>? elementsDataWidgets;
+    if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
+      elementsDataWidgets =
+          PostHogMaskController.instance.getCurrentWidgetsElements();
+    }
+
+    // Capture the image synchronously (starts the rasterization)
+    final syncImage = renderObject.toImage(pixelRatio: pixelRatio);
 
     try {
-      final srcWidth = renderObject.size.width;
-      final srcHeight = renderObject.size.height;
-      final pixelRatio = _getPixelRatio(
-        srcWidth: srcWidth,
-        srcHeight: srcHeight,
-      );
+      final isSessionReplayActive =
+          await _nativeCommunicator.isSessionReplayActive();
+      if (_cancelled) return null;
 
-      final syncImage = renderObject.toImage(pixelRatio: pixelRatio);
+      // wait the UI to settle
+      await SchedulerBinding.instance.endOfFrame;
+      if (_cancelled) return null;
 
-      final replayConfig = _config.sessionReplayConfig;
-
-      final postHogWidgetWrapperElements =
-          PostHogMaskController.instance.getPostHogWidgetWrapperElements();
-
-      // call getCurrentScreenRects if really necessary
-      List<ElementData>? elementsDataWidgets;
-      if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
-        elementsDataWidgets =
-            PostHogMaskController.instance.getCurrentWidgetsElements();
+      final image = await syncImage;
+      if (_cancelled) {
+        image.dispose();
+        return null;
       }
 
-      /// we firstly get current image (syncImage) and masks
-      /// (postHogWidgetWrapperElements, elementsDataWidgets) synchronously and
-      /// then executed the main process asynchronous
-      Future(() async {
-        final isSessionReplayActive =
-            await _nativeCommunicator.isSessionReplayActive();
+      if (!isSessionReplayActive || !image.isValidSize) {
+        _snapshotManager.clear();
+        image.dispose();
+        return null;
+      }
 
-        // wait the UI to settle
-        await SchedulerBinding.instance.endOfFrame;
-        final image = await syncImage;
-        if (!isSessionReplayActive || !image.isValidSize) {
-          _snapshotManager.clear();
-          image.dispose();
-          completer.complete(null);
-          return;
-        }
-
-        final recorder = ui.PictureRecorder();
-        final canvas = Canvas(recorder);
-
-        // using rawRgba for the diff check because it is faster than png encoding
-        Uint8List? imageBytes = await _getImageBytes(
+      // Get raw RGBA for change detection
+      Uint8List? imageBytes;
+      try {
+        imageBytes = await _getImageBytes(
           image,
           format: ui.ImageByteFormat.rawRgba,
         );
-        if (imageBytes == null || imageBytes.isEmpty) {
-          printIfDebug(
-            'Error: Failed to convert image byte data to Uint8List.',
+      } catch (e) {
+        image.dispose();
+        printIfDebug('Error getting image bytes: $e');
+        return null;
+      }
+
+      if (_cancelled) {
+        image.dispose();
+        return null;
+      }
+
+      if (imageBytes == null || imageBytes.isEmpty) {
+        printIfDebug(
+          'Error: Failed to convert image byte data to Uint8List.',
+        );
+        image.dispose();
+        return null;
+      }
+
+      // Use hash-based comparison instead of storing full raw RGBA bytes (~8MB)
+      final currentHash = _computeImageHash(imageBytes);
+      // Release the raw RGBA bytes immediately — we only need the hash
+      imageBytes = null;
+
+      if (currentHash == statusView.imageBytesHash) {
+        printIfDebug(
+          'Debug: Snapshot is the same as the last one, nothing changed, do nothing.',
+        );
+        image.dispose();
+        return null;
+      }
+
+      statusView.imageBytesHash = currentHash;
+
+      // Draw the original image onto a canvas for masking
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+
+      try {
+        canvas.drawImage(image, Offset.zero, Paint());
+      } finally {
+        image.dispose();
+      }
+
+      if (_cancelled) {
+        recorder.endRecording().dispose();
+        return null;
+      }
+
+      // Apply masks
+      if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
+        if (elementsDataWidgets != null && elementsDataWidgets.isNotEmpty) {
+          _imageMaskPainter.drawMaskedImage(
+            canvas,
+            elementsDataWidgets,
+            pixelRatio,
           );
-          recorder.endRecording().dispose();
-          image.dispose();
-          completer.complete(null);
-          return;
         }
-
-        if (const PHListEquality().equals(imageBytes, statusView.imageBytes)) {
-          printIfDebug(
-            'Debug: Snapshot is the same as the last one, nothing changed, do nothing.',
+      } else {
+        if (postHogWidgetWrapperElements != null &&
+            postHogWidgetWrapperElements.isNotEmpty) {
+          _imageMaskPainter.drawMaskedImage(
+            canvas,
+            postHogWidgetWrapperElements,
+            pixelRatio,
           );
-          recorder.endRecording().dispose();
-          image.dispose();
-          completer.complete(null);
-          return;
+        }
+      }
+
+      final picture = recorder.endRecording();
+      ui.Image? finalImage;
+      try {
+        finalImage = await picture.toImage(
+          srcWidth.toInt(),
+          srcHeight.toInt(),
+        );
+
+        if (_cancelled) {
+          return null;
         }
 
-        statusView.imageBytes = imageBytes;
-
-        try {
-          canvas.drawImage(image, Offset.zero, Paint());
-        } finally {
-          image.dispose();
+        if (!finalImage.isValidSize) {
+          return null;
         }
 
-        if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
-          if (elementsDataWidgets != null && elementsDataWidgets.isNotEmpty) {
-            _imageMaskPainter.drawMaskedImage(
-              canvas,
-              elementsDataWidgets,
-              pixelRatio,
-            );
-          }
-
-          final picture = recorder.endRecording();
-
-          try {
-            final finalImage = await picture.toImage(
-              srcWidth.toInt(),
-              srcHeight.toInt(),
-            );
-
-            if (!finalImage.isValidSize) {
-              finalImage.dispose();
-              picture.dispose();
-              completer.complete(null);
-              return;
-            }
-
-            try {
-              final maskedImagePngBytes = await _getImageBytes(finalImage);
-              if (maskedImagePngBytes == null || maskedImagePngBytes.isEmpty) {
-                finalImage.dispose();
-                picture.dispose();
-                completer.complete(null);
-                return;
-              }
-
-              final imageInfo = ImageInfo(
-                viewId,
-                globalPosition.dx.toInt(),
-                globalPosition.dy.toInt(),
-                srcWidth.toInt(),
-                srcHeight.toInt(),
-                shouldSendMetaEvent,
-                maskedImagePngBytes,
-              );
-              _snapshotManager.updateStatus(
-                renderObject,
-                shouldSendMetaEvent: shouldSendMetaEvent,
-              );
-              completer.complete(imageInfo);
-            } finally {
-              finalImage.dispose();
-            }
-          } finally {
-            picture.dispose();
-          }
-        } else {
-          if (postHogWidgetWrapperElements != null &&
-              postHogWidgetWrapperElements.isNotEmpty) {
-            _imageMaskPainter.drawMaskedImage(
-              canvas,
-              postHogWidgetWrapperElements,
-              pixelRatio,
-            );
-          }
-
-          final picture = recorder.endRecording();
-
-          try {
-            final finalImage = await picture.toImage(
-              srcWidth.toInt(),
-              srcHeight.toInt(),
-            );
-
-            if (!finalImage.isValidSize) {
-              finalImage.dispose();
-              picture.dispose();
-              completer.complete(null);
-              return;
-            }
-
-            try {
-              final pngBytes = await _getImageBytes(finalImage);
-              if (pngBytes == null || pngBytes.isEmpty) {
-                finalImage.dispose();
-                picture.dispose();
-                completer.complete(null);
-                return;
-              }
-
-              final imageInfo = ImageInfo(
-                viewId,
-                globalPosition.dx.toInt(),
-                globalPosition.dy.toInt(),
-                srcWidth.toInt(),
-                srcHeight.toInt(),
-                shouldSendMetaEvent,
-                pngBytes,
-              );
-              _snapshotManager.updateStatus(
-                renderObject,
-                shouldSendMetaEvent: shouldSendMetaEvent,
-              );
-              completer.complete(imageInfo);
-            } finally {
-              finalImage.dispose();
-            }
-          } finally {
-            picture.dispose();
-          }
+        final pngBytes = await _getImageBytes(finalImage);
+        if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
+          return null;
         }
-      }).catchError((error) {
-        printIfDebug('Error capturing image: $error');
-        if (!completer.isCompleted) {
-          completer.complete(null);
-        }
-      });
 
-      return completer.future;
+        _snapshotManager.updateStatus(
+          renderObject,
+          shouldSendMetaEvent: shouldSendMetaEvent,
+        );
+
+        return ImageInfo(
+          viewId,
+          globalPosition.dx.toInt(),
+          globalPosition.dy.toInt(),
+          srcWidth.toInt(),
+          srcHeight.toInt(),
+          shouldSendMetaEvent,
+          pngBytes,
+        );
+      } finally {
+        finalImage?.dispose();
+        picture.dispose();
+      }
     } catch (e) {
-      printIfDebug('Error initializing capture: $e');
-      return Future.value(null);
+      printIfDebug('Error capturing screenshot: $e');
+      return null;
     }
   }
 }
