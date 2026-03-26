@@ -1,5 +1,27 @@
 ## Next
 
+## 5.21.1
+
+### Patch Changes
+
+- 85d0d6a: fix: PostHogMaskWidget mask appearing at screen origin
+
+## 5.21.0
+
+### Minor Changes
+
+- 81a5883: Web: Override SDK info via \_overrideSDKInfo and set location properties on capture events
+
+### Patch Changes
+
+- 259ef67: Web: Fix dartify cast error in chunk_ids_web.dart for error tracking
+
+## 5.20.0
+
+### Minor Changes
+
+- bba1d83: bump native sdk versions to support survey event property filters
+
 ## 5.19.0
 
 ### Minor Changes
