@@ -34,13 +34,13 @@ jobs:
 
       - name: Setup Flutter (Swift)
         if: matrix.language == 'swift'
-        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        uses: subosito/flutter-action@0ca7a949e71ae44c8e688a51c5e7e93b2c87e295 # v2.22.0
         with:
           channel: 'stable'
 
       - name: Setup Xcode (Swift)
         if: matrix.language == 'swift'
-        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '16.4'
 
@@ -57,7 +57,7 @@ jobs:
 
       - name: Setup Flutter (Java/Kotlin)
         if: matrix.language == 'java-kotlin'
-        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        uses: subosito/flutter-action@0ca7a949e71ae44c8e688a51c5e7e93b2c87e295 # v2.22.0
         with:
           channel: 'stable'
 
