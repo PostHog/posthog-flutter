@@ -246,6 +246,12 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
                 ),
               ),
 
+              // Test 14: PostHogMaskWidget with TextFormField (password field)
+              _buildTestSection(
+                'Test 14: PostHogMaskWidget + TextFormField (password)',
+                const _MaskedPasswordField(),
+              ),
+
               const SizedBox(height: 40),
             ],
           ),
@@ -277,6 +283,86 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
           const SizedBox(height: 8),
           Center(child: child),
         ],
+      ),
+    );
+  }
+}
+
+class _MaskedPasswordField extends StatefulWidget {
+  const _MaskedPasswordField();
+
+  @override
+  State<_MaskedPasswordField> createState() => _MaskedPasswordFieldState();
+}
+
+class _MaskedPasswordFieldState extends State<_MaskedPasswordField> {
+  bool _obscureText = true;
+  final _focusNode = FocusNode();
+  final _controller = TextEditingController();
+
+  void _onToggleObscure() {
+    setState(() {
+      _obscureText = !_obscureText;
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PostHogMaskWidget(
+      child: TextFormField(
+        controller: _controller,
+        obscureText: _obscureText,
+        focusNode: _focusNode,
+        textAlign: TextAlign.start,
+        style: const TextStyle(fontSize: 16),
+        decoration: InputDecoration(
+          constraints: const BoxConstraints(maxWidth: double.infinity),
+          labelText: 'Password',
+          hintText: 'Enter your password',
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.white, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: Color.fromRGBO(69, 57, 191, 1),
+              width: 2,
+            ),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: Color.fromRGBO(215, 58, 8, 1),
+              width: 2,
+            ),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: Color.fromRGBO(215, 58, 8, 1),
+              width: 2,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          suffixIcon: IconButton(
+            icon: Icon(_obscureText ? Icons.visibility_off : Icons.visibility),
+            onPressed: _onToggleObscure,
+          ),
+        ),
       ),
     );
   }

@@ -41,22 +41,4 @@ class ImageMaskPainter {
       }
     }
   }
-
-  void drawMaskedImageWrapper(
-    Canvas canvas,
-    List<Rect> items,
-    double pixelRatio,
-  ) {
-    final paint = Paint()..style = PaintingStyle.fill;
-    for (var rect in items) {
-      paint.color = Colors.black;
-      final scaled = Rect.fromLTRB(
-        rect.left * pixelRatio,
-        rect.top * pixelRatio,
-        rect.right * pixelRatio,
-        rect.bottom * pixelRatio,
-      );
-      canvas.drawRect(scaled, paint);
-    }
-  }
 }

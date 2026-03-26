@@ -72,7 +72,7 @@ class PostHogMaskController {
     }
   }
 
-  List<Rect>? getPostHogWidgetWrapperElements() {
+  List<ElementData>? getPostHogWidgetWrapperElements() {
     final context = containerKey.currentContext;
 
     if (context == null) {
