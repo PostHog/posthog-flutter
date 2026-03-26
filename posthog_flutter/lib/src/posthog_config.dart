@@ -284,6 +284,8 @@ class PostHogErrorTrackingConfig {
   ///
   /// **Apple (iOS, macOS, tvOS):**
   ///
+  /// Native error tracking on Apple platforms is currently experimental
+  ///
   /// Captures Mach exceptions (e.g., EXC_BAD_ACCESS), POSIX signals
   /// (e.g., SIGSEGV, SIGABRT), and uncaught NSExceptions.
   /// Crashes are persisted to disk and sent as `$exception` events with
