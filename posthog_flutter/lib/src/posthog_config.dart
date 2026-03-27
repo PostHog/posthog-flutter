@@ -23,7 +23,7 @@ class PostHogConfig {
   var flushInterval = const Duration(seconds: 30);
   var sendFeatureFlagEvents = true;
   var preloadFeatureFlags = true;
-  var captureApplicationLifecycleEvents = false;
+  var captureApplicationLifecycleEvents = true;
 
   var debug = false;
   var optOut = false;

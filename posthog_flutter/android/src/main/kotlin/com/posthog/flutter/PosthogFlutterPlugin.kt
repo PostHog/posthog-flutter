@@ -67,7 +67,12 @@ class PosthogFlutterPlugin :
             }
 
             val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
-            val captureApplicationLifecycleEvents = bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
+            // Check new key first, then legacy key, default to true
+            val captureApplicationLifecycleEvents = if (bundle.containsKey("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS")) {
+                bundle.getBoolean("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS", true)
+            } else {
+                bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", true)
+            }
             val debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
             val posthogConfig = mutableMapOf<String, Any>()
