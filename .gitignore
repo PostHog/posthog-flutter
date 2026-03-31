@@ -631,7 +631,8 @@ lib/example/generated_plugin_registrant.dart
 posthog_flutter.iml
 
 # pod files
-Podfile.lock
+# We check in Podfile.lock for CI reproducibility and supply chain security.
+# Podfile.lock
 
 # https://nightshift.haplab.com/
 PLAN.md
