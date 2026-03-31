@@ -23,8 +23,6 @@ migrate_working_dir/
 #.vscode/
 
 # Flutter/Dart/Pub related
-# Libraries should not include pubspec.lock, per https://dart.dev/guides/libraries/private-files#pubspeclock.
-/pubspec.lock
 **/doc/api/
 .dart_tool/
 .packages
@@ -43,8 +41,9 @@ ios/Flutter/flutter_export_environment.sh
 .dart_tool/
 .packages
 build/
-# If you're building an application, you may want to check-in your pubspec.lock
-pubspec.lock
+# We check in pubspec.lock for CI reproducibility and supply chain security
+# (sha256 content hashes are verified on resolve).
+# Run `flutter pub upgrade` to update dependencies explicitly.
 
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.
@@ -632,7 +631,8 @@ lib/example/generated_plugin_registrant.dart
 posthog_flutter.iml
 
 # pod files
-Podfile.lock
+# We check in Podfile.lock for CI reproducibility and supply chain security.
+# Podfile.lock
 
 # https://nightshift.haplab.com/
 PLAN.md
