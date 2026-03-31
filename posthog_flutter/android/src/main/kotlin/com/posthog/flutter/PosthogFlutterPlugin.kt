@@ -1,13 +1,18 @@
 package com.posthog.flutter
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
 import com.posthog.PostHogConfig
@@ -16,16 +21,21 @@ import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import io.flutter.plugin.common.PluginRegistry
 import java.util.Date
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
     FlutterPlugin,
-    MethodCallHandler {
+    MethodCallHandler,
+    ActivityAware,
+    PluginRegistry.RequestPermissionsResultListener {
     // / The MethodChannel that will be the communication between Flutter and native Android
     // /
     // / This local reference serves to register the plugin with the Flutter Engine and unregister it
@@ -38,6 +48,15 @@ class PosthogFlutterPlugin :
 
     // The surveys delegate
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
+
+    // Activity references for push notification permission requests
+    private var activity: Activity? = null
+    private var activityBinding: ActivityPluginBinding? = null
+    private var pendingPermissionResult: Result? = null
+
+    companion object {
+        private const val PUSH_NOTIFICATION_PERMISSION_REQUEST_CODE = 20241
+    }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
@@ -216,6 +235,10 @@ class PosthogFlutterPlugin :
                 handleSurveyAction(call, result)
             }
 
+            "requestPushNotificationPermission" -> {
+                requestPushNotificationPermission(result)
+            }
+
             else -> {
                 result.notImplemented()
             }
@@ -369,6 +392,141 @@ class PosthogFlutterPlugin :
             }
 
         PostHogAndroid.setup(applicationContext, config)
+    }
+
+    // MARK: - ActivityAware
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activity = binding.activity
+        activityBinding = binding
+        binding.addRequestPermissionsResultListener(this)
+    }
+
+    override fun onDetachedFromActivity() {
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activity = null
+        activityBinding = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+        activityBinding = binding
+        binding.addRequestPermissionsResultListener(this)
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activity = null
+        activityBinding = null
+    }
+
+    // MARK: - RequestPermissionsResultListener
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ): Boolean {
+        if (requestCode == PUSH_NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                getPushTokenAndReturn()
+            } else {
+                pendingPermissionResult?.success(null)
+                pendingPermissionResult = null
+            }
+            return true
+        }
+        return false
+    }
+
+    // MARK: - Push Notifications
+
+    private fun requestPushNotificationPermission(result: Result) {
+        pendingPermissionResult = result
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val act = activity
+            if (act == null) {
+                result.error(
+                    "PosthogFlutterException",
+                    "Activity not available for permission request",
+                    null,
+                )
+                pendingPermissionResult = null
+                return
+            }
+
+            val permission = "android.permission.POST_NOTIFICATIONS"
+            if (ContextCompat.checkSelfPermission(act, permission) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                getPushTokenAndReturn()
+            } else {
+                ActivityCompat.requestPermissions(
+                    act,
+                    arrayOf(permission),
+                    PUSH_NOTIFICATION_PERMISSION_REQUEST_CODE,
+                )
+            }
+        } else {
+            // Pre-Android 13, notification permission is granted at install time
+            getPushTokenAndReturn()
+        }
+    }
+
+    private fun getPushTokenAndReturn() {
+        val result = pendingPermissionResult ?: return
+
+        try {
+            val firebaseMessaging =
+                com.google.firebase.messaging.FirebaseMessaging.getInstance()
+            firebaseMessaging.token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result
+                    val projectId = try {
+                        com.google.firebase.FirebaseApp.getInstance().options.projectId ?: ""
+                    } catch (e: Throwable) {
+                        ""
+                    }
+
+                    Handler(Looper.getMainLooper()).post {
+                        result.success(
+                            mapOf(
+                                "token" to token,
+                                "platform" to "android",
+                                "appId" to projectId,
+                            ),
+                        )
+                        pendingPermissionResult = null
+                    }
+                } else {
+                    Handler(Looper.getMainLooper()).post {
+                        result.error(
+                            "PosthogFlutterException",
+                            "Failed to get FCM token: ${task.exception?.message}",
+                            null,
+                        )
+                        pendingPermissionResult = null
+                    }
+                }
+            }
+        } catch (e: NoClassDefFoundError) {
+            result.error(
+                "PosthogFlutterException",
+                "Firebase Messaging not available. Add firebase_messaging to your app.",
+                null,
+            )
+            pendingPermissionResult = null
+        } catch (e: Throwable) {
+            result.error(
+                "PosthogFlutterException",
+                "Failed to get push token: ${e.message}",
+                null,
+            )
+            pendingPermissionResult = null
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {

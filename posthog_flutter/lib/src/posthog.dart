@@ -388,5 +388,36 @@ class Posthog {
   /// Returns whether session replay is currently active.
   Future<bool> isSessionReplayActive() => _posthog.isSessionReplayActive();
 
+  /// Requests push notification permission and registers the device token
+  /// with PostHog.
+  ///
+  /// On iOS, this requests notification authorization via
+  /// `UNUserNotificationCenter` and registers for remote notifications (APNS).
+  /// On Android, this requests the `POST_NOTIFICATIONS` permission
+  /// (Android 13+) and retrieves the FCM token.
+  ///
+  /// When the user grants permission and a device token is successfully
+  /// obtained, the token is automatically sent to PostHog's push subscription
+  /// endpoint.
+  ///
+  /// Returns `true` if the push subscription was successfully registered,
+  /// `false` if permission was denied, token retrieval failed, or the SDK
+  /// is not initialized.
+  ///
+  /// **Prerequisites:**
+  /// - iOS: Ensure push notification capabilities are enabled in your
+  ///   Xcode project.
+  /// - Android: Ensure Firebase Cloud Messaging is configured in your app.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final success = await Posthog().requestPushNotificationPermission();
+  /// if (success) {
+  ///   print('Push notifications registered successfully');
+  /// }
+  /// ```
+  Future<bool> requestPushNotificationPermission() =>
+      _posthog.requestPushNotificationPermission();
+
   Posthog._internal();
 }

@@ -83,6 +83,15 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     return featureFlagPayloads[key];
   }
 
+  // Push notification test data
+  bool pushNotificationPermissionGranted = false;
+  final List<Map<String, String>> pushSubscriptionCalls = [];
+
+  @override
+  Future<bool> requestPushNotificationPermission() async {
+    return pushNotificationPermissionGranted;
+  }
+
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,

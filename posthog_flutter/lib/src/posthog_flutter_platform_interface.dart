@@ -191,5 +191,15 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     );
   }
 
+  /// Requests push notification permission and registers the device token
+  /// with PostHog's push subscription endpoint.
+  ///
+  /// Returns `true` if the push subscription was successfully registered.
+  Future<bool> requestPushNotificationPermission() {
+    throw UnimplementedError(
+      'requestPushNotificationPermission() has not been implemented.',
+    );
+  }
+
   // TODO: missing capture with more parameters
 }

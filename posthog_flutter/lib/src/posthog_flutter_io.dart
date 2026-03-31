@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'push_subscription_sender_stub.dart'
+    if (dart.library.io) 'push_subscription_sender_io.dart';
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
@@ -754,5 +756,76 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       printIfDebug('Exception on isSessionReplayActive: $exception');
       return false;
     }
+  }
+
+  @override
+  Future<bool> requestPushNotificationPermission() async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      return false;
+    }
+
+    final config = _config;
+    if (config == null) {
+      printIfDebug(
+        '[PostHog] Cannot request push notification permission: SDK not initialized',
+      );
+      return false;
+    }
+
+    try {
+      final result = await _methodChannel
+          .invokeMapMethod<String, String>('requestPushNotificationPermission');
+      if (result == null) return false;
+
+      final token = result['token'];
+      final platform = result['platform'];
+      final appId = result['appId'];
+
+      if (token == null ||
+          token.isEmpty ||
+          platform == null ||
+          appId == null) {
+        return false;
+      }
+
+      final distinctId = await getDistinctId();
+      if (distinctId.isEmpty) return false;
+
+      await _sendPushSubscription(
+        host: config.host,
+        apiKey: config.apiKey,
+        distinctId: distinctId,
+        token: token,
+        platform: platform,
+        appId: appId,
+      );
+      return true;
+    } on PlatformException catch (exception) {
+      printIfDebug(
+        'Exception on requestPushNotificationPermission: $exception',
+      );
+      return false;
+    } catch (e) {
+      printIfDebug('[PostHog] Error sending push subscription: $e');
+      return false;
+    }
+  }
+
+  Future<void> _sendPushSubscription({
+    required String host,
+    required String apiKey,
+    required String distinctId,
+    required String token,
+    required String platform,
+    required String appId,
+  }) async {
+    await sendPushSubscription(
+      host: host,
+      apiKey: apiKey,
+      distinctId: distinctId,
+      token: token,
+      platform: platform,
+      appId: appId,
+    );
   }
 }

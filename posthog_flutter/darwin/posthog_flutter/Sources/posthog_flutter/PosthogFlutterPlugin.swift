@@ -2,6 +2,7 @@
 #if os(iOS)
     import Flutter
     import UIKit
+    import UserNotifications
 #elseif os(macOS)
     import AppKit
     import FlutterMacOS
@@ -41,6 +42,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         PosthogFlutterPlugin.instance = instance
         initPlugin()
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
+        #if os(iOS)
+            registrar.addApplicationDelegate(instance)
+        #endif
     }
 
     @objc func featureFlagsDidUpdate() {
@@ -200,6 +204,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private var onSurveyResponseCallback: OnPostHogSurveyResponse?
     private var onSurveyClosedCallback: OnPostHogSurveyClosed?
 
+    // Push notification permission state
+    private var pendingPushPermissionResult: FlutterResult?
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "setup":
@@ -267,6 +274,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 handleSurveyAction(call, result: result)
             #else
                 // surveys only supported on iOS
+                result(nil)
+            #endif
+        case "requestPushNotificationPermission":
+            #if os(iOS)
+                requestPushNotificationPermission(result: result)
+            #else
+                // Push notifications not supported on macOS
                 result(nil)
             #endif
         default:
@@ -840,4 +854,70 @@ extension PosthogFlutterPlugin {
             self?.channel?.invokeMethod(method, arguments: arguments)
         }
     }
+
+    // MARK: - Push Notifications
+
+    #if os(iOS)
+        private func requestPushNotificationPermission(result: @escaping FlutterResult) {
+            pendingPushPermissionResult = result
+
+            let center = UNUserNotificationCenter.current()
+            center.requestAuthorization(options: [.alert, .badge, .sound]) { [weak self] granted, error in
+                if let error = error {
+                    DispatchQueue.main.async {
+                        result(FlutterError(
+                            code: "PosthogFlutterException",
+                            message: "Failed to request notification permission: \(error.localizedDescription)",
+                            details: nil
+                        ))
+                        self?.pendingPushPermissionResult = nil
+                    }
+                    return
+                }
+
+                if granted {
+                    DispatchQueue.main.async {
+                        UIApplication.shared.registerForRemoteNotifications()
+                        // Result will be completed in application:didRegisterForRemoteNotificationsWithDeviceToken:
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        result(nil)
+                        self?.pendingPushPermissionResult = nil
+                    }
+                }
+            }
+        }
+
+        public func application(
+            _ application: UIApplication,
+            didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+        ) {
+            guard let result = pendingPushPermissionResult else { return }
+
+            let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
+            let bundleId = Bundle.main.bundleIdentifier ?? ""
+
+            result([
+                "token": tokenString,
+                "platform": "ios",
+                "appId": bundleId,
+            ])
+            pendingPushPermissionResult = nil
+        }
+
+        public func application(
+            _ application: UIApplication,
+            didFailToRegisterForRemoteNotificationsWithError error: Error
+        ) {
+            guard let result = pendingPushPermissionResult else { return }
+
+            result(FlutterError(
+                code: "PosthogFlutterException",
+                message: "Failed to register for remote notifications: \(error.localizedDescription)",
+                details: nil
+            ))
+            pendingPushPermissionResult = nil
+        }
+    #endif
 }
