@@ -22,16 +22,19 @@ void main() {
 
   tearDown(() {
     fake.screenName = null;
+    fake.screenProperties = null;
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
   });
 
   PosthogObserver getSut({
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
+    PostHogPropertiesExtractor? propertiesExtractor,
   }) {
     return PosthogObserver(
       nameExtractor: nameExtractor,
       routeFilter: routeFilter,
+      propertiesExtractor: propertiesExtractor,
     );
   }
 
@@ -106,6 +109,68 @@ void main() {
     sut.didPush(overlayRoute, null);
 
     expect(fake.screenName, 'Overlay Route');
+  });
+
+  test('properties are null by default', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    final sut = getSut();
+    sut.didPush(currentRoute, null);
+
+    expect(fake.screenName, 'Current Route');
+    expect(fake.screenProperties, null);
+  });
+
+  test('extracts properties from route', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    Map<String, Object>? propertiesExtractor(Route<dynamic> route) =>
+        {'app_state': 'resumed'};
+
+    final sut = getSut(propertiesExtractor: propertiesExtractor);
+    sut.didPush(currentRoute, null);
+
+    expect(fake.screenName, 'Current Route');
+    expect(fake.screenProperties, {'app_state': 'resumed'});
+  });
+
+  test('extracts properties gracefully when returning null', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    Map<String, Object>? propertiesExtractor(Route<dynamic> route) => null;
+
+    final sut = getSut(propertiesExtractor: propertiesExtractor);
+    sut.didPush(currentRoute, null);
+
+    expect(fake.screenName, 'Current Route');
+    expect(fake.screenProperties, null);
+  });
+
+  test('extracts properties on didReplace', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    Map<String, Object>? propertiesExtractor(Route<dynamic> route) =>
+        {'action': 'replace'};
+
+    final sut = getSut(propertiesExtractor: propertiesExtractor);
+    sut.didReplace(newRoute: currentRoute);
+
+    expect(fake.screenName, 'Current Route');
+    expect(fake.screenProperties, {'action': 'replace'});
+  });
+
+  test('extracts properties on didPop', () {
+    final previousRoute = route(const RouteSettings(name: 'Previous Route'));
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    Map<String, Object>? propertiesExtractor(Route<dynamic> route) =>
+        {'action': 'pop'};
+
+    final sut = getSut(propertiesExtractor: propertiesExtractor);
+    sut.didPop(currentRoute, previousRoute);
+
+    expect(fake.screenName, 'Previous Route');
+    expect(fake.screenProperties, {'action': 'pop'});
   });
 }
 

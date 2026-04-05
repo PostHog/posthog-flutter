@@ -6,6 +6,10 @@ import 'posthog.dart';
 
 typedef ScreenNameExtractor = String? Function(RouteSettings settings);
 
+/// [PostHogPropertiesExtractor] allows to extract properties from a route to be sent with the screen event.
+typedef PostHogPropertiesExtractor = Map<String, Object>? Function(
+    Route<dynamic> route);
+
 /// [PostHogRouteFilter] allows to filter out routes that should not be tracked.
 ///
 /// By default, only [PageRoute]s are tracked.
@@ -19,8 +23,10 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   PosthogObserver({
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
+    PostHogPropertiesExtractor? propertiesExtractor,
   })  : _nameExtractor = nameExtractor,
-        _routeFilter = routeFilter;
+        _routeFilter = routeFilter,
+        _propertiesExtractor = propertiesExtractor;
 
   /// The current navigation context, which can be used for showing modals
   /// This is updated whenever routes change (push, pop, replace)
@@ -58,6 +64,8 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
 
   final PostHogRouteFilter _routeFilter;
 
+  final PostHogPropertiesExtractor? _propertiesExtractor;
+
   bool _isTrackeableRoute(String? name) {
     return name != null && name.trim().isNotEmpty;
   }
@@ -87,7 +95,10 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
         return;
       }
 
-      Posthog().screen(screenName: screenName);
+      Posthog().screen(
+        screenName: screenName,
+        properties: _propertiesExtractor?.call(route),
+      );
     }
   }
 
