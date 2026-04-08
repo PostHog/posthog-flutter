@@ -107,6 +107,75 @@ void main() {
 
     expect(fake.screenName, 'Overlay Route');
   });
+
+  test('does not capture screen events when app is paused', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    final sut = getSut();
+
+    // Simulate app going to background
+    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+
+    sut.didPush(currentRoute, null);
+
+    expect(fake.screenName, null);
+  });
+
+  test('does not capture screen events when app is inactive', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    final sut = getSut();
+
+    // Simulate app becoming inactive
+    sut.didChangeAppLifecycleState(AppLifecycleState.inactive);
+
+    sut.didPush(currentRoute, null);
+
+    expect(fake.screenName, null);
+  });
+
+  test('resumes capturing screen events when app returns to foreground', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+
+    final sut = getSut();
+
+    // Simulate app going to background and back
+    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+    sut.didPush(currentRoute, null);
+    expect(fake.screenName, null);
+
+    sut.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    sut.didPush(currentRoute, null);
+    expect(fake.screenName, 'Current Route');
+  });
+
+  test('does not capture screen events on didPop when app is paused', () {
+    final currentRoute = route(const RouteSettings(name: 'Current Route'));
+    final previousRoute = route(const RouteSettings(name: 'Previous Route'));
+
+    final sut = getSut();
+
+    // Simulate app going to background
+    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+
+    sut.didPop(currentRoute, previousRoute);
+
+    expect(fake.screenName, null);
+  });
+
+  test('does not capture screen events on didReplace when app is paused', () {
+    final oldRoute = route(const RouteSettings(name: 'Old Route'));
+    final newRoute = route(const RouteSettings(name: 'New Route'));
+
+    final sut = getSut();
+
+    // Simulate app going to background
+    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+
+    sut.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+
+    expect(fake.screenName, null);
+  });
 }
 
 class CustomOverlawRoute extends OverlayRoute {
