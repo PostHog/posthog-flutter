@@ -355,7 +355,6 @@ class Posthog {
     _currentScreen = null;
     PostHogInternalEvents.sessionRecordingActive.value = false;
     PosthogObserver.clearCurrentContext();
-    PosthogObserver.dispose();
 
     // Uninstall Flutter integrations
     _uninstallFlutterIntegrations();
