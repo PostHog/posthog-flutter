@@ -9,6 +9,7 @@ import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
+import 'replay/native_communicator.dart';
 
 class Posthog {
   static PosthogFlutterPlatformInterface get _posthog =>
@@ -345,6 +346,102 @@ class Posthog {
       stackTrace: stackTrace,
       properties: properties,
     );
+  }
+
+  /// Captures an HTTP network event for session replay.
+  ///
+  /// Records network request metadata as an rrweb custom event in the
+  /// session replay timeline. No request/response bodies or headers are
+  /// captured — only metadata (URL, method, status, timing, size).
+  ///
+  /// This method is a no-op when:
+  /// - [PostHogSessionReplayConfig.captureNetworkTelemetry] is `false`
+  /// - Session replay is not active
+  /// - Running on Flutter web (web SDK handles network capture natively)
+  /// - The URL matches the PostHog host (prevents infinite capture loops)
+  ///
+  /// - [url] The full request URL
+  /// - [method] HTTP method (GET, POST, etc.)
+  /// - [statusCode] HTTP response status code (use 0 for failed requests)
+  /// - [startTimestampMs] Request start time in milliseconds since epoch
+  /// - [endTimestampMs] Request end time in milliseconds since epoch
+  /// - [transferSize] Response body size in bytes (optional, defaults to 0)
+  ///
+  /// **Example with `http` package:**
+  /// ```dart
+  /// class PostHogHttpClient extends http.BaseClient {
+  ///   final http.Client _inner;
+  ///   PostHogHttpClient(this._inner);
+  ///
+  ///   @override
+  ///   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+  ///     final start = DateTime.now().millisecondsSinceEpoch;
+  ///     final response = await _inner.send(request);
+  ///     final end = DateTime.now().millisecondsSinceEpoch;
+  ///
+  ///     Posthog().captureNetworkEvent(
+  ///       url: request.url.toString(),
+  ///       method: request.method,
+  ///       statusCode: response.statusCode,
+  ///       startTimestampMs: start,
+  ///       endTimestampMs: end,
+  ///       transferSize: response.contentLength ?? 0,
+  ///     );
+  ///     return response;
+  ///   }
+  /// }
+  /// ```
+  Future<void> captureNetworkEvent({
+    required String url,
+    required String method,
+    required int statusCode,
+    required int startTimestampMs,
+    required int endTimestampMs,
+    int transferSize = 0,
+  }) async {
+    final config = _config;
+    if (config == null) return;
+
+    // Guard: captureNetworkTelemetry must be enabled
+    if (!config.sessionReplayConfig.captureNetworkTelemetry) return;
+
+    // Guard: session replay must be active
+    if (!PostHogInternalEvents.sessionRecordingActive.value) return;
+
+    // Guard: skip on web (web SDK handles network capture natively)
+    if (kIsWeb) return;
+
+    // Guard: filter out PostHog host URLs to prevent infinite loops
+    try {
+      final requestHost = Uri.parse(url).host;
+      final posthogHost = Uri.parse(config.host).host;
+      if (requestHost == posthogHost) return;
+    } catch (_) {
+      // If URL parsing fails, skip filtering
+    }
+
+    final event = <String, dynamic>{
+      'type': 5,
+      'timestamp': startTimestampMs,
+      'data': {
+        'tag': 'performanceSpan',
+        'payload': {
+          'op': 'resource.fetch',
+          'description': url,
+          'startTimestamp': startTimestampMs / 1000.0,
+          'endTimestamp': endTimestampMs / 1000.0,
+          'data': {
+            'method': method,
+            'statusCode': statusCode,
+            'response': {
+              'size': transferSize,
+            },
+          },
+        },
+      },
+    };
+
+    await NativeCommunicator().sendNetworkEvent(event);
   }
 
   /// Closes the PostHog SDK and cleans up resources.

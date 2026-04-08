@@ -191,12 +191,28 @@ class PostHogSessionReplayConfig {
   /// If null, sampling is controlled by remote config (when available).
   double? sampleRate;
 
+  /// Enable capture of network telemetry in session replay.
+  ///
+  /// When enabled, you can use [Posthog.captureNetworkEvent] to record
+  /// HTTP request metadata (URL, method, status, timing, size) as part
+  /// of the session replay timeline.
+  ///
+  /// No request/response bodies or headers are captured — only metadata.
+  ///
+  /// **Note:**
+  /// - Not supported on Flutter web (web SDK handles this natively)
+  /// - You must call [Posthog.captureNetworkEvent] from your HTTP client
+  ///
+  /// Defaults to false.
+  var captureNetworkTelemetry = false;
+
   Map<String, dynamic> toMap() {
     return {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
       if (sampleRate != null) 'sampleRate': sampleRate,
+      'captureNetworkTelemetry': captureNetworkTelemetry,
     };
   }
 }
