@@ -1,10 +1,10 @@
 PODS:
   - FlutterMacOS (1.0.0)
-  - PostHog (3.48.3)
+  - PostHog (3.50.0)
   - posthog_flutter (0.0.1):
     - Flutter
     - FlutterMacOS
-    - PostHog (< 4.0.0, >= 3.47.0)
+    - PostHog (< 4.0.0, >= 3.50.0)
 
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
