@@ -15,12 +15,32 @@ String? defaultNameExtractor(RouteSettings settings) => settings.name;
 
 bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
 
-class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
+class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
+    with WidgetsBindingObserver {
   PosthogObserver({
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
   })  : _nameExtractor = nameExtractor,
-        _routeFilter = routeFilter;
+        _routeFilter = routeFilter {
+    WidgetsBinding.instance.addObserver(this);
+    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+  }
+
+  AppLifecycleState? _appLifecycleState;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appLifecycleState = state;
+  }
+
+  /// Whether the app is currently in the foreground (resumed state).
+  /// Screen events are suppressed when the app is not in the foreground
+  /// to avoid ghost screen views caused by background widget rebuilds.
+  bool get _isAppInForeground {
+    // If we haven't received a lifecycle state yet, assume foreground
+    final state = _appLifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
 
   /// The current navigation context, which can be used for showing modals
   /// This is updated whenever routes change (push, pop, replace)
@@ -73,6 +93,10 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
 
   void _sendScreenView(Route<dynamic>? route) {
     if (route == null) {
+      return;
+    }
+
+    if (!_isAppInForeground) {
       return;
     }
 
