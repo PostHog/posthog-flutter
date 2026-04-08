@@ -24,7 +24,11 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
         _routeFilter = routeFilter {
     WidgetsBinding.instance.addObserver(this);
     _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+    _instances.add(this);
   }
+
+  /// Tracks all active instances so they can be cleaned up on [dispose].
+  static final Set<PosthogObserver> _instances = {};
 
   AppLifecycleState? _appLifecycleState;
 
@@ -72,6 +76,18 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
   @internal
   static void clearCurrentContext() {
     _currentContext = null;
+  }
+
+  /// Removes all lifecycle observers registered by active [PosthogObserver] instances.
+  /// Called internally when [Posthog().close()] is called.
+  ///
+  /// For internal use only. Should not be used by app developers.
+  @internal
+  static void dispose() {
+    for (final instance in _instances) {
+      WidgetsBinding.instance.removeObserver(instance);
+    }
+    _instances.clear();
   }
 
   final ScreenNameExtractor _nameExtractor;
