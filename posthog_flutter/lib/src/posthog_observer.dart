@@ -22,12 +22,10 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
   })  : _nameExtractor = nameExtractor,
         _routeFilter = routeFilter {
-    _ambiguityResolver = WidgetsBinding.instance;
-    _ambiguityResolver.addObserver(this);
-    _appLifecycleState = _ambiguityResolver.lifecycleState;
+    WidgetsBinding.instance.addObserver(this);
+    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
   }
 
-  late final WidgetsBinding _ambiguityResolver;
   AppLifecycleState? _appLifecycleState;
 
   @override
