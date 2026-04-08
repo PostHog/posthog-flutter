@@ -1,5 +1,12 @@
 ## Next
 
+## 5.23.1
+
+### Patch Changes
+
+- b4532f5: fix: suppress ghost screen events when app is in background
+- ac2b568: chore: bump posthog-ios dependency to 3.50.0 for error tracking GA
+
 ## 5.23.0
 
 ### Minor Changes
