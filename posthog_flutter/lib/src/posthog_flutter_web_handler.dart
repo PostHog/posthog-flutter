@@ -292,7 +292,14 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'isSessionReplayActive':
       return posthog?.sessionRecordingStarted() ?? false;
     case 'startSessionRecording':
-      final resumeCurrent = args as bool? ?? true;
+      // The platform interface sends a Map ({'resumeCurrent': bool}). Fall back
+      // to the legacy bool shape so older callers keep working.
+      final bool resumeCurrent;
+      if (args is Map) {
+        resumeCurrent = args['resumeCurrent'] as bool? ?? true;
+      } else {
+        resumeCurrent = args as bool? ?? true;
+      }
       if (!resumeCurrent) {
         // Reset session ID to start a new session
         posthog?.sessionManager?.resetSessionId();
