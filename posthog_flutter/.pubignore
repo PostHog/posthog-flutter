@@ -1,0 +1,3 @@
+# Lock file is checked in for CI reproducibility and supply chain security,
+# but should not be published — consumers resolve their own versions.
+pubspec.lock
