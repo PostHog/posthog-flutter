@@ -12,7 +12,6 @@ import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/native_communicator.dart';
 import 'package:posthog_flutter/src/replay/screenshot/snapshot_manager.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
-import 'package:posthog_flutter/src/replay/vendor/equality.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 class ImageInfo {
@@ -37,7 +36,12 @@ class ImageInfo {
 
 class ViewTreeSnapshotStatus {
   bool sentMetaEvent = false;
-  Uint8List? imageBytes;
+
+  /// Hash of the last captured raw RGBA image bytes.
+  /// We store only a hash instead of the full byte array to avoid
+  /// holding ~8MB+ of raw pixel data in memory permanently.
+  int? imageBytesHash;
+
   ViewTreeSnapshotStatus(this.sentMetaEvent);
 }
 
@@ -76,6 +80,24 @@ class ScreenshotCapturer {
       printIfDebug('Error converting image to byte data: $e');
       return null;
     }
+  }
+
+  /// Computes a hash of the full raw RGBA byte array for change detection.
+  /// This avoids retaining the full image bytes while still hashing every byte.
+  int _computeImageHash(Uint8List bytes) {
+    var hash = 0x811c9dc5; // FNV offset basis (32-bit)
+    final length = bytes.length;
+
+    // Always include the length in the hash.
+    hash ^= length;
+    hash = (hash * 0x01000193) & 0x7fffffff;
+
+    for (var i = 0; i < length; i++) {
+      hash ^= bytes[i];
+      hash = (hash * 0x01000193) & 0x7fffffff;
+    }
+
+    return hash;
   }
 
   Future<ImageInfo?> captureScreenshot() {
@@ -159,7 +181,10 @@ class ScreenshotCapturer {
           return;
         }
 
-        if (const PHListEquality().equals(imageBytes, statusView.imageBytes)) {
+        final currentHash = _computeImageHash(imageBytes);
+        imageBytes = null;
+
+        if (currentHash == statusView.imageBytesHash) {
           printIfDebug(
             'Debug: Snapshot is the same as the last one, nothing changed, do nothing.',
           );
@@ -169,7 +194,7 @@ class ScreenshotCapturer {
           return;
         }
 
-        statusView.imageBytes = imageBytes;
+        statusView.imageBytesHash = currentHash;
 
         try {
           canvas.drawImage(image, Offset.zero, Paint());
