@@ -127,34 +127,52 @@ class ScreenshotCapturer {
       /// we firstly get current image (syncImage) and masks
       /// (postHogWidgetWrapperElements, elementsDataWidgets) synchronously and
       /// then executed the main process asynchronous
+      ui.Image? image;
+      ui.PictureRecorder? recorder;
+      ui.Picture? picture;
+      ui.Image? finalImage;
+
       Future(() async {
         final isSessionReplayActive =
             await _nativeCommunicator.isSessionReplayActive();
 
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
-        final image = await syncImage;
-        if (!isSessionReplayActive || !image.isValidSize) {
+        image = await syncImage;
+        final currentImage = image;
+        if (currentImage == null ||
+            !isSessionReplayActive ||
+            !currentImage.isValidSize) {
           _snapshotManager.clear();
-          image.dispose();
+          currentImage?.dispose();
+          image = null;
           completer.complete(null);
           return;
         }
 
-        final recorder = ui.PictureRecorder();
-        final canvas = Canvas(recorder);
+        recorder = ui.PictureRecorder();
+        final currentRecorder = recorder;
+        if (currentRecorder == null) {
+          currentImage.dispose();
+          image = null;
+          completer.complete(null);
+          return;
+        }
+        final canvas = Canvas(currentRecorder);
 
         // using rawRgba for the diff check because it is faster than png encoding
         Uint8List? imageBytes = await _getImageBytes(
-          image,
+          currentImage,
           format: ui.ImageByteFormat.rawRgba,
         );
         if (imageBytes == null || imageBytes.isEmpty) {
           printIfDebug(
             'Error: Failed to convert image byte data to Uint8List.',
           );
-          recorder.endRecording().dispose();
-          image.dispose();
+          currentRecorder.endRecording().dispose();
+          recorder = null;
+          currentImage.dispose();
+          image = null;
           completer.complete(null);
           return;
         }
@@ -163,8 +181,10 @@ class ScreenshotCapturer {
           printIfDebug(
             'Debug: Snapshot is the same as the last one, nothing changed, do nothing.',
           );
-          recorder.endRecording().dispose();
-          image.dispose();
+          currentRecorder.endRecording().dispose();
+          recorder = null;
+          currentImage.dispose();
+          image = null;
           completer.complete(null);
           return;
         }
@@ -172,9 +192,10 @@ class ScreenshotCapturer {
         statusView.imageBytes = imageBytes;
 
         try {
-          canvas.drawImage(image, Offset.zero, Paint());
+          canvas.drawImage(currentImage, Offset.zero, Paint());
         } finally {
-          image.dispose();
+          currentImage.dispose();
+          image = null;
         }
 
         if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
@@ -185,51 +206,6 @@ class ScreenshotCapturer {
               pixelRatio,
             );
           }
-
-          final picture = recorder.endRecording();
-
-          try {
-            final finalImage = await picture.toImage(
-              srcWidth.toInt(),
-              srcHeight.toInt(),
-            );
-
-            if (!finalImage.isValidSize) {
-              finalImage.dispose();
-              picture.dispose();
-              completer.complete(null);
-              return;
-            }
-
-            try {
-              final maskedImagePngBytes = await _getImageBytes(finalImage);
-              if (maskedImagePngBytes == null || maskedImagePngBytes.isEmpty) {
-                finalImage.dispose();
-                picture.dispose();
-                completer.complete(null);
-                return;
-              }
-
-              final imageInfo = ImageInfo(
-                viewId,
-                globalPosition.dx.toInt(),
-                globalPosition.dy.toInt(),
-                srcWidth.toInt(),
-                srcHeight.toInt(),
-                shouldSendMetaEvent,
-                maskedImagePngBytes,
-              );
-              _snapshotManager.updateStatus(
-                renderObject,
-                shouldSendMetaEvent: shouldSendMetaEvent,
-              );
-              completer.complete(imageInfo);
-            } finally {
-              finalImage.dispose();
-            }
-          } finally {
-            picture.dispose();
-          }
         } else {
           if (postHogWidgetWrapperElements != null &&
               postHogWidgetWrapperElements.isNotEmpty) {
@@ -239,53 +215,73 @@ class ScreenshotCapturer {
               pixelRatio,
             );
           }
+        }
 
-          final picture = recorder.endRecording();
+        picture = currentRecorder.endRecording();
+        recorder = null;
+
+        final currentPicture = picture;
+        if (currentPicture == null) {
+          completer.complete(null);
+          return;
+        }
+
+        try {
+          finalImage = await currentPicture.toImage(
+            srcWidth.toInt(),
+            srcHeight.toInt(),
+          );
+
+          final currentFinalImage = finalImage;
+          if (currentFinalImage == null || !currentFinalImage.isValidSize) {
+            currentFinalImage?.dispose();
+            finalImage = null;
+            completer.complete(null);
+            return;
+          }
 
           try {
-            final finalImage = await picture.toImage(
-              srcWidth.toInt(),
-              srcHeight.toInt(),
-            );
-
-            if (!finalImage.isValidSize) {
-              finalImage.dispose();
-              picture.dispose();
+            final pngBytes = await _getImageBytes(currentFinalImage);
+            if (pngBytes == null || pngBytes.isEmpty) {
               completer.complete(null);
               return;
             }
 
-            try {
-              final pngBytes = await _getImageBytes(finalImage);
-              if (pngBytes == null || pngBytes.isEmpty) {
-                finalImage.dispose();
-                picture.dispose();
-                completer.complete(null);
-                return;
-              }
-
-              final imageInfo = ImageInfo(
-                viewId,
-                globalPosition.dx.toInt(),
-                globalPosition.dy.toInt(),
-                srcWidth.toInt(),
-                srcHeight.toInt(),
-                shouldSendMetaEvent,
-                pngBytes,
-              );
-              _snapshotManager.updateStatus(
-                renderObject,
-                shouldSendMetaEvent: shouldSendMetaEvent,
-              );
-              completer.complete(imageInfo);
-            } finally {
-              finalImage.dispose();
-            }
+            final imageInfo = ImageInfo(
+              viewId,
+              globalPosition.dx.toInt(),
+              globalPosition.dy.toInt(),
+              srcWidth.toInt(),
+              srcHeight.toInt(),
+              shouldSendMetaEvent,
+              pngBytes,
+            );
+            _snapshotManager.updateStatus(
+              renderObject,
+              shouldSendMetaEvent: shouldSendMetaEvent,
+            );
+            completer.complete(imageInfo);
           } finally {
-            picture.dispose();
+            currentFinalImage.dispose();
+            finalImage = null;
           }
+        } finally {
+          currentPicture.dispose();
+          picture = null;
         }
       }).catchError((error) {
+        finalImage?.dispose();
+        finalImage = null;
+        picture?.dispose();
+        picture = null;
+        final currentRecorder = recorder;
+        if (currentRecorder != null) {
+          currentRecorder.endRecording().dispose();
+          recorder = null;
+        }
+        image?.dispose();
+        image = null;
+
         printIfDebug('Error capturing image: $error');
         if (!completer.isCompleted) {
           completer.complete(null);
