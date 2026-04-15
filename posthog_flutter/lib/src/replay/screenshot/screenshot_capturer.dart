@@ -84,7 +84,7 @@ class ScreenshotCapturer {
 
   /// Computes a hash of the full raw RGBA byte array for change detection.
   /// This avoids retaining the full image bytes while still hashing every byte.
-  static int _computeImageHash(Uint8List bytes) {
+  int _computeImageHash(Uint8List bytes) {
     var hash = 0x811c9dc5; // FNV offset basis (32-bit)
     final length = bytes.length;
 
