@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
@@ -23,10 +21,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   ScreenshotCapturer? _screenshotCapturer;
   NativeCommunicator? _nativeCommunicator;
 
-  Timer? _throttleTimer;
-  bool _isThrottling = false;
   bool _isCapturing = false;
-  Duration _throttleDuration = const Duration(milliseconds: 1000);
 
   @override
   void initState() {
@@ -49,10 +44,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   void _initComponents(PostHogConfig config) {
-    _throttleDuration = config.sessionReplayConfig.throttleDelay;
+    final throttleDelay = config.sessionReplayConfig.throttleDelay;
     _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
-    _changeDetector = ChangeDetector(_onChangeDetected);
+    _changeDetector = ChangeDetector(
+      _onChangeDetected,
+      interval: throttleDelay,
+    );
   }
 
   void _onSessionRecordingChanged() {
@@ -82,22 +80,11 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   // This works as onRootViewsChangedListeners
   void _onChangeDetected() {
-    if (_isThrottling || _isCapturing) {
-      // If throttling is active or a snapshot is already in progress, ignore this call.
+    if (_isCapturing) {
       return;
     }
 
-    // Start throttling
-    _isThrottling = true;
-
-    // Execute the snapshot generation
     _generateSnapshot();
-
-    _throttleTimer?.cancel();
-    // Reset throttling after the duration
-    _throttleTimer = Timer(_throttleDuration, () {
-      _isThrottling = false;
-    });
   }
 
   Future<void> _generateSnapshot() async {
@@ -146,8 +133,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
       _onSessionRecordingChanged,
     );
 
-    _throttleTimer?.cancel();
-    _throttleTimer = null;
     _changeDetector?.stop();
     _changeDetector = null;
     _screenshotCapturer = null;
