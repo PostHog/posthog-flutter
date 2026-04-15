@@ -25,6 +25,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   Timer? _throttleTimer;
   bool _isThrottling = false;
+  bool _isCapturing = false;
   Duration _throttleDuration = const Duration(milliseconds: 1000);
 
   @override
@@ -81,8 +82,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   // This works as onRootViewsChangedListeners
   void _onChangeDetected() {
-    if (_isThrottling) {
-      // If throttling is active, ignore this call
+    if (_isThrottling || _isCapturing) {
+      // If throttling is active or a snapshot is already in progress, ignore this call.
       return;
     }
 
@@ -102,25 +103,31 @@ class PostHogWidgetState extends State<PostHogWidget> {
   Future<void> _generateSnapshot() async {
     // Ensure no asynchronous calls occur before this function,
     // as it relies on a consistent state.
-    final imageInfo = await _screenshotCapturer?.captureScreenshot();
-    if (imageInfo == null) {
-      return;
-    }
+    _isCapturing = true;
 
-    if (imageInfo.shouldSendMetaEvent) {
-      await _nativeCommunicator?.sendMetaEvent(
-        width: imageInfo.width,
-        height: imageInfo.height,
-        screen: Posthog().currentScreen,
+    try {
+      final imageInfo = await _screenshotCapturer?.captureScreenshot();
+      if (imageInfo == null) {
+        return;
+      }
+
+      if (imageInfo.shouldSendMetaEvent) {
+        await _nativeCommunicator?.sendMetaEvent(
+          width: imageInfo.width,
+          height: imageInfo.height,
+          screen: Posthog().currentScreen,
+        );
+      }
+
+      await _nativeCommunicator?.sendFullSnapshot(
+        imageInfo.imageBytes,
+        id: imageInfo.id,
+        x: imageInfo.x,
+        y: imageInfo.y,
       );
+    } finally {
+      _isCapturing = false;
     }
-
-    await _nativeCommunicator?.sendFullSnapshot(
-      imageInfo.imageBytes,
-      id: imageInfo.id,
-      x: imageInfo.x,
-      y: imageInfo.y,
-    );
   }
 
   @override
