@@ -22,6 +22,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   NativeCommunicator? _nativeCommunicator;
 
   bool _isCapturing = false;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -76,6 +77,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   void _stopRecording() {
     _changeDetector?.stop();
+    _screenshotCapturer?.cancel();
   }
 
   // This works as onRootViewsChangedListeners
@@ -88,13 +90,17 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   Future<void> _generateSnapshot() async {
+    if (_disposed) {
+      return;
+    }
+
     // Ensure no asynchronous calls occur before this function,
     // as it relies on a consistent state.
     _isCapturing = true;
 
     try {
       final imageInfo = await _screenshotCapturer?.captureScreenshot();
-      if (imageInfo == null) {
+      if (imageInfo == null || _disposed) {
         return;
       }
 
@@ -104,6 +110,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
           height: imageInfo.height,
           screen: Posthog().currentScreen,
         );
+      }
+
+      if (_disposed) {
+        return;
       }
 
       await _nativeCommunicator?.sendFullSnapshot(
@@ -129,12 +139,15 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   @override
   void dispose() {
+    _disposed = true;
+
     PostHogInternalEvents.sessionRecordingActive.removeListener(
       _onSessionRecordingChanged,
     );
 
     _changeDetector?.stop();
     _changeDetector = null;
+    _screenshotCapturer?.cancel();
     _screenshotCapturer = null;
     _nativeCommunicator = null;
 
