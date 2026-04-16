@@ -1,5 +1,16 @@
 ## Next
 
+## 5.23.2
+
+### Patch Changes
+
+- e9e94d1: Accept Map args in the web session recording start handler
+- b55480e: Avoid retaining raw RGBA bytes for session replay diffing
+- 4bbfb38: Reduce session replay frame callback overhead
+- 3bc8c50: Cancel in-flight session replay screenshot capture when stopping
+- 0bdb58c: Prevent overlapping session replay snapshot captures
+- d4dcbbe: Dispose native session replay resources on screenshot errors
+
 ## 5.23.1
 
 ### Patch Changes
