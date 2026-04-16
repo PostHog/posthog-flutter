@@ -51,7 +51,13 @@ class ScreenshotCapturer {
   final _nativeCommunicator = NativeCommunicator();
   final _snapshotManager = SnapshotManager();
 
+  bool _cancelled = false;
+
   ScreenshotCapturer(this._config);
+
+  void cancel() {
+    _cancelled = true;
+  }
 
   double _getPixelRatio({
     int? width,
@@ -101,6 +107,8 @@ class ScreenshotCapturer {
   }
 
   Future<ImageInfo?> captureScreenshot() {
+    _cancelled = false;
+
     final context = PostHogMaskController.instance.containerKey.currentContext;
     if (context == null) {
       return Future.value(null);
@@ -157,11 +165,22 @@ class ScreenshotCapturer {
       Future(() async {
         final isSessionReplayActive =
             await _nativeCommunicator.isSessionReplayActive();
+        if (_cancelled) {
+          completer.complete(null);
+          return;
+        }
 
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
         image = await syncImage;
         final currentImage = image;
+        if (_cancelled) {
+          currentImage?.dispose();
+          image = null;
+          completer.complete(null);
+          return;
+        }
+
         if (currentImage == null ||
             !isSessionReplayActive ||
             !currentImage.isValidSize) {
@@ -187,6 +206,15 @@ class ScreenshotCapturer {
           currentImage,
           format: ui.ImageByteFormat.rawRgba,
         );
+        if (_cancelled) {
+          currentRecorder.endRecording().dispose();
+          recorder = null;
+          currentImage.dispose();
+          image = null;
+          completer.complete(null);
+          return;
+        }
+
         if (imageBytes == null || imageBytes.isEmpty) {
           printIfDebug(
             'Error: Failed to convert image byte data to Uint8List.',
@@ -221,6 +249,13 @@ class ScreenshotCapturer {
         } finally {
           currentImage.dispose();
           image = null;
+        }
+
+        if (_cancelled) {
+          currentRecorder.endRecording().dispose();
+          recorder = null;
+          completer.complete(null);
+          return;
         }
 
         if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
@@ -258,6 +293,13 @@ class ScreenshotCapturer {
           );
 
           final currentFinalImage = finalImage;
+          if (_cancelled) {
+            currentFinalImage?.dispose();
+            finalImage = null;
+            completer.complete(null);
+            return;
+          }
+
           if (currentFinalImage == null || !currentFinalImage.isValidSize) {
             currentFinalImage?.dispose();
             finalImage = null;
@@ -267,7 +309,7 @@ class ScreenshotCapturer {
 
           try {
             final pngBytes = await _getImageBytes(currentFinalImage);
-            if (pngBytes == null || pngBytes.isEmpty) {
+            if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
               completer.complete(null);
               return;
             }
