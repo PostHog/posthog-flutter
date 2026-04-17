@@ -1,6 +1,43 @@
-## Contributing
+# Contributing
 
-If you wish to contribute a change to this repo, please send a [pull request](https://github.com/posthog/posthog-flutter/pulls).
+Thanks for your interest in improving the PostHog Flutter SDK.
+
+## CI-aligned local checks
+
+From the repository root, run the same checks CI uses:
+
+```bash
+flutter pub get
+make installLinters
+make checkFormatDart
+make analyzeDart
+make formatKotlin
+make formatSwift
+cd posthog_flutter && flutter test
+```
+
+## Build checks
+
+CI also verifies the example app builds on the supported platforms. From the repository root:
+
+```bash
+flutter pub get
+cd example
+flutter build ios --simulator --no-codesign
+flutter build macos
+flutter build apk
+flutter build web
+```
+
+If you want to exercise Swift Package Manager locally as well, run:
+
+```bash
+flutter config --enable-swift-package-manager
+flutter pub get
+cd example
+flutter build ios --simulator --no-codesign
+flutter build macos
+```
 
 ## Testing with local native SDKs
 
@@ -24,12 +61,11 @@ end
 - Open iOS simulator
 - Run the app with `flutter run`
 
-
 ### Android
 
 In your local `posthog-android` repo:
 
-- Run `make dryRelease` to build & publish the package to Maven local
+- Run `make dryRelease` to build and publish the package to Maven local
 
 In the `posthog-flutter` repo:
 
