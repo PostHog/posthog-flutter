@@ -21,11 +21,11 @@ samples, guidance on mobile development, and a full API reference.
 # release mode
 rm -rf build/web
 flutter build web --source-maps
-posthog-cli sourcemap inject --directory build/web
+posthog-cli sourcemap inject --directory build/web --release-name posthog_flutter_example --release-version 1.0.0 --build 42
 # check the sourcemaps has chunk_id and release_id injected (*.js.map file)
 # check the js file has _posthogChunkIds injected (*.js file)
 # check the chunk_id and _posthogChunkIds match
-posthog-cli sourcemap upload --directory build/web
+posthog-cli sourcemap upload --directory build/web --release-name posthog_flutter_example --release-version 1.0.0 --build 42
 cd build/web
 # https://pub.dev/packages/dhttpd
 dhttpd
