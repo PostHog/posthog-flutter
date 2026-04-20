@@ -15,8 +15,10 @@ enum PostHogPersonProfiles { never, always, identifiedOnly }
 enum PostHogDataMode { wifi, cellular, any }
 
 class PostHogConfig {
+  static const defaultHost = 'https://us.i.posthog.com';
+
   final String apiKey;
-  var host = 'https://us.i.posthog.com';
+  var host = defaultHost;
   var flushAt = 20;
   var maxQueueSize = 1000;
   var maxBatchSize = 50;
@@ -132,15 +134,16 @@ class PostHogConfig {
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
 
   PostHogConfig(
-    this.apiKey, {
+    String apiKey, {
     this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
-  }) : beforeSend = beforeSend ?? [];
+  })  : apiKey = apiKey.trim(),
+        beforeSend = beforeSend ?? [];
 
   Map<String, dynamic> toMap() {
     return {
       'apiKey': apiKey,
-      'host': host,
+      'host': host.trim().isEmpty ? defaultHost : host.trim(),
       'flushAt': flushAt,
       'maxQueueSize': maxQueueSize,
       'maxBatchSize': maxBatchSize,
