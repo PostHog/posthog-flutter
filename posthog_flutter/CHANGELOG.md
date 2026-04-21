@@ -1,5 +1,11 @@
 ## Next
 
+## 5.23.3
+
+### Patch Changes
+
+- 04535db: Trim surrounding whitespace from API keys and host config before passing them to the native SDKs.
+
 ## 5.23.2
 
 ### Patch Changes
