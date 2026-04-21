@@ -51,8 +51,8 @@ void main() {
       final config = PostHogConfig('test_api_key');
       config.host = ' \n\t ';
 
-      expect(config.host, equals(PostHogConfig.defaultHost));
-      expect(config.toMap()['host'], equals(PostHogConfig.defaultHost));
+      expect(config.host, equals('https://us.i.posthog.com'));
+      expect(config.toMap()['host'], equals('https://us.i.posthog.com'));
     });
   });
 
@@ -186,8 +186,7 @@ void main() {
       expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
       expect(
         fakePlatformInterface
-            .setPersonPropertiesCalls
-            .last['userPropertiesToSet'],
+            .setPersonPropertiesCalls.last['userPropertiesToSet'],
         {'name': 'John Doe', 'email': 'john@example.com'},
       );
     });
@@ -200,8 +199,7 @@ void main() {
       expect(fakePlatformInterface.setPersonPropertiesCalls.length, 1);
       expect(
         fakePlatformInterface
-            .setPersonPropertiesCalls
-            .last['userPropertiesToSetOnce'],
+            .setPersonPropertiesCalls.last['userPropertiesToSetOnce'],
         {'date_of_first_login': '2024-03-01'},
       );
     });

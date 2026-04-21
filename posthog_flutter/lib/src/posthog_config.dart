@@ -7,18 +7,18 @@ import 'posthog_flutter_platform_interface.dart';
 ///
 /// Return a possibly modified event to send it, or return `null` to drop it.
 /// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback =
-    FutureOr<PostHogEvent?> Function(PostHogEvent event);
+typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+    PostHogEvent event);
 
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
 enum PostHogDataMode { wifi, cellular, any }
 
 class PostHogConfig {
-  static const defaultHost = 'https://us.i.posthog.com';
+  static const _defaultHost = 'https://us.i.posthog.com';
 
   final String apiKey;
-  String _host = defaultHost;
+  String _host = _defaultHost;
   String get host => _host;
   set host(String value) => _host = _normalizeHost(value);
   var flushAt = 20;
@@ -139,12 +139,12 @@ class PostHogConfig {
     String apiKey, {
     this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
-  }) : apiKey = apiKey.trim(),
-       beforeSend = beforeSend ?? [];
+  })  : apiKey = apiKey.trim(),
+        beforeSend = beforeSend ?? [];
 
   static String _normalizeHost(String host) {
     final trimmedHost = host.trim();
-    return trimmedHost.isEmpty ? defaultHost : trimmedHost;
+    return trimmedHost.isEmpty ? _defaultHost : trimmedHost;
   }
 
   Map<String, dynamic> toMap() {
