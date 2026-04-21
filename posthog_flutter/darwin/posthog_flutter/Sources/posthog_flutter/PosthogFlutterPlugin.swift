@@ -57,9 +57,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let apiKey = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? ""
+        let apiKey = (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let host = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost
+        let host = (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         let captureApplicationLifecycleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? true
         let debug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
 
@@ -76,13 +78,16 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             print("[PostHog] Plugin instance not found!")
             return
         }
-        let apiKey = posthogConfig["apiKey"] as? String ?? ""
+        let apiKey = (posthogConfig["apiKey"] as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         if apiKey.isEmpty {
             print("[PostHog] apiKey is missing!")
             return
         }
 
-        let host = posthogConfig["host"] as? String ?? PostHogConfig.defaultHost
+        let normalizedHost = (posthogConfig["host"] as? String ?? PostHogConfig.defaultHost)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let host = normalizedHost.isEmpty ? PostHogConfig.defaultHost : normalizedHost
 
         let config = PostHogConfig(
             apiKey: apiKey,

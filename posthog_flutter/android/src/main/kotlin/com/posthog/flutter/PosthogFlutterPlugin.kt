@@ -59,7 +59,7 @@ class PosthogFlutterPlugin :
                 return
             }
 
-            val apiKey = bundle.getString("com.posthog.posthog.API_KEY")
+            val apiKey = bundle.getString("com.posthog.posthog.API_KEY")?.trim()
 
             if (apiKey.isNullOrEmpty()) {
                 Log.e("PostHog", "com.posthog.posthog.API_KEY is missing!")
@@ -67,6 +67,9 @@ class PosthogFlutterPlugin :
             }
 
             val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: PostHogConfig.DEFAULT_HOST
             // Check new key first, then legacy key, default to true
             val captureApplicationLifecycleEvents = if (bundle.containsKey("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS")) {
                 bundle.getBoolean("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS", true)
@@ -279,13 +282,17 @@ class PosthogFlutterPlugin :
     }
 
     private fun setupPostHog(posthogConfig: Map<String, Any>) {
-        val apiKey = posthogConfig["apiKey"] as String?
+        val apiKey = (posthogConfig["apiKey"] as String?)?.trim()
         if (apiKey.isNullOrEmpty()) {
             Log.e("PostHog", "apiKey is missing!")
             return
         }
 
-        val host = posthogConfig["host"] as String? ?: PostHogConfig.DEFAULT_HOST
+        val host =
+            (posthogConfig["host"] as String?)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: PostHogConfig.DEFAULT_HOST
 
         val config =
             PostHogAndroidConfig(apiKey, host).apply {

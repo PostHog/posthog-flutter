@@ -36,6 +36,26 @@ void main() {
     );
   });
 
+  group('PostHogConfig', () {
+    test('trims whitespace-sensitive config values in config and toMap', () {
+      final config = PostHogConfig(' \n test_api_key\t ');
+      config.host = ' \nhttps://eu.i.posthog.com/\t ';
+
+      expect(config.apiKey, equals('test_api_key'));
+      expect(config.host, equals('https://eu.i.posthog.com/'));
+      expect(config.toMap()['apiKey'], equals('test_api_key'));
+      expect(config.toMap()['host'], equals('https://eu.i.posthog.com/'));
+    });
+
+    test('defaults a blank host after trimming whitespace', () {
+      final config = PostHogConfig('test_api_key');
+      config.host = ' \n\t ';
+
+      expect(config.host, equals('https://us.i.posthog.com'));
+      expect(config.toMap()['host'], equals('https://us.i.posthog.com'));
+    });
+  });
+
   group('getFeatureFlagResult', () {
     late PosthogFlutterPlatformFake fakePlatformInterface;
 
