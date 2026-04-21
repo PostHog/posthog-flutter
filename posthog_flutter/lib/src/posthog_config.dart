@@ -7,8 +7,8 @@ import 'posthog_flutter_platform_interface.dart';
 ///
 /// Return a possibly modified event to send it, or return `null` to drop it.
 /// Callbacks can be synchronous or asynchronous (returning `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
-    PostHogEvent event);
+typedef BeforeSendCallback =
+    FutureOr<PostHogEvent?> Function(PostHogEvent event);
 
 enum PostHogPersonProfiles { never, always, identifiedOnly }
 
@@ -18,7 +18,9 @@ class PostHogConfig {
   static const defaultHost = 'https://us.i.posthog.com';
 
   final String apiKey;
-  var host = defaultHost;
+  String _host = defaultHost;
+  String get host => _host;
+  set host(String value) => _host = _normalizeHost(value);
   var flushAt = 20;
   var maxQueueSize = 1000;
   var maxBatchSize = 50;
@@ -137,13 +139,18 @@ class PostHogConfig {
     String apiKey, {
     this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
-  })  : apiKey = apiKey.trim(),
-        beforeSend = beforeSend ?? [];
+  }) : apiKey = apiKey.trim(),
+       beforeSend = beforeSend ?? [];
+
+  static String _normalizeHost(String host) {
+    final trimmedHost = host.trim();
+    return trimmedHost.isEmpty ? defaultHost : trimmedHost;
+  }
 
   Map<String, dynamic> toMap() {
     return {
       'apiKey': apiKey,
-      'host': host.trim().isEmpty ? defaultHost : host.trim(),
+      'host': host,
       'flushAt': flushAt,
       'maxQueueSize': maxQueueSize,
       'maxBatchSize': maxBatchSize,
