@@ -57,7 +57,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let apiKey = (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String ?? "")
+        let projectToken = ((Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.PROJECT_TOKEN") as? String) ?? (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         let host = (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost)
@@ -66,7 +66,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         let debug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
 
         setupPostHog([
-            "apiKey": apiKey,
+            "projectToken": projectToken,
+            "apiKey": projectToken,
             "host": host,
             "captureApplicationLifecycleEvents": captureApplicationLifecycleEvents,
             "debug": debug,
@@ -78,10 +79,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             print("[PostHog] Plugin instance not found!")
             return
         }
-        let apiKey = (posthogConfig["apiKey"] as? String ?? "")
+        let projectToken = ((posthogConfig["projectToken"] as? String) ?? (posthogConfig["apiKey"] as? String) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        if apiKey.isEmpty {
-            print("[PostHog] apiKey is missing!")
+        if projectToken.isEmpty {
+            print("[PostHog] projectToken/apiKey is missing!")
             return
         }
 
@@ -90,7 +91,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         let host = normalizedHost.isEmpty ? PostHogConfig.defaultHost : normalizedHost
 
         let config = PostHogConfig(
-            apiKey: apiKey,
+            apiKey: projectToken,
             host: host
         )
         config.captureScreenViews = false

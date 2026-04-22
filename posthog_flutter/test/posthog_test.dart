@@ -41,8 +41,10 @@ void main() {
       final config = PostHogConfig(' \n test_api_key\t ');
       config.host = ' \nhttps://eu.i.posthog.com/\t ';
 
+      expect(config.projectToken, equals('test_api_key'));
       expect(config.apiKey, equals('test_api_key'));
       expect(config.host, equals('https://eu.i.posthog.com/'));
+      expect(config.toMap()['projectToken'], equals('test_api_key'));
       expect(config.toMap()['apiKey'], equals('test_api_key'));
       expect(config.toMap()['host'], equals('https://eu.i.posthog.com/'));
     });

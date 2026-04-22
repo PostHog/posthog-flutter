@@ -30,12 +30,12 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Set your Posthog write key and change the automatic event tracking
+        <!-- Set your PostHog project token and change the automatic event tracking
     on if you wish the library to take care of it for you.
     Remember that the application lifecycle events won't have any
     special context set for you by the time it is initialized. -->
         <meta-data
-            android:name="com.posthog.posthog.API_KEY"
+            android:name="com.posthog.posthog.PROJECT_TOKEN"
             android:value="phc_QFbR1y41s5sxnNTZoyKG2NJo2RlsCIWkUfdpawgb40D" />
         <meta-data
             android:name="com.posthog.posthog.POSTHOG_HOST"
