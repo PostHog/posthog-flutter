@@ -60,6 +60,16 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         let projectToken = ((Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.PROJECT_TOKEN") as? String) ?? (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
+        if Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.PROJECT_TOKEN") == nil,
+           Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") != nil {
+            print("[PostHog] com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!")
+        }
+
+        if projectToken.isEmpty {
+            print("[PostHog] Either com.posthog.posthog.PROJECT_TOKEN or com.posthog.posthog.API_KEY must be provided!")
+            return
+        }
+
         let host = (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.POSTHOG_HOST") as? String ?? PostHogConfig.defaultHost)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let captureApplicationLifecycleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? true
@@ -81,8 +91,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         }
         let projectToken = ((posthogConfig["projectToken"] as? String) ?? (posthogConfig["apiKey"] as? String) ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        if posthogConfig["projectToken"] == nil, posthogConfig["apiKey"] != nil {
+            print("[PostHog] apiKey is deprecated and will be removed in the next major version. Use projectToken instead!")
+        }
         if projectToken.isEmpty {
-            print("[PostHog] projectToken/apiKey is missing!")
+            print("[PostHog] Either projectToken or apiKey must be provided!")
             return
         }
 

@@ -25,7 +25,7 @@ class PostHogConfig {
   /// This field was formerly named [apiKey].
   final String projectToken;
 
-  @Deprecated('Deprecated in favor of [projectToken].')
+  @Deprecated('Deprecated in favor of [projectToken]. This will be removed in the next major version.')
   String get apiKey => projectToken;
 
   String _host = _defaultHost;

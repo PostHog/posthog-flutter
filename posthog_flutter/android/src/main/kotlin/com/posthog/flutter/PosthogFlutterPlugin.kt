@@ -64,8 +64,15 @@ class PosthogFlutterPlugin :
                     ?: bundle.getString("com.posthog.posthog.API_KEY"))
                     ?.trim()
 
+            if (!bundle.containsKey("com.posthog.posthog.PROJECT_TOKEN") && bundle.containsKey("com.posthog.posthog.API_KEY")) {
+                Log.w(
+                    "PostHog",
+                    "com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!"
+                )
+            }
+
             if (projectToken.isNullOrEmpty()) {
-                Log.e("PostHog", "com.posthog.posthog.PROJECT_TOKEN/com.posthog.posthog.API_KEY is missing!")
+                Log.e("PostHog", "Either com.posthog.posthog.PROJECT_TOKEN or com.posthog.posthog.API_KEY must be provided!")
                 return
             }
 
@@ -290,8 +297,14 @@ class PosthogFlutterPlugin :
             ((posthogConfig["projectToken"] as String?)
                 ?: (posthogConfig["apiKey"] as String?))
                 ?.trim()
+        if (!posthogConfig.containsKey("projectToken") && posthogConfig.containsKey("apiKey")) {
+            Log.w(
+                "PostHog",
+                "apiKey is deprecated and will be removed in the next major version. Use projectToken instead!"
+            )
+        }
         if (projectToken.isNullOrEmpty()) {
-            Log.e("PostHog", "projectToken/apiKey is missing!")
+            Log.e("PostHog", "Either projectToken or apiKey must be provided!")
             return
         }
 
