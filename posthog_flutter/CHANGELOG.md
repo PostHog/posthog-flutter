@@ -1,5 +1,11 @@
 ## Next
 
+## 5.24.0
+
+### Minor Changes
+
+- 4e3fa7b: Rename apiKey to projectToken with backward-compatible aliases
+
 ## 5.23.3
 
 ### Patch Changes
