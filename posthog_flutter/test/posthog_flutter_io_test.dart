@@ -148,7 +148,8 @@ void main() {
         callbackInvoked = true;
       }
 
-      testConfig = PostHogConfig('test_project_token', onFeatureFlags: testCallback);
+      testConfig =
+          PostHogConfig('test_project_token', onFeatureFlags: testCallback);
       await posthogFlutterIO.setup(testConfig);
 
       // Simulate native sending malformed arguments - callback should still be invoked
@@ -345,7 +346,8 @@ void main() {
     });
 
     test('beforeSend can drop event by returning null', () async {
-      testConfig = PostHogConfig('test_project_token', beforeSend: [(event) => null]);
+      testConfig =
+          PostHogConfig('test_project_token', beforeSend: [(event) => null]);
       await posthogFlutterIO.setup(testConfig);
 
       await posthogFlutterIO.capture(eventName: 'dropped_event');
