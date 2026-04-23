@@ -50,7 +50,7 @@ void main() {
         }
 
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           onFeatureFlags: testCallback,
         );
         await posthogFlutterIO.setup(testConfig);
@@ -70,13 +70,13 @@ void main() {
     );
 
     test('setup sends projectToken and deprecated apiKey alias', () async {
-      testConfig = PostHogConfig(' \n test_api_key\t ');
+      testConfig = PostHogConfig(' \n test_project_token\t ');
       await posthogFlutterIO.setup(testConfig);
 
       final call = log.firstWhere((c) => c.method == 'setup');
       final args = Map<String, dynamic>.from(call.arguments as Map);
-      expect(args['projectToken'], equals('test_api_key'));
-      expect(args['apiKey'], equals('test_api_key'));
+      expect(args['projectToken'], equals('test_project_token'));
+      expect(args['apiKey'], equals('test_project_token'));
     });
 
     test(
@@ -89,7 +89,7 @@ void main() {
         }
 
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           onFeatureFlags: testCallback,
         );
         await posthogFlutterIO.setup(testConfig);
@@ -120,7 +120,7 @@ void main() {
         }
 
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           onFeatureFlags: testCallback,
         );
         await posthogFlutterIO.setup(testConfig);
@@ -148,7 +148,7 @@ void main() {
         callbackInvoked = true;
       }
 
-      testConfig = PostHogConfig('test_api_key', onFeatureFlags: testCallback);
+      testConfig = PostHogConfig('test_project_token', onFeatureFlags: testCallback);
       await posthogFlutterIO.setup(testConfig);
 
       // Simulate native sending malformed arguments - callback should still be invoked
@@ -170,7 +170,7 @@ void main() {
 
     test('does not invoke callback when no callback is registered', () async {
       // Setup without callback
-      testConfig = PostHogConfig('test_api_key');
+      testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
 
       // This should not throw - just silently do nothing
@@ -190,7 +190,7 @@ void main() {
 
   group('PosthogFlutterIO setPersonProperties', () {
     test('sends method channel call with userPropertiesToSet', () async {
-      testConfig = PostHogConfig('test_api_key');
+      testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
 
       await posthogFlutterIO.setPersonProperties(
@@ -207,7 +207,7 @@ void main() {
     });
 
     test('sends method channel call with userPropertiesToSetOnce', () async {
-      testConfig = PostHogConfig('test_api_key');
+      testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
 
       await posthogFlutterIO.setPersonProperties(
@@ -223,7 +223,7 @@ void main() {
     });
 
     test('sends method channel call with both property types', () async {
-      testConfig = PostHogConfig('test_api_key');
+      testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
 
       await posthogFlutterIO.setPersonProperties(
@@ -242,7 +242,7 @@ void main() {
     test(
       'capture sends event unchanged when no beforeSend registered',
       () async {
-        testConfig = PostHogConfig('test_api_key');
+        testConfig = PostHogConfig('test_project_token');
         await posthogFlutterIO.setup(testConfig);
 
         await posthogFlutterIO.capture(
@@ -259,7 +259,7 @@ void main() {
 
     test('beforeSend can modify event name', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             event.event = 'modified_event';
@@ -278,7 +278,7 @@ void main() {
 
     test('beforeSend can modify properties', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             event.properties = {'modified': true};
@@ -300,7 +300,7 @@ void main() {
 
     test('beforeSend can modify userProperties', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             event.userProperties = {'name': 'Modified Name'};
@@ -322,7 +322,7 @@ void main() {
 
     test('beforeSend can modify userPropertiesSetOnce', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             event.userPropertiesSetOnce = {'last_logged_in_at': '2025-01-01'};
@@ -345,7 +345,7 @@ void main() {
     });
 
     test('beforeSend can drop event by returning null', () async {
-      testConfig = PostHogConfig('test_api_key', beforeSend: [(event) => null]);
+      testConfig = PostHogConfig('test_project_token', beforeSend: [(event) => null]);
       await posthogFlutterIO.setup(testConfig);
 
       await posthogFlutterIO.capture(eventName: 'dropped_event');
@@ -356,7 +356,7 @@ void main() {
 
     test('beforeSend can selectively drop events', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             if (event.event == 'drop me') return null;
@@ -379,7 +379,7 @@ void main() {
 
     test('beforeSend exception returns original event', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             throw Exception('Hey I errored out');
@@ -403,7 +403,7 @@ void main() {
       final callOrder = <int>[];
 
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             callOrder.add(1);
@@ -438,7 +438,7 @@ void main() {
         PostHogEvent? capturedEvent;
 
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           beforeSend: [
             (event) {
               capturedEvent = event;
@@ -469,7 +469,7 @@ void main() {
       'beforeSend adds \$set to properties but it is extracted as userProperties',
       () async {
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           beforeSend: [
             (event) {
               event.properties = {
@@ -498,7 +498,7 @@ void main() {
       'beforeSend adds \$set_once to properties but it is extracted as userPropertiesSetOnce',
       () async {
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           beforeSend: [
             (event) {
               event.properties = {
@@ -525,7 +525,7 @@ void main() {
 
     test('beforeSend legacy \$set merges with direct userProperties', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             event.properties = {
@@ -556,7 +556,7 @@ void main() {
 
     test('beforeSend can clear userProperties by setting to null', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             event.userProperties = null;
@@ -578,7 +578,7 @@ void main() {
 
     test('async beforeSend can modify event', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) async {
             await Future.delayed(const Duration(milliseconds: 10));
@@ -598,7 +598,7 @@ void main() {
 
     test('async beforeSend can drop event by returning null', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) async {
             await Future.delayed(const Duration(milliseconds: 100));
@@ -618,7 +618,7 @@ void main() {
       final callOrder = <String>[];
 
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) {
             callOrder.add('sync1');
@@ -650,7 +650,7 @@ void main() {
 
     test('async beforeSend exception returns original event', () async {
       testConfig = PostHogConfig(
-        'test_api_key',
+        'test_project_token',
         beforeSend: [
           (event) async {
             await Future.delayed(const Duration(milliseconds: 100));
@@ -677,7 +677,7 @@ void main() {
         final callOrder = <int>[];
 
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           beforeSend: [
             (event) async {
               callOrder.add(1);
@@ -704,7 +704,7 @@ void main() {
       'multiple events with async beforeSend are captured in order when capture is awaited',
       () async {
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           beforeSend: [
             (event) async {
               // Add delay only for second event
@@ -747,7 +747,7 @@ void main() {
       'multiple events with async beforeSend are captured out of order when capture is NOT awaited',
       () async {
         testConfig = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           beforeSend: [
             (event) async {
               // Add delay only for first event
