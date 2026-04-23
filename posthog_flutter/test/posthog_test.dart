@@ -21,7 +21,7 @@ void main() {
         void testCallback() {}
 
         final config = PostHogConfig(
-          'test_api_key',
+          'test_project_token',
           onFeatureFlags: testCallback,
         );
 
@@ -38,19 +38,19 @@ void main() {
 
   group('PostHogConfig', () {
     test('trims whitespace-sensitive config values in config and toMap', () {
-      final config = PostHogConfig(' \n test_api_key\t ');
+      final config = PostHogConfig(' \n test_project_token\t ');
       config.host = ' \nhttps://eu.i.posthog.com/\t ';
 
-      expect(config.projectToken, equals('test_api_key'));
-      expect(config.apiKey, equals('test_api_key'));
+      expect(config.projectToken, equals('test_project_token'));
+      expect(config.apiKey, equals('test_project_token'));
       expect(config.host, equals('https://eu.i.posthog.com/'));
-      expect(config.toMap()['projectToken'], equals('test_api_key'));
-      expect(config.toMap()['apiKey'], equals('test_api_key'));
+      expect(config.toMap()['projectToken'], equals('test_project_token'));
+      expect(config.toMap()['apiKey'], equals('test_project_token'));
       expect(config.toMap()['host'], equals('https://eu.i.posthog.com/'));
     });
 
     test('defaults a blank host after trimming whitespace', () {
-      final config = PostHogConfig('test_api_key');
+      final config = PostHogConfig('test_project_token');
       config.host = ' \n\t ';
 
       expect(config.host, equals('https://us.i.posthog.com'));
