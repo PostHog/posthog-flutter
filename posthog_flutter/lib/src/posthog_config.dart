@@ -17,7 +17,18 @@ enum PostHogDataMode { wifi, cellular, any }
 class PostHogConfig {
   static const _defaultHost = 'https://us.i.posthog.com';
 
-  final String apiKey;
+  /// Your PostHog project token.
+  ///
+  /// You can find it at:
+  /// https://us.posthog.com/settings/project-details#variables
+  ///
+  /// This field was formerly named [apiKey].
+  final String projectToken;
+
+  @Deprecated(
+      'Deprecated in favor of [projectToken]. This will be removed in the next major version.')
+  String get apiKey => projectToken;
+
   String _host = _defaultHost;
   String get host => _host;
   set host(String value) => _host = _normalizeHost(value);
@@ -136,10 +147,10 @@ class PostHogConfig {
   // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
 
   PostHogConfig(
-    String apiKey, {
+    String projectToken, {
     this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
-  })  : apiKey = apiKey.trim(),
+  })  : projectToken = projectToken.trim(),
         beforeSend = beforeSend ?? [];
 
   static String _normalizeHost(String host) {
@@ -149,7 +160,8 @@ class PostHogConfig {
 
   Map<String, dynamic> toMap() {
     return {
-      'apiKey': apiKey,
+      'projectToken': projectToken,
+      'apiKey': projectToken,
       'host': host,
       'flushAt': flushAt,
       'maxQueueSize': maxQueueSize,

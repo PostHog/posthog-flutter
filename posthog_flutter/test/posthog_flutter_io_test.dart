@@ -69,6 +69,16 @@ void main() {
       },
     );
 
+    test('setup sends projectToken and deprecated apiKey alias', () async {
+      testConfig = PostHogConfig(' \n test_api_key\t ');
+      await posthogFlutterIO.setup(testConfig);
+
+      final call = log.firstWhere((c) => c.method == 'setup');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['projectToken'], equals('test_api_key'));
+      expect(args['apiKey'], equals('test_api_key'));
+    });
+
     test(
       'invokes callback when native sends onFeatureFlagsCallback event',
       () async {

@@ -58,13 +58,13 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     // It's assumed posthog-js is initialized by the user in their HTML.
     // This setup primarily hooks into the existing posthog-js instance.
 
-    // If apiKey and host are in config, and posthog.init is to be handled by plugin:
+    // If projectToken and host are in config, and posthog.init is to be handled by plugin:
     // This is an example if we wanted the plugin to also call posthog.init()
     // final jsOptions = <String, dynamic>{
     //   'api_host': config.host,
     //   // Add other relevant options from PostHogConfig if needed for JS init
     // }.jsify();
-    // posthog?.callMethod('init'.toJS, config.apiKey.toJS, jsOptions);
+    // posthog?.callMethod('init'.toJS, config.projectToken.toJS, jsOptions);
 
     final ph = posthog;
     _config = config;

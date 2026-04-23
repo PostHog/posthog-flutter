@@ -28,12 +28,12 @@ class Posthog {
   ///
   /// This method sets up the connection to your PostHog instance and prepares the SDK for tracking events and feature flags.
   ///
-  /// - [config]: The [PostHogConfig] object containing your API key, host, and other settings.
+  /// - [config]: The [PostHogConfig] object containing your project token, host, and other settings.
   ///   To listen for feature flag load events, provide an `onFeatureFlags` callback in the [PostHogConfig].
   ///
   /// **Example:**
   /// ```dart
-  /// final config = PostHogConfig('YOUR_API_KEY');
+  /// final config = PostHogConfig('YOUR_PROJECT_TOKEN');
   /// config.host = 'YOUR_POSTHOG_HOST';
   /// config.onFeatureFlags = () {
   ///   // Feature flags are now loaded, you can read flag values here

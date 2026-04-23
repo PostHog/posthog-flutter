@@ -59,10 +59,20 @@ class PosthogFlutterPlugin :
                 return
             }
 
-            val apiKey = bundle.getString("com.posthog.posthog.API_KEY")?.trim()
+            val projectToken =
+                (bundle.getString("com.posthog.posthog.PROJECT_TOKEN")
+                    ?: bundle.getString("com.posthog.posthog.API_KEY"))
+                    ?.trim()
 
-            if (apiKey.isNullOrEmpty()) {
-                Log.e("PostHog", "com.posthog.posthog.API_KEY is missing!")
+            if (!bundle.containsKey("com.posthog.posthog.PROJECT_TOKEN") && bundle.containsKey("com.posthog.posthog.API_KEY")) {
+                Log.w(
+                    "PostHog",
+                    "com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!"
+                )
+            }
+
+            if (projectToken.isNullOrEmpty()) {
+                Log.e("PostHog", "Either com.posthog.posthog.PROJECT_TOKEN or com.posthog.posthog.API_KEY must be provided!")
                 return
             }
 
@@ -79,7 +89,8 @@ class PosthogFlutterPlugin :
             val debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
             val posthogConfig = mutableMapOf<String, Any>()
-            posthogConfig["apiKey"] = apiKey
+            posthogConfig["projectToken"] = projectToken
+            posthogConfig["apiKey"] = projectToken
             posthogConfig["host"] = host
             posthogConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
             posthogConfig["debug"] = debug
@@ -282,9 +293,18 @@ class PosthogFlutterPlugin :
     }
 
     private fun setupPostHog(posthogConfig: Map<String, Any>) {
-        val apiKey = (posthogConfig["apiKey"] as String?)?.trim()
-        if (apiKey.isNullOrEmpty()) {
-            Log.e("PostHog", "apiKey is missing!")
+        val projectToken =
+            ((posthogConfig["projectToken"] as String?)
+                ?: (posthogConfig["apiKey"] as String?))
+                ?.trim()
+        if (!posthogConfig.containsKey("projectToken") && posthogConfig.containsKey("apiKey")) {
+            Log.w(
+                "PostHog",
+                "apiKey is deprecated and will be removed in the next major version. Use projectToken instead!"
+            )
+        }
+        if (projectToken.isNullOrEmpty()) {
+            Log.e("PostHog", "Either projectToken or apiKey must be provided!")
             return
         }
 
@@ -295,7 +315,7 @@ class PosthogFlutterPlugin :
                 ?: PostHogConfig.DEFAULT_HOST
 
         val config =
-            PostHogAndroidConfig(apiKey, host).apply {
+            PostHogAndroidConfig(projectToken, host).apply {
                 captureScreenViews = false
                 captureDeepLinks = false
                 posthogConfig.getIfNotNull<Boolean>("captureApplicationLifecycleEvents") {
