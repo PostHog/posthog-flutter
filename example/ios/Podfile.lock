@@ -1,10 +1,10 @@
 PODS:
   - Flutter (1.0.0)
-  - PostHog (3.50.0)
+  - PostHog (3.56.0)
   - posthog_flutter (0.0.1):
     - Flutter
     - FlutterMacOS
-    - PostHog (< 4.0.0, >= 3.50.0)
+    - PostHog (< 4.0.0, >= 3.56.0)
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
@@ -22,8 +22,8 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  PostHog: 38e00e9376b90f0d92de958105029e4736ffe7f9
-  posthog_flutter: 789630788986be1f728624d10f4b4e753f83c39f
+  PostHog: 646b20ce2db3f07f71ce7fb004a9b3a4ba4afa4b
+  posthog_flutter: 03b15ff7a78e2a4162baaf11f8db37b079412106
 
 PODFILE CHECKSUM: a57f30d18f102dd3ce366b1d62a55ecbef2158e5
 
