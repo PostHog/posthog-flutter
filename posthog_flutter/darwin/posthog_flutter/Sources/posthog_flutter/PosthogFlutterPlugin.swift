@@ -104,7 +104,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         let host = normalizedHost.isEmpty ? PostHogConfig.defaultHost : normalizedHost
 
         let config = PostHogConfig(
-            apiKey: projectToken,
+            projectToken: projectToken,
             host: host
         )
         config.captureScreenViews = false
