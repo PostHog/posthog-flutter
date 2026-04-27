@@ -1,5 +1,11 @@
 ## Next
 
+## 5.24.1
+
+### Patch Changes
+
+- 0d4ab6e: Prefer projectToken when configuring PostHog on Darwin platforms.
+
 ## 5.24.0
 
 ### Minor Changes
