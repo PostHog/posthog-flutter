@@ -51,4 +51,25 @@ class NativeCommunicator {
       return false;
     }
   }
+
+  /// Sends a network event as a `$snapshot` event to the native SDK.
+  ///
+  /// This bypasses the Dart `beforeSend` pipeline (consistent with screenshots)
+  /// and goes directly through the native capture method, which attaches
+  /// `$session_id` automatically.
+  Future<void> sendNetworkEvent(Map<String, dynamic> event) async {
+    if (kIsWeb) {
+      return;
+    }
+    try {
+      await _channel.invokeMethod('capture', {
+        'eventName': '\$snapshot',
+        'properties': {
+          '\$snapshot_data': [event],
+        },
+      });
+    } catch (e) {
+      printIfDebug('Error sending network event to native: \$e');
+    }
+  }
 }
