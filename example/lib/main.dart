@@ -447,7 +447,7 @@ class InitialScreenState extends State<InitialScreen> {
                     }
 
                     // Test Flutter error handler by throwing in widget context
-                    await ErrorExample().causeHandledDivisionError();
+                    ErrorExample().causeUnhandledDivisionError();
                   },
                   child: const Text("Test Flutter Error Handler"),
                 ),
