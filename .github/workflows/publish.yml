@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '.changeset/**'
+      - '.changeset/*.md'
   workflow_dispatch:
 
 # Concurrency control: only one release process can run at a time
@@ -123,7 +123,7 @@ jobs:
             echo "No changes to commit"
             echo "committed=false" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "chore: release $NEW_VERSION [version bump]"
+            git commit -m "chore: release $NEW_VERSION [version bump] [skip ci]"
             git push origin main
             echo "committed=true" >> "$GITHUB_OUTPUT"
           fi
