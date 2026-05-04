@@ -58,7 +58,8 @@ class Posthog {
   void _installFlutterIntegrations(PostHogConfig config) {
     // Install exception autocapture if enabled
     if (config.errorTrackingConfig.captureFlutterErrors ||
-        config.errorTrackingConfig.capturePlatformDispatcherErrors) {
+        config.errorTrackingConfig.capturePlatformDispatcherErrors ||
+        config.errorTrackingConfig.captureIsolateErrors) {
       PostHogErrorTrackingAutoCaptureIntegration.install(
         config: config.errorTrackingConfig,
         posthog: _posthog,
@@ -209,7 +210,14 @@ class Posthog {
   }
 
   /// Enable data collection for a user
-  Future<void> enable() => _posthog.enable();
+  Future<void> enable() {
+    final config = _config;
+    if (config != null) {
+      _installFlutterIntegrations(config);
+    }
+
+    return _posthog.enable();
+  }
 
   /// Check if the user has opted out of data collection
   Future<bool> isOptOut() => _posthog.isOptOut();

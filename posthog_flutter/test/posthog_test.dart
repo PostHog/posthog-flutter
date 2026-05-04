@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
@@ -32,6 +33,52 @@ void main() {
           fakePlatformInterface.registeredOnFeatureFlagsCallback,
           equals(testCallback),
         );
+      },
+    );
+
+    test(
+      'enable reinstalls Flutter error autocapture after disable',
+      () async {
+        final originalFlutterErrorHandler = FlutterError.onError;
+        FlutterError.onError = (_) {};
+
+        try {
+          final config = PostHogConfig('test_project_token');
+          config.errorTrackingConfig.captureFlutterErrors = true;
+          await Posthog().setup(config);
+
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: Exception('before-disable'),
+              context: ErrorDescription('issue 381 repro'),
+            ),
+          );
+          expect(fakePlatformInterface.capturedExceptions.length, 1);
+
+          fakePlatformInterface.capturedExceptions.clear();
+          await Posthog().disable();
+
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: Exception('while-disabled'),
+              context: ErrorDescription('issue 381 repro'),
+            ),
+          );
+          expect(fakePlatformInterface.capturedExceptions, isEmpty);
+
+          await Posthog().enable();
+
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: Exception('after-enable'),
+              context: ErrorDescription('issue 381 repro'),
+            ),
+          );
+          expect(fakePlatformInterface.capturedExceptions.length, 1);
+        } finally {
+          await Posthog().disable();
+          FlutterError.onError = originalFlutterErrorHandler;
+        }
       },
     );
   });
