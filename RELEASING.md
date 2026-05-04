@@ -22,13 +22,9 @@ The changeset file will be created in the `.changeset/` directory.
 
 Create a PR with your changes and the changeset file(s).
 
-### 3. Add the `release` Label
+### 3. Merge the PR
 
-When the PR is ready to be released, add the `release` label to it.
-
-### 4. Merge the PR
-
-When the PR is merged to `main`, the release workflow will automatically:
+No release label is required. When the PR is merged to `main`, the release workflow will automatically:
 
 1. Check for changesets
 2. Notify the client libraries team in Slack for approval
@@ -80,7 +76,7 @@ If the release workflow fails with "No changesets found", ensure your PR include
 
 ### Release not triggered
 
-Make sure the PR has the `release` label applied before merging.
+Make sure the PR includes a changeset file and was merged to `main`, or trigger the workflow manually from the Actions tab.
 
 ### Manual pub.dev publish (emergency only)
 

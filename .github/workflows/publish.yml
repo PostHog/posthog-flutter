@@ -4,9 +4,10 @@ permissions:
   contents: read
 
 on:
-  pull_request:
+  push:
     branches: [main]
-    types: [closed]
+    paths:
+      - '.changeset/*.md'
   workflow_dispatch:
 
 # Concurrency control: only one release process can run at a time
@@ -18,33 +19,10 @@ jobs:
   check-changesets:
     name: Check for changesets
     runs-on: ubuntu-latest
-    # Run when a PR into main is merged with the 'release' label, or when manually triggered
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     outputs:
       has-changesets: ${{ steps.check.outputs.has-changesets }}
     steps:
-      - name: Check release label on merged pull request
-        if: github.event_name == 'pull_request'
-        id: check-label
-        run: |
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          echo "Merged PR #${PR_NUMBER} into ${{ github.event.pull_request.base.ref }}"
-
-          LABELS=$(jq -r '[.pull_request.labels[].name] | join(", ")' "$GITHUB_EVENT_PATH")
-          echo "PR labels: ${LABELS:-<none>}"
-
-          HAS_LABEL=$(jq '[.pull_request.labels[] | select(.name == "release")] | length' "$GITHUB_EVENT_PATH")
-
-          if [ "$HAS_LABEL" -gt 0 ]; then
-            echo "✓ PR #${PR_NUMBER} has the 'release' label"
-            echo "has-release-label=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "PR #${PR_NUMBER} does not have the 'release' label. Skipping release."
-            echo "has-release-label=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout repository
-        if: github.event_name == 'workflow_dispatch' || steps.check-label.outputs.has-release-label == 'true'
         uses: actions/checkout@v6
         with:
           ref: main
@@ -52,7 +30,6 @@ jobs:
 
       - name: Check for changesets
         id: check
-        if: github.event_name == 'workflow_dispatch' || steps.check-label.outputs.has-release-label == 'true'
         run: |
           if [ ! -d ".changeset" ] || [ -z "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "❌ No changesets found. Cannot proceed with release."
