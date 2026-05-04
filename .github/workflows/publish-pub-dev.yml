@@ -3,6 +3,9 @@ name: 'Publish to pub.dev'
 permissions:
   contents: write
 
+# pub.dev trusted publishing requires releases to run from GitHub tags.
+# Keep this tag-triggered workflow separate from the main release workflow; the
+# release workflow creates these tags from main after applying changesets.
 on:
   push:
     tags:
