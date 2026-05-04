@@ -1,5 +1,11 @@
 ## Next
 
+## 5.24.2
+
+### Patch Changes
+
+- 5c60fb5: Reinstall Flutter error autocapture handlers when re-enabling data collection.
+
 ## 5.24.1
 
 ### Patch Changes
