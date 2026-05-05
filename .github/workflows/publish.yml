@@ -62,7 +62,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      committed: ${{ steps.check-changes.outputs.committed }}
+      committed: ${{ steps.commit-version-bump.outputs.commit-hash != '' }}
       new-version: ${{ steps.apply-changesets.outputs.new-version }}
     steps:
       - name: Notify Slack - Approved
@@ -139,20 +139,20 @@ jobs:
           git fetch origin main
           git reset --hard "$COMMIT_HASH"
       - name: Save Slack thread_ts to cache
-        if: steps.check-changes.outputs.committed == 'true'
+        if: steps.commit-version-bump.outputs.commit-hash != ''
         env:
           SLACK_THREAD_TS: ${{ needs.notify-approval-needed.outputs.slack_ts }}
         run: echo "$SLACK_THREAD_TS" > .slack-thread-ts
 
       - name: Cache Slack thread_ts for publish workflow
-        if: steps.check-changes.outputs.committed == 'true'
+        if: steps.commit-version-bump.outputs.commit-hash != ''
         uses: actions/cache/save@v5
         with:
           path: .slack-thread-ts
           key: slack-thread-ts-${{ steps.apply-changesets.outputs.new-version }}
 
       - name: Tag and push
-        if: steps.check-changes.outputs.committed == 'true'
+        if: steps.commit-version-bump.outputs.commit-hash != ''
         env:
           GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
           NEW_VERSION: ${{ steps.apply-changesets.outputs.new-version }}
