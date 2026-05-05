@@ -175,6 +175,7 @@ jobs:
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
           thread_ts: ${{ steps.slack-thread.outputs.thread_ts }}
           message: '🚀 `posthog_flutter@${{ steps.get-version.outputs.version }}` released successfully!'
+          emoji_reaction: "rocket"
 
       - name: Notify Slack - Failed
         if: needs.publish.result == 'failure'
