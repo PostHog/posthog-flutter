@@ -23,7 +23,7 @@ jobs:
       has-changesets: ${{ steps.check.outputs.has-changesets }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: main
           fetch-depth: 0
@@ -44,7 +44,7 @@ jobs:
     name: Notify Slack - Approval Needed
     needs: check-changesets
     if: needs.check-changesets.outputs.has-changesets == 'true'
-    uses: PostHog/.github/.github/workflows/notify-approval-needed.yml@main
+    uses: PostHog/.github/.github/workflows/notify-approval-needed.yml@d2e7c952fef6a22b2210bcffc70bec71abeeba03
     with:
       slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
       slack_user_group_id: ${{ vars.GROUP_CLIENT_LIBRARIES_SLACK_GROUP_ID }}
@@ -67,7 +67,7 @@ jobs:
     steps:
       - name: Notify Slack - Approved
         continue-on-error: true
-        uses: PostHog/.github/.github/actions/slack-thread-reply@main
+        uses: PostHog/.github/.github/actions/slack-thread-reply@d2e7c952fef6a22b2210bcffc70bec71abeeba03
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
@@ -77,13 +77,13 @@ jobs:
 
       - name: Get GitHub App token
         id: releaser
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ secrets.GH_APP_POSTHOG_FLUTTER_RELEASER_APP_ID }}
           private-key: ${{ secrets.GH_APP_POSTHOG_FLUTTER_RELEASER_PRIVATE_KEY }}
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: main
           fetch-depth: 0
@@ -146,7 +146,7 @@ jobs:
 
       - name: Cache Slack thread_ts for publish workflow
         if: steps.commit-version-bump.outputs.commit-hash != ''
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .slack-thread-ts
           key: slack-thread-ts-${{ steps.apply-changesets.outputs.new-version }}
@@ -163,7 +163,7 @@ jobs:
       - name: Notify Slack - Failed
         continue-on-error: true
         if: ${{ failure() && needs.notify-approval-needed.outputs.slack_ts != '' }}
-        uses: PostHog/.github/.github/actions/slack-thread-reply@main
+        uses: PostHog/.github/.github/actions/slack-thread-reply@d2e7c952fef6a22b2210bcffc70bec71abeeba03
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
@@ -203,7 +203,7 @@ jobs:
       - name: Notify Slack - Rejected
         if: steps.check-rejection.outputs.was_rejected == 'true'
         continue-on-error: true
-        uses: PostHog/.github/.github/actions/slack-thread-reply@main
+        uses: PostHog/.github/.github/actions/slack-thread-reply@d2e7c952fef6a22b2210bcffc70bec71abeeba03
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
