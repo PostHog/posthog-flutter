@@ -30,6 +30,8 @@ def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0
 if (agpMajor < 9) {
     apply plugin: 'kotlin-android'
 } else {
+    // AGP 9 enables built-in Kotlin by default. Flutter templates can explicitly opt out
+    // with android.builtInKotlin=false, in which case we still apply kotlin-android.
     def builtInKotlin = providers.gradleProperty('android.builtInKotlin')
         .map { it.toBoolean() }
         .getOrElse(true)
