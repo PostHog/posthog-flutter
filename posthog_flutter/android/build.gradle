@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 group 'com.posthog.flutter'
 version '1.0-SNAPSHOT'
@@ -28,12 +29,6 @@ apply plugin: 'com.android.library'
 def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
 if (agpMajor < 9) {
     apply plugin: 'kotlin-android'
-
-    kotlin {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_1_8
-        }
-    }
 }
 
 android {
@@ -74,5 +69,11 @@ android {
                 showStandardStreams = true
             }
         }
+    }
+}
+
+tasks.withType(KotlinCompile).configureEach {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_1_8
     }
 }
