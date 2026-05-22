@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 group 'com.posthog.flutter'
 version '1.0-SNAPSHOT'
 
@@ -9,7 +12,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.4.2'
+        classpath 'com.android.tools.build:gradle:8.11.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -22,7 +25,20 @@ allprojects {
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
+
+def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
+if (agpMajor < 9) {
+    apply plugin: 'kotlin-android'
+} else {
+    // AGP 9 enables built-in Kotlin by default. Flutter templates can explicitly opt out
+    // with android.builtInKotlin=false, in which case we still apply kotlin-android.
+    def builtInKotlin = providers.gradleProperty('android.builtInKotlin')
+        .map { it.toBoolean() }
+        .getOrElse(true)
+    if (!builtInKotlin) {
+        apply plugin: 'kotlin-android'
+    }
+}
 
 android {
     if (project.android.hasProperty("namespace")) {
@@ -34,11 +50,6 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = '1.8'
-        // no need to set languageVersion and apiVersion since we want 2.0 compatibility, but we are compiling using kotlin 2.0 already
     }
 
     sourceSets {
@@ -67,5 +78,11 @@ android {
                 showStandardStreams = true
             }
         }
+    }
+}
+
+tasks.withType(KotlinCompile).configureEach {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_1_8
     }
 }
