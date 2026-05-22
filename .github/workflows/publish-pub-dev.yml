@@ -54,7 +54,10 @@ jobs:
         uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
+        # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
+        # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
+        uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
         with:
           channel: 'stable'
 
