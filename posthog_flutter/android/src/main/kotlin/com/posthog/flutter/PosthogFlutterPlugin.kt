@@ -30,6 +30,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.io.ByteArrayOutputStream
 import java.util.Date
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 /** PosthogFlutterPlugin */
@@ -46,6 +47,8 @@ class PosthogFlutterPlugin :
     private lateinit var applicationContext: Context
     private var activity: Activity? = null
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val screenshotCompressionExecutor = Executors.newSingleThreadExecutor()
     private val snapshotSender = SnapshotSender()
 
     // The surveys delegate
@@ -448,6 +451,7 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+        screenshotCompressionExecutor.shutdown()
     }
 
     private fun handleSendFullSnapshot(
@@ -553,7 +557,7 @@ class PosthogFlutterPlugin :
                 bitmap,
                 { copyResult ->
                     if (copyResult == PixelCopy.SUCCESS) {
-                        result.success(bitmapToPng(bitmap))
+                        compressBitmapToPngAsync(bitmap, result)
                     } else {
                         bitmap.recycle()
                         captureNativeScreenshotFallback(
@@ -568,7 +572,7 @@ class PosthogFlutterPlugin :
                         )
                     }
                 },
-                Handler(Looper.getMainLooper()),
+                mainHandler,
             )
             return
         }
@@ -597,6 +601,8 @@ class PosthogFlutterPlugin :
     ) {
         val contentBitmap =
             Bitmap.createBitmap(contentView.width, contentView.height, Bitmap.Config.ARGB_8888)
+        // Software Canvas cannot read GPU-composited surfaces like SurfaceView or TextureView,
+        // so those platform views may still appear blank when we hit this fallback path.
         contentView.draw(android.graphics.Canvas(contentBitmap))
 
         val croppedBitmap =
@@ -618,7 +624,7 @@ class PosthogFlutterPlugin :
                 }
             }
 
-        result.success(bitmapToPng(outputBitmap))
+        compressBitmapToPngAsync(outputBitmap, result)
     }
 
     private fun bitmapToPng(bitmap: Bitmap): ByteArray {
@@ -626,6 +632,27 @@ class PosthogFlutterPlugin :
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
         bitmap.recycle()
         return outputStream.toByteArray()
+    }
+
+    private fun compressBitmapToPngAsync(
+        bitmap: Bitmap,
+        result: Result,
+    ) {
+        screenshotCompressionExecutor.execute {
+            try {
+                val pngBytes = bitmapToPng(bitmap)
+                mainHandler.post {
+                    result.success(pngBytes)
+                }
+            } catch (e: Throwable) {
+                if (!bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+                mainHandler.post {
+                    result.error("PosthogFlutterException", e.localizedMessage, null)
+                }
+            }
+        }
     }
 
     private fun getFeatureFlag(
