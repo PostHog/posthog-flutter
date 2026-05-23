@@ -328,6 +328,14 @@ class PostHogSessionReplayConfig {
   /// If null, sampling is controlled by remote config (when available).
   double? sampleRate;
 
+  /// Capture native platform views, such as maps and web views, in session replay.
+  ///
+  /// Default: false.
+  ///
+  /// Platform view content is captured from the native view hierarchy and cannot
+  /// be automatically masked by Flutter widget masking rules.
+  var capturePlatformViews = false;
+
   /// Converts this session replay configuration to a platform-channel map.
   ///
   /// Returns values consumed by the Android and Apple session replay
@@ -337,6 +345,7 @@ class PostHogSessionReplayConfig {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
+      'capturePlatformViews': capturePlatformViews,
       if (sampleRate != null) 'sampleRate': sampleRate,
     };
   }

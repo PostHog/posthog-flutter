@@ -138,6 +138,22 @@ void main() {
       expect(config.host, equals('https://us.i.posthog.com'));
       expect(config.toMap()['host'], equals('https://us.i.posthog.com'));
     });
+
+    test('session replay platform view capture is opt-in', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.sessionReplayConfig.capturePlatformViews, isFalse);
+
+      final replayConfig =
+          config.toMap()['sessionReplayConfig'] as Map<String, dynamic>;
+      expect(replayConfig['capturePlatformViews'], isFalse);
+
+      config.sessionReplayConfig.capturePlatformViews = true;
+
+      final updatedReplayConfig =
+          config.toMap()['sessionReplayConfig'] as Map<String, dynamic>;
+      expect(updatedReplayConfig['capturePlatformViews'], isTrue);
+    });
   });
 
   group('getFeatureFlagResult', () {
