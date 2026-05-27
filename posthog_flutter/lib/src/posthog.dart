@@ -10,6 +10,10 @@ import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
 
+/// Entry point for the PostHog Flutter SDK.
+///
+/// Use the singleton returned by [Posthog] to set up the SDK, capture events,
+/// identify users, evaluate feature flags, and control session replay.
 class Posthog {
   static PosthogFlutterPlatformInterface get _posthog =>
       PosthogFlutterPlatformInterface.instance;
@@ -18,6 +22,7 @@ class Posthog {
 
   PostHogConfig? _config;
 
+  /// Returns the singleton PostHog client instance.
   factory Posthog() {
     return _instance;
   }
@@ -26,10 +31,14 @@ class Posthog {
 
   /// Initializes the PostHog SDK.
   ///
-  /// This method sets up the connection to your PostHog instance and prepares the SDK for tracking events and feature flags.
+  /// This method sets up the connection to your PostHog instance and prepares
+  /// the SDK for tracking events and feature flags.
   ///
-  /// - [config]: The [PostHogConfig] object containing your project token, host, and other settings.
-  ///   To listen for feature flag load events, provide an `onFeatureFlags` callback in the [PostHogConfig].
+  /// The [config] object contains your project token, host, and other settings.
+  /// To listen for feature flag load events, provide an `onFeatureFlags`
+  /// callback in the [PostHogConfig].
+  ///
+  /// Returns a [Future] that completes when platform setup has finished.
   ///
   /// **Example:**
   /// ```dart
@@ -42,7 +51,8 @@ class Posthog {
   /// ```
   ///
   /// For Android and iOS, if you are performing a manual setup,
-  /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native configuration.
+  /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
+  /// configuration.
   Future<void> setup(PostHogConfig config) {
     _config = config; // Store the config
 
@@ -72,19 +82,29 @@ class Posthog {
     PostHogErrorTrackingAutoCaptureIntegration.uninstall();
   }
 
+  /// The active SDK configuration, if [setup] has completed.
+  ///
+  /// For internal use by Flutter integrations.
   @internal
   PostHogConfig? get config => _config;
 
-  /// Returns the current screen name (or route name)
-  /// Only returns a value if [PosthogObserver] is used
+  /// Returns the current screen name or route name.
+  ///
+  /// Only returns a value if [PosthogObserver] is used.
   @internal
   String? get currentScreen => _currentScreen;
 
-  /// Can associate events with specific users
+  /// Associates events with a specific user.
   ///
-  /// - [userId] A unique identifier for your user. Typically either their email or database ID.
-  /// - [userProperties] the user properties, set as a "$set" property,
-  /// - [userPropertiesSetOnce] the user properties to set only once, set as a "$set_once" property.
+  /// The [userId] is a unique identifier for your user, typically their email or
+  /// database ID.
+  ///
+  /// The optional [userProperties] are person properties set with `$set`.
+  ///
+  /// The optional [userPropertiesSetOnce] are person properties set with
+  /// `$set_once`.
+  ///
+  /// Returns a [Future] that completes when the identify call has been queued.
   ///
   /// **Example:**
   /// ```dart
@@ -107,12 +127,17 @@ class Posthog {
 
   /// Sets person properties for the current user without requiring identify.
   ///
-  /// This method sends a `$set` event to update person properties.
+  /// This method sends person property updates without changing the current
+  /// distinct ID.
   ///
-  /// - [userPropertiesToSet] the user properties to set, will overwrite existing values
-  /// - [userPropertiesToSetOnce] the user properties to set only once, will not overwrite existing values
+  /// The optional [userPropertiesToSet] values are set with `$set` and overwrite
+  /// existing values.
   ///
-  /// Returns early without sending an event if both property maps are null or empty.
+  /// The optional [userPropertiesToSetOnce] values are set with `$set_once` and
+  /// do not overwrite existing values.
+  ///
+  /// Returns a [Future] that completes when the update has been queued.
+  /// If both property maps are null or empty, no event is queued.
   ///
   /// **Example:**
   /// ```dart
@@ -130,18 +155,23 @@ class Posthog {
         userPropertiesToSetOnce: userPropertiesToSetOnce,
       );
 
-  /// Captures events.
-  /// Docs https://posthog.com/docs/product-analytics/user-properties
+  /// Captures a custom event.
   ///
-  /// We recommend using a [object] [verb] format for your event names,
-  /// where [object] is the entity that the behavior relates to,
-  /// and [verb] is the behavior itself.
-  /// For example, project created, user signed up, or invite sent.
+  /// Docs: https://posthog.com/docs/product-analytics/user-properties
   ///
-  /// - [eventName] name of event
-  /// - [properties] the custom properties
-  /// - [userProperties] the user properties, set as a "$set" property,
-  /// - [userPropertiesSetOnce] the user properties to set only once, set as a "$set_once" property.
+  /// We recommend using an `[object] [verb]` format for [eventName], where the
+  /// object is the entity that the behavior relates to and the verb is the
+  /// behavior itself. For example: `project created`, `user signed up`, or
+  /// `invite sent`.
+  ///
+  /// The optional [properties] are event properties.
+  ///
+  /// The optional [userProperties] are person properties set with `$set`.
+  ///
+  /// The optional [userPropertiesSetOnce] are person properties set with
+  /// `$set_once`.
+  ///
+  /// Returns a [Future] that completes when the event has been queued.
   ///
   /// **Example**
   /// ```dart
@@ -175,10 +205,13 @@ class Posthog {
     );
   }
 
-  /// Captures a screen view event
+  /// Captures a screen view event.
   ///
-  /// - [screenName] the screen title
-  /// - [properties] the custom properties
+  /// The [screenName] is the screen title or route name.
+  ///
+  /// The optional [properties] are additional screen event properties.
+  ///
+  /// Returns a [Future] that completes when the screen event has been queued.
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
@@ -187,21 +220,31 @@ class Posthog {
     return _posthog.screen(screenName: screenName, properties: properties);
   }
 
-  /// Creates an alias for the user.
-  /// Docs https://posthog.com/docs/product-analytics/identify#alias-assigning-multiple-distinct-ids-to-the-same-user
+  /// Creates an alias for the current user.
   ///
-  /// - [alias] the alias
+  /// Docs:
+  /// https://posthog.com/docs/product-analytics/identify#alias-assigning-multiple-distinct-ids-to-the-same-user
+  ///
+  /// The [alias] is the additional distinct ID to associate with the user.
+  ///
+  /// Returns a [Future] that completes when the alias call has been queued.
   Future<void> alias({required String alias}) => _posthog.alias(alias: alias);
 
-  /// Returns the registered `distinctId` property
+  /// Returns the registered `distinctId` property.
+  ///
+  /// Returns an empty string if the platform cannot provide a distinct ID.
   Future<String> getDistinctId() => _posthog.getDistinctId();
 
-  /// Resets all the cached properties including the `distinctId`.
+  /// Resets all cached properties including the `distinctId`.
   ///
-  /// The SDK will behave as its been [setup] for the first time
+  /// The SDK will behave as if it has been [setup] for the first time.
+  ///
+  /// Returns a [Future] that completes when the reset request has been queued.
   Future<void> reset() => _posthog.reset();
 
-  /// Disable data collection for a user
+  /// Disables data collection for the current user.
+  ///
+  /// Returns a [Future] that completes when the opt-out request has been queued.
   Future<void> disable() {
     // Uninstall Flutter-specific integrations when disabling
     _uninstallFlutterIntegrations();
@@ -209,7 +252,9 @@ class Posthog {
     return _posthog.disable();
   }
 
-  /// Enable data collection for a user
+  /// Enables data collection for the current user.
+  ///
+  /// Returns a [Future] that completes when the opt-in request has been queued.
   Future<void> enable() {
     final config = _config;
     if (config != null) {
@@ -219,43 +264,58 @@ class Posthog {
     return _posthog.enable();
   }
 
-  /// Check if the user has opted out of data collection
+  /// Returns whether the current user has opted out of data collection.
   Future<bool> isOptOut() => _posthog.isOptOut();
 
-  /// Enable or disable verbose logs about the inner workings of the SDK.
+  /// Enables or disables verbose logs about the inner workings of the SDK.
   ///
-  /// - [enabled] whether to enable or disable debug logs
+  /// Set [enabled] to `true` to enable debug logs, or `false` to disable them.
+  ///
+  /// Returns a [Future] that completes when the debug setting has been applied.
   Future<void> debug(bool enabled) => _posthog.debug(enabled);
 
-  /// Register a property to always be sent with all the following events until you call
-  /// [unregister] with the same key.
+  /// Registers a super property sent with all following events.
   ///
-  /// - [key] the Key
-  /// - [value] the Value
+  /// The property remains active until [unregister] is called with the same
+  /// [key]. The [value] must be supported by the platform channel serializer.
+  ///
+  /// Returns a [Future] that completes when the property has been registered.
   Future<void> register(String key, Object value) =>
       _posthog.register(key, value);
 
-  /// Unregisters the previously set property to be sent with all the following events
+  /// Unregisters a previously registered super property.
   ///
-  /// [key] the Key
+  /// The [key] identifies the property to stop sending with future events.
+  ///
+  /// Returns a [Future] that completes when the property has been removed.
   Future<void> unregister(String key) => _posthog.unregister(key);
 
-  /// Returns if a feature flag is enabled, the feature flag must be a Boolean
+  /// Returns whether a boolean feature flag is enabled.
   ///
-  /// Docs https://posthog.com/docs/feature-flags and https://posthog.com/docs/experiments
+  /// Docs: https://posthog.com/docs/feature-flags and
+  /// https://posthog.com/docs/experiments
   ///
-  /// - [key] the Key of the feature
+  /// The [key] is the feature flag key.
+  ///
+  /// Returns `false` when the flag is disabled, missing, or not a boolean flag.
   Future<bool> isFeatureEnabled(String key) => _posthog.isFeatureEnabled(key);
 
-  /// Reloads the feature flags
+  /// Reloads feature flags for the current user.
+  ///
+  /// Returns a [Future] that completes when the reload request has been queued.
   Future<void> reloadFeatureFlags() => _posthog.reloadFeatureFlags();
 
-  /// Creates a group.
-  /// Docs https://posthog.com/docs/product-analytics/group-analytics
+  /// Associates the current user with a group.
   ///
-  /// - [groupType] the Group type
-  /// - [groupKey] the Group key
-  /// - [groupProperties] the Group properties, set as a "$group_set" property.
+  /// Docs: https://posthog.com/docs/product-analytics/group-analytics
+  ///
+  /// The [groupType] is the group type, such as `company`.
+  ///
+  /// The [groupKey] is the unique key for the group.
+  ///
+  /// The optional [groupProperties] are group properties set with `$group_set`.
+  ///
+  /// Returns a [Future] that completes when the group call has been queued.
   ///
   /// **Example:**
   /// ```dart
@@ -277,21 +337,23 @@ class Posthog {
         groupProperties: groupProperties,
       );
 
-  /// Returns the feature flag value for the given key.
+  /// Returns the feature flag value for [key].
   ///
-  /// Returns `null` if the flag doesn't exist.
-  /// For boolean flags, returns `true` or `false`.
-  /// For multivariate flags, returns the variant string.
+  /// Returns `null` if the flag does not exist or cannot be loaded. For boolean
+  /// flags, returns `true` or `false`. For multivariate flags, returns the
+  /// variant key.
   Future<Object?> getFeatureFlag(String key) =>
       _posthog.getFeatureFlag(key: key);
 
-  /// Returns the full feature flag result including value and payload.
+  /// Returns the full feature flag result for [key], including value and
+  /// payload.
   ///
   /// This is the canonical method for getting feature flag data.
-  /// Returns `null` if the flag doesn't exist.
+  /// Returns `null` if the flag does not exist or cannot be loaded.
   ///
   /// Set [sendEvent] to `false` to suppress the `$feature_flag_called` event.
-  /// This is useful when you only need the payload and don't want to emit the event.
+  /// This is useful when you only need the payload and do not want to emit the
+  /// event.
   ///
   /// **Example:**
   /// ```dart
@@ -307,20 +369,31 @@ class Posthog {
   }) =>
       _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
 
-  /// Returns the payload for a feature flag.
+  /// Returns the payload for the feature flag [key].
+  ///
+  /// Returns `null` when the flag does not exist, has no payload, or the payload
+  /// cannot be loaded.
   @Deprecated(
     'Use getFeatureFlagResult instead, which returns both value and payload.',
   )
   Future<Object?> getFeatureFlagPayload(String key) =>
       _posthog.getFeatureFlagPayload(key: key);
 
+  /// Flushes queued events immediately where supported by the platform.
+  ///
+  /// Returns a [Future] that completes when the flush request has finished.
   Future<void> flush() => _posthog.flush();
 
-  /// Captures exceptions with optional custom properties
+  /// Captures an exception with optional custom properties.
   ///
-  /// - [error] - The error/exception to capture
-  /// - [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
-  /// - [properties] - Optional custom properties to attach to the exception event
+  /// The [error] is the error or exception to capture.
+  ///
+  /// The optional [stackTrace] is attached to the exception. If omitted, the
+  /// current stack trace is used by the exception processor where possible.
+  ///
+  /// The optional [properties] are added to the `$exception` event.
+  ///
+  /// Returns a [Future] that completes when the exception event has been queued.
   Future<void> captureException({
     required Object error,
     StackTrace? stackTrace,
@@ -332,12 +405,18 @@ class Posthog {
         properties: properties,
       );
 
-  /// Captures runZonedGuarded exceptions with optional custom properties
-  /// https://api.flutter.dev/flutter/dart-async/runZonedGuarded.html
+  /// Captures a `runZonedGuarded` error with optional custom properties.
   ///
-  /// - [error] - The error/exception to capture
-  /// - [stackTrace] - Optional stack trace (if not provided, current stack trace will be used)
-  /// - [properties] - Optional custom properties to attach to the exception event
+  /// See: https://api.flutter.dev/flutter/dart-async/runZonedGuarded.html
+  ///
+  /// The [error] is the error or exception received by `runZonedGuarded`.
+  ///
+  /// The optional [stackTrace] is attached to the exception. If omitted, the
+  /// current stack trace is used by the exception processor where possible.
+  ///
+  /// The optional [properties] are added to the `$exception` event.
+  ///
+  /// Returns a [Future] that completes when the exception event has been queued.
   Future<void> captureRunZonedGuardedError({
     required Object error,
     StackTrace? stackTrace,
@@ -357,7 +436,10 @@ class Posthog {
 
   /// Closes the PostHog SDK and cleans up resources.
   ///
-  /// Note: Please note that after calling close(), surveys will not be rendered until the SDK is re-initialized and the next navigation event occurs.
+  /// Returns a [Future] that completes when platform resources have been closed.
+  ///
+  /// **Note:** After calling `close()`, surveys will not be rendered until the
+  /// SDK is re-initialized and the next navigation event occurs.
   Future<void> close() {
     _config = null;
     _currentScreen = null;
@@ -370,7 +452,10 @@ class Posthog {
     return _posthog.close();
   }
 
-  /// Returns the session Id if a session is active
+  /// Returns the session ID if a session is active.
+  ///
+  /// Returns `null` when no session is active or the platform cannot provide a
+  /// session ID.
   Future<String?> getSessionId() => _posthog.getSessionId();
 
   /// Starts session recording.
@@ -378,8 +463,10 @@ class Posthog {
   /// This method will have no effect if PostHog is not enabled, or if session
   /// replay is disabled in your project settings.
   ///
-  /// [resumeCurrent] - If true (default), resumes recording of the current session.
-  /// If false, starts a new session and begins recording.
+  /// Set [resumeCurrent] to `true` (the default) to resume recording the current
+  /// session. Set it to `false` to start a new session and begin recording.
+  ///
+  /// Returns a [Future] that completes when the start request has been sent.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
     PostHogInternalEvents.sessionRecordingActive.value = true;
@@ -388,12 +475,17 @@ class Posthog {
   /// Stops the current session recording if one is in progress.
   ///
   /// This method will have no effect if PostHog is not enabled.
+  ///
+  /// Returns a [Future] that completes when the stop request has been sent.
   Future<void> stopSessionRecording() async {
     await _posthog.stopSessionRecording();
     PostHogInternalEvents.sessionRecordingActive.value = false;
   }
 
   /// Returns whether session replay is currently active.
+  ///
+  /// Returns `false` when session replay is inactive or unsupported by the
+  /// current platform.
   Future<bool> isSessionReplayActive() => _posthog.isSessionReplayActive();
 
   Posthog._internal();

@@ -7,15 +7,23 @@ import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
 import 'replay/screenshot/screenshot_capturer.dart';
 
+/// Wraps a Flutter app to enable mobile session replay screenshots.
+///
+/// Place [PostHogWidget] above your app content when `PostHogConfig.sessionReplay`
+/// is enabled. The widget captures snapshots from [child] and sends them to the
+/// native SDK while session recording is active.
 class PostHogWidget extends StatefulWidget {
+  /// The widget subtree to include in session replay snapshots.
   final Widget child;
 
+  /// Creates a session replay root widget around [child].
   const PostHogWidget({super.key, required this.child});
 
   @override
   PostHogWidgetState createState() => PostHogWidgetState();
 }
 
+/// State for [PostHogWidget].
 class PostHogWidgetState extends State<PostHogWidget> {
   ChangeDetector? _changeDetector;
   ScreenshotCapturer? _screenshotCapturer;
