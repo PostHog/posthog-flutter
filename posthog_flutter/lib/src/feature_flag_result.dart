@@ -18,6 +18,18 @@ class PostHogFeatureFlagResult {
   /// The JSON payload associated with the flag, if any.
   final Object? payload;
 
+  /// Creates a feature flag evaluation result.
+  ///
+  /// The [key] is the feature flag key that was evaluated.
+  ///
+  /// The [enabled] value is the boolean result for boolean flags. For
+  /// multivariate flags, it is `true` when the flag evaluates to a variant and
+  /// `false` when it does not match.
+  ///
+  /// The optional [variant] is the variant key for multivariate flags.
+  ///
+  /// The optional [payload] is the JSON payload configured for the matched flag
+  /// or variant.
   const PostHogFeatureFlagResult({
     required this.key,
     required this.enabled,
@@ -44,9 +56,11 @@ class PostHogFeatureFlagResult {
 
   /// Creates a [PostHogFeatureFlagResult] from a native SDK response map.
   ///
-  /// The [map] should contain: key, enabled, variant, payload.
-  /// Falls back to [fallbackKey] if the map doesn't include a key.
-  /// Returns null if [result] is null or not a Map.
+  /// The [result] should be a map containing `key`, `enabled`, `variant`, and
+  /// `payload` entries. Falls back to [fallbackKey] if the map does not include
+  /// a key.
+  ///
+  /// Returns `null` if [result] is `null` or is not a [Map].
   static PostHogFeatureFlagResult? fromMap(Object? result, String fallbackKey) {
     if (result == null) return null;
     if (result is! Map) return null;

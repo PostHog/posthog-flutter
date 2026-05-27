@@ -4,19 +4,44 @@ import 'package:meta/meta.dart';
 
 import 'posthog.dart';
 
+/// Extracts a PostHog screen name from Flutter [RouteSettings].
+///
+/// Return `null` to skip tracking the route. The [settings] argument is the
+/// route settings from the route being pushed, popped to, or replaced.
 typedef ScreenNameExtractor = String? Function(RouteSettings settings);
 
-/// [PostHogRouteFilter] allows to filter out routes that should not be tracked.
+/// Filters routes before [PosthogObserver] captures screen views.
 ///
-/// By default, only [PageRoute]s are tracked.
+/// Return `true` to allow tracking for [route] and `false` to ignore it. By
+/// default, only [PageRoute]s are tracked.
 typedef PostHogRouteFilter = bool Function(Route<dynamic>? route);
 
+/// Returns [RouteSettings.name] as the screen name for [settings].
+///
+/// Returns `null` when the route settings do not define a name.
 String? defaultNameExtractor(RouteSettings settings) => settings.name;
 
+/// Returns whether [route] should be tracked by the default route filter.
+///
+/// The default implementation tracks only [PageRoute] instances.
 bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
 
+/// A Flutter [NavigatorObserver] that automatically captures `$screen` events.
+///
+/// Add this observer to `MaterialApp.navigatorObservers` or a router such as
+/// `go_router` to capture screen views when named routes are pushed, popped, or
+/// replaced.
 class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
     with WidgetsBindingObserver {
+  /// Creates a PostHog route observer.
+  ///
+  /// The [nameExtractor] reads a screen name from route settings. It defaults
+  /// to [defaultNameExtractor], which returns [RouteSettings.name].
+  ///
+  /// The [routeFilter] determines which routes are eligible for tracking. It
+  /// defaults to [defaultPostHogRouteFilter], which tracks [PageRoute]s.
+  ///
+  /// Screen events are only sent while the app is in the foreground.
   PosthogObserver({
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,

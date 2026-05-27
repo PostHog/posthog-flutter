@@ -1,6 +1,7 @@
-/// Represents an event that can be modified or dropped by the [BeforeSendCallback].
+/// Represents an event that can be modified or dropped before it is sent.
 ///
-/// This class is used in the beforeSend callback to allow modification of events before they are sent to PostHog.
+/// This class is used in before-send callbacks to allow modification of events
+/// before they are sent to PostHog.
 class PostHogEvent {
   /// The name of the event (e.g., 'button_clicked', '$screen', '$exception')
   String event;
@@ -21,6 +22,17 @@ class PostHogEvent {
   /// These properties will only be set if they don't already exist on the user profile.
   Map<String, Object>? userPropertiesSetOnce;
 
+  /// Creates an event passed to a before-send callback.
+  ///
+  /// The [event] is the event name to capture.
+  ///
+  /// The optional [properties] are event properties that can be amended before
+  /// capture.
+  ///
+  /// The optional [userProperties] are person properties to set with `$set`.
+  ///
+  /// The optional [userPropertiesSetOnce] are person properties to set with
+  /// `$set_once`.
   PostHogEvent({
     required this.event,
     this.properties,

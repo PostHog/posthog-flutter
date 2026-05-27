@@ -1,3 +1,4 @@
+/// Public Flutter API for the PostHog SDK.
 library posthog_flutter;
 
 export 'src/feature_flag_result.dart';
