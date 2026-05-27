@@ -11,7 +11,10 @@ runs:
   using: composite
   steps:
     - name: Setup Flutter
-      uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+      # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
+      # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
+      # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
+      uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
       with:
         channel: 'stable'
 
