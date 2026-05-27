@@ -137,6 +137,7 @@ class Posthog {
   /// do not overwrite existing values.
   ///
   /// Returns a [Future] that completes when the update has been queued.
+  /// If both property maps are null or empty, no event is queued.
   ///
   /// **Example:**
   /// ```dart
