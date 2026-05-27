@@ -1,5 +1,15 @@
 ## Next
 
+## 5.25.0
+
+### Minor Changes
+
+- cfcab97: Support Android builds with AGP 9 built-in Kotlin while preserving compatibility with AGP 8. This release requires Android Gradle Plugin 8.0 or newer.
+
+### Patch Changes
+
+- f9490ed: Raise the minimum `posthog-android` version to 3.44.0 to guarantee session replay minimum recording duration support.
+
 ## 5.24.2
 
 ### Patch Changes
