@@ -69,6 +69,9 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> enable() async {}
 
   @override
+  Future<void> close() async {}
+
+  @override
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
