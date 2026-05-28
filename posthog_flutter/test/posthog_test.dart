@@ -38,29 +38,38 @@ void main() {
       },
     );
 
-    test(
-      'setup with blank project token skips platform setup and integrations',
-      () async {
-        final originalFlutterErrorHandler = FlutterError.onError;
-        void sentinelHandler(FlutterErrorDetails _) {}
-        FlutterError.onError = sentinelHandler;
+    group('setup with blank project token', () {
+      const blankProjectTokens = <String, String>{
+        'empty string': '',
+        'space': ' ',
+        'tab': '\t',
+        'mixed whitespace': ' \n\t ',
+      };
 
-        try {
-          final config = PostHogConfig(' \n\t ');
-          config.sessionReplay = true;
-          config.errorTrackingConfig.captureFlutterErrors = true;
+      for (final entry in blankProjectTokens.entries) {
+        test('skips platform setup and integrations for ${entry.key}',
+            () async {
+          final originalFlutterErrorHandler = FlutterError.onError;
+          void sentinelHandler(FlutterErrorDetails _) {}
+          FlutterError.onError = sentinelHandler;
 
-          await Posthog().setup(config);
+          try {
+            final config = PostHogConfig(entry.value);
+            config.sessionReplay = true;
+            config.errorTrackingConfig.captureFlutterErrors = true;
 
-          expect(fakePlatformInterface.receivedConfig, isNull);
-          expect(Posthog().config, isNull);
-          expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
-          expect(FlutterError.onError, same(sentinelHandler));
-        } finally {
-          FlutterError.onError = originalFlutterErrorHandler;
-        }
-      },
-    );
+            await Posthog().setup(config);
+
+            expect(fakePlatformInterface.receivedConfig, isNull);
+            expect(Posthog().config, isNull);
+            expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
+            expect(FlutterError.onError, same(sentinelHandler));
+          } finally {
+            FlutterError.onError = originalFlutterErrorHandler;
+          }
+        });
+      }
+    });
 
     test(
       'enable reinstalls Flutter error autocapture after disable',

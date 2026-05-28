@@ -56,7 +56,7 @@ class Posthog {
   Future<void> setup(PostHogConfig config) {
     if (config.projectToken.isEmpty) {
       debugPrint(
-        '[PostHog] Either projectToken or apiKey must be provided! Setup skipped.',
+        '[PostHog] projectToken must not be blank. Setup skipped.',
       );
       return Future<void>.value();
     }
