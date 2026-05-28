@@ -54,6 +54,13 @@ class Posthog {
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
   Future<void> setup(PostHogConfig config) {
+    if (config.projectToken.isEmpty) {
+      debugPrint(
+        '[PostHog] projectToken must not be blank. Setup skipped.',
+      );
+      return Future<void>.value();
+    }
+
     _config = config; // Store the config
 
     if (config.sessionReplay) {

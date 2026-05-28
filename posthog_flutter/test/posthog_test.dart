@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
+import 'package:posthog_flutter/src/posthog_internal_events.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -11,9 +12,10 @@ void main() {
   group('Posthog', () {
     late PosthogFlutterPlatformFake fakePlatformInterface;
 
-    setUp(() {
+    setUp(() async {
       fakePlatformInterface = PosthogFlutterPlatformFake();
       PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+      await Posthog().close();
     });
 
     test(
@@ -35,6 +37,39 @@ void main() {
         );
       },
     );
+
+    group('setup with blank project token', () {
+      const blankProjectTokens = <String, String>{
+        'empty string': '',
+        'space': ' ',
+        'tab': '\t',
+        'mixed whitespace': ' \n\t ',
+      };
+
+      for (final entry in blankProjectTokens.entries) {
+        test('skips platform setup and integrations for ${entry.key}',
+            () async {
+          final originalFlutterErrorHandler = FlutterError.onError;
+          void sentinelHandler(FlutterErrorDetails _) {}
+          FlutterError.onError = sentinelHandler;
+
+          try {
+            final config = PostHogConfig(entry.value);
+            config.sessionReplay = true;
+            config.errorTrackingConfig.captureFlutterErrors = true;
+
+            await Posthog().setup(config);
+
+            expect(fakePlatformInterface.receivedConfig, isNull);
+            expect(Posthog().config, isNull);
+            expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
+            expect(FlutterError.onError, same(sentinelHandler));
+          } finally {
+            FlutterError.onError = originalFlutterErrorHandler;
+          }
+        });
+      }
+    });
 
     test(
       'enable reinstalls Flutter error autocapture after disable',
