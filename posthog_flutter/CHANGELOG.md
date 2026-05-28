@@ -1,5 +1,11 @@
 ## Next
 
+## 5.25.1
+
+### Patch Changes
+
+- 06b1569: Skip Flutter SDK setup for blank project tokens before storing config or installing Dart integrations.
+
 ## 5.25.0
 
 ### Minor Changes
