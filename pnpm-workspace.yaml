@@ -1,2 +1,4 @@
 packages:
   - posthog_flutter
+
+minimumReleaseAge: 10080
