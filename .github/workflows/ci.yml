@@ -18,7 +18,7 @@ concurrency:
 jobs:
   # Linting and formatting checks
   lint:
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -65,7 +65,7 @@ jobs:
 
   # Apple builds (iOS and macOS) with CocoaPods and Swift Package Manager
   build-apple:
-    runs-on: macos-latest
+    runs-on: macos-26
     strategy:
       matrix:
         target: [ios, macos]
