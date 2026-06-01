@@ -1,5 +1,11 @@
 ## Next
 
+## 5.25.2
+
+### Patch Changes
+
+- 2c0925e: Fix link-type survey questions with no URL silently failing to render on Android. The deserializer now treats a missing link as an empty string instead of throwing on `null`.
+
 ## 5.25.1
 
 ### Patch Changes
