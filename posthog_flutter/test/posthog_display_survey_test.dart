@@ -30,35 +30,23 @@ void main() {
     return survey.questions.first as PostHogDisplayLinkQuestion;
   }
 
+  // (description, native link payload, expected parsed link)
+  const cases = <(String, Object?, String)>[
+    ('parses a real URL unchanged', 'https://posthog.com', 'https://posthog.com'),
+    // posthog-ios maps a missing URL to "" before the Flutter bridge sees it.
+    ('iOS payload: empty-string link parses to an empty string', '', ''),
+    // posthog-android forwards a raw null instead (issue #407 crash site).
+    ('Android payload: null link parses to empty string', null, ''),
+    ('absent link key parses to an empty string', _absent, ''),
+  ];
+
   group('PostHogDisplaySurvey.fromDict link question', () {
-    test('parses a real URL unchanged', () {
-      final question = firstLinkQuestion(surveyWithLink('https://posthog.com'));
-      expect(question.link, 'https://posthog.com');
-    });
-
-    test('iOS payload: empty-string link parses to an empty string', () {
-      // posthog-ios maps a missing URL to "" (question.link ?? "") before it
-      // reaches the Flutter bridge, so the Dart layer receives "".
-      final question = firstLinkQuestion(surveyWithLink(''));
-      expect(question.link, '');
-    });
-
-    test('Android payload: null link does not throw and parses to empty string',
-        () {
-      // posthog-android has no "" fallback, so the Flutter bridge forwards a
-      // raw null. This is issue #407: a non-null cast threw here and silently
-      // dropped the whole survey on Android while iOS rendered fine.
-      expect(
-        () => firstLinkQuestion(surveyWithLink(null)),
-        returnsNormally,
-      );
-      expect(firstLinkQuestion(surveyWithLink(null)).link, '');
-    });
-
-    test('absent link key parses to an empty string', () {
-      final question = firstLinkQuestion(surveyWithLink(_absent));
-      expect(question.link, '');
-    });
+    for (final (description, input, expected) in cases) {
+      test(description, () {
+        final question = firstLinkQuestion(surveyWithLink(input));
+        expect(question.link, expected);
+      });
+    }
   });
 }
 
