@@ -89,7 +89,7 @@ jobs:
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: latest-stable
+          xcode-version: '26.4'
 
       - name: Enable Swift Package Manager
         if: matrix.package_manager == 'spm'
