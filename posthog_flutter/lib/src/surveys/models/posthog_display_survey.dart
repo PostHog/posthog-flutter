@@ -35,7 +35,7 @@ class PostHogDisplaySurvey {
           return PostHogDisplayLinkQuestion(
             id: id,
             question: question,
-            link: q['link'] as String,
+            link: q['link'] as String? ?? '',
             description: questionDescription,
             descriptionContentType: questionDescriptionContentType,
             optional: optional,
