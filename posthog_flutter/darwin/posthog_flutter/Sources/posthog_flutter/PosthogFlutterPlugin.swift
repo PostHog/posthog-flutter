@@ -765,8 +765,13 @@ extension PosthogFlutterPlugin {
     }
 
     private func reloadFeatureFlags(_ result: @escaping FlutterResult) {
-        PostHogSDK.shared.reloadFeatureFlags()
-        result(nil)
+        // Resolve the Dart Future only once flags have actually finished loading.
+        // The native callback fires on a background thread, so hop to main for Flutter.
+        PostHogSDK.shared.reloadFeatureFlags {
+            DispatchQueue.main.async {
+                result(nil)
+            }
+        }
     }
 
     private func group(
