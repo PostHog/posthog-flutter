@@ -1,3 +1,6 @@
+// Portions of this file are derived from getsentry/sentry-dart by Sentry
+// Licensed under the MIT License
+
 import '_io_isolate_utils.dart'
     if (dart.library.js_interop) '_web_isolate_utils.dart' as platform;
 

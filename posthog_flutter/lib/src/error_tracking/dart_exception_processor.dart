@@ -1,3 +1,6 @@
+// Portions of this file are derived from getsentry/sentry-dart by Sentry
+// Licensed under the MIT License
+
 import 'package:flutter/foundation.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:stack_trace/stack_trace.dart';
