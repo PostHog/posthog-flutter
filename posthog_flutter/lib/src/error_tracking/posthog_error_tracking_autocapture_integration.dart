@@ -1,3 +1,6 @@
+// Portions of this file are derived from getsentry/sentry-dart by Sentry
+// Licensed under the MIT License
+
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
