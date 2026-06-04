@@ -628,8 +628,14 @@ class PosthogFlutterPlugin :
 
     private fun reloadFeatureFlags(result: Result) {
         try {
-            PostHog.reloadFeatureFlags()
-            result.success(null)
+            // Resolve the Dart Future only once flags have actually finished
+            // loading. The native callback fires on a background thread, so the
+            // result must be posted back to the main thread for Flutter.
+            PostHog.reloadFeatureFlags {
+                Handler(Looper.getMainLooper()).post {
+                    result.success(null)
+                }
+            }
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
