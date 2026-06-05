@@ -158,6 +158,22 @@ class PosthogFlutterPlugin :
                 reloadFeatureFlags(result)
             }
 
+            "setPersonPropertiesForFlags" -> {
+                setPersonPropertiesForFlags(call, result)
+            }
+
+            "resetPersonPropertiesForFlags" -> {
+                resetPersonPropertiesForFlags(result)
+            }
+
+            "setGroupPropertiesForFlags" -> {
+                setGroupPropertiesForFlags(call, result)
+            }
+
+            "resetGroupPropertiesForFlags" -> {
+                resetGroupPropertiesForFlags(call, result)
+            }
+
             "group" -> {
                 group(call, result)
             }
@@ -636,6 +652,57 @@ class PosthogFlutterPlugin :
                     result.success(null)
                 }
             }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    // reloadFeatureFlags is handled on the Dart side (so the Future resolves only
+    // after the awaited reload completes), so we always disable the native reload.
+    private fun setPersonPropertiesForFlags(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val userProperties: Map<String, Any> = call.argument("userProperties")!!
+            PostHog.setPersonPropertiesForFlags(userProperties, reloadFeatureFlags = false)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun resetPersonPropertiesForFlags(result: Result) {
+        try {
+            PostHog.resetPersonPropertiesForFlags(reloadFeatureFlags = false)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun setGroupPropertiesForFlags(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val groupType: String = call.argument("groupType")!!
+            val groupProperties: Map<String, Any> = call.argument("groupProperties")!!
+            PostHog.setGroupPropertiesForFlags(groupType, groupProperties, reloadFeatureFlags = false)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun resetGroupPropertiesForFlags(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val groupType: String? = call.argument("groupType")
+            PostHog.resetGroupPropertiesForFlags(groupType, reloadFeatureFlags = false)
+            result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }

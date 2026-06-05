@@ -494,6 +494,76 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setPersonPropertiesForFlags(
+    Map<String, Object> userProperties,
+  ) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      final normalizedUserProperties =
+          PropertyNormalizer.normalize(userProperties);
+
+      await _methodChannel.invokeMethod('setPersonPropertiesForFlags', {
+        'userProperties': normalizedUserProperties,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on setPersonPropertiesForFlags: $exception');
+    }
+  }
+
+  @override
+  Future<void> resetPersonPropertiesForFlags() async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('resetPersonPropertiesForFlags');
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on resetPersonPropertiesForFlags: $exception');
+    }
+  }
+
+  @override
+  Future<void> setGroupPropertiesForFlags(
+    String groupType,
+    Map<String, Object> groupProperties,
+  ) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      final normalizedGroupProperties =
+          PropertyNormalizer.normalize(groupProperties);
+
+      await _methodChannel.invokeMethod('setGroupPropertiesForFlags', {
+        'groupType': groupType,
+        'groupProperties': normalizedGroupProperties,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on setGroupPropertiesForFlags: $exception');
+    }
+  }
+
+  @override
+  Future<void> resetGroupPropertiesForFlags({String? groupType}) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('resetGroupPropertiesForFlags', {
+        if (groupType != null) 'groupType': groupType,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on resetGroupPropertiesForFlags: $exception');
+    }
+  }
+
+  @override
   Future<void> group({
     required String groupType,
     required String groupKey,

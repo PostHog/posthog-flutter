@@ -235,6 +235,46 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setPersonPropertiesForFlags(
+    Map<String, Object> userProperties,
+  ) async {
+    return handleWebMethodCall(
+      MethodCall('setPersonPropertiesForFlags', {
+        'userProperties': userProperties,
+      }),
+    );
+  }
+
+  @override
+  Future<void> resetPersonPropertiesForFlags() async {
+    return handleWebMethodCall(
+      const MethodCall('resetPersonPropertiesForFlags'),
+    );
+  }
+
+  @override
+  Future<void> setGroupPropertiesForFlags(
+    String groupType,
+    Map<String, Object> groupProperties,
+  ) async {
+    return handleWebMethodCall(
+      MethodCall('setGroupPropertiesForFlags', {
+        'groupType': groupType,
+        'groupProperties': groupProperties,
+      }),
+    );
+  }
+
+  @override
+  Future<void> resetGroupPropertiesForFlags({String? groupType}) async {
+    return handleWebMethodCall(
+      MethodCall('resetGroupPropertiesForFlags', {
+        if (groupType != null) 'groupType': groupType,
+      }),
+    );
+  }
+
+  @override
   Future<void> group({
     required String groupType,
     required String groupKey,

@@ -239,6 +239,74 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO properties for flags', () {
+    setUp(() async {
+      testConfig = PostHogConfig('test_project_token');
+      await posthogFlutterIO.setup(testConfig);
+    });
+
+    test('setPersonPropertiesForFlags sends userProperties', () async {
+      await posthogFlutterIO.setPersonPropertiesForFlags({
+        'storefront_country': 'US',
+        'superwall_demand_score': 88,
+      });
+
+      final call =
+          log.firstWhere((c) => c.method == 'setPersonPropertiesForFlags');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['userProperties'], {
+        'storefront_country': 'US',
+        'superwall_demand_score': 88,
+      });
+    });
+
+    test('resetPersonPropertiesForFlags sends method channel call', () async {
+      await posthogFlutterIO.resetPersonPropertiesForFlags();
+
+      expect(
+        log.any((c) => c.method == 'resetPersonPropertiesForFlags'),
+        isTrue,
+      );
+    });
+
+    test('setGroupPropertiesForFlags sends groupType and properties', () async {
+      await posthogFlutterIO.setGroupPropertiesForFlags(
+        'organization',
+        {'name': 'ACME Corp', 'is_enterprise': true},
+      );
+
+      final call =
+          log.firstWhere((c) => c.method == 'setGroupPropertiesForFlags');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['groupType'], 'organization');
+      expect(args['groupProperties'], {
+        'name': 'ACME Corp',
+        'is_enterprise': true,
+      });
+    });
+
+    test('resetGroupPropertiesForFlags includes groupType when provided',
+        () async {
+      await posthogFlutterIO.resetGroupPropertiesForFlags(
+        groupType: 'organization',
+      );
+
+      final call =
+          log.firstWhere((c) => c.method == 'resetGroupPropertiesForFlags');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['groupType'], 'organization');
+    });
+
+    test('resetGroupPropertiesForFlags omits groupType when null', () async {
+      await posthogFlutterIO.resetGroupPropertiesForFlags();
+
+      final call =
+          log.firstWhere((c) => c.method == 'resetGroupPropertiesForFlags');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args.containsKey('groupType'), isFalse);
+    });
+  });
+
   group('PosthogFlutterIO beforeSend callback', () {
     test(
       'capture sends event unchanged when no beforeSend registered',

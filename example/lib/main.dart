@@ -272,6 +272,36 @@ class InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    await _posthogFlutterPlugin.setPersonPropertiesForFlags({
+                      "storefront_country": "US",
+                      "demand_score": 88,
+                    });
+                  },
+                  child: const Text("Set person properties for flags"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.resetPersonPropertiesForFlags();
+                  },
+                  child: const Text("Reset person properties for flags"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.setGroupPropertiesForFlags(
+                      "theType",
+                      {"is_enterprise": true},
+                    );
+                  },
+                  child: const Text("Set group properties for flags"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _posthogFlutterPlugin.resetGroupPropertiesForFlags();
+                  },
+                  child: const Text("Reset group properties for flags"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
                     await _posthogFlutterPlugin.identify(
                       userId: "myId",
                       userProperties: {"foo": "bar"},
