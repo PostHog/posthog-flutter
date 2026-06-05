@@ -115,6 +115,33 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
   }
 
+  Future<void> setPersonPropertiesForFlags(Map<String, Object> userProperties) {
+    throw UnimplementedError(
+      'setPersonPropertiesForFlags() has not been implemented.',
+    );
+  }
+
+  Future<void> resetPersonPropertiesForFlags() {
+    throw UnimplementedError(
+      'resetPersonPropertiesForFlags() has not been implemented.',
+    );
+  }
+
+  Future<void> setGroupPropertiesForFlags(
+    String groupType,
+    Map<String, Object> groupProperties,
+  ) {
+    throw UnimplementedError(
+      'setGroupPropertiesForFlags() has not been implemented.',
+    );
+  }
+
+  Future<void> resetGroupPropertiesForFlags({String? groupType}) {
+    throw UnimplementedError(
+      'resetGroupPropertiesForFlags() has not been implemented.',
+    );
+  }
+
   Future<void> showSurvey(Map<String, dynamic> survey) {
     throw UnimplementedError('showSurvey() has not been implemented.');
   }

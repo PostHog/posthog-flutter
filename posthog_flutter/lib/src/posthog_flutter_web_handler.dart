@@ -32,6 +32,16 @@ extension PostHogExtension on PostHog {
     JSAny? userPropertiesToSet,
     JSAny? userPropertiesToSetOnce,
   );
+  external void setPersonPropertiesForFlags(
+    JSAny properties,
+    JSAny reloadFeatureFlags,
+  );
+  external void resetPersonPropertiesForFlags();
+  external void setGroupPropertiesForFlags(
+    JSAny properties,
+    JSAny reloadFeatureFlags,
+  );
+  external void resetGroupPropertiesForFlags(JSAny? groupType);
   // ignore: non_constant_identifier_names
   external void opt_in_capturing();
   // ignore: non_constant_identifier_names
@@ -229,6 +239,33 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'reloadFeatureFlags':
       posthog?.reloadFeatureFlags();
+      break;
+    case 'setPersonPropertiesForFlags':
+      final userProperties = safeMapConversion(args['userProperties']);
+      // reload is orchestrated by the Dart layer, so disable it here.
+      posthog?.setPersonPropertiesForFlags(
+        mapToJSAny(userProperties),
+        boolToJSAny(false),
+      );
+      break;
+    case 'resetPersonPropertiesForFlags':
+      posthog?.resetPersonPropertiesForFlags();
+      break;
+    case 'setGroupPropertiesForFlags':
+      final groupType = args['groupType'] as String;
+      final groupProperties = safeMapConversion(args['groupProperties']);
+      // posthog-js expects an object keyed by group type.
+      // reload is orchestrated by the Dart layer, so disable it here.
+      posthog?.setGroupPropertiesForFlags(
+        mapToJSAny({groupType: groupProperties}),
+        boolToJSAny(false),
+      );
+      break;
+    case 'resetGroupPropertiesForFlags':
+      final groupType = args['groupType'] as String?;
+      posthog?.resetGroupPropertiesForFlags(
+        groupType != null ? stringToJSAny(groupType) : null,
+      );
       break;
     case 'enable':
       posthog?.opt_in_capturing();

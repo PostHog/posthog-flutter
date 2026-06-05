@@ -396,4 +396,88 @@ void main() {
       expect(result!.enabled, isFalse);
     });
   });
+
+  group('Posthog properties for flags', () {
+    late PosthogFlutterPlatformFake fake;
+
+    setUp(() async {
+      fake = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fake;
+      await Posthog().close();
+    });
+
+    test('setPersonPropertiesForFlags sets props and reloads by default',
+        () async {
+      await Posthog().setPersonPropertiesForFlags({'country': 'US'});
+
+      expect(fake.setPersonPropertiesForFlagsCalls, [
+        {'country': 'US'},
+      ]);
+      expect(fake.reloadFeatureFlagsCount, 1);
+    });
+
+    test('setPersonPropertiesForFlags skips reload when reloadFeatureFlags=false',
+        () async {
+      await Posthog().setPersonPropertiesForFlags(
+        {'country': 'US'},
+        reloadFeatureFlags: false,
+      );
+
+      expect(fake.setPersonPropertiesForFlagsCalls.length, 1);
+      expect(fake.reloadFeatureFlagsCount, 0);
+    });
+
+    test('setPersonPropertiesForFlags is a no-op for empty map', () async {
+      await Posthog().setPersonPropertiesForFlags({});
+
+      expect(fake.setPersonPropertiesForFlagsCalls, isEmpty);
+      expect(fake.reloadFeatureFlagsCount, 0);
+    });
+
+    test('resetPersonPropertiesForFlags resets and reloads by default',
+        () async {
+      await Posthog().resetPersonPropertiesForFlags();
+
+      expect(fake.resetPersonPropertiesForFlagsCount, 1);
+      expect(fake.reloadFeatureFlagsCount, 1);
+    });
+
+    test('setGroupPropertiesForFlags passes groupType and reloads', () async {
+      await Posthog().setGroupPropertiesForFlags(
+        'organization',
+        {'name': 'ACME'},
+      );
+
+      expect(fake.setGroupPropertiesForFlagsCalls, [
+        {
+          'groupType': 'organization',
+          'groupProperties': {'name': 'ACME'},
+        },
+      ]);
+      expect(fake.reloadFeatureFlagsCount, 1);
+    });
+
+    test('setGroupPropertiesForFlags is a no-op for empty map', () async {
+      await Posthog().setGroupPropertiesForFlags('organization', {});
+
+      expect(fake.setGroupPropertiesForFlagsCalls, isEmpty);
+      expect(fake.reloadFeatureFlagsCount, 0);
+    });
+
+    test('resetGroupPropertiesForFlags forwards groupType and reloads',
+        () async {
+      await Posthog().resetGroupPropertiesForFlags(groupType: 'organization');
+
+      expect(fake.resetGroupPropertiesForFlagsCalls, ['organization']);
+      expect(fake.reloadFeatureFlagsCount, 1);
+    });
+
+    test('resetGroupPropertiesForFlags forwards null when groupType omitted',
+        () async {
+      await Posthog().resetGroupPropertiesForFlags(reloadFeatureFlags: false);
+
+      expect(fake.resetGroupPropertiesForFlagsCalls, [null]);
+      expect(fake.reloadFeatureFlagsCount, 0);
+    });
+  });
 }

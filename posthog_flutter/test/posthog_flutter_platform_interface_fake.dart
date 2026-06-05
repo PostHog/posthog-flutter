@@ -31,6 +31,46 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   // Call tracking for getFeatureFlagResult
   final List<Map<String, dynamic>> getFeatureFlagResultCalls = [];
 
+  // Call tracking for properties-for-flags + reload
+  int reloadFeatureFlagsCount = 0;
+  final List<Map<String, Object>> setPersonPropertiesForFlagsCalls = [];
+  int resetPersonPropertiesForFlagsCount = 0;
+  final List<Map<String, dynamic>> setGroupPropertiesForFlagsCalls = [];
+  final List<String?> resetGroupPropertiesForFlagsCalls = [];
+
+  @override
+  Future<void> reloadFeatureFlags() async {
+    reloadFeatureFlagsCount++;
+  }
+
+  @override
+  Future<void> setPersonPropertiesForFlags(
+    Map<String, Object> userProperties,
+  ) async {
+    setPersonPropertiesForFlagsCalls.add(userProperties);
+  }
+
+  @override
+  Future<void> resetPersonPropertiesForFlags() async {
+    resetPersonPropertiesForFlagsCount++;
+  }
+
+  @override
+  Future<void> setGroupPropertiesForFlags(
+    String groupType,
+    Map<String, Object> groupProperties,
+  ) async {
+    setGroupPropertiesForFlagsCalls.add({
+      'groupType': groupType,
+      'groupProperties': groupProperties,
+    });
+  }
+
+  @override
+  Future<void> resetGroupPropertiesForFlags({String? groupType}) async {
+    resetGroupPropertiesForFlagsCalls.add(groupType);
+  }
+
   @override
   Future<void> screen({
     required String screenName,

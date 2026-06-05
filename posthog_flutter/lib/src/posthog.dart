@@ -312,6 +312,118 @@ class Posthog {
   /// Returns a [Future] that completes when the reload request has been queued.
   Future<void> reloadFeatureFlags() => _posthog.reloadFeatureFlags();
 
+  /// Sets person properties that are used only for feature flag evaluation.
+  ///
+  /// Docs: https://posthog.com/docs/feature-flags
+  ///
+  /// Unlike [setPersonProperties], this does **not** enqueue a `$set` event. The
+  /// properties are sent inline with the next feature flag evaluation request,
+  /// so flags that target these properties can be evaluated immediately without
+  /// waiting for the `$set` event to be ingested into the person store.
+  ///
+  /// The [userProperties] are merged with any previously set values; matching
+  /// keys are overwritten. If [userProperties] is empty, this is a no-op.
+  ///
+  /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
+  /// the properties (defaults to `true`). When `true`, the returned [Future]
+  /// awaits the reload before completing; on iOS and Android this means flags
+  /// have finished loading, so the next [getFeatureFlag] / [getFeatureFlagResult]
+  /// reflects the updated properties. On web the reload is best-effort.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().setPersonPropertiesForFlags({
+  ///   "storefront_country": "US",
+  ///   "superwall_demand_score": 88,
+  /// });
+  /// final result = await Posthog().getFeatureFlagResult("my_flag");
+  /// ```
+  Future<void> setPersonPropertiesForFlags(
+    Map<String, Object> userProperties, {
+    bool reloadFeatureFlags = true,
+  }) async {
+    if (userProperties.isEmpty) {
+      return;
+    }
+    await _posthog.setPersonPropertiesForFlags(userProperties);
+    if (reloadFeatureFlags) {
+      await this.reloadFeatureFlags();
+    }
+  }
+
+  /// Clears all person properties that were set for feature flag evaluation via
+  /// [setPersonPropertiesForFlags].
+  ///
+  /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
+  /// the properties (defaults to `true`). When `true`, the returned [Future]
+  /// awaits the reload before completing (on iOS/Android, after flags finish
+  /// loading; on web, best-effort).
+  Future<void> resetPersonPropertiesForFlags({
+    bool reloadFeatureFlags = true,
+  }) async {
+    await _posthog.resetPersonPropertiesForFlags();
+    if (reloadFeatureFlags) {
+      await this.reloadFeatureFlags();
+    }
+  }
+
+  /// Sets properties for a specific [groupType] that are used only for feature
+  /// flag evaluation.
+  ///
+  /// The properties are sent inline with the next feature flag evaluation
+  /// request, so flags that target group properties can be evaluated without
+  /// waiting for ingestion.
+  ///
+  /// The [groupProperties] are merged with any previously set values for the
+  /// same [groupType]; matching keys are overwritten. If [groupProperties] is
+  /// empty, this is a no-op.
+  ///
+  /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
+  /// the properties (defaults to `true`). When `true`, the returned [Future]
+  /// awaits the reload before completing (on iOS/Android, after flags finish
+  /// loading; on web, best-effort).
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().setGroupPropertiesForFlags(
+  ///   "organization",
+  ///   {"name": "ACME Corp", "is_enterprise": true},
+  /// );
+  /// ```
+  Future<void> setGroupPropertiesForFlags(
+    String groupType,
+    Map<String, Object> groupProperties, {
+    bool reloadFeatureFlags = true,
+  }) async {
+    if (groupProperties.isEmpty) {
+      return;
+    }
+    await _posthog.setGroupPropertiesForFlags(groupType, groupProperties);
+    if (reloadFeatureFlags) {
+      await this.reloadFeatureFlags();
+    }
+  }
+
+  /// Clears group properties that were set for feature flag evaluation via
+  /// [setGroupPropertiesForFlags].
+  ///
+  /// If [groupType] is provided, only properties for that group type are
+  /// cleared; otherwise all group properties are cleared.
+  ///
+  /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
+  /// the properties (defaults to `true`). When `true`, the returned [Future]
+  /// awaits the reload before completing (on iOS/Android, after flags finish
+  /// loading; on web, best-effort).
+  Future<void> resetGroupPropertiesForFlags({
+    String? groupType,
+    bool reloadFeatureFlags = true,
+  }) async {
+    await _posthog.resetGroupPropertiesForFlags(groupType: groupType);
+    if (reloadFeatureFlags) {
+      await this.reloadFeatureFlags();
+    }
+  }
+
   /// Associates the current user with a group.
   ///
   /// Docs: https://posthog.com/docs/product-analytics/group-analytics

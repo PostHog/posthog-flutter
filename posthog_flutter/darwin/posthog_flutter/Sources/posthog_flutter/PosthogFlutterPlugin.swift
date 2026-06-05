@@ -255,6 +255,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             debug(call, result: result)
         case "reloadFeatureFlags":
             reloadFeatureFlags(result)
+        case "setPersonPropertiesForFlags":
+            setPersonPropertiesForFlags(call, result: result)
+        case "resetPersonPropertiesForFlags":
+            resetPersonPropertiesForFlags(result)
+        case "setGroupPropertiesForFlags":
+            setGroupPropertiesForFlags(call, result: result)
+        case "resetGroupPropertiesForFlags":
+            resetGroupPropertiesForFlags(call, result: result)
         case "group":
             group(call, result: result)
         case "register":
@@ -772,6 +780,55 @@ extension PosthogFlutterPlugin {
                 result(nil)
             }
         }
+    }
+
+    // reloadFeatureFlags is handled on the Dart side (so the Future resolves only
+    // after the awaited reload completes), so we always disable the native reload.
+    private func setPersonPropertiesForFlags(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let userProperties = args["userProperties"] as? [String: Any]
+        {
+            PostHogSDK.shared.setPersonPropertiesForFlags(userProperties, reloadFeatureFlags: false)
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func resetPersonPropertiesForFlags(_ result: @escaping FlutterResult) {
+        PostHogSDK.shared.resetPersonPropertiesForFlags(reloadFeatureFlags: false)
+        result(nil)
+    }
+
+    private func setGroupPropertiesForFlags(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let groupType = args["groupType"] as? String,
+           let groupProperties = args["groupProperties"] as? [String: Any]
+        {
+            PostHogSDK.shared.setGroupPropertiesForFlags(groupType, properties: groupProperties, reloadFeatureFlags: false)
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func resetGroupPropertiesForFlags(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        let groupType = (call.arguments as? [String: Any])?["groupType"] as? String
+        if let groupType = groupType {
+            PostHogSDK.shared.resetGroupPropertiesForFlags(groupType, reloadFeatureFlags: false)
+        } else {
+            PostHogSDK.shared.resetGroupPropertiesForFlags(reloadFeatureFlags: false)
+        }
+        result(nil)
     }
 
     private func group(
