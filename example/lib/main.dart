@@ -272,9 +272,10 @@ class InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    await _posthogFlutterPlugin.setPersonPropertiesForFlags(
-                      {"storefront_country": "US", "demand_score": 88},
-                    );
+                    await _posthogFlutterPlugin.setPersonPropertiesForFlags({
+                      "storefront_country": "US",
+                      "demand_score": 88,
+                    });
                   },
                   child: const Text("Set person properties for flags"),
                 ),

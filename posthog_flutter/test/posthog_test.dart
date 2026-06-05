@@ -416,7 +416,8 @@ void main() {
       expect(fake.reloadFeatureFlagsCount, 1);
     });
 
-    test('setPersonPropertiesForFlags skips reload when reloadFeatureFlags=false',
+    test(
+        'setPersonPropertiesForFlags skips reload when reloadFeatureFlags=false',
         () async {
       await Posthog().setPersonPropertiesForFlags(
         {'country': 'US'},
