@@ -240,10 +240,12 @@ void main() {
   });
 
   group('PosthogFlutterIO properties for flags', () {
-    test('setPersonPropertiesForFlags sends userProperties', () async {
+    setUp(() async {
       testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
+    });
 
+    test('setPersonPropertiesForFlags sends userProperties', () async {
       await posthogFlutterIO.setPersonPropertiesForFlags({
         'storefront_country': 'US',
         'superwall_demand_score': 88,
@@ -259,9 +261,6 @@ void main() {
     });
 
     test('resetPersonPropertiesForFlags sends method channel call', () async {
-      testConfig = PostHogConfig('test_project_token');
-      await posthogFlutterIO.setup(testConfig);
-
       await posthogFlutterIO.resetPersonPropertiesForFlags();
 
       expect(
@@ -271,9 +270,6 @@ void main() {
     });
 
     test('setGroupPropertiesForFlags sends groupType and properties', () async {
-      testConfig = PostHogConfig('test_project_token');
-      await posthogFlutterIO.setup(testConfig);
-
       await posthogFlutterIO.setGroupPropertiesForFlags(
         'organization',
         {'name': 'ACME Corp', 'is_enterprise': true},
@@ -291,9 +287,6 @@ void main() {
 
     test('resetGroupPropertiesForFlags includes groupType when provided',
         () async {
-      testConfig = PostHogConfig('test_project_token');
-      await posthogFlutterIO.setup(testConfig);
-
       await posthogFlutterIO.resetGroupPropertiesForFlags(
         groupType: 'organization',
       );
@@ -305,9 +298,6 @@ void main() {
     });
 
     test('resetGroupPropertiesForFlags omits groupType when null', () async {
-      testConfig = PostHogConfig('test_project_token');
-      await posthogFlutterIO.setup(testConfig);
-
       await posthogFlutterIO.resetGroupPropertiesForFlags();
 
       final call =
