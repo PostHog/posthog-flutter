@@ -15,6 +15,7 @@ jobs:
   publish:
     name: Publish to pub.dev
     runs-on: ubuntu-latest
+    environment: 'Release' # pub.dev trusted publishing is tag-triggered, so gate this publishing job too.
     permissions:
       contents: write
       id-token: write # Required for authentication using OIDC

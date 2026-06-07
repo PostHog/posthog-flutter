@@ -28,14 +28,20 @@ No release label is required. When the PR is merged to `main`, the release workf
 
 1. Check for changesets
 2. Notify the client libraries team in Slack for approval
-3. Wait for approval from a maintainer (via GitHub environment protection)
+3. Wait for the first approval from a maintainer (via GitHub `Release` environment protection)
 4. Once approved:
    - Apply changesets and bump the version
    - Update the CHANGELOG.md
    - Sync the version to `pubspec.yaml`, iOS (`PostHogFlutterVersion.swift`), and Android (`PostHogVersion.kt`)
    - Commit the version bump to `main`
+   - Create and push the release tag
+5. The tag-triggered pub.dev publish workflow starts from that release tag
+6. Wait for the second approval from a maintainer (via GitHub `Release` environment protection)
+7. Once approved:
    - Publish the package to pub.dev
-   - Create a git tag and GitHub release
+   - Create the GitHub release
+
+Flutter releases require two `Release` environment approvals because pub.dev trusted publishing only allows publishing from GitHub tag workflows. The first approval gates the version bump and tag creation; the second approval gates the tag-triggered pub.dev publish job.
 
 ### Manual Trigger
 
@@ -67,6 +73,8 @@ pnpm changeset pre exit
 ## pub.dev Package
 
 The package is published as [`posthog_flutter`](https://pub.dev/packages/posthog_flutter) on pub.dev.
+
+Release tags are protected by a GitHub tag ruleset: https://github.com/PostHog/posthog-flutter/settings/rules/11273241. This ensures tag-triggered pub.dev publishing can only happen from protected release tags created by the approved release process.
 
 ## Troubleshooting
 
