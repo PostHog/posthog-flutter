@@ -1,6 +1,7 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'feature_flag_result.dart';
+import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
@@ -64,6 +65,17 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     Map<String, Object>? properties,
   }) {
     throw UnimplementedError('screen() has not been implemented.');
+  }
+
+  Future<void> captureLog({
+    required String body,
+    PostHogLogSeverity level = PostHogLogSeverity.info,
+    Map<String, Object>? attributes,
+    String? traceId,
+    String? spanId,
+    int? traceFlags,
+  }) {
+    throw UnimplementedError('captureLog() has not been implemented.');
   }
 
   /// Opens a URL using the platform's default browser

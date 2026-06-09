@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
@@ -860,5 +861,88 @@ void main() {
         expect(eventOrder, isNot(['event_1', 'event_2', 'event_3']));
       },
     );
+  });
+
+  group('PosthogFlutterIO captureLog', () {
+    test('sends body, lowercase level name, and attributes', () async {
+      await posthogFlutterIO.captureLog(
+        body: 'checkout completed',
+        level: PostHogLogSeverity.warn,
+        attributes: {'order_id': 'ord_789'},
+      );
+
+      final call = log.firstWhere((c) => c.method == 'captureLog');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['body'], 'checkout completed');
+      expect(args['level'], 'warn');
+      expect(args['attributes'], {'order_id': 'ord_789'});
+    });
+
+    test('omits attributes when none provided', () async {
+      await posthogFlutterIO.captureLog(body: 'hello');
+
+      final call = log.firstWhere((c) => c.method == 'captureLog');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['level'], 'info');
+      expect(args.containsKey('attributes'), isFalse);
+    });
+
+    test('serializes every severity as its lowercase wire name', () async {
+      const expected = {
+        PostHogLogSeverity.trace: 'trace',
+        PostHogLogSeverity.debug: 'debug',
+        PostHogLogSeverity.info: 'info',
+        PostHogLogSeverity.warn: 'warn',
+        PostHogLogSeverity.error: 'error',
+        PostHogLogSeverity.fatal: 'fatal',
+      };
+
+      for (final entry in expected.entries) {
+        log.clear();
+        await posthogFlutterIO.captureLog(body: 'x', level: entry.key);
+        final call = log.firstWhere((c) => c.method == 'captureLog');
+        final args = Map<String, dynamic>.from(call.arguments as Map);
+        expect(args['level'], entry.value, reason: 'for ${entry.key}');
+      }
+    });
+
+    test('normalizes unsupported attribute values for the channel', () async {
+      await posthogFlutterIO.captureLog(
+        body: 'event',
+        attributes: {'at': DateTime(2024, 3, 1)},
+      );
+
+      final call = log.firstWhere((c) => c.method == 'captureLog');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      final attributes = Map<String, dynamic>.from(args['attributes'] as Map);
+      // DateTime is not a StandardMessageCodec type; it is stringified.
+      expect(attributes['at'], isA<String>());
+    });
+
+    test('sends trace fields when provided', () async {
+      await posthogFlutterIO.captureLog(
+        body: 'event',
+        traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+        spanId: '00f067aa0ba902b7',
+        traceFlags: 1,
+      );
+
+      final call = log.firstWhere((c) => c.method == 'captureLog');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['traceId'], '4bf92f3577b34da6a3ce929d0e0e4736');
+      expect(args['spanId'], '00f067aa0ba902b7');
+      expect(args['traceFlags'], 1);
+    });
+
+    test('emits an explicit traceFlags of 0 but omits trace fields when null',
+        () async {
+      await posthogFlutterIO.captureLog(body: 'event', traceFlags: 0);
+
+      final call = log.firstWhere((c) => c.method == 'captureLog');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['traceFlags'], 0);
+      expect(args.containsKey('traceId'), isFalse);
+      expect(args.containsKey('spanId'), isFalse);
+    });
   });
 }

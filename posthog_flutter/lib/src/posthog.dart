@@ -5,10 +5,14 @@ import 'package:meta/meta.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'feature_flag_result.dart';
+import 'logs/posthog_log_record.dart';
+import 'logs/posthog_log_severity.dart';
+import 'logs/posthog_logger.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
+import 'utils/before_send.dart';
 
 /// Entry point for the PostHog Flutter SDK.
 ///
@@ -226,6 +230,100 @@ class Posthog {
     _currentScreen = screenName;
     return _posthog.screen(screenName: screenName, properties: properties);
   }
+
+  /// Captures a structured log record.
+  ///
+  /// Docs: https://posthog.com/docs/logs
+  ///
+  /// The [body] is the log message. A blank body is dropped before
+  /// [PostHogLogsConfig.beforeSend] runs.
+  ///
+  /// The optional [level] is the severity, defaulting to
+  /// [PostHogLogSeverity.info].
+  ///
+  /// The optional [attributes] are per-record attributes (e.g. request id,
+  /// duration). Values must be supported by the platform channel serializer.
+  ///
+  /// The optional [traceId], [spanId], and [traceFlags] are W3C distributed
+  /// tracing fields used to correlate a log with a trace. [traceId] is a
+  /// 32-character lowercase hex string, [spanId] is 16 characters, and
+  /// [traceFlags] is a bitfield whose bit 0 is the `sampled` flag (an explicit
+  /// `0` is emitted; `null` omits the field). They pass through unchanged and
+  /// are not visible to [PostHogLogsConfig.beforeSend].
+  ///
+  /// Auto-captured context (distinct id, session id, screen name, app state,
+  /// active feature flags) is added by the native SDK.
+  ///
+  /// Records are passed through [PostHogLogsConfig.beforeSend] before being
+  /// forwarded to the native SDK; a callback may modify or drop them.
+  ///
+  /// Returns a [Future] that completes when the record has been forwarded.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().captureLog(
+  ///   body: 'checkout completed',
+  ///   level: PostHogLogSeverity.info,
+  ///   attributes: {'order_id': 'ord_789'},
+  /// );
+  /// ```
+  Future<void> captureLog({
+    required String body,
+    PostHogLogSeverity level = PostHogLogSeverity.info,
+    Map<String, Object>? attributes,
+    String? traceId,
+    String? spanId,
+    int? traceFlags,
+  }) async {
+    if (body.trim().isEmpty) {
+      return;
+    }
+
+    var record = PostHogLogRecord(
+      body: body,
+      level: level,
+      attributes: attributes,
+    );
+
+    final callbacks =
+        _config?.logs.beforeSend ?? const <BeforeSendLogCallback>[];
+    for (final callback in callbacks) {
+      final result = await applyBeforeSend<PostHogLogRecord>(callback, record);
+      if (result == null) {
+        debugPrint('[PostHog] Log dropped by beforeSend');
+        return;
+      }
+      record = result;
+    }
+
+    // A beforeSend callback may have blanked the body, which drops the record.
+    if (record.body.trim().isEmpty) {
+      return;
+    }
+
+    return _posthog.captureLog(
+      body: record.body,
+      level: record.level,
+      attributes: record.attributes,
+      traceId: traceId,
+      spanId: spanId,
+      traceFlags: traceFlags,
+    );
+  }
+
+  /// Per-level logger facade for capturing structured logs.
+  ///
+  /// Each helper delegates to [captureLog] with the matching severity.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// Posthog().logger.info('user signed in', {'method': 'google'});
+  /// Posthog().logger.error('payment failed', {'error_code': 'E001'});
+  /// ```
+  late final PostHogLogger logger = PostHogLogger(
+    (body, level, attributes) =>
+        captureLog(body: body, level: level, attributes: attributes),
+  );
 
   /// Creates an alias for the current user.
   ///

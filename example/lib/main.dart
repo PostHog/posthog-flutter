@@ -201,6 +201,39 @@ class InitialScreenState extends State<InitialScreen> {
                 const Padding(
                   padding: EdgeInsets.all(8.0),
                   child: Text(
+                    "Logs",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        _posthogFlutterPlugin.captureLog(
+                          body: "checkout completed",
+                          level: PostHogLogSeverity.info,
+                          attributes: {"order_id": "ord_789"},
+                        );
+                      },
+                      child: const Text("Capture Log (info)"),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _posthogFlutterPlugin.logger.error("payment failed", {
+                          "error_code": "E001",
+                        });
+                      },
+                      child: const Text("logger.error"),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
                     "Activity",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
