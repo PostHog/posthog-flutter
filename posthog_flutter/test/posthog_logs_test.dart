@@ -282,6 +282,19 @@ void main() {
         });
       });
 
+      test('floors sub-second flush/rate-cap durations at 1s (not 0)', () {
+        final config = PostHogConfig('test_token');
+        config.logs
+          ..flushInterval = const Duration(milliseconds: 500)
+          ..rateCapWindow = const Duration(milliseconds: 1);
+
+        // Native windows are whole seconds; truncating to 0 would disable the
+        // rate cap / trigger continuous flushing, so we floor at 1s.
+        final logs = config.toMap()['logs'] as Map;
+        expect(logs['flushIntervalSeconds'], 1);
+        expect(logs['rateCapWindowSeconds'], 1);
+      });
+
       test('omits the tuning knobs that were left unset', () {
         final config = PostHogConfig('test_token');
         config.logs

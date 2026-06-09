@@ -420,15 +420,22 @@ class PostHogLogsConfig {
       if (resourceAttributes.isNotEmpty)
         'resourceAttributes': resourceAttributes,
       if (flushInterval != null)
-        'flushIntervalSeconds': flushInterval!.inSeconds,
+        'flushIntervalSeconds': _wholeSeconds(flushInterval!),
       if (flushAt != null) 'flushAt': flushAt,
       if (maxBatchSize != null) 'maxBatchSize': maxBatchSize,
       if (maxBufferSize != null) 'maxBufferSize': maxBufferSize,
       if (rateCapMaxLogs != null) 'rateCapMaxLogs': rateCapMaxLogs,
       if (rateCapWindow != null)
-        'rateCapWindowSeconds': rateCapWindow!.inSeconds,
+        'rateCapWindowSeconds': _wholeSeconds(rateCapWindow!),
     };
   }
+
+  /// The native flush interval and rate-cap window are whole seconds. A
+  /// sub-second [Duration] truncates to `0`, which the native SDK treats as
+  /// "disabled" (rate cap) or continuous flushing — surprising for a caller who
+  /// set, say, 500ms. Floor at 1s, the smallest value the native API can honor.
+  static int _wholeSeconds(Duration duration) =>
+      duration.inSeconds < 1 ? 1 : duration.inSeconds;
 }
 
 /// Configuration for mobile session replay capture and masking.
