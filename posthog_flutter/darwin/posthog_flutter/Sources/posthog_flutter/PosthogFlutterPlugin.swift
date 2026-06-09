@@ -769,8 +769,9 @@ extension PosthogFlutterPlugin {
             let spanId = args["spanId"] as? String
             // traceFlags 0 is meaningful (W3C sampled-false); nil omits it.
             let traceFlags = args["traceFlags"] as? Int
-            // Unknown levels fall back to .info.
-            let severity = PostHogLogSeverity.from(name: level) ?? .info
+            // PostHogLogSeverity.from(name:) is internal in the SDK, so map the
+            // wire string here. Unknown levels fall back to .info.
+            let severity = severityFromString(level)
             PostHogSDK.shared.captureLog(
                 body,
                 level: severity,
@@ -782,6 +783,20 @@ extension PosthogFlutterPlugin {
             result(nil)
         } else {
             _badArgumentError(result)
+        }
+    }
+
+    // Maps the lowercase wire level to PostHogLogSeverity using only public enum
+    // cases (the SDK's `from(name:)` is internal). Unknown levels fall back to .info.
+    private func severityFromString(_ level: String) -> PostHogLogSeverity {
+        switch level {
+        case "trace": return .trace
+        case "debug": return .debug
+        case "info": return .info
+        case "warn": return .warn
+        case "error": return .error
+        case "fatal": return .fatal
+        default: return .info
         }
     }
 
