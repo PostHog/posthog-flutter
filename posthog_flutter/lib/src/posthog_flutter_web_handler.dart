@@ -215,8 +215,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final spanId = args['spanId'] as String?;
       final traceFlags = args['traceFlags'] as int?;
 
-      // posthog-js captureLog options. See:
-      // https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture-log.ts
+      // posthog-js captureLog options. See https://posthog.com/docs/logs
       final options = <String, Object>{
         'body': body,
         'level': level,
@@ -230,8 +229,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       try {
         posthog?.captureLog(mapToJSAny(options));
       } catch (error) {
-        // captureLog was added to posthog-js after the minimum supported
-        // version, so calling it on an older build throws.
+        // Older posthog-js builds lack captureLog and throw.
         printIfDebug(
           '[PostHog] captureLog is not supported by the loaded posthog-js version: $error',
         );

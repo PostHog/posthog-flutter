@@ -56,9 +56,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (_beforeSendCallbacks.isEmpty) return event;
 
     for (final callback in _beforeSendCallbacks) {
-      final result = await applyBeforeSend<PostHogEvent>(callback, event);
-      if (result == null) return null;
-      event = result;
+      try {
+        final result = await runBeforeSend<PostHogEvent>(callback, event);
+        if (result == null) return null;
+        event = result;
+      } catch (e) {
+        // Skip a throwing callback; continue with the pre-callback event.
+        printIfDebug('[PostHog] beforeSend callback threw exception: $e');
+      }
     }
     return event;
   }
@@ -370,10 +375,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       final normalizedAttributes =
           attributes != null ? PropertyNormalizer.normalize(attributes) : null;
 
-      // These keys are camelCase on the native (iOS/Android) channel. The web
-      // path remaps the trace fields to snake_case (`trace_id`/`span_id`/
-      // `trace_flags`) for posthog-js; if you add or rename a field here, update
-      // the `captureLog` case in posthog_flutter_web_handler.dart too.
+      // Trace fields are camelCase here; the web handler remaps them to
+      // snake_case for posthog-js.
       await _methodChannel.invokeMethod('captureLog', {
         'body': body,
         'level': level.name,

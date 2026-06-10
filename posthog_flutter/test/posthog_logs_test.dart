@@ -54,27 +54,23 @@ void main() {
         expect(fake.capturedLogs.single.level, PostHogLogSeverity.info);
       });
 
-      test('each logger level maps to its severity', () async {
-        await setupWith(PostHogConfig('test_token'));
+      final loggerByLevel =
+          <PostHogLogSeverity, Future<void> Function(PostHogLogger)>{
+        PostHogLogSeverity.trace: (l) => l.trace('m'),
+        PostHogLogSeverity.debug: (l) => l.debug('m'),
+        PostHogLogSeverity.info: (l) => l.info('m'),
+        PostHogLogSeverity.warn: (l) => l.warn('m'),
+        PostHogLogSeverity.error: (l) => l.error('m'),
+        PostHogLogSeverity.fatal: (l) => l.fatal('m'),
+      };
+      loggerByLevel.forEach((level, call) {
+        test('logger.${level.name} captures at ${level.name}', () async {
+          await setupWith(PostHogConfig('test_token'));
 
-        await Posthog().logger.trace('a');
-        await Posthog().logger.debug('b');
-        await Posthog().logger.info('c');
-        await Posthog().logger.warn('d');
-        await Posthog().logger.error('e');
-        await Posthog().logger.fatal('f');
+          await call(Posthog().logger);
 
-        expect(
-          fake.capturedLogs.map((c) => c.level).toList(),
-          const [
-            PostHogLogSeverity.trace,
-            PostHogLogSeverity.debug,
-            PostHogLogSeverity.info,
-            PostHogLogSeverity.warn,
-            PostHogLogSeverity.error,
-            PostHogLogSeverity.fatal,
-          ],
-        );
+          expect(fake.capturedLogs.single.level, level);
+        });
       });
     });
 
@@ -190,16 +186,18 @@ void main() {
         expect(fake.capturedLogs, isEmpty);
       });
 
-      test('throwing hook is contained and record continues', () async {
+      test('throwing hook is contained and drops the log', () async {
+        // Fail closed: a throwing redaction hook must not let the unredacted
+        // record through. The exception is logged so the bug stays visible.
         final config = PostHogConfig('test_token');
         config.logs.beforeSend = [
           (record) => throw Exception('boom'),
         ];
         await setupWith(config);
 
-        await Posthog().captureLog(body: 'still sent');
+        await Posthog().captureLog(body: 'dropped on throw');
 
-        expect(fake.capturedLogs.single.body, 'still sent');
+        expect(fake.capturedLogs, isEmpty);
       });
 
       test('callbacks run left-to-right, feeding each output to the next',

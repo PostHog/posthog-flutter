@@ -235,6 +235,8 @@ class Posthog {
   ///
   /// Docs: https://posthog.com/docs/logs
   ///
+  /// `captureLog` is not gated by remote config.
+  ///
   /// The [body] is the log message. A blank body is dropped before
   /// [PostHogLogsConfig.beforeSend] runs.
   ///
@@ -288,12 +290,18 @@ class Posthog {
     final callbacks =
         _config?.logs.beforeSend ?? const <BeforeSendLogCallback>[];
     for (final callback in callbacks) {
-      final result = await applyBeforeSend<PostHogLogRecord>(callback, record);
-      if (result == null) {
-        debugPrint('[PostHog] Log dropped by beforeSend');
+      try {
+        final result = await runBeforeSend<PostHogLogRecord>(callback, record);
+        if (result == null) {
+          debugPrint('[PostHog] Log dropped by beforeSend');
+          return;
+        }
+        record = result;
+      } catch (e) {
+        // Fail closed: a throwing hook drops the log so it can't leak unredacted.
+        debugPrint('[PostHog] beforeSend threw, dropping log: $e');
         return;
       }
-      record = result;
     }
 
     // A beforeSend callback may have blanked the body, which drops the record.
@@ -311,19 +319,22 @@ class Posthog {
     );
   }
 
+  PostHogLogger? _logger;
+
   /// Per-level logger facade for capturing structured logs.
   ///
-  /// Each helper delegates to [captureLog] with the matching severity.
+  /// Each helper delegates to [captureLog] with the matching severity. Built
+  /// once on first access and cached.
   ///
   /// **Example:**
   /// ```dart
   /// Posthog().logger.info('user signed in', {'method': 'google'});
   /// Posthog().logger.error('payment failed', {'error_code': 'E001'});
   /// ```
-  late final PostHogLogger logger = PostHogLogger(
-    (body, level, attributes) =>
-        captureLog(body: body, level: level, attributes: attributes),
-  );
+  PostHogLogger get logger => _logger ??= PostHogLogger(
+        (body, level, attributes) =>
+            captureLog(body: body, level: level, attributes: attributes),
+      );
 
   /// Creates an alias for the current user.
   ///

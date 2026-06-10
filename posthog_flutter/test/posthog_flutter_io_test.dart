@@ -887,23 +887,22 @@ void main() {
       expect(args.containsKey('attributes'), isFalse);
     });
 
-    test('serializes every severity as its lowercase wire name', () async {
-      const expected = {
-        PostHogLogSeverity.trace: 'trace',
-        PostHogLogSeverity.debug: 'debug',
-        PostHogLogSeverity.info: 'info',
-        PostHogLogSeverity.warn: 'warn',
-        PostHogLogSeverity.error: 'error',
-        PostHogLogSeverity.fatal: 'fatal',
-      };
+    const severityWireNames = {
+      PostHogLogSeverity.trace: 'trace',
+      PostHogLogSeverity.debug: 'debug',
+      PostHogLogSeverity.info: 'info',
+      PostHogLogSeverity.warn: 'warn',
+      PostHogLogSeverity.error: 'error',
+      PostHogLogSeverity.fatal: 'fatal',
+    };
+    severityWireNames.forEach((severity, wireName) {
+      test('serializes ${severity.name} as "$wireName" on the wire', () async {
+        await posthogFlutterIO.captureLog(body: 'x', level: severity);
 
-      for (final entry in expected.entries) {
-        log.clear();
-        await posthogFlutterIO.captureLog(body: 'x', level: entry.key);
         final call = log.firstWhere((c) => c.method == 'captureLog');
         final args = Map<String, dynamic>.from(call.arguments as Map);
-        expect(args['level'], entry.value, reason: 'for ${entry.key}');
-      }
+        expect(args['level'], wireName);
+      });
     });
 
     test('normalizes unsupported attribute values for the channel', () async {
