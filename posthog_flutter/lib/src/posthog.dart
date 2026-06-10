@@ -298,7 +298,6 @@ class Posthog {
         }
         record = result;
       } catch (e) {
-        // Fail closed: a throwing hook drops the log so it can't leak unredacted.
         debugPrint('[PostHog] beforeSend threw, dropping log: $e');
         return;
       }

@@ -187,8 +187,6 @@ void main() {
       });
 
       test('throwing hook is contained and drops the log', () async {
-        // Fail closed: a throwing redaction hook must not let the unredacted
-        // record through. The exception is logged so the bug stays visible.
         final config = PostHogConfig('test_token');
         config.logs.beforeSend = [
           (record) => throw Exception('boom'),
