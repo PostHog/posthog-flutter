@@ -88,6 +88,18 @@ class ScreenshotCapturer {
     }
   }
 
+  Future<ui.Image?> _decodeImage(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      codec.dispose();
+      return frame.image;
+    } catch (e) {
+      printIfDebug('Error decoding image bytes: $e');
+      return null;
+    }
+  }
+
   /// Computes a hash of the full raw RGBA byte array for change detection.
   /// This avoids retaining the full image bytes while still hashing every byte.
   int _computeImageHash(Uint8List bytes) {
@@ -140,8 +152,6 @@ class ScreenshotCapturer {
         srcHeight: srcHeight,
       );
 
-      final syncImage = renderObject.toImage(pixelRatio: pixelRatio);
-
       final replayConfig = _config.sessionReplayConfig;
 
       final postHogWidgetWrapperElements =
@@ -154,9 +164,8 @@ class ScreenshotCapturer {
             PostHogMaskController.instance.getCurrentWidgetsElements();
       }
 
-      /// we firstly get current image (syncImage) and masks
-      /// (postHogWidgetWrapperElements, elementsDataWidgets) synchronously and
-      /// then executed the main process asynchronous
+      /// We capture the mask metadata synchronously, then resolve the image
+      /// asynchronously from the native view hierarchy when available.
       ui.Image? image;
       ui.PictureRecorder? recorder;
       ui.Picture? picture;
@@ -169,10 +178,25 @@ class ScreenshotCapturer {
           completer.complete(null);
           return;
         }
+        if (!isSessionReplayActive) {
+          _snapshotManager.clear();
+          completer.complete(null);
+          return;
+        }
 
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
-        image = await syncImage;
+        final nativeImageBytes = replayConfig.capturePlatformViews
+            ? await _nativeCommunicator.captureNativeScreenshot(
+                x: globalPosition.dx.round(),
+                y: globalPosition.dy.round(),
+                width: srcWidth.round(),
+                height: srcHeight.round(),
+              )
+            : null;
+        image = nativeImageBytes != null
+            ? await _decodeImage(nativeImageBytes)
+            : await renderObject.toImage(pixelRatio: pixelRatio);
         final currentImage = image;
         if (_cancelled) {
           currentImage?.dispose();

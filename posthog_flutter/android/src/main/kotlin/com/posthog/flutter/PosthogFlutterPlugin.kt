@@ -1,12 +1,18 @@
 package com.posthog.flutter
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.view.PixelCopy
+import android.view.View
 import android.util.Log
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
@@ -15,16 +21,22 @@ import com.posthog.PostHogOnFeatureFlags
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.io.ByteArrayOutputStream
 import java.util.Date
+import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
     FlutterPlugin,
+    ActivityAware,
     MethodCallHandler {
     // / The MethodChannel that will be the communication between Flutter and native Android
     // /
@@ -33,7 +45,10 @@ class PosthogFlutterPlugin :
     private lateinit var channel: MethodChannel
 
     private lateinit var applicationContext: Context
+    private var activity: Activity? = null
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val screenshotCompressionExecutor = Executors.newSingleThreadExecutor()
     private val snapshotSender = SnapshotSender()
 
     // The surveys delegate
@@ -220,6 +235,10 @@ class PosthogFlutterPlugin :
 
             "sendFullSnapshot" -> {
                 handleSendFullSnapshot(call, result)
+            }
+
+            "captureNativeScreenshot" -> {
+                handleCaptureNativeScreenshot(call, result)
             }
 
             "isSessionReplayActive" -> {
@@ -414,8 +433,25 @@ class PosthogFlutterPlugin :
         PostHogAndroid.setup(applicationContext, config)
     }
 
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
+
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+        screenshotCompressionExecutor.shutdown()
     }
 
     private fun handleSendFullSnapshot(
@@ -435,6 +471,187 @@ class PosthogFlutterPlugin :
             }
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun handleCaptureNativeScreenshot(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val currentActivity = activity
+            if (currentActivity == null) {
+                result.success(null)
+                return
+            }
+
+            val x = call.argument<Int>("x") ?: 0
+            val y = call.argument<Int>("y") ?: 0
+            val width = call.argument<Int>("width") ?: 0
+            val height = call.argument<Int>("height") ?: 0
+
+            if (width <= 0 || height <= 0) {
+                result.error("INVALID_ARGUMENT", "Width or height is 0", null)
+                return
+            }
+
+            captureNativeScreenshot(
+                activity = currentActivity,
+                x = x,
+                y = y,
+                width = width,
+                height = height,
+                result = result,
+            )
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureNativeScreenshot(
+        activity: Activity,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        result: Result,
+    ) {
+        val contentView = activity.findViewById<View>(android.R.id.content) ?: run {
+            result.success(null)
+            return
+        }
+
+        val contentWidthPx = contentView.width
+        val contentHeightPx = contentView.height
+        if (contentWidthPx <= 0 || contentHeightPx <= 0) {
+            result.success(null)
+            return
+        }
+
+        val density = activity.resources.displayMetrics.density
+        val cropLeft = (x * density).roundToInt().coerceIn(0, contentWidthPx - 1)
+        val cropTop = (y * density).roundToInt().coerceIn(0, contentHeightPx - 1)
+        val cropRight = ((x + width) * density).roundToInt().coerceIn(cropLeft + 1, contentWidthPx)
+        val cropBottom = ((y + height) * density).roundToInt().coerceIn(cropTop + 1, contentHeightPx)
+
+        val logicalWidth = width.coerceAtLeast(1)
+        val logicalHeight = height.coerceAtLeast(1)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val locationInWindow = IntArray(2)
+            contentView.getLocationInWindow(locationInWindow)
+
+            val srcRect =
+                Rect(
+                    locationInWindow[0] + cropLeft,
+                    locationInWindow[1] + cropTop,
+                    locationInWindow[0] + cropRight,
+                    locationInWindow[1] + cropBottom,
+                )
+
+            val bitmap = Bitmap.createBitmap(logicalWidth, logicalHeight, Bitmap.Config.ARGB_8888)
+
+            PixelCopy.request(
+                activity.window,
+                srcRect,
+                bitmap,
+                { copyResult ->
+                    if (copyResult == PixelCopy.SUCCESS) {
+                        compressBitmapToPngAsync(bitmap, result)
+                    } else {
+                        bitmap.recycle()
+                        captureNativeScreenshotFallback(
+                            contentView = contentView,
+                            cropLeft = cropLeft,
+                            cropTop = cropTop,
+                            cropRight = cropRight,
+                            cropBottom = cropBottom,
+                            logicalWidth = logicalWidth,
+                            logicalHeight = logicalHeight,
+                            result = result,
+                        )
+                    }
+                },
+                mainHandler,
+            )
+            return
+        }
+
+        captureNativeScreenshotFallback(
+            contentView = contentView,
+            cropLeft = cropLeft,
+            cropTop = cropTop,
+            cropRight = cropRight,
+            cropBottom = cropBottom,
+            logicalWidth = logicalWidth,
+            logicalHeight = logicalHeight,
+            result = result,
+        )
+    }
+
+    private fun captureNativeScreenshotFallback(
+        contentView: View,
+        cropLeft: Int,
+        cropTop: Int,
+        cropRight: Int,
+        cropBottom: Int,
+        logicalWidth: Int,
+        logicalHeight: Int,
+        result: Result,
+    ) {
+        val contentBitmap =
+            Bitmap.createBitmap(contentView.width, contentView.height, Bitmap.Config.ARGB_8888)
+        // Software Canvas cannot read GPU-composited surfaces like SurfaceView or TextureView,
+        // so those platform views may still appear blank when we hit this fallback path.
+        contentView.draw(android.graphics.Canvas(contentBitmap))
+
+        val croppedBitmap =
+            Bitmap.createBitmap(
+                contentBitmap,
+                cropLeft,
+                cropTop,
+                cropRight - cropLeft,
+                cropBottom - cropTop,
+            )
+        contentBitmap.recycle()
+
+        val outputBitmap =
+            if (croppedBitmap.width == logicalWidth && croppedBitmap.height == logicalHeight) {
+                croppedBitmap
+            } else {
+                Bitmap.createScaledBitmap(croppedBitmap, logicalWidth, logicalHeight, true).also {
+                    croppedBitmap.recycle()
+                }
+            }
+
+        compressBitmapToPngAsync(outputBitmap, result)
+    }
+
+    private fun bitmapToPng(bitmap: Bitmap): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+        bitmap.recycle()
+        return outputStream.toByteArray()
+    }
+
+    private fun compressBitmapToPngAsync(
+        bitmap: Bitmap,
+        result: Result,
+    ) {
+        screenshotCompressionExecutor.execute {
+            try {
+                val pngBytes = bitmapToPng(bitmap)
+                mainHandler.post {
+                    result.success(pngBytes)
+                }
+            } catch (e: Throwable) {
+                if (!bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+                mainHandler.post {
+                    result.error("PosthogFlutterException", e.localizedMessage, null)
+                }
+            }
         }
     }
 

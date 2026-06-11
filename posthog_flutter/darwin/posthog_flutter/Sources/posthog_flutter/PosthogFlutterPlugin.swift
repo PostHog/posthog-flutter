@@ -279,6 +279,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendMetaEvent(call, result: result)
         case "sendFullSnapshot":
             sendFullSnapshot(call, result: result)
+        case "captureNativeScreenshot":
+            captureNativeScreenshot(call, result: result)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
         case "startSessionRecording":
@@ -413,6 +415,67 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 #endif
 
 extension PosthogFlutterPlugin {
+    private func captureNativeScreenshot(_ call: FlutterMethodCall,
+                                         result: @escaping FlutterResult)
+    {
+        #if os(iOS)
+            guard let args = call.arguments as? [String: Any] else {
+                _badArgumentError(result)
+                return
+            }
+
+            let x = args["x"] as? Int ?? 0
+            let y = args["y"] as? Int ?? 0
+            let width = args["width"] as? Int ?? 0
+            let height = args["height"] as? Int ?? 0
+
+            guard width > 0, height > 0 else {
+                _badArgumentError(result)
+                return
+            }
+
+            DispatchQueue.main.async {
+                guard let window = self.captureWindow() else {
+                    result(nil)
+                    return
+                }
+
+                let cropRect = CGRect(x: x, y: y, width: width, height: height)
+                    .intersection(window.bounds)
+                guard !cropRect.isNull, !cropRect.isEmpty else {
+                    result(nil)
+                    return
+                }
+
+                let format = UIGraphicsImageRendererFormat.default()
+                format.scale = 1
+                format.opaque = window.isOpaque
+
+                let image = UIGraphicsImageRenderer(size: cropRect.size, format: format).image { _ in
+                    let drawRect = window.bounds.offsetBy(dx: -cropRect.origin.x, dy: -cropRect.origin.y)
+                    window.drawHierarchy(in: drawRect, afterScreenUpdates: false)
+                }
+
+                result(image.pngData().map(FlutterStandardTypedData.init(bytes:)) ?? nil)
+            }
+        #else
+            result(nil)
+        #endif
+    }
+
+    #if os(iOS)
+        private func captureWindow() -> UIWindow? {
+            if #available(iOS 13.0, *) {
+                return UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first(where: \.isKeyWindow) ?? UIApplication.shared.windows.first
+            } else {
+                return UIApplication.shared.keyWindow
+            }
+        }
+    #endif
+
     private func sendMetaEvent(_ call: FlutterMethodCall,
                                result: @escaping FlutterResult)
     {
