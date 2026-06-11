@@ -1,4 +1,5 @@
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 
@@ -12,6 +13,25 @@ class CapturedExceptionCall {
     required this.error,
     this.stackTrace,
     this.properties,
+  });
+}
+
+/// Captured log call data
+class CapturedLogCall {
+  final String body;
+  final PostHogLogSeverity level;
+  final Map<String, Object>? attributes;
+  final String? traceId;
+  final String? spanId;
+  final int? traceFlags;
+
+  CapturedLogCall({
+    required this.body,
+    required this.level,
+    this.attributes,
+    this.traceId,
+    this.spanId,
+    this.traceFlags,
   });
 }
 
@@ -71,12 +91,36 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     resetGroupPropertiesForFlagsCalls.add(groupType);
   }
 
+  // Tracking for captureLog calls (after Dart-side beforeSend has run)
+  final List<CapturedLogCall> capturedLogs = [];
+
   @override
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
   }) async {
     this.screenName = screenName;
+  }
+
+  @override
+  Future<void> captureLog({
+    required String body,
+    PostHogLogSeverity level = PostHogLogSeverity.info,
+    Map<String, Object>? attributes,
+    String? traceId,
+    String? spanId,
+    int? traceFlags,
+  }) async {
+    capturedLogs.add(
+      CapturedLogCall(
+        body: body,
+        level: level,
+        attributes: attributes,
+        traceId: traceId,
+        spanId: spanId,
+        traceFlags: traceFlags,
+      ),
+    );
   }
 
   @override

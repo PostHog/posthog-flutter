@@ -207,6 +207,41 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
 
+        // Configure logs (beforeSend runs Dart-side). Each field is only present
+        // when the user set it; unset fields keep native defaults.
+        if let logsConfig = posthogConfig["logs"] as? [String: Any] {
+            if let serviceName = logsConfig["serviceName"] as? String {
+                config.logs.serviceName = serviceName
+            }
+            if let serviceVersion = logsConfig["serviceVersion"] as? String {
+                config.logs.serviceVersion = serviceVersion
+            }
+            if let environment = logsConfig["environment"] as? String {
+                config.logs.environment = environment
+            }
+            if let resourceAttributes = logsConfig["resourceAttributes"] as? [String: Any] {
+                config.logs.resourceAttributes = resourceAttributes
+            }
+            if let flushIntervalSeconds = logsConfig["flushIntervalSeconds"] as? Int {
+                config.logs.flushIntervalSeconds = TimeInterval(flushIntervalSeconds)
+            }
+            if let flushAt = logsConfig["flushAt"] as? Int {
+                config.logs.flushAt = flushAt
+            }
+            if let maxBatchSize = logsConfig["maxBatchSize"] as? Int {
+                config.logs.maxBatchSize = maxBatchSize
+            }
+            if let maxBufferSize = logsConfig["maxBufferSize"] as? Int {
+                config.logs.maxBufferSize = maxBufferSize
+            }
+            if let rateCapMaxLogs = logsConfig["rateCapMaxLogs"] as? Int {
+                config.logs.rateCapMaxLogs = rateCapMaxLogs
+            }
+            if let rateCapWindowSeconds = logsConfig["rateCapWindowSeconds"] as? Int {
+                config.logs.rateCapWindowSeconds = TimeInterval(rateCapWindowSeconds)
+            }
+        }
+
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
         postHogVersion = postHogFlutterVersion
@@ -239,6 +274,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             capture(call, result: result)
         case "screen":
             screen(call, result: result)
+        case "captureLog":
+            captureLog(call, result: result)
         case "alias":
             alias(call, result: result)
         case "distinctId":
@@ -716,6 +753,50 @@ extension PosthogFlutterPlugin {
             result(nil)
         } else {
             _badArgumentError(result)
+        }
+    }
+
+    private func captureLog(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let body = args["body"] as? String
+        {
+            let level = args["level"] as? String ?? "info"
+            let attributes = args["attributes"] as? [String: Any]
+            let traceId = args["traceId"] as? String
+            let spanId = args["spanId"] as? String
+            // traceFlags 0 is meaningful (W3C sampled-false); nil omits it.
+            let traceFlags = args["traceFlags"] as? Int
+            // PostHogLogSeverity.from(name:) is internal in the SDK, so map the
+            // wire string here. Unknown levels fall back to .info.
+            let severity = severityFromString(level)
+            PostHogSDK.shared.captureLog(
+                body,
+                level: severity,
+                attributes: attributes,
+                traceId: traceId,
+                spanId: spanId,
+                traceFlags: traceFlags
+            )
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    // Maps the wire level to PostHogLogSeverity using only public enum cases
+    // (the SDK's `from(name:)` is internal). Unknown levels fall back to .info.
+    private func severityFromString(_ level: String) -> PostHogLogSeverity {
+        switch level.lowercased() {
+        case "trace": return .trace
+        case "debug": return .debug
+        case "info": return .info
+        case "warn": return .warn
+        case "error": return .error
+        case "fatal": return .fatal
+        default: return .info
         }
     }
 

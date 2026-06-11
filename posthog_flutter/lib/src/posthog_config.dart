@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'logs/posthog_log_record.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 
@@ -13,6 +14,19 @@ import 'posthog_flutter_platform_interface.dart';
 /// `FutureOr<PostHogEvent?>`).
 typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
   PostHogEvent event,
+);
+
+/// Callback to intercept and modify log records before they are sent to
+/// PostHog.
+///
+/// The [record] argument contains the body, level, and user-provided
+/// attributes that are about to be captured. Return a possibly modified record
+/// to send it, or return `null` to drop it.
+///
+/// Callbacks can be synchronous or asynchronous (returning
+/// `FutureOr<PostHogLogRecord?>`).
+typedef BeforeSendLogCallback = FutureOr<PostHogLogRecord?> Function(
+  PostHogLogRecord record,
 );
 
 /// Controls whether events create or update PostHog person profiles.
@@ -157,6 +171,10 @@ class PostHogConfig {
   /// Configuration for error tracking and exception capture.
   final errorTrackingConfig = PostHogErrorTrackingConfig();
 
+  /// Configuration for the logs subsystem (`Posthog().captureLog()` and the
+  /// `Posthog().logger` facade).
+  final logsConfig = PostHogLogsConfig();
+
   /// Callback to be invoked when feature flags are loaded.
   ///
   /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
@@ -284,8 +302,140 @@ class PostHogConfig {
       'dataMode': dataMode.name,
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
+      'logs': logsConfig.toMap(),
     };
   }
+}
+
+/// Configuration for the logs subsystem.
+///
+/// Assign values before calling `Posthog().setup(config)`. The identity and
+/// tuning fields are forwarded to the native iOS/Android logs configuration;
+/// [beforeSend] runs in Dart before a record is forwarded to the native SDK.
+///
+/// Every field that is `null` (or, for [resourceAttributes], empty) is left at
+/// the native SDK's default — it is not sent over the channel.
+///
+/// **Flutter web:** this configuration is **not** applied on web. The web SDK
+/// hooks onto an already-initialized posthog-js instance, so configure logs in
+/// your `posthog.init({...})` call instead. Only [beforeSend] runs on web (in
+/// Dart).
+class PostHogLogsConfig {
+  /// Creates a logs configuration with native defaults.
+  PostHogLogsConfig();
+
+  /// Sets the OTLP `service.name` resource attribute.
+  ///
+  /// When `null`, the native SDK's default is used (the app bundle id on Apple
+  /// platforms, the app namespace on Android).
+  String? serviceName;
+
+  /// Sets the OTLP `service.version` resource attribute.
+  ///
+  /// When `null`, the native SDK's default is used (the app version where the
+  /// platform provides one).
+  String? serviceVersion;
+
+  /// Sets the OTLP `deployment.environment` resource attribute (e.g.
+  /// `production`, `staging`). When `null`, the native SDK's default is used
+  /// (no environment).
+  String? environment;
+
+  /// Extra OTLP resource attributes merged into every payload.
+  ///
+  /// SDK-managed identity keys (`service.*`, `telemetry.sdk.*`) take precedence
+  /// and cannot be overridden.
+  Map<String, Object> resourceAttributes = {};
+
+  /// Periodic auto-flush interval. When `null`, the native default is used
+  /// (30s on iOS/Android).
+  Duration? flushInterval;
+
+  /// Queue depth that triggers an immediate flush. When `null`, the native
+  /// default is used (20 on iOS/Android).
+  int? flushAt;
+
+  /// Maximum number of records sent per POST. When `null`, the native default
+  /// is used (50 on iOS/Android).
+  int? maxBatchSize;
+
+  /// Maximum number of buffered records before the oldest are dropped (FIFO).
+  /// When `null`, the native default is used (1000 on iOS/Android).
+  int? maxBufferSize;
+
+  /// Maximum number of logs accepted per rate-cap window before excess logs are
+  /// dropped. When `null`, the native default is used (500 on iOS/Android). A
+  /// non-positive value disables the cap natively.
+  int? rateCapMaxLogs;
+
+  /// Length of the rate-cap window. When `null`, the native default is used
+  /// (10s on iOS/Android).
+  Duration? rateCapWindow;
+
+  /// Callbacks to intercept and modify log records before they are forwarded to
+  /// the native SDK.
+  ///
+  /// Callbacks are invoked in order for records captured via
+  /// `Posthog().captureLog()` and the `Posthog().logger` facade. Each callback
+  /// receives the record (possibly modified by previous callbacks). Return a
+  /// possibly modified record to continue, or return `null` to drop it.
+  /// Blanking the body also drops the record.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// config.logsConfig.beforeSend = [
+  ///   (record) {
+  ///     record.attributes?.remove('password');
+  ///     return record;
+  ///   },
+  ///   (record) => record.body.contains('secret') ? null : record,
+  /// ];
+  /// ```
+  ///
+  /// **Note:**
+  /// - Runs in Dart on all platforms — it is intentionally not forwarded to the
+  ///   native SDKs' own `beforeSend`. Dart callbacks cannot cross the platform
+  ///   channel, and running it here gives identical behavior everywhere
+  ///   (including web). This mirrors the event [PostHogConfig.beforeSend].
+  /// - Callbacks can be synchronous or asynchronous (via
+  ///   `FutureOr<PostHogLogRecord?>`).
+  /// - A callback that throws is logged, and the record is dropped.
+  /// - The W3C trace fields (`traceId`, `spanId`, `traceFlags`) are **not**
+  ///   part of [PostHogLogRecord] and are not visible here. They pass straight
+  ///   through to the native SDK, so they cannot be redacted or used to drop a
+  ///   record. Keep anything sensitive out of those fields; put it in [body] or
+  ///   [PostHogLogRecord.attributes], which a callback can scrub or drop.
+  List<BeforeSendLogCallback> beforeSend = [];
+
+  /// Converts the identity and tuning options to a platform-channel map.
+  ///
+  /// Only fields the user set are included, so unset fields keep the native
+  /// default. [beforeSend] is intentionally omitted: it runs in Dart and never
+  /// crosses the platform channel.
+  Map<String, dynamic> toMap() {
+    return {
+      if (serviceName != null) 'serviceName': serviceName,
+      if (serviceVersion != null) 'serviceVersion': serviceVersion,
+      if (environment != null) 'environment': environment,
+      if (resourceAttributes.isNotEmpty)
+        'resourceAttributes': resourceAttributes,
+      if (flushInterval != null)
+        'flushIntervalSeconds': _wholeSeconds(flushInterval!),
+      if (flushAt != null) 'flushAt': flushAt,
+      if (maxBatchSize != null) 'maxBatchSize': maxBatchSize,
+      if (maxBufferSize != null) 'maxBufferSize': maxBufferSize,
+      if (rateCapMaxLogs != null) 'rateCapMaxLogs': rateCapMaxLogs,
+      if (rateCapWindow != null)
+        'rateCapWindowSeconds': _wholeSeconds(rateCapWindow!),
+    };
+  }
+
+  /// The native flush interval and rate-cap window are whole seconds. A
+  /// sub-second [Duration] truncates to `0`, which the native SDK treats as
+  /// "disabled" (rate cap) or continuous flushing — surprising for a caller who
+  /// set, say, 500ms. Floor at 1s, the smallest value the native API can honor.
+  static int _wholeSeconds(Duration duration) =>
+      duration.inSeconds < 1 ? 1 : duration.inSeconds;
 }
 
 /// Configuration for mobile session replay capture and masking.

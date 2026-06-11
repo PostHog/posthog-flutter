@@ -10,6 +10,7 @@ import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
+import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
@@ -155,6 +156,31 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
           'userProperties': normalizedUserProperties,
         if (normalizedUserPropertiesSetOnce != null)
           'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
+      }),
+    );
+  }
+
+  @override
+  Future<void> captureLog({
+    required String body,
+    PostHogLogSeverity level = PostHogLogSeverity.info,
+    Map<String, Object>? attributes,
+    String? traceId,
+    String? spanId,
+    int? traceFlags,
+  }) async {
+    final normalizedAttributes =
+        attributes != null ? PropertyNormalizer.normalize(attributes) : null;
+
+    return handleWebMethodCall(
+      MethodCall('captureLog', {
+        'body': body,
+        'level': level.name,
+        if (normalizedAttributes != null) 'attributes': normalizedAttributes,
+        if (traceId != null) 'traceId': traceId,
+        if (spanId != null) 'spanId': spanId,
+        // traceFlags 0 is meaningful (W3C sampled-false); only omit when null.
+        if (traceFlags != null) 'traceFlags': traceFlags,
       }),
     );
   }

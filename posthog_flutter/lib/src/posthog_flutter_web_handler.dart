@@ -20,6 +20,8 @@ extension PostHogExtension on PostHog {
     JSAny propertiesSetOnce,
   );
   external JSAny? capture(JSAny eventName, JSAny? properties, JSAny? options);
+  // May be absent on older posthog-js builds; the call site guards with try/catch.
+  external void captureLog(JSAny options);
   external JSAny? alias(JSAny alias);
   // ignore: non_constant_identifier_names
   external JSAny? get_distinct_id();
@@ -204,6 +206,34 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       properties.addAll(_getLocationProperties());
 
       posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
+      break;
+    case 'captureLog':
+      final body = args['body'] as String;
+      final level = args['level'] as String? ?? 'info';
+      final attributes = safeMapConversion(args['attributes']);
+      final traceId = args['traceId'] as String?;
+      final spanId = args['spanId'] as String?;
+      final traceFlags = args['traceFlags'] as int?;
+
+      // posthog-js captureLog options. See https://posthog.com/docs/logs
+      final options = <String, Object>{
+        'body': body,
+        'level': level,
+        if (attributes.isNotEmpty) 'attributes': attributes,
+        if (traceId != null) 'trace_id': traceId,
+        if (spanId != null) 'span_id': spanId,
+        // trace_flags 0 is meaningful (W3C sampled-false); only omit when null.
+        if (traceFlags != null) 'trace_flags': traceFlags,
+      };
+
+      try {
+        posthog?.captureLog(mapToJSAny(options));
+      } catch (error) {
+        // Older posthog-js builds lack captureLog and throw.
+        printIfDebug(
+          '[PostHog] captureLog is not supported by the loaded posthog-js version: $error',
+        );
+      }
       break;
     case 'alias':
       final alias = args['alias'] as String;
