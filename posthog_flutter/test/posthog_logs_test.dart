@@ -143,7 +143,7 @@ void main() {
     group('beforeSend hook', () {
       test('hook returning null drops the record', () async {
         final config = PostHogConfig('test_token');
-        config.logs.beforeSend = [(record) => null];
+        config.logsConfig.beforeSend = [(record) => null];
         await setupWith(config);
 
         await Posthog().captureLog(body: 'secret');
@@ -153,7 +153,7 @@ void main() {
 
       test('hook can mutate body and attributes', () async {
         final config = PostHogConfig('test_token');
-        config.logs.beforeSend = [
+        config.logsConfig.beforeSend = [
           (record) {
             record.body = 'redacted';
             record.attributes = {'safe': true};
@@ -173,7 +173,7 @@ void main() {
 
       test('hook blanking the body drops the record', () async {
         final config = PostHogConfig('test_token');
-        config.logs.beforeSend = [
+        config.logsConfig.beforeSend = [
           (record) {
             record.body = '   ';
             return record;
@@ -188,7 +188,7 @@ void main() {
 
       test('throwing hook is contained and drops the log', () async {
         final config = PostHogConfig('test_token');
-        config.logs.beforeSend = [
+        config.logsConfig.beforeSend = [
           (record) => throw Exception('boom'),
         ];
         await setupWith(config);
@@ -201,7 +201,7 @@ void main() {
       test('callbacks run left-to-right, feeding each output to the next',
           () async {
         final config = PostHogConfig('test_token');
-        config.logs.beforeSend = [
+        config.logsConfig.beforeSend = [
           (record) {
             record.body = '${record.body}-1';
             return record;
@@ -220,7 +220,7 @@ void main() {
 
       test('async hook is awaited', () async {
         final config = PostHogConfig('test_token');
-        config.logs.beforeSend = [
+        config.logsConfig.beforeSend = [
           (record) async {
             await Future<void>.delayed(Duration.zero);
             record.body = 'async';
@@ -244,7 +244,7 @@ void main() {
 
       test('serializes set identity fields and attributes', () {
         final config = PostHogConfig('test_token');
-        config.logs
+        config.logsConfig
           ..serviceName = 'checkout'
           ..serviceVersion = '1.2.3'
           ..environment = 'production'
@@ -260,7 +260,7 @@ void main() {
 
       test('serializes tuning knobs, sending durations as seconds', () {
         final config = PostHogConfig('test_token');
-        config.logs
+        config.logsConfig
           ..flushInterval = const Duration(seconds: 15)
           ..flushAt = 5
           ..maxBatchSize = 25
@@ -280,7 +280,7 @@ void main() {
 
       test('floors sub-second flush/rate-cap durations at 1s (not 0)', () {
         final config = PostHogConfig('test_token');
-        config.logs
+        config.logsConfig
           ..flushInterval = const Duration(milliseconds: 500)
           ..rateCapWindow = const Duration(milliseconds: 1);
 
@@ -293,7 +293,7 @@ void main() {
 
       test('omits the tuning knobs that were left unset', () {
         final config = PostHogConfig('test_token');
-        config.logs
+        config.logsConfig
           ..flushAt = 5
           ..rateCapWindow = const Duration(seconds: 20);
 
@@ -307,7 +307,7 @@ void main() {
 
       test('beforeSend is never serialized', () {
         final config = PostHogConfig('test_token');
-        config.logs.beforeSend = [(record) => record];
+        config.logsConfig.beforeSend = [(record) => record];
 
         expect(
           (config.toMap()['logs'] as Map).containsKey('beforeSend'),

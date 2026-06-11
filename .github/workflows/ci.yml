@@ -63,6 +63,11 @@ jobs:
         working-directory: ./posthog_flutter
         run: flutter test
 
+      # Browser-only tests (`@TestOn('browser')`) are skipped by the VM run above.
+      - name: Test (web)
+        working-directory: ./posthog_flutter
+        run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart
+
   # Apple builds (iOS and macOS) with CocoaPods and Swift Package Manager
   build-apple:
     runs-on: macos-26

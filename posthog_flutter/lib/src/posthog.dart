@@ -284,11 +284,11 @@ class Posthog {
     var record = PostHogLogRecord(
       body: body,
       level: level,
-      attributes: attributes,
+      attributes: attributes == null ? null : {...attributes},
     );
 
     final callbacks =
-        _config?.logs.beforeSend ?? const <BeforeSendLogCallback>[];
+        _config?.logsConfig.beforeSend ?? const <BeforeSendLogCallback>[];
     for (final callback in callbacks) {
       try {
         final result = await runBeforeSend<PostHogLogRecord>(callback, record);

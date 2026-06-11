@@ -12,6 +12,8 @@ Posthog().logger.error('payment failed', {'error_code': 'E001'});
 await Posthog().captureLog(body: 'request finished', level: PostHogLogSeverity.warn);
 ```
 
-Levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal`. Configure service identity, redaction (`beforeSend`), and batching/rate-cap tuning on `config.logs` — all optional, with sensible native defaults. Works on iOS, Android, and web.
+Levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal`. Configure service identity, redaction (`beforeSend`), and batching/rate-cap tuning on `config.logsConfig` — all optional, with sensible native defaults. Works on iOS, Android, and web.
+
+Requires `posthog-android` `3.48.0` or newer.
 
 See https://posthog.com/docs/logs for details.

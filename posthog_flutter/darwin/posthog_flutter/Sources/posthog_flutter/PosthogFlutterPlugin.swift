@@ -786,10 +786,10 @@ extension PosthogFlutterPlugin {
         }
     }
 
-    // Maps the lowercase wire level to PostHogLogSeverity using only public enum
-    // cases (the SDK's `from(name:)` is internal). Unknown levels fall back to .info.
+    // Maps the wire level to PostHogLogSeverity using only public enum cases
+    // (the SDK's `from(name:)` is internal). Unknown levels fall back to .info.
     private func severityFromString(_ level: String) -> PostHogLogSeverity {
-        switch level {
+        switch level.lowercased() {
         case "trace": return .trace
         case "debug": return .debug
         case "info": return .info

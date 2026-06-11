@@ -173,7 +173,7 @@ class PostHogConfig {
 
   /// Configuration for the logs subsystem (`Posthog().captureLog()` and the
   /// `Posthog().logger` facade).
-  final logs = PostHogLogsConfig();
+  final logsConfig = PostHogLogsConfig();
 
   /// Callback to be invoked when feature flags are loaded.
   ///
@@ -302,7 +302,7 @@ class PostHogConfig {
       'dataMode': dataMode.name,
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
-      'logs': logs.toMap(),
+      'logs': logsConfig.toMap(),
     };
   }
 }
@@ -383,7 +383,7 @@ class PostHogLogsConfig {
   ///
   /// **Example:**
   /// ```dart
-  /// config.logs.beforeSend = [
+  /// config.logsConfig.beforeSend = [
   ///   (record) {
   ///     record.attributes?.remove('password');
   ///     return record;
@@ -399,7 +399,7 @@ class PostHogLogsConfig {
   ///   (including web). This mirrors the event [PostHogConfig.beforeSend].
   /// - Callbacks can be synchronous or asynchronous (via
   ///   `FutureOr<PostHogLogRecord?>`).
-  /// - Exceptions in a callback skip that callback and continue with the next.
+  /// - A callback that throws is logged, and the record is dropped.
   /// - The W3C trace fields (`traceId`, `spanId`, `traceFlags`) are **not**
   ///   part of [PostHogLogRecord] and are not visible here. They pass straight
   ///   through to the native SDK, so they cannot be redacted or used to drop a
