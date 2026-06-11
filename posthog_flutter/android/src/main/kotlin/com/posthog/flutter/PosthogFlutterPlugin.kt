@@ -60,14 +60,15 @@ class PosthogFlutterPlugin :
             }
 
             val projectToken =
-                (bundle.getString("com.posthog.posthog.PROJECT_TOKEN")
-                    ?: bundle.getString("com.posthog.posthog.API_KEY"))
-                    ?.trim()
+                (
+                    bundle.getString("com.posthog.posthog.PROJECT_TOKEN")
+                        ?: bundle.getString("com.posthog.posthog.API_KEY")
+                )?.trim()
 
             if (!bundle.containsKey("com.posthog.posthog.PROJECT_TOKEN") && bundle.containsKey("com.posthog.posthog.API_KEY")) {
                 Log.w(
                     "PostHog",
-                    "com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!"
+                    "com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!",
                 )
             }
 
@@ -76,16 +77,19 @@ class PosthogFlutterPlugin :
                 return
             }
 
-            val host = bundle.getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-                ?: PostHogConfig.DEFAULT_HOST
+            val host =
+                bundle
+                    .getString("com.posthog.posthog.POSTHOG_HOST", PostHogConfig.DEFAULT_HOST)
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: PostHogConfig.DEFAULT_HOST
             // Check new key first, then legacy key, default to true
-            val captureApplicationLifecycleEvents = if (bundle.containsKey("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS")) {
-                bundle.getBoolean("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS", true)
-            } else {
-                bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", true)
-            }
+            val captureApplicationLifecycleEvents =
+                if (bundle.containsKey("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS")) {
+                    bundle.getBoolean("com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS", true)
+                } else {
+                    bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", true)
+                }
             val debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
 
             val posthogConfig = mutableMapOf<String, Any>()
@@ -310,13 +314,14 @@ class PosthogFlutterPlugin :
 
     private fun setupPostHog(posthogConfig: Map<String, Any>) {
         val projectToken =
-            ((posthogConfig["projectToken"] as String?)
-                ?: (posthogConfig["apiKey"] as String?))
-                ?.trim()
+            (
+                (posthogConfig["projectToken"] as String?)
+                    ?: (posthogConfig["apiKey"] as String?)
+            )?.trim()
         if (!posthogConfig.containsKey("projectToken") && posthogConfig.containsKey("apiKey")) {
             Log.w(
                 "PostHog",
-                "apiKey is deprecated and will be removed in the next major version. Use projectToken instead!"
+                "apiKey is deprecated and will be removed in the next major version. Use projectToken instead!",
             )
         }
         if (projectToken.isNullOrEmpty()) {
