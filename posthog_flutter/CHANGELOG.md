@@ -444,8 +444,8 @@ final observer = PosthogObserver(routeFilter: myRouteFilter);
 - Android minSdkVersion 21
 - iOS min version 13.0
 - Flutter min version 3.3.0
-- Upgraded PostHog Android SDK to [v3](https://github.com/PostHog/posthog-android/blob/main/USAGE.md)
-- Upgraded PostHog iOS SDK to [v3](https://github.com/PostHog/posthog-ios/blob/main/USAGE.md)
+- Upgraded PostHog Android SDK to [v3](https://posthog.com/docs/libraries/android)
+- Upgraded PostHog iOS SDK to [v3](https://posthog.com/docs/libraries/ios/usage)
 - Upgraded PostHog JS SDK to the latest version
 - PostHog Flutter Plugins are written in Kotlin and Swift
 - Added missing features such as feature flags payloads, debug, and more
@@ -485,8 +485,8 @@ final observer = PosthogObserver(routeFilter: myRouteFilter);
 - Android minSdkVersion 21
 - iOS min version 13.0
 - Flutter min version 3.3.0
-- Upgraded PostHog Android SDK to [v3](https://github.com/PostHog/posthog-android/blob/main/USAGE.md)
-- Upgraded PostHog iOS SDK to [v3 preview](https://github.com/PostHog/posthog-ios/blob/main/USAGE.md)
+- Upgraded PostHog Android SDK to [v3](https://posthog.com/docs/libraries/android)
+- Upgraded PostHog iOS SDK to [v3 preview](https://posthog.com/docs/libraries/ios/usage)
 - Upgraded PostHog JS SDK to the latest version
 - PostHog Flutter Plugins are written in Kotlin and Swift
 

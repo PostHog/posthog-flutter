@@ -1,42 +1,9 @@
-# posthog_flutter_example
+# PostHog Flutter example
 
-Demonstrates how to use the posthog_flutter plugin.
+Please see the main [PostHog docs](https://posthog.com/docs).
 
-## Getting Started
+SDK usage examples and code snippets live in the official documentation so they stay up to date.
 
-This project is a starting point for a Flutter application.
+## Documentation
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-
-## Running web example
-
-```bash
-# release mode
-rm -rf build/web
-flutter build web --source-maps
-posthog-cli sourcemap inject --directory build/web --release-name posthog_flutter_example --release-version 1.0.0 --build 42
-# check the sourcemaps has chunk_id and release_id injected (*.js.map file)
-# check the js file has _posthogChunkIds injected (*.js file)
-# check the chunk_id and _posthogChunkIds match
-posthog-cli sourcemap upload --directory build/web --release-name posthog_flutter_example --release-version 1.0.0 --build 42
-cd build/web
-# https://pub.dev/packages/dhttpd
-dhttpd
-```
-
-## Running Apple example
-
-```
-# needs device pairing - enable debug mode on the device
-# make sure you have a valid team in Xcode, go to Signing & Capabilities
-flutter devices
-flutter run --release -d Manoel --verbose
-# replace Manoel with your device's name/id
-```
+- [Flutter library docs](https://posthog.com/docs/libraries/flutter)
