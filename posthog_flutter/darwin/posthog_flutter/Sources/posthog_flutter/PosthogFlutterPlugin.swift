@@ -61,7 +61,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         if Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.PROJECT_TOKEN") == nil,
-           Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") != nil {
+           Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") != nil
+        {
             print("[PostHog] com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!")
         }
 

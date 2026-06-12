@@ -1,4 +1,4 @@
-.PHONY: format formatKotlin formatSwift formatDart checkDart installLinters test
+.PHONY: format formatKotlin formatSwift formatDart checkFormatDart checkFormatKotlin checkFormatSwift analyzeDart installLinters test
 
 format: formatSwift formatKotlin formatDart
 
@@ -9,9 +9,15 @@ installLinters:
 formatKotlin:
 	ktlint --format --baseline=posthog_flutter/ktlint-baseline.xml posthog_flutter/android/**/*.kt
 
+checkFormatKotlin:
+	ktlint --baseline=posthog_flutter/ktlint-baseline.xml posthog_flutter/android/**/*.kt
+
 # swiftlint darwin/posthog_flutter/Sources --fix conflicts with swiftformat
 formatSwift:
 	swiftformat posthog_flutter/darwin/posthog_flutter/Sources/posthog_flutter --swiftversion 5.3
+
+checkFormatSwift:
+	swiftformat posthog_flutter/darwin/posthog_flutter/Sources/posthog_flutter --swiftversion 5.3 --lint
 
 formatDart:
 	dart format .
