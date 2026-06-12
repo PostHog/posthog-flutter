@@ -56,6 +56,27 @@ jobs:
       - name: Analyze Dart
         run: make analyzeDart
 
+  public-api:
+    name: Dart public API
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
+      # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
+      # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
+      - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check Dart public API snapshot
+        run: make checkApiDart
+
   kotlin-format:
     name: Kotlin format
     runs-on: macos-26
