@@ -1,4 +1,4 @@
-.PHONY: format formatKotlin formatSwift formatDart checkFormatDart checkFormatKotlin checkFormatSwift analyzeDart installLinters test
+.PHONY: format formatKotlin formatSwift formatDart checkFormatDart checkFormatKotlin checkFormatSwift checkApiDart updateApiDart analyzeDart installLinters test
 
 format: formatSwift formatKotlin formatDart
 
@@ -27,6 +27,12 @@ checkFormatDart:
 
 analyzeDart:
 	dart analyze .
+
+checkApiDart:
+	scripts/check-api-dart.sh
+
+updateApiDart:
+	scripts/check-api-dart.sh --update
 
 test: 
 	cd posthog_flutter && flutter test -r expanded

@@ -24,6 +24,7 @@ dependencies:
   web: ^1.1.0
 
 dev_dependencies:
+  dart_apitool: ^0.23.1
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
