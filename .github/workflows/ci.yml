@@ -5,60 +5,79 @@ on:
     branches:
       - main
   pull_request:
-    paths-ignore:
-      - "**/*.md"
 
 permissions:
   contents: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  detect-markdown-only:
+    uses: PostHog/.github/.github/workflows/detect-markdown-only.yml@ec25337d9fae0100622cbfea1bd5bd88284ac10b
+    permissions:
+      pull-requests: read
+
   dart-format:
+    needs: detect-markdown-only
     name: Dart format
     runs-on: ubuntu-latest
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
       - name: Check Dart formatting
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: make checkFormatDart
 
   dart-analyze:
+    needs: detect-markdown-only
     name: Dart analyze
     runs-on: ubuntu-latest
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
       - name: Analyze Dart
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: make analyzeDart
 
   public-api:
+    needs: detect-markdown-only
     name: Dart public API
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && needs.detect-markdown-only.outputs.markdown_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -78,78 +97,110 @@ jobs:
         run: make checkApiDart
 
   kotlin-format:
+    needs: detect-markdown-only
     name: Kotlin format
     runs-on: macos-26
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       - name: Install ktlint
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: brew install ktlint
 
       - name: Check Kotlin formatting
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: make checkFormatKotlin
 
   swift-format:
+    needs: detect-markdown-only
     name: Swift format
     runs-on: macos-26
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       - name: Install swiftformat
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: brew install swiftformat
 
       - name: Check Swift formatting
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: make checkFormatSwift
 
   # Unit tests
   test:
+    needs: detect-markdown-only
     runs-on: ubuntu-latest
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
       - name: Test
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./posthog_flutter
         run: flutter test
 
       # Browser-only tests (`@TestOn('browser')`) are skipped by the VM run above.
       - name: Test (web)
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./posthog_flutter
         run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart
 
   publish-dry-run:
+    needs: detect-markdown-only
     name: Pub publish dry run
     runs-on: ubuntu-latest
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
       - name: Validate pub package
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./posthog_flutter
         run: flutter pub publish --dry-run
 
   # Apple builds (iOS and macOS) with CocoaPods and Swift Package Manager
   build-apple:
+    needs: detect-markdown-only
     runs-on: macos-26
     strategy:
       matrix:
@@ -161,39 +212,53 @@ jobs:
           - target: macos
             build_command: flutter build macos
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Select Xcode version
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '26.4'
 
       - name: Enable Swift Package Manager
-        if: matrix.package_manager == 'spm'
+        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && (matrix.package_manager == 'spm') }}
         run: flutter config --enable-swift-package-manager # flutter config --no-enable-swift-package-manager
 
       - name: Install dependencies
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
       - name: Build ${{ matrix.target }} (${{ matrix.package_manager }})
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./example
         run: ${{ matrix.build_command }}
 
   # Android build
   build-android:
+    needs: detect-markdown-only
     runs-on: ubuntu-latest
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       - name: 'Set up Java'
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: 17
@@ -203,34 +268,45 @@ jobs:
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
       - name: Build Android
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./example
         run: flutter build apk
 
   # Web build
   build-web:
+    needs: detect-markdown-only
     runs-on: ubuntu-latest
     steps:
+      - name: Complete markdown-only PR check
+        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
       - name: Build Web
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./example
         run: flutter build web
