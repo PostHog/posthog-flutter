@@ -23,9 +23,9 @@ jobs:
     name: Dart format
     runs-on: ubuntu-latest
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -51,9 +51,9 @@ jobs:
     name: Dart analyze
     runs-on: ubuntu-latest
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -80,9 +80,9 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -108,9 +108,9 @@ jobs:
     name: Kotlin format
     runs-on: macos-26
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -127,9 +127,9 @@ jobs:
     name: Swift format
     runs-on: macos-26
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -146,9 +146,9 @@ jobs:
     needs: detect-markdown-only
     runs-on: ubuntu-latest
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -181,9 +181,9 @@ jobs:
     name: Pub publish dry run
     runs-on: ubuntu-latest
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -219,9 +219,9 @@ jobs:
           - target: macos
             build_command: flutter build macos
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -258,9 +258,9 @@ jobs:
     needs: detect-markdown-only
     runs-on: ubuntu-latest
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
@@ -294,9 +294,9 @@ jobs:
     needs: detect-markdown-only
     runs-on: ubuntu-latest
     steps:
-      - name: Skip expensive CI for markdown-only PR
+      - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; marking this check successful without running expensive CI."
+        run: echo "Only Markdown files changed; no additional work is required for this check."
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
