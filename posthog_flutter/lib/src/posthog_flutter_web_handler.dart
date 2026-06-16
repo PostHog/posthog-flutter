@@ -22,6 +22,8 @@ extension PostHogExtension on PostHog {
   external JSAny? capture(JSAny eventName, JSAny? properties, JSAny? options);
   // May be absent on older posthog-js builds; the call site guards with try/catch.
   external void captureLog(JSAny options);
+  // May be absent on older posthog-js builds; the call site guards with try/catch.
+  external void addExceptionStep(JSAny message, JSAny? properties);
   external JSAny? alias(JSAny alias);
   // ignore: non_constant_identifier_names
   external JSAny? get_distinct_id();
@@ -347,6 +349,22 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'close':
       // not supported on Web
       // analytics.callMethod('close');
+      break;
+    case 'addExceptionStep':
+      final message = args['message'] as String;
+      final properties = safeMapConversion(args['properties']);
+
+      try {
+        posthog?.addExceptionStep(
+          stringToJSAny(message),
+          properties.isNotEmpty ? mapToJSAny(properties) : null,
+        );
+      } catch (error) {
+        // Older posthog-js builds lack addExceptionStep and throw.
+        printIfDebug(
+          '[PostHog] addExceptionStep is not supported by the loaded posthog-js version: $error',
+        );
+      }
       break;
     case 'sendMetaEvent':
       // not supported on Web

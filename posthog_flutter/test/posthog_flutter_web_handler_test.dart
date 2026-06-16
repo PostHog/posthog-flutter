@@ -77,4 +77,47 @@ void main() {
       expect(options.containsKey('span_id'), isFalse);
     });
   });
+
+  group('handleWebMethodCall addExceptionStep', () {
+    String? capturedMessage;
+    JSAny? capturedProperties;
+    var captured = false;
+
+    setUp(() {
+      capturedMessage = null;
+      capturedProperties = null;
+      captured = false;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'addExceptionStep'.toJS,
+        ((JSString message, JSAny? properties) {
+          captured = true;
+          capturedMessage = message.toDart;
+          capturedProperties = properties;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('forwards message and properties to posthog-js', () async {
+      await handleWebMethodCall(const MethodCall('addExceptionStep', {
+        'message': 'User tapped Checkout',
+        'properties': {'screen': 'cart'},
+      }));
+
+      expect(capturedMessage, 'User tapped Checkout');
+      expect(capturedProperties.dartify(), {'screen': 'cart'});
+    });
+
+    test('forwards null properties when none provided', () async {
+      await handleWebMethodCall(const MethodCall('addExceptionStep', {
+        'message': 'Opened modal',
+      }));
+
+      expect(captured, isTrue);
+      expect(capturedMessage, 'Opened modal');
+      expect(capturedProperties, isNull);
+    });
+  });
 }

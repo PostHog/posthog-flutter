@@ -863,6 +863,37 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "addExceptionStep",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "message",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "properties",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "close",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1692,6 +1723,37 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "addExceptionStep",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "message",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "properties",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "close",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2439,6 +2501,17 @@
                         "name": "captureIsolateErrors",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "exceptionSteps",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogExceptionStepsConfig"
                     }
                 ],
                 "isDeprecated": false,
@@ -2446,6 +2519,71 @@
                 "isRequired": false,
                 "isSealed": false,
                 "name": "PostHogErrorTrackingConfig",
+                "relativePath": "lib/src/posthog_config.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "toMap",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "returnTypeName": "Map<String, dynamic>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "returnTypeName": "PostHogExceptionStepsConfig",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "enabled",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "maxBytes",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogExceptionStepsConfig",
                 "relativePath": "lib/src/posthog_config.dart",
                 "superTypeNames": [
                     "Object"
@@ -3913,6 +4051,37 @@
                                 "name": "stackTrace",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "StackTrace?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "properties",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object>?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "addExceptionStep",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "message",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String"
                             },
                             {
                                 "isDeprecated": false,

@@ -481,4 +481,42 @@ void main() {
       expect(fake.reloadFeatureFlagsCount, 0);
     });
   });
+
+  group('Posthog addExceptionStep', () {
+    late PosthogFlutterPlatformFake fake;
+
+    setUp(() async {
+      fake = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fake;
+      await Posthog().close();
+    });
+
+    test('forwards message and properties to the platform', () async {
+      await Posthog().addExceptionStep(
+        'User tapped Checkout',
+        properties: {'screen': 'cart'},
+      );
+
+      expect(fake.addExceptionStepCalls, [
+        {
+          'message': 'User tapped Checkout',
+          'properties': {'screen': 'cart'},
+        },
+      ]);
+    });
+
+    test('forwards message without properties', () async {
+      await Posthog().addExceptionStep('Opened modal');
+
+      expect(fake.addExceptionStepCalls, [
+        {'message': 'Opened modal', 'properties': null},
+      ]);
+    });
+
+    test('is a no-op for an empty message', () async {
+      await Posthog().addExceptionStep('');
+
+      expect(fake.addExceptionStepCalls, isEmpty);
+    });
+  });
 }

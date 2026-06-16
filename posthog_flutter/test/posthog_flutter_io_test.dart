@@ -944,4 +944,30 @@ void main() {
       expect(args.containsKey('spanId'), isFalse);
     });
   });
+
+  group('PosthogFlutterIO addExceptionStep', () {
+    test('sends message and normalized properties', () async {
+      await posthogFlutterIO.addExceptionStep(
+        'User tapped Checkout',
+        properties: {'screen': 'cart', 'at': DateTime(2024, 3, 1)},
+      );
+
+      final call = log.firstWhere((c) => c.method == 'addExceptionStep');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['message'], 'User tapped Checkout');
+      final properties = Map<String, dynamic>.from(args['properties'] as Map);
+      expect(properties['screen'], 'cart');
+      // DateTime is not a StandardMessageCodec type; it is stringified.
+      expect(properties['at'], isA<String>());
+    });
+
+    test('omits properties when none provided', () async {
+      await posthogFlutterIO.addExceptionStep('Opened modal');
+
+      final call = log.firstWhere((c) => c.method == 'addExceptionStep');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args['message'], 'Opened modal');
+      expect(args.containsKey('properties'), isFalse);
+    });
+  });
 }

@@ -764,6 +764,28 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> addExceptionStep(
+    String message, {
+    Map<String, Object>? properties,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      final normalizedProperties =
+          properties != null ? PropertyNormalizer.normalize(properties) : null;
+
+      await _methodChannel.invokeMethod('addExceptionStep', {
+        'message': message,
+        if (normalizedProperties != null) 'properties': normalizedProperties,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on addExceptionStep: $exception');
+    }
+  }
+
+  @override
   Future<void> close() async {
     if (!isSupportedPlatform()) {
       return;

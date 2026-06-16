@@ -661,6 +661,49 @@ class Posthog {
     );
   }
 
+  /// Records an exception step (breadcrumb-style context record).
+  ///
+  /// Steps accumulate in a rolling, byte-bounded buffer and are attached to
+  /// every captured `$exception` event as `$exception_steps`, giving the
+  /// PostHog error-tracking UI a timeline of recent activity leading up to each
+  /// error. The buffer rotates only by byte-budget eviction (see
+  /// [PostHogExceptionStepsConfig.maxBytes]) and is not cleared by a capture or
+  /// an identity change.
+  ///
+  /// The buffer is owned by the embedded native SDK, so steps also survive
+  /// native fatal crashes and attach to the crash `$exception` reported on the
+  /// next launch.
+  ///
+  /// The [message] is a short, non-empty description of what happened; an empty
+  /// message is ignored. The optional [properties] are additional context. The
+  /// reserved keys `$message` and `$timestamp` are stripped — the SDK sets the
+  /// canonical values, including a timestamp captured when the step is recorded.
+  ///
+  /// Recording never throws into your app and does not block the caller.
+  ///
+  /// **Note:**
+  /// - Flutter web: forwarded to posthog-js. Steps attach to exceptions
+  ///   captured by posthog-js, but not to exceptions captured via
+  ///   [captureException] on web.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// Posthog().addExceptionStep(
+  ///   'User tapped Checkout',
+  ///   properties: {'screen': 'cart'},
+  /// );
+  /// ```
+  Future<void> addExceptionStep(
+    String message, {
+    Map<String, Object>? properties,
+  }) {
+    if (message.isEmpty) {
+      debugPrint('[PostHog] addExceptionStep called with an empty message.');
+      return Future<void>.value();
+    }
+    return _posthog.addExceptionStep(message, properties: properties);
+  }
+
   /// Closes the PostHog SDK and cleans up resources.
   ///
   /// Returns a [Future] that completes when platform resources have been closed.
