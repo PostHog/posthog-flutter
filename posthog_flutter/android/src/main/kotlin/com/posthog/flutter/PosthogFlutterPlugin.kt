@@ -219,6 +219,10 @@ class PosthogFlutterPlugin :
                 captureException(call, result)
             }
 
+            "addExceptionStep" -> {
+                addExceptionStep(call, result)
+            }
+
             "close" -> {
                 close(result)
             }
@@ -408,6 +412,14 @@ class PosthogFlutterPlugin :
                     }
                     errorConfig.getIfNotNull<List<String>>("inAppIncludes") { includes ->
                         errorTrackingConfig.inAppIncludes.addAll(includes)
+                    }
+                    errorConfig.getIfNotNull<Map<String, Any>>("exceptionSteps") { stepsConfig ->
+                        stepsConfig.getIfNotNull<Boolean>("enabled") {
+                            errorTrackingConfig.exceptionSteps.enabled = it
+                        }
+                        stepsConfig.getIfNotNull<Int>("maxBytes") {
+                            errorTrackingConfig.exceptionSteps.maxBytes = it
+                        }
                     }
                 }
 
@@ -857,6 +869,24 @@ class PosthogFlutterPlugin :
             result.success(null)
         } catch (e: Throwable) {
             result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)
+        }
+    }
+
+    private fun addExceptionStep(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val message: String =
+                call.argument("message") ?: run {
+                    result.error("PosthogFlutterException", "Missing argument: message", null)
+                    return
+                }
+            val properties: Map<String, Any>? = call.argument("properties")
+            PostHog.addExceptionStep(message, properties)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 

@@ -206,6 +206,15 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             if let inAppByDefault = errorConfig["inAppByDefault"] as? Bool {
                 config.errorTrackingConfig.inAppByDefault = inAppByDefault
             }
+
+            if let exceptionSteps = errorConfig["exceptionSteps"] as? [String: Any] {
+                if let enabled = exceptionSteps["enabled"] as? Bool {
+                    config.errorTrackingConfig.exceptionSteps.enabled = enabled
+                }
+                if let maxBytes = exceptionSteps["maxBytes"] as? Int {
+                    config.errorTrackingConfig.exceptionSteps.maxBytes = maxBytes
+                }
+            }
         }
 
         // Configure logs (beforeSend runs Dart-side). Each field is only present
@@ -311,6 +320,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             flush(result)
         case "captureException":
             captureException(call, result: result)
+        case "addExceptionStep":
+            addExceptionStep(call, result: result)
         case "close":
             close(result)
         case "sendMetaEvent":
@@ -979,6 +990,19 @@ extension PosthogFlutterPlugin {
 
         // Use capture method with timestamp to ensure Flutter timestamp is used
         PostHogSDK.shared.capture("$exception", properties: properties, timestamp: timestamp)
+        result(nil)
+    }
+
+    private func addExceptionStep(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let arguments = call.arguments as? [String: Any],
+              let message = arguments["message"] as? String
+        else {
+            _badArgumentError(result)
+            return
+        }
+
+        let properties = arguments["properties"] as? [String: Any]
+        PostHogSDK.shared.addExceptionStep(message, properties: properties)
         result(nil)
     }
 

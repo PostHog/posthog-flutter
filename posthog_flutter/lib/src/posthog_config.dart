@@ -630,6 +630,12 @@ class PostHogErrorTrackingConfig {
   /// Default: false
   var captureIsolateErrors = false;
 
+  /// Configuration for exception steps (breadcrumb-style context records
+  /// attached to every captured `$exception` as `$exception_steps`).
+  ///
+  /// Record steps with `Posthog().addExceptionStep()`.
+  final exceptionSteps = PostHogExceptionStepsConfig();
+
   /// Converts this error tracking configuration to a platform-channel map.
   ///
   /// Returns values consumed by the Android, Apple, and Dart exception capture
@@ -644,6 +650,48 @@ class PostHogErrorTrackingConfig {
       'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
       'captureNativeExceptions': captureNativeExceptions,
       'captureIsolateErrors': captureIsolateErrors,
+      'exceptionSteps': exceptionSteps.toMap(),
+    };
+  }
+}
+
+/// Configuration for exception steps.
+///
+/// Exception steps are breadcrumb-style context records recorded over time via
+/// `Posthog().addExceptionStep()`. The SDK keeps a rolling, byte-bounded buffer
+/// of these steps and attaches a snapshot to every captured `$exception` event
+/// as `$exception_steps`, giving the error tracking UI a timeline of recent
+/// activity leading up to each error.
+///
+/// The buffer is owned by the embedded native SDK (iOS/Android), so steps also
+/// survive native fatal crashes and attach to the crash `$exception` reported
+/// on the next launch.
+///
+/// **Flutter web:** the buffer lives in posthog-js. Steps are forwarded to it,
+/// but they only attach to exceptions captured by posthog-js itself, not to
+/// exceptions captured via `Posthog().captureException()` on web.
+class PostHogExceptionStepsConfig {
+  /// Creates an exception-steps configuration with native defaults.
+  PostHogExceptionStepsConfig();
+
+  /// Whether recording and attaching exception steps is enabled.
+  ///
+  /// When disabled, `Posthog().addExceptionStep()` is a no-op and nothing is
+  /// attached. Defaults to `true`.
+  var enabled = true;
+
+  /// Total UTF-8 byte budget for the rolling step buffer.
+  ///
+  /// When adding a step would exceed the budget, the oldest steps are evicted
+  /// until the total fits. A single step larger than the budget is rejected
+  /// outright. Defaults to `32768` (32 KiB).
+  var maxBytes = 32768;
+
+  /// Converts this configuration to a platform-channel map.
+  Map<String, Object> toMap() {
+    return {
+      'enabled': enabled,
+      'maxBytes': maxBytes,
     };
   }
 }

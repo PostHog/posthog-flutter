@@ -413,4 +413,20 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     );
     return result as bool? ?? false;
   }
+
+  @override
+  Future<void> addExceptionStep(
+    String message, {
+    Map<String, Object>? properties,
+  }) async {
+    final normalizedProperties =
+        properties != null ? PropertyNormalizer.normalize(properties) : null;
+
+    return handleWebMethodCall(
+      MethodCall('addExceptionStep', {
+        'message': message,
+        if (normalizedProperties != null) 'properties': normalizedProperties,
+      }),
+    );
+  }
 }

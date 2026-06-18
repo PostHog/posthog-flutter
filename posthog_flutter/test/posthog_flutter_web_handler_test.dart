@@ -6,6 +6,7 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/posthog_flutter_web.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
 // Browser-only: handleWebMethodCall talks to the posthog-js instance on
@@ -75,6 +76,144 @@ void main() {
       expect(options['trace_flags'], 0);
       expect(options.containsKey('trace_id'), isFalse);
       expect(options.containsKey('span_id'), isFalse);
+    });
+  });
+
+  group('handleWebMethodCall addExceptionStep', () {
+    String? capturedMessage;
+    JSAny? capturedProperties;
+    var captured = false;
+
+    setUp(() {
+      capturedMessage = null;
+      capturedProperties = null;
+      captured = false;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'addExceptionStep'.toJS,
+        ((JSString message, JSAny? properties) {
+          captured = true;
+          capturedMessage = message.toDart;
+          capturedProperties = properties;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('forwards message and properties to posthog-js', () async {
+      await handleWebMethodCall(const MethodCall('addExceptionStep', {
+        'message': 'User tapped Checkout',
+        'properties': {'screen': 'cart'},
+      }));
+
+      expect(capturedMessage, 'User tapped Checkout');
+      expect(capturedProperties.dartify(), {'screen': 'cart'});
+    });
+
+    test('forwards null properties when none provided', () async {
+      await handleWebMethodCall(const MethodCall('addExceptionStep', {
+        'message': 'Opened modal',
+      }));
+
+      expect(captured, isTrue);
+      expect(capturedMessage, 'Opened modal');
+      expect(capturedProperties, isNull);
+    });
+  });
+
+  // Guards the web wiring: PosthogFlutterWeb must override addExceptionStep so
+  // the call actually reaches posthog-js. Without the override it falls through
+  // to the platform interface and throws UnimplementedError on web.
+  group('PosthogFlutterWeb addExceptionStep', () {
+    String? capturedMessage;
+    JSAny? capturedProperties;
+
+    setUp(() {
+      capturedMessage = null;
+      capturedProperties = null;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'addExceptionStep'.toJS,
+        ((JSString message, JSAny? properties) {
+          capturedMessage = message.toDart;
+          capturedProperties = properties;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('override forwards message and normalized properties to posthog-js',
+        () async {
+      await PosthogFlutterWeb().addExceptionStep(
+        'User tapped Checkout',
+        properties: {'screen': 'cart', 'count': 3},
+      );
+
+      expect(capturedMessage, 'User tapped Checkout');
+      expect(capturedProperties.dartify(), {'screen': 'cart', 'count': 3});
+    });
+  });
+
+  // captureException must route through posthog-js's captureException (not the
+  // generic capture) so it attaches required metadata and any buffered
+  // $exception_steps. The Dart-built payload is passed as additionalProperties,
+  // which posthog-js spreads last — so our $exception_list must survive.
+  group('handleWebMethodCall captureException', () {
+    String? capturedMessage;
+    JSAny? capturedProperties;
+    var captured = false;
+
+    setUp(() {
+      capturedMessage = null;
+      capturedProperties = null;
+      captured = false;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'captureException'.toJS,
+        ((JSString message, JSAny? properties) {
+          captured = true;
+          capturedMessage = message.toDart;
+          capturedProperties = properties;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('forwards to captureException, preserving the Dart \$exception_list',
+        () async {
+      await handleWebMethodCall(const MethodCall('captureException', {
+        'properties': {
+          r'$exception_level': 'error',
+          r'$exception_list': [
+            {'type': 'StateError', 'value': 'boom'},
+          ],
+        },
+      }));
+
+      expect(captured, isTrue);
+      // The trigger message is the exception value; its parse is discarded.
+      expect(capturedMessage, 'boom');
+
+      final props = capturedProperties!.dartify()! as Map<Object?, Object?>;
+      // Our Dart-built payload wins over posthog-js's synthetic parse.
+      expect(props[r'$exception_level'], 'error');
+      final list = props[r'$exception_list'] as List;
+      final first = list.first as Map;
+      expect(first['type'], 'StateError');
+      expect(first['value'], 'boom');
+    });
+
+    test('uses a fallback trigger message when no exception value is present',
+        () async {
+      await handleWebMethodCall(const MethodCall('captureException', {
+        'properties': {r'$exception_level': 'error'},
+      }));
+
+      expect(captured, isTrue);
+      expect(capturedMessage, 'Exception');
     });
   });
 }

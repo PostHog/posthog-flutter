@@ -146,6 +146,20 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     );
   }
 
+  // Tracking for addExceptionStep calls
+  final List<Map<String, Object?>> addExceptionStepCalls = [];
+
+  @override
+  Future<void> addExceptionStep(
+    String message, {
+    Map<String, Object>? properties,
+  }) async {
+    addExceptionStepCalls.add({
+      'message': message,
+      'properties': properties,
+    });
+  }
+
   @override
   Future<void> disable() async {}
 

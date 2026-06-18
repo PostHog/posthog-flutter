@@ -20,8 +20,13 @@ extension PostHogExtension on PostHog {
     JSAny propertiesSetOnce,
   );
   external JSAny? capture(JSAny eventName, JSAny? properties, JSAny? options);
+  // Routes through posthog-js's error pipeline so required metadata and
+  // $exception_steps attach. The call site guards with try/catch.
+  external JSAny? captureException(JSAny? error, JSAny? additionalProperties);
   // May be absent on older posthog-js builds; the call site guards with try/catch.
   external void captureLog(JSAny options);
+  // May be absent on older posthog-js builds; the call site guards with try/catch.
+  external void addExceptionStep(JSAny message, JSAny? properties);
   external JSAny? alias(JSAny alias);
   // ignore: non_constant_identifier_names
   external JSAny? get_distinct_id();
@@ -135,6 +140,23 @@ Map<String, String> _getLocationProperties() {
   } catch (_) {
     return {};
   }
+}
+
+// The human-readable message used only as the posthog-js captureException
+// trigger; its parse is overridden by the Dart-built properties we pass as
+// additionalProperties. Read from the exception list the Dart side builds.
+String _exceptionMessage(Map<String, Object?> properties) {
+  final exceptionList = properties[r'$exception_list'];
+  if (exceptionList is List && exceptionList.isNotEmpty) {
+    final first = exceptionList.first;
+    if (first is Map) {
+      final value = first['value'];
+      if (value is String && value.isNotEmpty) {
+        return value;
+      }
+    }
+  }
+  return 'Exception';
 }
 
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
@@ -348,6 +370,22 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       // not supported on Web
       // analytics.callMethod('close');
       break;
+    case 'addExceptionStep':
+      final message = args['message'] as String;
+      final properties = safeMapConversion(args['properties']);
+
+      try {
+        posthog?.addExceptionStep(
+          stringToJSAny(message),
+          properties.isNotEmpty ? mapToJSAny(properties) : null,
+        );
+      } catch (error) {
+        // Older posthog-js builds lack addExceptionStep and throw.
+        printIfDebug(
+          '[PostHog] addExceptionStep is not supported by the loaded posthog-js version: $error',
+        );
+      }
+      break;
     case 'sendMetaEvent':
       // not supported on Web
       // Flutter Web uses the JS SDK for Session replay
@@ -386,11 +424,26 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
 
-      posthog?.capture(
-        stringToJSAny('\$exception'),
-        mapToJSAny(properties),
-        null,
-      );
+      // Route through posthog-js's captureException so it attaches required
+      // metadata and any buffered $exception_steps. posthog-js spreads the
+      // additionalProperties last, so our Dart-built $exception_list (frames,
+      // mechanism.handled, level) overrides its synthetic parse of `message`.
+      try {
+        posthog?.captureException(
+          stringToJSAny(_exceptionMessage(properties)),
+          mapToJSAny(properties),
+        );
+      } catch (error) {
+        // Very old posthog-js lacks captureException; still record the event.
+        printIfDebug(
+          '[PostHog] captureException via posthog-js failed; falling back to capture: $error',
+        );
+        posthog?.capture(
+          stringToJSAny('\$exception'),
+          mapToJSAny(properties),
+          null,
+        );
+      }
       break;
     default:
       throw PlatformException(
