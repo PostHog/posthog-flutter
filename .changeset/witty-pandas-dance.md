@@ -10,4 +10,4 @@ Steps accumulate in a rolling, byte-bounded buffer owned by the embedded native 
 Posthog().addExceptionStep('User tapped Checkout', properties: {'screen': 'cart'});
 ```
 
-Requires `posthog-android` and `posthog-ios` versions that support exception steps. On web, steps are forwarded to posthog-js.
+Requires `posthog-android` and `posthog-ios` versions that support exception steps. On web, steps are forwarded to posthog-js, and exceptions captured via `captureException` now route through posthog-js's `captureException` (instead of a generic `$exception` capture) so steps and other required metadata attach.

@@ -155,4 +155,65 @@ void main() {
       expect(capturedProperties.dartify(), {'screen': 'cart', 'count': 3});
     });
   });
+
+  // captureException must route through posthog-js's captureException (not the
+  // generic capture) so it attaches required metadata and any buffered
+  // $exception_steps. The Dart-built payload is passed as additionalProperties,
+  // which posthog-js spreads last — so our $exception_list must survive.
+  group('handleWebMethodCall captureException', () {
+    String? capturedMessage;
+    JSAny? capturedProperties;
+    var captured = false;
+
+    setUp(() {
+      capturedMessage = null;
+      capturedProperties = null;
+      captured = false;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'captureException'.toJS,
+        ((JSString message, JSAny? properties) {
+          captured = true;
+          capturedMessage = message.toDart;
+          capturedProperties = properties;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('forwards to captureException, preserving the Dart \$exception_list',
+        () async {
+      await handleWebMethodCall(const MethodCall('captureException', {
+        'properties': {
+          r'$exception_level': 'error',
+          r'$exception_list': [
+            {'type': 'StateError', 'value': 'boom'},
+          ],
+        },
+      }));
+
+      expect(captured, isTrue);
+      // The trigger message is the exception value; its parse is discarded.
+      expect(capturedMessage, 'boom');
+
+      final props = capturedProperties!.dartify()! as Map<Object?, Object?>;
+      // Our Dart-built payload wins over posthog-js's synthetic parse.
+      expect(props[r'$exception_level'], 'error');
+      final list = props[r'$exception_list'] as List;
+      final first = list.first as Map;
+      expect(first['type'], 'StateError');
+      expect(first['value'], 'boom');
+    });
+
+    test('uses a fallback trigger message when no exception value is present',
+        () async {
+      await handleWebMethodCall(const MethodCall('captureException', {
+        'properties': {r'$exception_level': 'error'},
+      }));
+
+      expect(captured, isTrue);
+      expect(capturedMessage, 'Exception');
+    });
+  });
 }
