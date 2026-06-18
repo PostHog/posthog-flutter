@@ -6,6 +6,7 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/posthog_flutter_web.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
 // Browser-only: handleWebMethodCall talks to the posthog-js instance on
@@ -118,6 +119,40 @@ void main() {
       expect(captured, isTrue);
       expect(capturedMessage, 'Opened modal');
       expect(capturedProperties, isNull);
+    });
+  });
+
+  // Guards the web wiring: PosthogFlutterWeb must override addExceptionStep so
+  // the call actually reaches posthog-js. Without the override it falls through
+  // to the platform interface and throws UnimplementedError on web.
+  group('PosthogFlutterWeb addExceptionStep', () {
+    String? capturedMessage;
+    JSAny? capturedProperties;
+
+    setUp(() {
+      capturedMessage = null;
+      capturedProperties = null;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'addExceptionStep'.toJS,
+        ((JSString message, JSAny? properties) {
+          capturedMessage = message.toDart;
+          capturedProperties = properties;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('override forwards message and normalized properties to posthog-js',
+        () async {
+      await PosthogFlutterWeb().addExceptionStep(
+        'User tapped Checkout',
+        properties: {'screen': 'cart', 'count': 3},
+      );
+
+      expect(capturedMessage, 'User tapped Checkout');
+      expect(capturedProperties.dartify(), {'screen': 'cart', 'count': 3});
     });
   });
 }
