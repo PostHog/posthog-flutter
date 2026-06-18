@@ -145,7 +145,7 @@ Map<String, String> _getLocationProperties() {
 // The human-readable message used only as the posthog-js captureException
 // trigger; its parse is overridden by the Dart-built properties we pass as
 // additionalProperties. Read from the exception list the Dart side builds.
-String _exceptionMessage(Map<String, dynamic> properties) {
+String _exceptionMessage(Map<String, Object?> properties) {
   final exceptionList = properties[r'$exception_list'];
   if (exceptionList is List && exceptionList.isNotEmpty) {
     final first = exceptionList.first;
