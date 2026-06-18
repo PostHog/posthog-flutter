@@ -675,9 +675,10 @@ class Posthog {
   /// next launch.
   ///
   /// The [message] is a short, non-empty description of what happened; an empty
-  /// message is ignored. The optional [properties] are additional context. The
-  /// reserved keys `$message` and `$timestamp` are stripped — the SDK sets the
-  /// canonical values, including a timestamp captured when the step is recorded.
+  /// or whitespace-only message is ignored. The optional [properties] are
+  /// additional context. The reserved keys `$message` and `$timestamp` are
+  /// stripped — the SDK sets the canonical values, including a timestamp
+  /// captured when the step is recorded.
   ///
   /// Recording never throws into your app and does not block the caller.
   ///
@@ -697,7 +698,7 @@ class Posthog {
     String message, {
     Map<String, Object>? properties,
   }) {
-    if (message.isEmpty) {
+    if (message.trim().isEmpty) {
       debugPrint('[PostHog] addExceptionStep called with an empty message.');
       return Future<void>.value();
     }

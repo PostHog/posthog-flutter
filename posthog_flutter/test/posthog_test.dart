@@ -519,6 +519,12 @@ void main() {
       expect(fake.addExceptionStepCalls, isEmpty);
     });
 
+    test('is a no-op for a whitespace-only message', () async {
+      await Posthog().addExceptionStep('   \t\n');
+
+      expect(fake.addExceptionStepCalls, isEmpty);
+    });
+
     test('is a no-op when exception steps are disabled', () async {
       final config = PostHogConfig('test_project_token')
         ..errorTrackingConfig.exceptionSteps.enabled = false;
@@ -527,6 +533,28 @@ void main() {
       await Posthog().addExceptionStep('User tapped Checkout');
 
       expect(fake.addExceptionStepCalls, isEmpty);
+    });
+  });
+
+  group('PostHogExceptionStepsConfig', () {
+    test('toMap serializes the native defaults', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(
+        config.errorTrackingConfig.exceptionSteps.toMap(),
+        {'enabled': true, 'maxBytes': 32768},
+      );
+    });
+
+    test('toMap reflects overridden values', () {
+      final config = PostHogConfig('test_project_token')
+        ..errorTrackingConfig.exceptionSteps.enabled = false
+        ..errorTrackingConfig.exceptionSteps.maxBytes = 1024;
+
+      expect(
+        config.errorTrackingConfig.exceptionSteps.toMap(),
+        {'enabled': false, 'maxBytes': 1024},
+      );
     });
   });
 }
