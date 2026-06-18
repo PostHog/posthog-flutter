@@ -518,5 +518,15 @@ void main() {
 
       expect(fake.addExceptionStepCalls, isEmpty);
     });
+
+    test('is a no-op when exception steps are disabled', () async {
+      final config = PostHogConfig('test_project_token')
+        ..errorTrackingConfig.exceptionSteps.enabled = false;
+      await Posthog().setup(config);
+
+      await Posthog().addExceptionStep('User tapped Checkout');
+
+      expect(fake.addExceptionStepCalls, isEmpty);
+    });
   });
 }

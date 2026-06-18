@@ -701,6 +701,12 @@ class Posthog {
       debugPrint('[PostHog] addExceptionStep called with an empty message.');
       return Future<void>.value();
     }
+    // Honor the documented no-op contract on every platform: native enforces
+    // `enabled` via the config forwarded at setup, but on web `setup` doesn't
+    // push it to posthog-js, so guard here too.
+    if (_config?.errorTrackingConfig.exceptionSteps.enabled == false) {
+      return Future<void>.value();
+    }
     return _posthog.addExceptionStep(message, properties: properties);
   }
 
