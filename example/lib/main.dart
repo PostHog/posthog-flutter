@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter_example/error_example.dart';
 
+import 'exception_steps_screen.dart';
 import 'masking_tests_screen.dart';
 
 Future<void> main() async {
@@ -160,6 +161,23 @@ class InitialScreenState extends State<InitialScreen> {
                     );
                   },
                   child: const Text('Masking Tests'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ExceptionStepsScreen(),
+                        settings: const RouteSettings(name: 'exception_steps'),
+                      ),
+                    );
+                  },
+                  child: const Text('Exception Steps'),
                 ),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
