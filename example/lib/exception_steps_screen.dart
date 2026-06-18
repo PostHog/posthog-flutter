@@ -135,7 +135,10 @@ class _ExceptionStepsScreenState extends State<ExceptionStepsScreen> {
                 child: const Text('Steps → native crash (will crash app!)'),
               ),
               const Divider(),
-              const Text('Activity', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Activity',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               for (final entry in _log)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -149,9 +152,9 @@ class _ExceptionStepsScreenState extends State<ExceptionStepsScreen> {
   }
 
   Widget _section(String title) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      );
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+  );
 }
 
 /// Thrown by the "unhandled Flutter error" test so it groups as its own issue in
