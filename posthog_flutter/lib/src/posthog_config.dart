@@ -688,7 +688,7 @@ class PostHogExceptionStepsConfig {
   var maxBytes = 32768;
 
   /// Converts this configuration to a platform-channel map.
-  Map<String, dynamic> toMap() {
+  Map<String, Object> toMap() {
     return {
       'enabled': enabled,
       'maxBytes': maxBytes,

@@ -2538,7 +2538,7 @@
                         "name": "toMap",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, dynamic>",
+                        "returnTypeName": "Map<String, Object>",
                         "type": "method",
                         "typeParameterNames": []
                     },
