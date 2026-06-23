@@ -2,6 +2,7 @@ import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
+    import WebKit
 #elseif os(macOS)
     import AppKit
     import FlutterMacOS
@@ -279,6 +280,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendMetaEvent(call, result: result)
         case "sendFullSnapshot":
             sendFullSnapshot(call, result: result)
+        case "captureNativeScreenshot":
+            captureNativeScreenshot(call, result: result)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
         case "startSessionRecording":
@@ -413,6 +416,136 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 #endif
 
 extension PosthogFlutterPlugin {
+    private func captureNativeScreenshot(_ call: FlutterMethodCall,
+                                         result: @escaping FlutterResult)
+    {
+        #if os(iOS)
+            guard let args = call.arguments as? [String: Any] else {
+                _badArgumentError(result)
+                return
+            }
+
+            let x = args["x"] as? Int ?? 0
+            let y = args["y"] as? Int ?? 0
+            let width = args["width"] as? Int ?? 0
+            let height = args["height"] as? Int ?? 0
+
+            guard width > 0, height > 0 else {
+                _badArgumentError(result)
+                return
+            }
+
+            DispatchQueue.main.async {
+                guard let window = self.captureWindow() else {
+                    result(nil)
+                    return
+                }
+
+                // If a native VC is presented over Flutter (paywall, system sheet,
+                // etc.) Flutter has no widget rects for it, so capturing would
+                // include unmasked native content. Fall back to Flutter-only.
+                if window.rootViewController?.presentedViewController != nil {
+                    result(nil)
+                    return
+                }
+
+                let cropRect = CGRect(x: x, y: y, width: width, height: height)
+                    .intersection(window.bounds)
+                guard !cropRect.isNull, !cropRect.isEmpty else {
+                    result(nil)
+                    return
+                }
+
+                if let webView = self.findWKWebView(in: window, intersecting: cropRect) {
+                    webView.takeSnapshot(with: nil) { snapshotImage, error in
+                        guard error == nil, let snapshotImage = snapshotImage else {
+                            result(nil)
+                            return
+                        }
+                        result(snapshotImage.pngData().map(FlutterStandardTypedData.init(bytes:)) ?? nil)
+                    }
+                    return
+                }
+
+                // Fallback: drawHierarchy for hybrid-composition views.
+                let format = UIGraphicsImageRendererFormat.default()
+                format.scale = 1
+                format.opaque = false
+
+                let image = UIGraphicsImageRenderer(size: cropRect.size, format: format).image { _ in
+                    let drawRect = window.bounds.offsetBy(dx: -cropRect.origin.x, dy: -cropRect.origin.y)
+                    window.drawHierarchy(in: drawRect, afterScreenUpdates: false)
+                }
+
+                guard !self.isImageBlank(image) else {
+                    result(nil)
+                    return
+                }
+
+                result(image.pngData().map(FlutterStandardTypedData.init(bytes:)) ?? nil)
+            }
+        #else
+            result(nil)
+        #endif
+    }
+
+    #if os(iOS)
+        private func captureWindow() -> UIWindow? {
+            if #available(iOS 13.0, *) {
+                return UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first(where: \.isKeyWindow) ?? UIApplication.shared.windows.first
+            } else {
+                return UIApplication.shared.keyWindow
+            }
+        }
+
+        private func isImageBlank(_ image: UIImage) -> Bool {
+            guard let cgImage = image.cgImage else { return true }
+            let sampleSide = 8
+            guard let ctx = CGContext(
+                data: nil,
+                width: sampleSide,
+                height: sampleSide,
+                bitsPerComponent: 8,
+                bytesPerRow: sampleSide * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return false }
+            ctx.interpolationQuality = .none
+            ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: sampleSide, height: sampleSide))
+            guard let raw = ctx.data else { return false }
+            let bytes = raw.bindMemory(to: UInt8.self, capacity: sampleSide * sampleSide * 4)
+            // Check 1: all transparent → blank.
+            var anyVisible = false
+            for i in 0 ..< (sampleSide * sampleSide) {
+                if bytes[i * 4 + 3] > 10 { anyVisible = true; break }
+            }
+            if !anyVisible { return true }
+            // Check 2: all pixels the same color → uniform background, no content.
+            let r0 = bytes[0], g0 = bytes[1], b0 = bytes[2]
+            for i in 0 ..< (sampleSide * sampleSide) {
+                let b = i * 4
+                if abs(Int(bytes[b]) - Int(r0)) > 8 ||
+                   abs(Int(bytes[b + 1]) - Int(g0)) > 8 ||
+                   abs(Int(bytes[b + 2]) - Int(b0)) > 8 { return false }
+            }
+            return true
+        }
+
+        private func findWKWebView(in view: UIView, intersecting rect: CGRect) -> WKWebView? {
+            if let webView = view as? WKWebView {
+                let frameInWindow = webView.convert(webView.bounds, to: nil)
+                if frameInWindow.intersects(rect) { return webView }
+            }
+            for sub in view.subviews {
+                if let found = findWKWebView(in: sub, intersecting: rect) { return found }
+            }
+            return nil
+        }
+    #endif
+
     private func sendMetaEvent(_ call: FlutterMethodCall,
                                result: @escaping FlutterResult)
     {

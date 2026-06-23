@@ -7,6 +7,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter_example/error_example.dart';
 
 import 'masking_tests_screen.dart';
+import 'platform_views_screen.dart';
 
 Future<void> main() async {
   final config = PostHogConfig(
@@ -43,7 +44,7 @@ Future<void> main() async {
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://us.i.posthog.com';
   config.surveys = false;
-  config.sessionReplay = false;
+  config.sessionReplay = true;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
   config.sessionReplayConfig.throttleDelay = const Duration(milliseconds: 1000);
@@ -160,6 +161,23 @@ class InitialScreenState extends State<InitialScreen> {
                     );
                   },
                   child: const Text('Masking Tests'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PlatformViewsScreen(),
+                        settings:
+                            const RouteSettings(name: 'platform_views'),
+                      ),
+                    );
+                  },
+                  child: const Text('Platform Views (Replay)'),
                 ),
                 const Padding(
                   padding: EdgeInsets.all(8.0),

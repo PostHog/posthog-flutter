@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart' show Element, WidgetsBinding;
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/image_extension.dart';
@@ -45,6 +46,12 @@ class ViewTreeSnapshotStatus {
   ViewTreeSnapshotStatus(this.sentMetaEvent);
 }
 
+class _PlatformViewRects {
+  final List<ElementData> masked;
+  final List<ElementData> captured;
+  const _PlatformViewRects({required this.masked, required this.captured});
+}
+
 class ScreenshotCapturer {
   final PostHogConfig _config;
   final ImageMaskPainter _imageMaskPainter = ImageMaskPainter();
@@ -84,6 +91,140 @@ class ScreenshotCapturer {
       return byteData.buffer.asUint8List();
     } catch (e) {
       printIfDebug('Error converting image to byte data: $e');
+      return null;
+    }
+  }
+
+  bool _isPlatformViewRenderObject(RenderObject ro) =>
+      ro is PlatformViewRenderBox ||
+      ro is RenderDarwinPlatformView ||
+      ro is TextureBox;
+
+  _PlatformViewRects _collectPlatformViewRects() {
+    final masked = <ElementData>[];
+    final captured = <ElementData>[];
+    final ancestor = PostHogMaskController
+        .instance.containerKey.currentContext
+        ?.findRenderObject();
+    final seen = <int>{};
+
+    final rootElement = WidgetsBinding.instance.rootElement;
+    if (rootElement != null) {
+      _visitElementForPlatformViews(rootElement, ancestor, masked, captured,
+          seen, PostHogPlatformViewPrivacy.mask);
+    }
+
+    printIfDebug(
+        'Debug: found ${masked.length + captured.length} platform view rect(s) for masking');
+    return _PlatformViewRects(masked: masked, captured: captured);
+  }
+
+  void _visitElementForPlatformViews(
+    Element element,
+    RenderObject? ancestor,
+    List<ElementData> masked,
+    List<ElementData> captured,
+    Set<int> seen,
+    PostHogPlatformViewPrivacy inheritedPolicy,
+  ) {
+    PostHogPlatformViewPrivacy policy = inheritedPolicy;
+    if (element.widget is PostHogPlatformView) {
+      policy = (element.widget as PostHogPlatformView).privacy;
+    }
+
+    final ro = element.renderObject;
+    if (ro is RenderBox &&
+        ro.hasSize &&
+        ro.size.isValidSize &&
+        _isPlatformViewRenderObject(ro)) {
+      _addIfNew(ro, ancestor, masked, captured, seen, policy);
+    }
+    element.visitChildren(
+      (child) => _visitElementForPlatformViews(
+          child, ancestor, masked, captured, seen, policy),
+    );
+  }
+
+  void _addIfNew(
+    RenderBox ro,
+    RenderObject? ancestor,
+    List<ElementData> masked,
+    List<ElementData> captured,
+    Set<int> seen,
+    PostHogPlatformViewPrivacy policy,
+  ) {
+    if (!seen.add(identityHashCode(ro))) return;
+    try {
+      final transform = ro.getTransformTo(ancestor);
+      final data = ElementData(
+        rect: ro.paintBounds,
+        type: 'platformView',
+        transform: transform,
+      );
+      if (policy == PostHogPlatformViewPrivacy.capture) {
+        captured.add(data);
+      } else {
+        masked.add(data);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _compositeRevealedView(
+    Canvas canvas,
+    ElementData viewRect,
+    Offset globalPosition,
+    double pixelRatio,
+  ) async {
+    // Android texture mode: content already in Flutter base image — skip.
+    // iOS UiKitView: capture native content and composite with srcOver.
+    // Returns null on Android texture mode or failure → fail-closed mask.
+    final transform = viewRect.transform;
+    if (transform == null) return;
+    final topLeft =
+        MatrixUtils.transformPoint(transform, viewRect.rect.topLeft);
+    final nativeX = (globalPosition.dx + topLeft.dx).round();
+    final nativeY = (globalPosition.dy + topLeft.dy).round();
+    final nativeW = viewRect.rect.width.round();
+    final nativeH = viewRect.rect.height.round();
+    if (nativeW <= 0 || nativeH <= 0) return;
+
+    final bytes = await _nativeCommunicator.captureNativeScreenshot(
+      x: nativeX,
+      y: nativeY,
+      width: nativeW,
+      height: nativeH,
+    );
+    if (bytes == null) {
+      // Android texture mode (null return) or failure → fail-closed with mask.
+      _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
+      return;
+    }
+    final nativeImage = await _decodeImage(bytes);
+    if (nativeImage == null) {
+      _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
+      return;
+    }
+    // dstOver: native pixels fill the transparent hole left by toImage().
+    final destRect = Rect.fromLTWH(
+        topLeft.dx, topLeft.dy, viewRect.rect.width, viewRect.rect.height);
+    canvas.drawImageRect(
+      nativeImage,
+      Rect.fromLTWH(0, 0, nativeImage.width.toDouble(),
+          nativeImage.height.toDouble()),
+      destRect,
+      Paint()..blendMode = ui.BlendMode.srcOver,
+    );
+    nativeImage.dispose();
+  }
+
+  Future<ui.Image?> _decodeImage(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      codec.dispose();
+      return frame.image;
+    } catch (e) {
+      printIfDebug('Error decoding image bytes: $e');
       return null;
     }
   }
@@ -140,8 +281,6 @@ class ScreenshotCapturer {
         srcHeight: srcHeight,
       );
 
-      final syncImage = renderObject.toImage(pixelRatio: pixelRatio);
-
       final replayConfig = _config.sessionReplayConfig;
 
       final postHogWidgetWrapperElements =
@@ -154,9 +293,8 @@ class ScreenshotCapturer {
             PostHogMaskController.instance.getCurrentWidgetsElements();
       }
 
-      /// we firstly get current image (syncImage) and masks
-      /// (postHogWidgetWrapperElements, elementsDataWidgets) synchronously and
-      /// then executed the main process asynchronous
+      /// We capture the mask metadata synchronously, then resolve the image
+      /// asynchronously from the native view hierarchy when available.
       ui.Image? image;
       ui.PictureRecorder? recorder;
       ui.Picture? picture;
@@ -169,11 +307,17 @@ class ScreenshotCapturer {
           completer.complete(null);
           return;
         }
+        if (!isSessionReplayActive) {
+          _snapshotManager.clear();
+          completer.complete(null);
+          return;
+        }
 
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
-        image = await syncImage;
-        final currentImage = image;
+        image = await renderObject.toImage(pixelRatio: pixelRatio);
+
+final currentImage = image;
         if (_cancelled) {
           currentImage?.dispose();
           image = null;
@@ -201,7 +345,6 @@ class ScreenshotCapturer {
         }
         final canvas = Canvas(currentRecorder);
 
-        // using rawRgba for the diff check because it is faster than png encoding
         Uint8List? imageBytes = await _getImageBytes(
           currentImage,
           format: ui.ImageByteFormat.rawRgba,
@@ -227,12 +370,17 @@ class ScreenshotCapturer {
           return;
         }
 
-        final currentHash = _computeImageHash(imageBytes);
+        final preMaskHash = _computeImageHash(imageBytes);
         imageBytes = null;
 
-        if (currentHash == statusView.imageBytesHash) {
+        final pvRects = replayConfig.maskAllPlatformViews
+            ? _collectPlatformViewRects()
+            : null;
+        final hasCapturedViews = pvRects?.captured.isNotEmpty ?? false;
+
+        if (!hasCapturedViews && preMaskHash == statusView.imageBytesHash) {
           printIfDebug(
-            'Debug: Snapshot is the same as the last one, nothing changed, do nothing.',
+            'Snapshot is the same as the last one, nothing changed, do nothing.',
           );
           currentRecorder.endRecording().dispose();
           recorder = null;
@@ -241,8 +389,6 @@ class ScreenshotCapturer {
           completer.complete(null);
           return;
         }
-
-        statusView.imageBytesHash = currentHash;
 
         try {
           canvas.drawImage(currentImage, Offset.zero, Paint());
@@ -277,6 +423,20 @@ class ScreenshotCapturer {
           }
         }
 
+        if (pvRects != null) {
+          if (pvRects.masked.isNotEmpty) {
+            _imageMaskPainter.drawMaskedImage(
+              canvas,
+              pvRects.masked,
+              pixelRatio,
+            );
+          }
+          for (final capturedRect in pvRects.captured) {
+            await _compositeRevealedView(
+                canvas, capturedRect, globalPosition, pixelRatio);
+          }
+        }
+
         picture = currentRecorder.endRecording();
         recorder = null;
 
@@ -308,12 +468,13 @@ class ScreenshotCapturer {
           }
 
           try {
+            statusView.imageBytesHash = preMaskHash;
+
             final pngBytes = await _getImageBytes(currentFinalImage);
             if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
               completer.complete(null);
               return;
             }
-
             final imageInfo = ImageInfo(
               viewId,
               globalPosition.dx.toInt(),

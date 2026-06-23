@@ -1,12 +1,23 @@
 package com.posthog.flutter
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
+import androidx.annotation.RequiresApi
 import android.os.Looper
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.view.PixelCopy
+import android.view.SurfaceView
+import android.view.View
+import android.view.ViewGroup
 import android.util.Log
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
@@ -15,16 +26,22 @@ import com.posthog.PostHogOnFeatureFlags
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.io.ByteArrayOutputStream
 import java.util.Date
+import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
     FlutterPlugin,
+    ActivityAware,
     MethodCallHandler {
     // / The MethodChannel that will be the communication between Flutter and native Android
     // /
@@ -33,7 +50,10 @@ class PosthogFlutterPlugin :
     private lateinit var channel: MethodChannel
 
     private lateinit var applicationContext: Context
+    private var activity: Activity? = null
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val screenshotCompressionExecutor = Executors.newSingleThreadExecutor()
     private val snapshotSender = SnapshotSender()
 
     // The surveys delegate
@@ -220,6 +240,10 @@ class PosthogFlutterPlugin :
 
             "sendFullSnapshot" -> {
                 handleSendFullSnapshot(call, result)
+            }
+
+            "captureNativeScreenshot" -> {
+                handleCaptureNativeScreenshot(call, result)
             }
 
             "isSessionReplayActive" -> {
@@ -414,8 +438,25 @@ class PosthogFlutterPlugin :
         PostHogAndroid.setup(applicationContext, config)
     }
 
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
+
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
+        screenshotCompressionExecutor.shutdown()
     }
 
     private fun handleSendFullSnapshot(
@@ -435,6 +476,313 @@ class PosthogFlutterPlugin :
             }
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun handleCaptureNativeScreenshot(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val currentActivity = activity
+            if (currentActivity == null) {
+                result.success(null)
+                return
+            }
+
+            val x = call.argument<Int>("x") ?: 0
+            val y = call.argument<Int>("y") ?: 0
+            val width = call.argument<Int>("width") ?: 0
+            val height = call.argument<Int>("height") ?: 0
+
+            if (width <= 0 || height <= 0) {
+                result.error("INVALID_ARGUMENT", "Width or height is 0", null)
+                return
+            }
+
+            captureNativeScreenshot(
+                activity = currentActivity,
+                x = x,
+                y = y,
+                width = width,
+                height = height,
+                result = result,
+            )
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureNativeScreenshot(
+        activity: Activity,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        result: Result,
+    ) {
+        val contentView = activity.findViewById<View>(android.R.id.content) ?: run {
+            result.success(null)
+            return
+        }
+
+        val contentWidthPx = contentView.width
+        val contentHeightPx = contentView.height
+        if (contentWidthPx <= 0 || contentHeightPx <= 0) {
+            result.success(null)
+            return
+        }
+
+        val density = activity.resources.displayMetrics.density
+        val cropLeft = (x * density).roundToInt().coerceIn(0, contentWidthPx - 1)
+        val cropTop = (y * density).roundToInt().coerceIn(0, contentHeightPx - 1)
+        val cropRight = ((x + width) * density).roundToInt().coerceIn(cropLeft + 1, contentWidthPx)
+        val cropBottom = ((y + height) * density).roundToInt().coerceIn(cropTop + 1, contentHeightPx)
+
+        val logicalWidth = width.coerceAtLeast(1)
+        val logicalHeight = height.coerceAtLeast(1)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val locationInWindow = IntArray(2)
+            contentView.getLocationInWindow(locationInWindow)
+
+            val bitmap = Bitmap.createBitmap(logicalWidth, logicalHeight, Bitmap.Config.ARGB_8888)
+
+            // Flutter renders on FlutterSurfaceView — a SurfaceView that lives OUTSIDE the
+            // window surface in its own hardware-composited layer. Capturing activity.window
+            // gives only the (empty) window background. We must capture FlutterSurfaceView
+            // directly, then composite any platform-view SurfaceViews (e.g. google_maps_flutter)
+            // on top.
+            val allSurfaceViews = collectAllSurfaceViews(contentView)
+
+            val flutterSv = allSurfaceViews.firstOrNull { it.javaClass.name.startsWith("io.flutter") }
+            val platformViewSvs = allSurfaceViews.filter { !it.javaClass.name.startsWith("io.flutter") }
+
+            if (flutterSv == null) {
+                // No FlutterSurfaceView — fall back to window PixelCopy (handles TextureView-based
+                // Flutter configurations where Flutter renders via the window surface directly).
+                val svLocation = locationInWindow
+                val srcRect = Rect(
+                    svLocation[0] + cropLeft,
+                    svLocation[1] + cropTop,
+                    svLocation[0] + cropRight,
+                    svLocation[1] + cropBottom,
+                )
+                PixelCopy.request(
+                    activity.window, srcRect, bitmap,
+                    { copyResult ->
+                        if (copyResult != PixelCopy.SUCCESS) {
+                            bitmap.recycle()
+                            captureNativeScreenshotFallback(contentView, cropLeft, cropTop, cropRight, cropBottom, logicalWidth, logicalHeight, result)
+                            return@request
+                        }
+                        compressBitmapToPngAsync(bitmap, result)
+                    },
+                    mainHandler,
+                )
+                return
+            }
+
+            // Compute srcRect within the FlutterSurfaceView's local coordinate space.
+            val fsvLocation = IntArray(2)
+            flutterSv.getLocationInWindow(fsvLocation)
+            val fsvSrcLeft = (locationInWindow[0] + cropLeft - fsvLocation[0]).coerceIn(0, flutterSv.width - 1)
+            val fsvSrcTop  = (locationInWindow[1] + cropTop  - fsvLocation[1]).coerceIn(0, flutterSv.height - 1)
+            val fsvSrcRight  = (locationInWindow[0] + cropRight  - fsvLocation[0]).coerceIn(fsvSrcLeft + 1, flutterSv.width)
+            val fsvSrcBottom = (locationInWindow[1] + cropBottom - fsvLocation[1]).coerceIn(fsvSrcTop  + 1, flutterSv.height)
+            val fsvSrcRect = Rect(fsvSrcLeft, fsvSrcTop, fsvSrcRight, fsvSrcBottom)
+
+            PixelCopy.request(
+                flutterSv,
+                fsvSrcRect,
+                bitmap,
+                { copyResult ->
+                    if (copyResult != PixelCopy.SUCCESS) {
+                        bitmap.recycle()
+                        captureNativeScreenshotFallback(contentView, cropLeft, cropTop, cropRight, cropBottom, logicalWidth, logicalHeight, result)
+                        return@request
+                    }
+
+                    if (platformViewSvs.isEmpty()) {
+                        compressBitmapToPngAsync(bitmap, result)
+                    } else {
+                        // Composite platform-view SurfaceViews (WebView, Maps) on top.
+                        compositeSurfaceViewsOnto(
+                            svList = platformViewSvs,
+                            destBitmap = bitmap,
+                            contentViewLocation = locationInWindow,
+                            cropLeft = cropLeft,
+                            cropTop = cropTop,
+                            density = density,
+                            index = 0,
+                        ) {
+                            compressBitmapToPngAsync(bitmap, result)
+                        }
+                    }
+                },
+                mainHandler,
+            )
+            return
+        }
+
+        captureNativeScreenshotFallback(
+            contentView = contentView,
+            cropLeft = cropLeft,
+            cropTop = cropTop,
+            cropRight = cropRight,
+            cropBottom = cropBottom,
+            logicalWidth = logicalWidth,
+            logicalHeight = logicalHeight,
+            result = result,
+        )
+    }
+
+    /** Walk the view hierarchy and collect ALL SurfaceViews (Flutter and platform views). */
+    private fun collectAllSurfaceViews(view: View): List<SurfaceView> {
+        val result = mutableListOf<SurfaceView>()
+        if (view is SurfaceView) {
+            result.add(view)
+        }
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                result.addAll(collectAllSurfaceViews(view.getChildAt(i)))
+            }
+        }
+        return result
+    }
+
+    /**
+     * Sequentially capture each SurfaceView with PixelCopy and composite it onto
+     * [destBitmap] at the correct logical-pixel offset.
+     */
+    @Suppress("SameParameterValue")
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun compositeSurfaceViewsOnto(
+        svList: List<SurfaceView>,
+        destBitmap: Bitmap,
+        contentViewLocation: IntArray,
+        cropLeft: Int,
+        cropTop: Int,
+        density: Float,
+        index: Int,
+        onComplete: () -> Unit,
+    ) {
+        if (index >= svList.size) {
+            onComplete()
+            return
+        }
+        val sv = svList[index]
+        val advance = {
+            compositeSurfaceViewsOnto(svList, destBitmap, contentViewLocation, cropLeft, cropTop, density, index + 1, onComplete)
+        }
+
+        if (!sv.isAttachedToWindow || sv.width <= 0 || sv.height <= 0) {
+            advance()
+            return
+        }
+
+        val svLocation = IntArray(2)
+        sv.getLocationInWindow(svLocation)
+
+        // SurfaceView position relative to the PixelCopy crop origin (physical px → logical px)
+        val destX = ((svLocation[0] - contentViewLocation[0] - cropLeft) / density).roundToInt()
+        val destY = ((svLocation[1] - contentViewLocation[1] - cropTop) / density).roundToInt()
+        val svLogW = (sv.width / density).roundToInt().coerceAtLeast(1)
+        val svLogH = (sv.height / density).roundToInt().coerceAtLeast(1)
+
+        // Skip if completely outside the destination bitmap
+        if (destX >= destBitmap.width || destY >= destBitmap.height ||
+            destX + svLogW <= 0 || destY + svLogH <= 0
+        ) {
+            advance()
+            return
+        }
+
+        val svBitmap = Bitmap.createBitmap(svLogW, svLogH, Bitmap.Config.ARGB_8888)
+        PixelCopy.request(
+            sv,
+            null, // capture the full SurfaceView content
+            svBitmap,
+            { svCopyResult ->
+                if (svCopyResult == PixelCopy.SUCCESS) {
+                    val canvas = android.graphics.Canvas(destBitmap)
+                    val paint = android.graphics.Paint().apply {
+                        // SRC replaces the destination, including any background fill in the
+                        // "hole" left by the SurfaceView in the window surface.
+                        xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC)
+                    }
+                    canvas.drawBitmap(svBitmap, destX.toFloat(), destY.toFloat(), paint)
+                }
+                svBitmap.recycle()
+                advance()
+            },
+            mainHandler,
+        )
+    }
+
+    private fun captureNativeScreenshotFallback(
+        contentView: View,
+        cropLeft: Int,
+        cropTop: Int,
+        cropRight: Int,
+        cropBottom: Int,
+        logicalWidth: Int,
+        logicalHeight: Int,
+        result: Result,
+    ) {
+        val contentBitmap =
+            Bitmap.createBitmap(contentView.width, contentView.height, Bitmap.Config.ARGB_8888)
+        // Software Canvas cannot read GPU-composited surfaces like SurfaceView or TextureView,
+        // so those platform views may still appear blank when we hit this fallback path.
+        contentView.draw(android.graphics.Canvas(contentBitmap))
+
+        val croppedBitmap =
+            Bitmap.createBitmap(
+                contentBitmap,
+                cropLeft,
+                cropTop,
+                cropRight - cropLeft,
+                cropBottom - cropTop,
+            )
+        contentBitmap.recycle()
+
+        val outputBitmap =
+            if (croppedBitmap.width == logicalWidth && croppedBitmap.height == logicalHeight) {
+                croppedBitmap
+            } else {
+                Bitmap.createScaledBitmap(croppedBitmap, logicalWidth, logicalHeight, true).also {
+                    croppedBitmap.recycle()
+                }
+            }
+
+        compressBitmapToPngAsync(outputBitmap, result)
+    }
+
+    private fun bitmapToPng(bitmap: Bitmap): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+        bitmap.recycle()
+        return outputStream.toByteArray()
+    }
+
+    private fun compressBitmapToPngAsync(
+        bitmap: Bitmap,
+        result: Result,
+    ) {
+        screenshotCompressionExecutor.execute {
+            try {
+                val pngBytes = bitmapToPng(bitmap)
+                mainHandler.post {
+                    result.success(pngBytes)
+                }
+            } catch (e: Throwable) {
+                if (!bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+                mainHandler.post {
+                    result.error("PosthogFlutterException", e.localizedMessage, null)
+                }
+            }
         }
     }
 

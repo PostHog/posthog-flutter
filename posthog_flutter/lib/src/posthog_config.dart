@@ -328,6 +328,15 @@ class PostHogSessionReplayConfig {
   /// If null, sampling is controlled by remote config (when available).
   double? sampleRate;
 
+  /// Mask all platform views (WebView, Maps, etc.) in session replay.
+  ///
+  /// Default: true.
+  ///
+  /// When true, every platform view is covered with a black rectangle in
+  /// session replay screenshots. Set to false to opt out globally, or wrap
+  /// individual views with [PostHogPlatformView] for per-view control.
+  var maskAllPlatformViews = true;
+
   /// Converts this session replay configuration to a platform-channel map.
   ///
   /// Returns values consumed by the Android and Apple session replay
@@ -337,6 +346,7 @@ class PostHogSessionReplayConfig {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
+      'maskAllPlatformViews': maskAllPlatformViews,
       if (sampleRate != null) 'sampleRate': sampleRate,
     };
   }
