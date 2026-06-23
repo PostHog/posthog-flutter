@@ -24,8 +24,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
 
-  // TODO: we should change the $lib and $lib_version to be the flutter one when capturing things
-
   static void registerWith(Registrar registrar) {
     final channel = MethodChannel(
       'posthog_flutter',

@@ -173,9 +173,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
 
     return PopScope(
       canPop: false,
-      // TODO: replace with onPopInvokedWithResult once set bump the min Flutter version to 3.24
-      // ignore: deprecated_member_use
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
           _handleClose();
         }
