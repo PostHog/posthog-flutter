@@ -51,8 +51,11 @@ from pathlib import Path
 raw_path = Path(sys.argv[1])
 out_path = Path(sys.argv[2])
 data = json.loads(raw_path.read_text())
+package_api = data.get("packageApi", {})
 # dart_apitool writes a temporary package path that changes on every run.
-data.get("packageApi", {}).pop("packagePath", None)
+package_api.pop("packagePath", None)
+# Keep the checked-in public API snapshot independent from release bumps.
+package_api["packageVersion"] = "<version>"
 out_path.write_text(json.dumps(data, indent=4, sort_keys=True) + "\n")
 PY
 
