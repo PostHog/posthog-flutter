@@ -256,7 +256,7 @@ class PostHogConfig {
   ///   callbacks are not called.
   List<BeforeSendCallback> beforeSend = [];
 
-  // TODO: missing getAnonymousId, propertiesSanitizer, captureDeepLinks integrations
+  // TODO: missing getAnonymousId, captureDeepLinks integrations
 
   /// Creates a configuration for [projectToken].
   ///
