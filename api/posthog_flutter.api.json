@@ -4619,7 +4619,7 @@
             }
         ],
         "packageName": "posthog_flutter",
-        "packageVersion": "5.28.0",
+        "packageVersion": "<version>",
         "sdkType": "flutter",
         "semantics": [
             "containsPlatformConstraints"
