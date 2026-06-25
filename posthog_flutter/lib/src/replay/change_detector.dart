@@ -26,6 +26,8 @@ class ChangeDetector {
   bool _isRunning = false;
   Timer? _timer;
 
+  bool hasCapturedPlatformViews = false;
+
   /// Creates a [ChangeDetector] with the given [onChange] callback.
   ///
   /// [interval] controls how often to check for changes.
@@ -62,6 +64,9 @@ class ChangeDetector {
       return;
     }
 
+    if (hasCapturedPlatformViews) {
+      WidgetsBinding.instance.scheduleFrame();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isRunning) {
         onChange();

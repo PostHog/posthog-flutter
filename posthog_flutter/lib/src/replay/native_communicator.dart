@@ -51,4 +51,31 @@ class NativeCommunicator {
       return false;
     }
   }
+
+  Future<Uint8List?> captureNativeScreenshot({
+    required int x,
+    required int y,
+    required int width,
+    required int height,
+  }) async {
+    if (kIsWeb) {
+      return null;
+    }
+    try {
+      final bytes = await _channel.invokeMethod<Uint8List>(
+        'captureNativeScreenshot',
+        {'x': x, 'y': y, 'width': width, 'height': height},
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => null,
+      );
+      if (bytes == null || bytes.isEmpty) {
+        return null;
+      }
+      return bytes;
+    } catch (e) {
+      printIfDebug('Error capturing native screenshot: $e');
+      return null;
+    }
+  }
 }
