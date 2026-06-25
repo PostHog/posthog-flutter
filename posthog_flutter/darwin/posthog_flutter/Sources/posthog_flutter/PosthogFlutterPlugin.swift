@@ -2,6 +2,7 @@ import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
+    import WebKit
 #elseif os(macOS)
     import AppKit
     import FlutterMacOS
@@ -328,6 +329,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendMetaEvent(call, result: result)
         case "sendFullSnapshot":
             sendFullSnapshot(call, result: result)
+        case "captureNativeScreenshot":
+            captureNativeScreenshot(call, result: result)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
         case "startSessionRecording":
@@ -462,6 +465,99 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 #endif
 
 extension PosthogFlutterPlugin {
+    private func captureNativeScreenshot(_ call: FlutterMethodCall,
+                                         result: @escaping FlutterResult)
+    {
+        #if os(iOS)
+            guard let args = call.arguments as? [String: Any] else {
+                _badArgumentError(result)
+                return
+            }
+
+            let x = args["x"] as? Int ?? 0
+            let y = args["y"] as? Int ?? 0
+            let width = args["width"] as? Int ?? 0
+            let height = args["height"] as? Int ?? 0
+
+            guard width > 0, height > 0 else {
+                _badArgumentError(result)
+                return
+            }
+
+            DispatchQueue.main.async {
+                guard let window = self.captureWindow() else {
+                    result(nil)
+                    return
+                }
+
+                // If a native VC is presented over Flutter (paywall, system sheet,
+                // etc.) Flutter has no widget rects for it, so capturing would
+                // include unmasked native content. Fall back to Flutter-only.
+                if window.rootViewController?.presentedViewController != nil {
+                    result(nil)
+                    return
+                }
+
+                let cropRect = CGRect(x: x, y: y, width: width, height: height)
+                    .intersection(window.bounds)
+                guard !cropRect.isNull, !cropRect.isEmpty else {
+                    result(nil)
+                    return
+                }
+
+                // Only reveal a web view that the capture rect fully covers, and
+                // snapshot only the crop region. Requiring containment (not mere
+                // intersection) stops a neighboring MASKED web view that overlaps
+                // this captured view's rect from being snapshotted and leaked.
+                if let webView = self.findWKWebView(in: window, containedBy: cropRect) {
+                    let config = WKSnapshotConfiguration()
+                    config.rect = webView.convert(cropRect, from: nil).intersection(webView.bounds)
+                    guard !config.rect.isNull, !config.rect.isEmpty else {
+                        result(nil)
+                        return
+                    }
+                    webView.takeSnapshot(with: config) { snapshotImage, error in
+                        guard error == nil, let snapshotImage = snapshotImage else {
+                            result(nil)
+                            return
+                        }
+                        result(snapshotImage.pngData().map(FlutterStandardTypedData.init(bytes:)) ?? nil)
+                    }
+                    return
+                }
+
+                // No WKWebView found for the captured rect. Returning nil here
+                // keeps this safe: drawHierarchy over the full window would
+                // include any masked CALayer-backed platform view overlapping
+                // the crop region and leak it into replay.
+                result(nil)
+            }
+        #else
+            result(nil)
+        #endif
+    }
+
+    #if os(iOS)
+        private func captureWindow() -> UIWindow? {
+            return UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+                .first(where: \.isKeyWindow) ?? UIApplication.shared.windows.first
+        }
+
+        private func findWKWebView(in view: UIView, containedBy rect: CGRect) -> WKWebView? {
+            if let webView = view as? WKWebView {
+                let frameInWindow = webView.convert(webView.bounds, to: nil)
+                // 1pt slack absorbs rounding between Flutter's rect and the native frame.
+                if rect.insetBy(dx: -1, dy: -1).contains(frameInWindow) { return webView }
+            }
+            for sub in view.subviews {
+                if let found = findWKWebView(in: sub, containedBy: rect) { return found }
+            }
+            return nil
+        }
+    #endif
+
     private func sendMetaEvent(_ call: FlutterMethodCall,
                                result: @escaping FlutterResult)
     {

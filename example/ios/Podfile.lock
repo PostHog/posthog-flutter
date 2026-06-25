@@ -1,30 +1,38 @@
 PODS:
   - Flutter (1.0.0)
-  - PostHog (3.56.0)
-  - posthog_flutter (0.0.1):
+  - Google-Maps-iOS-Utils (5.0.0):
+    - GoogleMaps (~> 8.0)
+  - google_maps_flutter_ios (0.0.1):
     - Flutter
-    - FlutterMacOS
-    - PostHog (< 4.0.0, >= 3.56.0)
+    - Google-Maps-iOS-Utils (< 7.0, >= 5.0)
+    - GoogleMaps (< 11.0, >= 8.4)
+  - GoogleMaps (8.4.0):
+    - GoogleMaps/Maps (= 8.4.0)
+  - GoogleMaps/Base (8.4.0)
+  - GoogleMaps/Maps (8.4.0):
+    - GoogleMaps/Base
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
-  - posthog_flutter (from `.symlinks/plugins/posthog_flutter/darwin`)
+  - google_maps_flutter_ios (from `.symlinks/plugins/google_maps_flutter_ios/ios`)
 
 SPEC REPOS:
   trunk:
-    - PostHog
+    - Google-Maps-iOS-Utils
+    - GoogleMaps
 
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
-  posthog_flutter:
-    :path: ".symlinks/plugins/posthog_flutter/darwin"
+  google_maps_flutter_ios:
+    :path: ".symlinks/plugins/google_maps_flutter_ios/ios"
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  PostHog: 646b20ce2db3f07f71ce7fb004a9b3a4ba4afa4b
-  posthog_flutter: 03b15ff7a78e2a4162baaf11f8db37b079412106
+  Google-Maps-iOS-Utils: 66d6de12be1ce6d3742a54661e7a79cb317a9321
+  google_maps_flutter_ios: 17552876e72723da1d41accc22f03b5f7afbde69
+  GoogleMaps: 8939898920281c649150e0af74aa291c60f2e77d
 
-PODFILE CHECKSUM: a57f30d18f102dd3ce366b1d62a55ecbef2158e5
+PODFILE CHECKSUM: 1959d098c91d8a792531a723c4a9d7e9f6a01e38
 
 COCOAPODS: 1.16.2
