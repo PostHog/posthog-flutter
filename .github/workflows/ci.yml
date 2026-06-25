@@ -26,7 +26,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
@@ -54,7 +54,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
@@ -80,7 +80,7 @@ jobs:
     if: github.event_name == 'pull_request' && needs.detect-markdown-only.outputs.markdown_only != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
@@ -104,7 +104,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       - name: Install ktlint
@@ -123,7 +123,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       - name: Install swiftformat
@@ -142,7 +142,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
@@ -177,7 +177,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
@@ -215,7 +215,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
@@ -254,7 +254,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       - name: 'Set up Java'
@@ -290,7 +290,7 @@ jobs:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
         run: echo "Only Markdown files changed; no additional work is required for this check."
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
