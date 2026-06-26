@@ -438,19 +438,51 @@ class PostHogLogsConfig {
       duration.inSeconds < 1 ? 1 : duration.inSeconds;
 }
 
-/// Configuration for mobile session replay capture and masking.
+/// Configuration for session replay capture and masking.
 ///
 /// Assign an instance to [PostHogConfig.sessionReplayConfig] before calling
 /// `Posthog().setup(config)`.
+///
+/// **Platform behaviour**
+///
+/// On iOS and Android, the Flutter SDK captures screenshots of the widget tree
+/// and applies masking by walking the render tree and painting opaque rectangles
+/// over sensitive render objects (text, images, or [PostHogMaskWidget] subtrees)
+/// before encoding the snapshot.
+///
+/// On Flutter web (CanvasKit renderer), the posthog-js library records the raw
+/// `<canvas>` element directly.  Because all content is painted as canvas pixels
+/// there are no DOM text nodes for CSS selectors to target, so the standard
+/// web `maskTextSelector` approach does not work.  Instead, when [maskAllTexts]
+/// or [maskAllImages] is `true` the Flutter SDK translates those flags to the
+/// posthog-js `session_recording.maskCanvas` option, which instructs rrweb to
+/// replace the entire canvas content with a solid colour in the recorded stream.
+/// This is an all-or-nothing masking strategy: when either flag is enabled the
+/// full canvas is masked rather than individual widget bounds.  If you need more
+/// granular control on web, configure `session_recording.maskCanvas` directly
+/// in your posthog-js `init` call before the Flutter SDK's `setup()` runs.
 class PostHogSessionReplayConfig {
   /// Creates a session replay configuration with default masking enabled.
   PostHogSessionReplayConfig();
 
   /// Enable masking of all text and text input fields.
+  ///
+  /// On iOS/Android: masks [RenderParagraph], [RenderTransform], and
+  /// [RenderEditable] nodes in the captured screenshot.
+  ///
+  /// On Flutter web (CanvasKit): sets `session_recording.maskCanvas: true` in
+  /// posthog-js, replacing the entire canvas with a solid colour in the replay.
+  ///
   /// Default: true.
   var maskAllTexts = true;
 
   /// Enable masking of all images.
+  ///
+  /// On iOS/Android: masks [RenderImage] nodes in the captured screenshot.
+  ///
+  /// On Flutter web (CanvasKit): sets `session_recording.maskCanvas: true` in
+  /// posthog-js, replacing the entire canvas with a solid colour in the replay.
+  ///
   /// Default: true.
   var maskAllImages = true;
 

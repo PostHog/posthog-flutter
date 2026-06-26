@@ -68,6 +68,8 @@ extension PostHogExtension on PostHog {
   external bool sessionRecordingStarted();
   external SessionManager? get sessionManager;
   // ignore: non_constant_identifier_names
+  external void set_config(JSAny config);
+  // ignore: non_constant_identifier_names
   external void _overrideSDKInfo(JSAny sdkName, JSAny sdkVersion);
 }
 
