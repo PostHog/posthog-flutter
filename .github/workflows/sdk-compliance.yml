@@ -1,0 +1,21 @@
+name: SDK Compliance Tests
+
+permissions:
+  contents: read
+  packages: read
+  pull-requests: write
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  compliance:
+    name: PostHog SDK compliance tests
+    uses: PostHog/posthog-sdk-test-harness/.github/workflows/test-sdk-action.yml@be8b8d5a3f94a249659844e94832e874f049c1e4
+    with:
+      adapter-dockerfile: "sdk_compliance_adapter/Dockerfile"
+      adapter-context: "."
+      test-harness-version: "0.8.0"

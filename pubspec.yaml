@@ -7,3 +7,4 @@ environment:
 workspace:
   - posthog_flutter
   - example
+  - sdk_compliance_adapter

@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  sdk-adapter:
+    build:
+      context: ..
+      dockerfile: sdk_compliance_adapter/Dockerfile
+    networks:
+      - test-network
+
+  test-harness:
+    image: ghcr.io/posthog/sdk-test-harness:0.8.0
+    command:
+      [
+        "run",
+        "--adapter-url",
+        "http://sdk-adapter:8080",
+        "--mock-url",
+        "http://test-harness:8081"
+      ]
+    networks:
+      - test-network
+    depends_on:
+      - sdk-adapter
+
+networks:
+  test-network:
+    driver: bridge
