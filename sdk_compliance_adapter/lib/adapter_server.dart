@@ -40,7 +40,6 @@ class ComplianceAdapter {
         await _route(request);
       } catch (error, stackTrace) {
         stderr.writeln('Unhandled adapter error: $error\n$stackTrace');
-        request.response.statusCode = 500;
         await _sendJson(request, {'error': error.toString()}, statusCode: 500);
       }
     }
@@ -358,14 +357,15 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
         uuidList: batch.map((event) => event['uuid']! as String).toList(),
       ));
 
+      if (attempt > 0) {
+        state.totalRetries++;
+      }
+
       if (result.statusCode >= 200 && result.statusCode < 300) {
         return true;
       }
 
       state.lastError = 'Batch request failed with HTTP ${result.statusCode}';
-      if (attempt > 0) {
-        state.totalRetries++;
-      }
       if (attempt < _maxRetries && _shouldRetry(result.statusCode)) {
         await Future<void>.delayed(
           Duration(milliseconds: result.retryAfterMs ?? 100),
@@ -445,12 +445,17 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     final client = HttpClient();
     Object? value = false;
     try {
-      final request =
-          await client.postUrl(Uri.parse(_host!).resolve('/flags/?v=2'));
+      final uri = Uri.parse(_host!).resolve('/flags/?v=2');
+      final request = await client.postUrl(uri);
       request.headers.contentType = ContentType.json;
       request.write(jsonEncode(payload));
       final response = await request.close();
       final body = await utf8.decoder.bind(response).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        state.lastError =
+            'Feature flag request failed with HTTP ${response.statusCode}';
+        throw HttpException(state.lastError!, uri: uri);
+      }
       final decoded = body.isEmpty ? null : jsonDecode(body);
       if (decoded is Map) {
         final flags = decoded['featureFlags'] ?? decoded['flags'];
