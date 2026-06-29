@@ -37,10 +37,10 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDirs("src/main/kotlin")
+            java.setSrcDirs(listOf("src/main/kotlin"))
         }
         getByName("test") {
-            java.srcDirs("src/test/kotlin")
+            java.setSrcDirs(listOf("src/test/kotlin"))
         }
     }
 
@@ -58,10 +58,10 @@ android {
     testOptions {
         unitTests.all {
             it.useJUnitPlatform()
+            it.outputs.upToDateWhen { false }
 
             it.testLogging {
                 events("passed", "skipped", "failed", "standardOut", "standardError")
-                outputs.upToDateWhen { false }
                 showStandardStreams = true
             }
         }
