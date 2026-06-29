@@ -430,7 +430,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     required bool disableGeoip,
   }) async {
     final payload = <String, Object?>{
-      'token': _apiKey,
+      'api_key': _apiKey,
       'distinct_id': distinctId,
       'person_properties': <String, Object?>{
         ...?personProperties,
