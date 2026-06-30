@@ -331,6 +331,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendFullSnapshot(call, result: result)
         case "captureNativeScreenshot":
             captureNativeScreenshot(call, result: result)
+        case "captureNativeScreenshots":
+            captureNativeScreenshots(call, result: result)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
         case "startSessionRecording":
@@ -473,20 +475,46 @@ extension PosthogFlutterPlugin {
                 _badArgumentError(result)
                 return
             }
-
             let x = args["x"] as? Int ?? 0
             let y = args["y"] as? Int ?? 0
             let width = args["width"] as? Int ?? 0
             let height = args["height"] as? Int ?? 0
-
             guard width > 0, height > 0 else {
                 _badArgumentError(result)
                 return
             }
+            captureOneNative(x: x, y: y, width: width, height: height) { bytes in
+                result(bytes)
+            }
+        #else
+            result(nil)
+        #endif
+    }
 
+    private func captureNativeScreenshots(_ call: FlutterMethodCall,
+                                          result: @escaping FlutterResult)
+    {
+        #if os(iOS)
+            guard let args = call.arguments as? [String: Any],
+                  let views = args["views"] as? [[String: Int]] else {
+                result([])
+                return
+            }
+            captureNextNative(views: views, index: 0, acc: []) { results in
+                result(results)
+            }
+        #else
+            result([])
+        #endif
+    }
+
+    #if os(iOS)
+        private func captureOneNative(x: Int, y: Int, width: Int, height: Int,
+                                      onResult: @escaping (FlutterStandardTypedData?) -> Void)
+        {
             DispatchQueue.main.async {
                 guard let window = self.captureWindow() else {
-                    result(nil)
+                    onResult(nil)
                     return
                 }
 
@@ -494,14 +522,14 @@ extension PosthogFlutterPlugin {
                 // etc.) Flutter has no widget rects for it, so capturing would
                 // include unmasked native content. Fall back to Flutter-only.
                 if window.rootViewController?.presentedViewController != nil {
-                    result(nil)
+                    onResult(nil)
                     return
                 }
 
                 let cropRect = CGRect(x: x, y: y, width: width, height: height)
                     .intersection(window.bounds)
                 guard !cropRect.isNull, !cropRect.isEmpty else {
-                    result(nil)
+                    onResult(nil)
                     return
                 }
 
@@ -513,15 +541,15 @@ extension PosthogFlutterPlugin {
                     let config = WKSnapshotConfiguration()
                     config.rect = webView.convert(cropRect, from: nil).intersection(webView.bounds)
                     guard !config.rect.isNull, !config.rect.isEmpty else {
-                        result(nil)
+                        onResult(nil)
                         return
                     }
                     webView.takeSnapshot(with: config) { snapshotImage, error in
                         guard error == nil, let snapshotImage = snapshotImage else {
-                            result(nil)
+                            onResult(nil)
                             return
                         }
-                        result(snapshotImage.pngData().map(FlutterStandardTypedData.init(bytes:)) ?? nil)
+                        onResult(snapshotImage.pngData().map(FlutterStandardTypedData.init(bytes:)) ?? nil)
                     }
                     return
                 }
@@ -530,18 +558,32 @@ extension PosthogFlutterPlugin {
                 // keeps this safe: drawHierarchy over the full window would
                 // include any masked CALayer-backed platform view overlapping
                 // the crop region and leak it into replay.
-                result(nil)
+                onResult(nil)
             }
-        #else
-            result(nil)
-        #endif
-    }
+        }
 
-    #if os(iOS)
+        private func captureNextNative(views: [[String: Int]], index: Int,
+                                       acc: [FlutterStandardTypedData?],
+                                       completion: @escaping ([FlutterStandardTypedData?]) -> Void)
+        {
+            guard index < views.count else {
+                completion(acc)
+                return
+            }
+            let v = views[index]
+            let x = v["x"] ?? 0
+            let y = v["y"] ?? 0
+            let width = v["width"] ?? 0
+            let height = v["height"] ?? 0
+            captureOneNative(x: x, y: y, width: width, height: height) { bytes in
+                self.captureNextNative(views: views, index: index + 1, acc: acc + [bytes], completion: completion)
+            }
+        }
+
         private func captureWindow() -> UIWindow? {
             return UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
-                .flatMap(\.windows)
+                .flatMap { $0.windows }
                 .first(where: \.isKeyWindow) ?? UIApplication.shared.windows.first
         }
 

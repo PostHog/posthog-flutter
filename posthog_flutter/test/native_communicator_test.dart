@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/replay/native_communicator.dart';
@@ -9,52 +11,62 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
-  group('NativeCommunicator.captureNativeScreenshot', () {
+  group('NativeCommunicator.captureNativeScreenshots', () {
     tearDown(() {
       messenger.setMockMethodCallHandler(channel, null);
     });
 
-    test('returns the bytes when native returns a non-empty payload', () async {
-      final payload = Uint8List.fromList([1, 2, 3, 4]);
+    test('returns list of bytes for each view', () async {
+      final a = Uint8List.fromList([1, 2, 3, 4]);
+      final b = Uint8List.fromList([5, 6, 7, 8]);
       messenger.setMockMethodCallHandler(channel, (call) async {
-        expect(call.method, 'captureNativeScreenshot');
-        return payload;
+        expect(call.method, 'captureNativeScreenshots');
+        return [a, b];
       });
 
-      final result = await NativeCommunicator()
-          .captureNativeScreenshot(x: 0, y: 0, width: 10, height: 10);
+      final result = await NativeCommunicator().captureNativeScreenshots([
+        {'x': 0, 'y': 0, 'width': 10, 'height': 10},
+        {'x': 10, 'y': 0, 'width': 10, 'height': 10},
+      ]);
 
-      expect(result, payload);
+      expect(result, [a, b]);
     });
 
-    test('returns null when native returns null', () async {
-      messenger.setMockMethodCallHandler(channel, (_) async => null);
+    test('returns list with nulls when native returns nulls', () async {
+      messenger.setMockMethodCallHandler(channel, (_) async => [null, null]);
 
-      final result = await NativeCommunicator()
-          .captureNativeScreenshot(x: 0, y: 0, width: 10, height: 10);
+      final result = await NativeCommunicator().captureNativeScreenshots([
+        {'x': 0, 'y': 0, 'width': 10, 'height': 10},
+        {'x': 10, 'y': 0, 'width': 10, 'height': 10},
+      ]);
 
-      expect(result, isNull);
+      expect(result, [null, null]);
     });
 
-    test('returns null when native returns empty bytes', () async {
-      messenger.setMockMethodCallHandler(channel, (_) async => Uint8List(0));
+    test('returns empty list for empty input without calling native', () async {
+      var called = false;
+      messenger.setMockMethodCallHandler(channel, (_) async {
+        called = true;
+        return [];
+      });
 
-      final result = await NativeCommunicator()
-          .captureNativeScreenshot(x: 0, y: 0, width: 10, height: 10);
+      final result = await NativeCommunicator().captureNativeScreenshots([]);
 
-      expect(result, isNull);
+      expect(result, isEmpty);
+      expect(called, isFalse);
     });
 
-    test('returns null when the channel throws', () async {
+    test('returns null-filled list when the channel throws', () async {
       messenger.setMockMethodCallHandler(
         channel,
         (_) async => throw PlatformException(code: 'boom'),
       );
 
-      final result = await NativeCommunicator()
-          .captureNativeScreenshot(x: 0, y: 0, width: 10, height: 10);
+      final result = await NativeCommunicator().captureNativeScreenshots([
+        {'x': 0, 'y': 0, 'width': 10, 'height': 10},
+      ]);
 
-      expect(result, isNull);
+      expect(result, [null]);
     });
   });
 }
