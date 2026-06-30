@@ -191,6 +191,8 @@ class ScreenshotCapturer {
     Canvas canvas,
     ElementData viewRect,
     Uint8List? bytes,
+    int nativeW,
+    int nativeH,
     double pixelRatio,
   ) async {
     final transform = viewRect.transform;
@@ -200,7 +202,7 @@ class ScreenshotCapturer {
       _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
       return;
     }
-    final nativeImage = await _decodeImage(bytes);
+    final nativeImage = await _decodeRawPixels(bytes, nativeW, nativeH);
     if (nativeImage == null) {
       _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
       return;
@@ -215,18 +217,22 @@ class ScreenshotCapturer {
     nativeImage.dispose();
   }
 
-  Future<ui.Image?> _decodeImage(Uint8List bytes) async {
-    ui.Codec? codec;
+  Future<ui.Image?> _decodeRawPixels(Uint8List bytes, int width, int height) {
+    if (width <= 0 || height <= 0 || bytes.isEmpty) return Future.value(null);
+    final completer = Completer<ui.Image?>();
     try {
-      codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      return frame.image;
+      ui.decodeImageFromPixels(
+        bytes,
+        width,
+        height,
+        ui.PixelFormat.rgba8888,
+        (image) => completer.complete(image),
+      );
     } catch (e) {
-      printIfDebug('Error decoding image bytes: $e');
-      return null;
-    } finally {
-      codec?.dispose();
+      printIfDebug('Error decoding raw pixels: $e');
+      completer.complete(null);
     }
+    return completer.future;
   }
 
   /// Computes a hash of the full raw RGBA byte array for change detection.
@@ -451,8 +457,10 @@ class ScreenshotCapturer {
           final bytesList =
               await _nativeCommunicator.captureNativeScreenshots(specs);
           for (var i = 0; i < pvRects.captured.length; i++) {
+            final spec = specs[i];
             await _compositeRevealedView(
-                canvas, pvRects.captured[i], bytesList[i], pixelRatio);
+                canvas, pvRects.captured[i], bytesList[i],
+                spec['width']!, spec['height']!, pixelRatio);
           }
         }
 
