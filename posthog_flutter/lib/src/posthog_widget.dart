@@ -108,6 +108,11 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
     try {
       final imageInfo = await _screenshotCapturer?.captureScreenshot();
+      // Refresh this before the null check: a dropped frame (null) on a static
+      // captured-view screen must still keep forced frames scheduled, otherwise
+      // the screen would never produce another snapshot.
+      _changeDetector?.hasCapturedPlatformViews =
+          _screenshotCapturer?.hasCapturedPlatformViews ?? false;
       if (imageInfo == null || _disposed) {
         return;
       }

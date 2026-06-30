@@ -7,25 +7,25 @@ let package = Package(
     name: "posthog_flutter",
     platforms: [
         .iOS("13.0"),
-        .macOS("10.15")
+        .macOS("10.15"),
     ],
     products: [
-        .library(name: "posthog-flutter", targets: ["posthog_flutter"])
+        .library(name: "posthog-flutter", targets: ["posthog_flutter"]),
     ],
     dependencies: [
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
-        .package(url: "https://github.com/PostHog/posthog-ios", "3.61.0"..<"4.0.0")
+        .package(url: "https://github.com/PostHog/posthog-ios", "3.61.0" ..< "4.0.0"),
     ],
     targets: [
         .target(
             name: "posthog_flutter",
             dependencies: [
                 .product(name: "FlutterFramework", package: "FlutterFramework"),
-                .product(name: "PostHog", package: "posthog-ios")
+                .product(name: "PostHog", package: "posthog-ios"),
             ],
             resources: [
-                .process("PrivacyInfo.xcprivacy")
+                .process("PrivacyInfo.xcprivacy"),
             ]
-        )
+        ),
     ]
 )

@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="PostHog Flutter Example"
         android:name="${applicationName}"
@@ -50,5 +52,11 @@
        <meta-data
             android:name="com.posthog.posthog.AUTO_INIT"
             android:value="false" />
+
+        <!-- Dummy key: Maps SDK still creates its SurfaceView (shows error tiles).
+             This is intentional — we're testing the capture/mask pipeline, not map rendering. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyDummyKeyForTestingPurposesOnly00001" />
     </application>
 </manifest>
