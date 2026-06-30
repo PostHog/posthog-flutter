@@ -550,7 +550,7 @@ extension PosthogFlutterPlugin {
                             onResult(nil)
                             return
                         }
-                        onResult(snapshotImage.pngData().map(FlutterStandardTypedData.init(bytes:)) ?? nil)
+                        onResult(self.imageToRawRgba(snapshotImage).map(FlutterStandardTypedData.init(bytes:)))
                     }
                     return
                 }
@@ -579,6 +579,25 @@ extension PosthogFlutterPlugin {
             captureOneNative(x: x, y: y, width: width, height: height) { bytes in
                 self.captureNextNative(views: views, index: index + 1, acc: acc + [bytes], completion: completion)
             }
+        }
+
+        private func imageToRawRgba(_ image: UIImage) -> Data? {
+            guard let cgImage = image.cgImage else { return nil }
+            let width = cgImage.width
+            let height = cgImage.height
+            let bytesPerRow = width * 4
+            var buffer = [UInt8](repeating: 0, count: height * bytesPerRow)
+            guard let context = CGContext(
+                data: &buffer,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return nil }
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+            return Data(buffer)
         }
 
         private func captureWindow() -> UIWindow? {

@@ -34,7 +34,6 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import java.io.ByteArrayOutputStream
 import java.util.Date
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -680,7 +679,7 @@ class PosthogFlutterPlugin :
                             )
                             return@request
                         }
-                        compressBitmapAsync(bitmap, onResult)
+                        exportBitmapAsync(bitmap, onResult)
                     },
                     mainHandler,
                 )
@@ -716,7 +715,7 @@ class PosthogFlutterPlugin :
                     }
 
                     if (platformViewSvs.isEmpty()) {
-                        compressBitmapAsync(bitmap, onResult)
+                        exportBitmapAsync(bitmap, onResult)
                     } else {
                         compositeSurfaceViewsOnto(
                             svList = platformViewSvs,
@@ -727,7 +726,7 @@ class PosthogFlutterPlugin :
                             density = density,
                             index = 0,
                         ) {
-                            compressBitmapAsync(bitmap, onResult)
+                            exportBitmapAsync(bitmap, onResult)
                         }
                     }
                 },
@@ -865,17 +864,25 @@ class PosthogFlutterPlugin :
                 }
             }
 
-        compressBitmapAsync(outputBitmap, onResult)
+        exportBitmapAsync(outputBitmap, onResult)
     }
 
-    private fun bitmapToPng(bitmap: Bitmap): ByteArray {
-        val outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+    private fun bitmapToRawRgba(bitmap: Bitmap): ByteArray {
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         bitmap.recycle()
-        return outputStream.toByteArray()
+        val bytes = ByteArray(pixels.size * 4)
+        for (i in pixels.indices) {
+            val pixel = pixels[i]
+            bytes[i * 4] = ((pixel shr 16) and 0xFF).toByte() // R
+            bytes[i * 4 + 1] = ((pixel shr 8) and 0xFF).toByte() // G
+            bytes[i * 4 + 2] = (pixel and 0xFF).toByte() // B
+            bytes[i * 4 + 3] = ((pixel shr 24) and 0xFF).toByte() // A
+        }
+        return bytes
     }
 
-    private fun compressBitmapAsync(
+    private fun exportBitmapAsync(
         bitmap: Bitmap,
         onResult: (ByteArray?) -> Unit,
     ) {
@@ -885,8 +892,8 @@ class PosthogFlutterPlugin :
         try {
             screenshotCompressionExecutor.execute {
                 try {
-                    val pngBytes = bitmapToPng(bitmap)
-                    mainHandler.post { onResult(pngBytes) }
+                    val rgbaBytes = bitmapToRawRgba(bitmap)
+                    mainHandler.post { onResult(rgbaBytes) }
                 } catch (e: Throwable) {
                     if (!bitmap.isRecycled) bitmap.recycle()
                     mainHandler.post { onResult(null) }
