@@ -10,6 +10,12 @@ enum PostHogPlatformViewPrivacy {
   /// On Android texture mode the content is already in the Flutter render base,
   /// so no extra capture work is done. On iOS and hybrid composition the
   /// compositor fills the transparent hole via a native capture + srcOver.
+  ///
+  /// **iOS note:** only [WKWebView]-backed platform views (e.g. `webview_flutter`
+  /// in the default web-view mode) are actually captured on iOS. All other
+  /// platform view types (Google Maps, ARKit, camera previews, etc.) are masked
+  /// regardless of this policy, because the iOS compositor cannot safely
+  /// snapshot arbitrary CALayer-backed views without leaking unmasked content.
   capture,
 }
 

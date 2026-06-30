@@ -595,6 +595,11 @@ class PosthogFlutterPlugin :
                 val y = v["y"] ?: 0
                 val w = v["width"] ?: 0
                 val h = v["height"] ?: 0
+                if (w <= 0 || h <= 0) {
+                    results.add(null)
+                    captureNext(index + 1)
+                    return
+                }
                 captureOneNative(currentActivity, x, y, w, h) { bytes ->
                     results.add(bytes)
                     captureNext(index + 1)

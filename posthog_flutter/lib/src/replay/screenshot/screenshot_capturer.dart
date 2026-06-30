@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart' show Element, WidgetsBinding;
@@ -131,10 +132,7 @@ class ScreenshotCapturer {
     Set<int> seen,
     PostHogPlatformViewPrivacy inheritedPolicy,
   ) {
-    PostHogPlatformViewPrivacy policy = inheritedPolicy;
-    if (element.widget is PostHogPlatformView) {
-      policy = (element.widget as PostHogPlatformView).privacy;
-    }
+    final policy = resolvePrivacyPolicyForElement(element, inheritedPolicy);
 
     final ro = element.renderObject;
     if (ro is RenderBox &&
@@ -458,8 +456,9 @@ class ScreenshotCapturer {
               await _nativeCommunicator.captureNativeScreenshots(specs);
           for (var i = 0; i < pvRects.captured.length; i++) {
             final spec = specs[i];
-            await _compositeRevealedView(canvas, pvRects.captured[i],
-                bytesList[i], spec['width']!, spec['height']!, pixelRatio);
+            final bytes = i < bytesList.length ? bytesList[i] : null;
+            await _compositeRevealedView(canvas, pvRects.captured[i], bytes,
+                spec['width']!, spec['height']!, pixelRatio);
           }
         }
 
@@ -561,4 +560,15 @@ class ScreenshotCapturer {
       return Future.value(null);
     }
   }
+}
+
+@visibleForTesting
+PostHogPlatformViewPrivacy resolvePrivacyPolicyForElement(
+  Element element,
+  PostHogPlatformViewPrivacy inherited,
+) {
+  if (element.widget is PostHogPlatformView) {
+    return (element.widget as PostHogPlatformView).privacy;
+  }
+  return inherited;
 }
