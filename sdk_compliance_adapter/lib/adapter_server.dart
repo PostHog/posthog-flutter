@@ -225,6 +225,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
   int _flushIntervalMs = _defaultFlushIntervalMs;
   int _maxRetries = _defaultMaxRetries;
   bool _enableCompression = false;
+  bool _autoFlushPaused = false;
   Timer? _flushTimer;
   Future<void>? _activeFlush;
   String? _nextDistinctId;
@@ -247,10 +248,11 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     _flushIntervalMs = max(1, flushIntervalMs);
     _maxRetries = max(0, maxRetries);
     _enableCompression = enableCompression;
+    _autoFlushPaused = false;
     _flushTimer?.cancel();
     _flushTimer = Timer.periodic(
       Duration(milliseconds: _flushIntervalMs),
-      (_) => unawaited(flush()),
+      (_) => unawaited(_flushFromTimer()),
     );
   }
 
@@ -300,6 +302,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
         '\$set_once': userPropertiesSetOnce,
     };
 
+    _autoFlushPaused = false;
     state.queue.add({
       'uuid': uuid,
       'event': eventName,
@@ -313,6 +316,13 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     if (state.queue.length >= _flushAt) {
       unawaited(flush());
     }
+  }
+
+  Future<void> _flushFromTimer() {
+    if (_autoFlushPaused) {
+      return Future.value();
+    }
+    return flush();
   }
 
   @override
@@ -332,24 +342,59 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
   }
 
   Future<void> _flushInternal() async {
-    if (!isInitialized || state.queue.isEmpty) {
+    final flushState = state;
+    final apiKey = _apiKey;
+    final host = _host;
+    final maxRetries = _maxRetries;
+    final enableCompression = _enableCompression;
+    if (apiKey == null || host == null || flushState.queue.isEmpty) {
       return;
     }
 
-    final batch = List<Map<String, Object?>>.from(state.queue);
-    final success = await _sendBatchWithRetries(batch);
-    final sentUuids = batch.map((event) => event['uuid']).toSet();
-    state.queue.removeWhere((event) => sentUuids.contains(event['uuid']));
-    state.pendingEvents = state.queue.length;
+    final batch = List<Map<String, Object?>>.from(flushState.queue);
+    final success = await _sendBatchWithRetries(
+      flushState,
+      batch,
+      apiKey: apiKey,
+      host: host,
+      maxRetries: maxRetries,
+      enableCompression: enableCompression,
+    );
     if (success) {
-      state.totalEventsSent += batch.length;
+      final sentUuids = batch.map((event) => event['uuid']).toSet();
+      flushState.queue
+          .removeWhere((event) => sentUuids.contains(event['uuid']));
+      flushState.pendingEvents = flushState.queue.length;
+      flushState.totalEventsSent += batch.length;
+      if (identical(state, flushState)) {
+        _autoFlushPaused = false;
+      }
+    } else {
+      flushState.pendingEvents = flushState.queue.length;
+      if (identical(state, flushState)) {
+        _autoFlushPaused = true;
+      }
     }
   }
 
-  Future<bool> _sendBatchWithRetries(List<Map<String, Object?>> batch) async {
-    for (var attempt = 0; attempt <= _maxRetries; attempt++) {
-      final result = await _postBatch(batch, attempt);
-      state.requestsMade.add(_RequestRecord(
+  Future<bool> _sendBatchWithRetries(
+    _AdapterState flushState,
+    List<Map<String, Object?>> batch, {
+    required String apiKey,
+    required String host,
+    required int maxRetries,
+    required bool enableCompression,
+  }) async {
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      final result = await _postBatch(
+        flushState,
+        batch,
+        attempt,
+        apiKey: apiKey,
+        host: host,
+        enableCompression: enableCompression,
+      );
+      flushState.requestsMade.add(_RequestRecord(
         timestampMs: DateTime.now().millisecondsSinceEpoch,
         statusCode: result.statusCode,
         retryAttempt: attempt,
@@ -358,15 +403,16 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       ));
 
       if (attempt > 0) {
-        state.totalRetries++;
+        flushState.totalRetries++;
       }
 
       if (result.statusCode >= 200 && result.statusCode < 300) {
         return true;
       }
 
-      state.lastError = 'Batch request failed with HTTP ${result.statusCode}';
-      if (attempt < _maxRetries && _shouldRetry(result.statusCode)) {
+      flushState.lastError =
+          'Batch request failed with HTTP ${result.statusCode}';
+      if (attempt < maxRetries && _shouldRetry(result.statusCode)) {
         await Future<void>.delayed(
           Duration(milliseconds: result.retryAfterMs ?? 100),
         );
@@ -381,12 +427,16 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       statusCode == 408 || statusCode == 429 || statusCode >= 500;
 
   Future<_PostResult> _postBatch(
+    _AdapterState flushState,
     List<Map<String, Object?>> batch,
-    int attempt,
-  ) async {
+    int attempt, {
+    required String apiKey,
+    required String host,
+    required bool enableCompression,
+  }) async {
     final client = HttpClient();
     try {
-      final uri = Uri.parse(_host!).resolve(
+      final uri = Uri.parse(host).resolve(
         attempt > 0 ? '/batch?retry_count=$attempt' : '/batch',
       );
       final request = await client.postUrl(uri);
@@ -397,13 +447,13 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       );
 
       final payload = jsonEncode({
-        'api_key': _apiKey,
+        'api_key': apiKey,
         'batch': batch,
         'sent_at': DateTime.now().toUtc().toIso8601String(),
       });
       final body = utf8.encode(payload);
-      final bytesToSend = _enableCompression ? gzip.encode(body) : body;
-      if (_enableCompression) {
+      final bytesToSend = enableCompression ? gzip.encode(body) : body;
+      if (enableCompression) {
         request.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
       }
       request.contentLength = bytesToSend.length;
@@ -414,7 +464,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       await response.drain<void>();
       return _PostResult(response.statusCode, retryAfterMs: retryAfterMs);
     } catch (error) {
-      state.lastError = error.toString();
+      flushState.lastError = error.toString();
       return const _PostResult(500);
     } finally {
       client.close(force: true);
@@ -507,6 +557,8 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
   Future<void> resetAdapterState() async {
     _flushTimer?.cancel();
     _flushTimer = null;
+    _activeFlush = null;
+    _autoFlushPaused = false;
     _apiKey = null;
     _host = null;
     _nextDistinctId = null;
