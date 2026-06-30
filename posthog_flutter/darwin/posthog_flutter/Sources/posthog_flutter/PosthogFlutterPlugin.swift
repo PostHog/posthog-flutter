@@ -496,7 +496,8 @@ extension PosthogFlutterPlugin {
     {
         #if os(iOS)
             guard let args = call.arguments as? [String: Any],
-                  let views = args["views"] as? [[String: Int]] else {
+                  let views = args["views"] as? [[String: Int]]
+            else {
                 result([])
                 return
             }
@@ -583,7 +584,7 @@ extension PosthogFlutterPlugin {
         private func captureWindow() -> UIWindow? {
             return UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
+                .flatMap(\.windows)
                 .first(where: \.isKeyWindow) ?? UIApplication.shared.windows.first
         }
 

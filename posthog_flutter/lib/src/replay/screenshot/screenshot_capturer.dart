@@ -216,14 +216,16 @@ class ScreenshotCapturer {
   }
 
   Future<ui.Image?> _decodeImage(Uint8List bytes) async {
+    ui.Codec? codec;
     try {
-      final codec = await ui.instantiateImageCodec(bytes);
+      codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
-      codec.dispose();
       return frame.image;
     } catch (e) {
       printIfDebug('Error decoding image bytes: $e');
       return null;
+    } finally {
+      codec?.dispose();
     }
   }
 
