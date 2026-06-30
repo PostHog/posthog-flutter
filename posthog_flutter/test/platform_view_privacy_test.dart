@@ -72,19 +72,16 @@ void main() {
         ),
       );
 
-      // Outer wrapper overrides the global-default capture policy with mask.
       final outerElement = tester.element(find.byKey(const Key('outer')));
       final outerPolicy = resolvePrivacyPolicyForElement(
           outerElement, PostHogPlatformViewPrivacy.capture);
       expect(outerPolicy, PostHogPlatformViewPrivacy.mask);
 
-      // Inner wrapper then overrides the outer mask with capture.
       final innerElement = tester.element(find.byKey(const Key('inner')));
       final innerPolicy =
           resolvePrivacyPolicyForElement(innerElement, outerPolicy);
       expect(innerPolicy, PostHogPlatformViewPrivacy.capture);
 
-      // Leaf has no wrapper; the innermost capture policy is preserved.
       final leafElement = tester.element(find.byKey(const Key('leaf')));
       final leafPolicy =
           resolvePrivacyPolicyForElement(leafElement, innerPolicy);
