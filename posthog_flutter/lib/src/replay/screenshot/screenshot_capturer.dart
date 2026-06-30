@@ -43,6 +43,8 @@ class ViewTreeSnapshotStatus {
   /// holding ~8MB+ of raw pixel data in memory permanently.
   int? imageBytesHash;
 
+  int? compositedBytesHash;
+
   ViewTreeSnapshotStatus(this.sentMetaEvent);
 }
 
@@ -173,32 +175,28 @@ class ScreenshotCapturer {
     }
   }
 
+  Map<String, int> _viewSpec(ElementData viewRect, Offset globalPosition) {
+    final transform = viewRect.transform;
+    if (transform == null) return {'x': 0, 'y': 0, 'width': 0, 'height': 0};
+    final rect = MatrixUtils.transformRect(transform, viewRect.rect);
+    return {
+      'x': (globalPosition.dx + rect.left).round(),
+      'y': (globalPosition.dy + rect.top).round(),
+      'width': rect.width.round(),
+      'height': rect.height.round(),
+    };
+  }
+
   Future<void> _compositeRevealedView(
     Canvas canvas,
     ElementData viewRect,
-    Offset globalPosition,
+    Uint8List? bytes,
     double pixelRatio,
   ) async {
-    // Android texture mode: content already in Flutter base image — skip.
-    // iOS UiKitView: capture native content and composite with srcOver.
-    // Returns null on Android texture mode or failure → fail-closed mask.
     final transform = viewRect.transform;
     if (transform == null) return;
     final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
-    final nativeX = (globalPosition.dx + transformedRect.left).round();
-    final nativeY = (globalPosition.dy + transformedRect.top).round();
-    final nativeW = transformedRect.width.round();
-    final nativeH = transformedRect.height.round();
-    if (nativeW <= 0 || nativeH <= 0) return;
-
-    final bytes = await _nativeCommunicator.captureNativeScreenshot(
-      x: nativeX,
-      y: nativeY,
-      width: nativeW,
-      height: nativeH,
-    );
     if (bytes == null) {
-      // Android texture mode (null return) or failure → fail-closed with mask.
       _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
       return;
     }
@@ -207,28 +205,25 @@ class ScreenshotCapturer {
       _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
       return;
     }
-    final destRect = transformedRect;
     canvas.drawImageRect(
       nativeImage,
       Rect.fromLTWH(
           0, 0, nativeImage.width.toDouble(), nativeImage.height.toDouble()),
-      destRect,
+      transformedRect,
       Paint()..blendMode = ui.BlendMode.srcOver,
     );
     nativeImage.dispose();
   }
 
   Future<ui.Image?> _decodeImage(Uint8List bytes) async {
-    ui.Codec? codec;
     try {
-      codec = await ui.instantiateImageCodec(bytes);
+      final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
+      codec.dispose();
       return frame.image;
     } catch (e) {
       printIfDebug('Error decoding image bytes: $e');
       return null;
-    } finally {
-      codec?.dispose();
     }
   }
 
@@ -447,9 +442,16 @@ class ScreenshotCapturer {
             pixelRatio,
           );
         }
-        for (final capturedRect in pvRects.captured) {
-          await _compositeRevealedView(
-              canvas, capturedRect, globalPosition, pixelRatio);
+        if (pvRects.captured.isNotEmpty) {
+          final specs = pvRects.captured
+              .map((r) => _viewSpec(r, globalPosition))
+              .toList();
+          final bytesList =
+              await _nativeCommunicator.captureNativeScreenshots(specs);
+          for (var i = 0; i < pvRects.captured.length; i++) {
+            await _compositeRevealedView(
+                canvas, pvRects.captured[i], bytesList[i], pixelRatio);
+          }
         }
 
         picture = currentRecorder.endRecording();
@@ -490,6 +492,19 @@ class ScreenshotCapturer {
               completer.complete(null);
               return;
             }
+
+            if (hasCapturedViews) {
+              final compositedHash = _computeImageHash(pngBytes);
+              if (compositedHash == statusView.compositedBytesHash) {
+                printIfDebug(
+                  'Composited snapshot is the same as the last one, nothing changed, do nothing.',
+                );
+                completer.complete(null);
+                return;
+              }
+              statusView.compositedBytesHash = compositedHash;
+            }
+
             final imageInfo = ImageInfo(
               viewId,
               globalPosition.dx.toInt(),

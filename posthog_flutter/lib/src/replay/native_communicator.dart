@@ -52,30 +52,24 @@ class NativeCommunicator {
     }
   }
 
-  Future<Uint8List?> captureNativeScreenshot({
-    required int x,
-    required int y,
-    required int width,
-    required int height,
-  }) async {
-    if (kIsWeb) {
-      return null;
+  Future<List<Uint8List?>> captureNativeScreenshots(
+      List<Map<String, int>> views) async {
+    if (kIsWeb || views.isEmpty) {
+      return List.filled(views.length, null);
     }
     try {
-      final bytes = await _channel.invokeMethod<Uint8List>(
-        'captureNativeScreenshot',
-        {'x': x, 'y': y, 'width': width, 'height': height},
+      final raw = await _channel.invokeListMethod<Object?>(
+        'captureNativeScreenshots',
+        {'views': views},
       ).timeout(
         const Duration(seconds: 5),
         onTimeout: () => null,
       );
-      if (bytes == null || bytes.isEmpty) {
-        return null;
-      }
-      return bytes;
+      if (raw == null) return List.filled(views.length, null);
+      return raw.map((e) => e as Uint8List?).toList();
     } catch (e) {
-      printIfDebug('Error capturing native screenshot: $e');
-      return null;
+      printIfDebug('Error capturing native screenshots: $e');
+      return List.filled(views.length, null);
     }
   }
 }
