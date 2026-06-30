@@ -458,9 +458,8 @@ class ScreenshotCapturer {
               await _nativeCommunicator.captureNativeScreenshots(specs);
           for (var i = 0; i < pvRects.captured.length; i++) {
             final spec = specs[i];
-            await _compositeRevealedView(
-                canvas, pvRects.captured[i], bytesList[i],
-                spec['width']!, spec['height']!, pixelRatio);
+            await _compositeRevealedView(canvas, pvRects.captured[i],
+                bytesList[i], spec['width']!, spec['height']!, pixelRatio);
           }
         }
 
