@@ -16,7 +16,11 @@ services:
         "--adapter-url",
         "http://sdk-adapter:8080",
         "--mock-url",
-        "http://test-harness:8081"
+        "http://test-harness:8081",
+        "--sdk-type",
+        "client",
+        "--suite",
+        "capture"
       ]
     networks:
       - test-network
