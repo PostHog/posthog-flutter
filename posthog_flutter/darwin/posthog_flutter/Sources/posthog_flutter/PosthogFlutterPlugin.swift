@@ -583,8 +583,10 @@ extension PosthogFlutterPlugin {
 
         private func imageToRawRgba(_ image: UIImage) -> Data? {
             guard let cgImage = image.cgImage else { return nil }
-            let width = cgImage.width
-            let height = cgImage.height
+            // image.size is in points; cgImage.width/height are physical pixels (2×/3× on Retina).
+            // Dart decodes at logical-pixel dimensions, so the buffer must be point-sized.
+            let width = Int(image.size.width)
+            let height = Int(image.size.height)
             let bytesPerRow = width * 4
             var buffer = [UInt8](repeating: 0, count: height * bytesPerRow)
             guard let context = CGContext(
