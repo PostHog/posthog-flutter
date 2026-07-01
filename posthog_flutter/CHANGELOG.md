@@ -1,8 +1,8 @@
 ## Next
 
-### Bug Fixes
+### Known Limitations
 
-- Flutter web (CanvasKit): `maskAllTexts` and `maskAllImages` now take effect on web. Previously these flags were no-ops on Flutter web because the Dart widget-tree masking pipeline is bypassed when posthog-js records the raw `<canvas>` element. The SDK now translates either flag to posthog-js `session_recording.maskCanvas: true` during `setup()`, which instructs rrweb to replace the entire canvas with a solid colour in the recorded stream. This closes the PII gap reported for `Text` widgets rendered with the CanvasKit renderer (fixes PostHog/posthog#66291).
+- Flutter web (CanvasKit): `maskAllTexts` and `maskAllImages` have **no effect** when the CanvasKit renderer is active. posthog-js records the raw `<canvas>` element (not DOM nodes), so the Dart-side masking pipeline is bypassed entirely. rrweb has no per-region canvas masking API; a `<canvas>` can be recorded or blocked, but individual pixel regions cannot be redacted. A complete fix requires overlaying DOM block elements at widget bounds across the CanvasKit compositing boundary, which is tracked separately.
 
 ## 5.28.0
 

@@ -68,30 +68,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final ph = posthog;
     _config = config;
 
-    // On Flutter web, session replay is handled by posthog-js recording the
-    // CanvasKit <canvas> element.  The Dart-side widget-tree masking pipeline
-    // (maskAllTexts / maskAllImages) is a no-op here because posthog-js
-    // captures raw canvas pixels, not DOM nodes.  To honour those flags we
-    // translate them to the posthog-js `session_recording.maskCanvas` option,
-    // which instructs rrweb to replace the entire canvas content with a solid
-    // colour in the recorded stream.
-    if (config.sessionReplay && ph != null) {
-      final replayConfig = config.sessionReplayConfig;
-      if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
-        try {
-          ph.set_config(
-            mapToJSAny({
-              'session_recording': {'maskCanvas': true},
-            }),
-          );
-        } catch (error) {
-          // set_config may be absent on very old posthog-js stubs.
-          printIfDebug(
-            '[PostHog] set_config is not supported by the loaded posthog-js version: $error',
-          );
-        }
-      }
-    }
+    // NOTE: Flutter web with CanvasKit renderer — known masking limitation.
+    // posthog-js records the raw <canvas> element (not DOM nodes), so the
+    // Dart-side `maskAllTexts` / `maskAllImages` flags have no effect on web.
+    // rrweb treats a <canvas> as all-or-nothing (record vs. block); there is
+    // no per-region masking API in posthog-js today.  A future fix would
+    // overlay DOM block elements at widget bounds before recording, but that
+    // requires measuring widget positions across CanvasKit's compositing
+    // boundary and falls outside the scope of this SDK.
 
     if (config.onFeatureFlags != null && ph != null) {
       final dartCallback = config.onFeatureFlags!;
