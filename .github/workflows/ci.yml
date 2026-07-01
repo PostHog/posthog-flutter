@@ -13,71 +13,181 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  detect-markdown-only:
-    uses: PostHog/.github/.github/workflows/detect-markdown-only.yml@ec25337d9fae0100622cbfea1bd5bd88284ac10b
+  detect-ci-impact:
+    name: Detect CI impact
+    runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
+    outputs:
+      skip_heavy: ${{ steps.detect.outputs.skip_heavy }}
+    steps:
+      - name: Detect non-impacting PR changes
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -u
+
+          skip_heavy=false
+          reason="defaulting to full CI"
+
+          finish() {
+            echo "skip_heavy=${skip_heavy}" >> "$GITHUB_OUTPUT"
+            echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+            echo "skip_heavy=${skip_heavy}"
+            echo "reason=${reason}"
+          }
+
+          is_non_impacting_path() {
+            case "$1" in
+              *.md) return 0 ;;
+              docs/*) return 0 ;;
+              .github/ISSUE_TEMPLATE/*) return 0 ;;
+              .github/PULL_REQUEST_TEMPLATE/*) return 0 ;;
+              .github/pull_request_template.md) return 0 ;;
+              .github/CODEOWNERS|CODEOWNERS) return 0 ;;
+              .github/dependabot.yml) return 0 ;;
+              .github/workflows/release.yml|.github/workflows/release.yaml) return 0 ;;
+              .github/workflows/publish.yml|.github/workflows/publish.yaml) return 0 ;;
+              .github/workflows/stale.yml|.github/workflows/stale.yaml) return 0 ;;
+              .github/workflows/lint-pr.yml|.github/workflows/lint-pr.yaml) return 0 ;;
+              .github/workflows/call-flags-project-board.yml|.github/workflows/call-flags-project-board.yaml) return 0 ;;
+              .github/workflows/changeset-hygiene.yml|.github/workflows/changeset-hygiene.yaml) return 0 ;;
+              .github/workflows/dependabot-changeset.yml|.github/workflows/dependabot-changeset.yaml) return 0 ;;
+              .github/workflows/validate-versioning.yml|.github/workflows/validate-versioning.yaml) return 0 ;;
+              .github/workflows/new-pr.yml|.github/workflows/new-pr.yaml) return 0 ;;
+              .github/workflows/generated-files-notice.yml|.github/workflows/generated-files-notice.yaml) return 0 ;;
+              .github/workflows/posthog-upgrade.yml|.github/workflows/posthog-upgrade.yaml) return 0 ;;
+              .github/workflows/posthog-watcher-*.yml|.github/workflows/posthog-watcher-*.yaml) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            reason="${GITHUB_EVENT_NAME} events always run full CI"
+            finish
+            exit 0
+          fi
+
+          if [ -z "${PR_NUMBER:-}" ]; then
+            reason="pull request number is unavailable"
+            finish
+            exit 0
+          fi
+
+          if ! command -v gh >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+            reason="gh or jq is unavailable"
+            finish
+            exit 0
+          fi
+
+          files_json="$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" 2>/tmp/detect-ci-impact-gh.err)"
+          gh_status=$?
+          if [ "$gh_status" -ne 0 ]; then
+            reason="failed to list pull request files"
+            cat /tmp/detect-ci-impact-gh.err
+            finish
+            exit 0
+          fi
+
+          paths_file="$(mktemp)"
+          if ! printf '%s' "$files_json" | jq -r '.[][] | [.filename, (.previous_filename // "")] | @tsv' > "$paths_file"; then
+            reason="failed to parse pull request files"
+            finish
+            exit 0
+          fi
+
+          if [ ! -s "$paths_file" ]; then
+            reason="pull request file list is empty"
+            finish
+            exit 0
+          fi
+
+          total=0
+          while IFS=$'\t' read -r filename previous_filename; do
+            total=$((total + 1))
+            echo "changed: ${filename}"
+            if ! is_non_impacting_path "$filename"; then
+              reason="${filename} requires full CI"
+              finish
+              exit 0
+            fi
+            if [ -n "${previous_filename:-}" ]; then
+              echo "renamed from: ${previous_filename}"
+              if ! is_non_impacting_path "$previous_filename"; then
+                reason="${previous_filename} requires full CI"
+                finish
+                exit 0
+              fi
+            fi
+          done < "$paths_file"
+
+          skip_heavy=true
+          reason="all ${total} changed pull request file(s) are non-impacting"
+          finish
 
   dart-format:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     name: Dart format
     runs-on: ubuntu-latest
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: flutter pub get
 
       - name: Check Dart formatting
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: make checkFormatDart
 
   dart-analyze:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     name: Dart analyze
     runs-on: ubuntu-latest
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: flutter pub get
 
       - name: Analyze Dart
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: make analyzeDart
 
   public-api:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     name: Dart public API
-    if: github.event_name == 'pull_request' && needs.detect-markdown-only.outputs.markdown_only != 'true'
+    if: github.event_name == 'pull_request' && needs.detect-ci-impact.outputs.skip_heavy != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -97,110 +207,110 @@ jobs:
         run: make checkApiDart
 
   kotlin-format:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     name: Kotlin format
     runs-on: macos-26
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       - name: Install ktlint
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: brew install ktlint
 
       - name: Check Kotlin formatting
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: make checkFormatKotlin
 
   swift-format:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     name: Swift format
     runs-on: macos-26
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       - name: Install swiftformat
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: brew install swiftformat
 
       - name: Check Swift formatting
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: make checkFormatSwift
 
   # Unit tests
   test:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     runs-on: ubuntu-latest
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: flutter pub get
 
       - name: Test
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         working-directory: ./posthog_flutter
         run: flutter test
 
       # Browser-only tests (`@TestOn('browser')`) are skipped by the VM run above.
       - name: Test (web)
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         working-directory: ./posthog_flutter
         run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart
 
   publish-dry-run:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     name: Pub publish dry run
     runs-on: ubuntu-latest
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: flutter pub get
 
       - name: Validate pub package
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         working-directory: ./posthog_flutter
         run: flutter pub publish --dry-run
 
   # Apple builds (iOS and macOS) with CocoaPods and Swift Package Manager
   build-apple:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     runs-on: macos-26
     strategy:
       matrix:
@@ -212,53 +322,53 @@ jobs:
           - target: macos
             build_command: flutter build macos
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Select Xcode version
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: '26.4'
 
       - name: Enable Swift Package Manager
-        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && (matrix.package_manager == 'spm') }}
+        if: ${{ needs.detect-ci-impact.outputs.skip_heavy != 'true' && (matrix.package_manager == 'spm') }}
         run: flutter config --enable-swift-package-manager # flutter config --no-enable-swift-package-manager
 
       - name: Install dependencies
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: flutter pub get
 
       - name: Build ${{ matrix.target }} (${{ matrix.package_manager }})
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         working-directory: ./example
         run: ${{ matrix.build_command }}
 
   # Android build
   build-android:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     runs-on: ubuntu-latest
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       - name: 'Set up Java'
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
         with:
           java-version: 17
@@ -268,45 +378,45 @@ jobs:
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: flutter pub get
 
       - name: Build Android
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         working-directory: ./example
         run: flutter build apk
 
   # Web build
   build-web:
-    needs: detect-markdown-only
+    needs: detect-ci-impact
     runs-on: ubuntu-latest
     steps:
-      - name: Complete markdown-only PR check
-        if: needs.detect-markdown-only.outputs.markdown_only == 'true'
-        run: echo "Only Markdown files changed; no additional work is required for this check."
+      - name: Complete non-impacting PR check
+        if: needs.detect-ci-impact.outputs.skip_heavy == 'true'
+        run: echo "Only non-impacting files changed; no additional work is required for this check."
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
 
       # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
       # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
       # "Require actions to be pinned to a full-length commit SHA" policy. Tracks upstream.
       - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         with:
           channel: 'stable'
           cache: true
 
       - name: Install dependencies
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         run: flutter pub get
 
       - name: Build Web
-        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        if: needs.detect-ci-impact.outputs.skip_heavy != 'true'
         working-directory: ./example
         run: flutter build web
