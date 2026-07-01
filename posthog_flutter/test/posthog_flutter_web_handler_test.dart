@@ -6,6 +6,7 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
@@ -153,6 +154,92 @@ void main() {
 
       expect(capturedMessage, 'User tapped Checkout');
       expect(capturedProperties.dartify(), {'screen': 'cart', 'count': 3});
+    });
+  });
+
+  // On Flutter web (CanvasKit) maskAllTexts/maskAllImages must forward to
+  // posthog-js set_config({ session_recording: { maskCanvas: true } }) because
+  // the Dart widget-tree masking pipeline is bypassed when the JS SDK records
+  // the raw <canvas> element directly.
+  group('PosthogFlutterWeb setup canvas masking', () {
+    JSAny? capturedConfig;
+    bool setConfigCalled = false;
+
+    setUp(() {
+      capturedConfig = null;
+      setConfigCalled = false;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'set_config'.toJS,
+        ((JSAny config) {
+          setConfigCalled = true;
+          capturedConfig = config;
+        }).toJS,
+      );
+      // onFeatureFlags is called during setup if a callback is registered;
+      // provide a no-op so it doesn't throw.
+      fake.setProperty(
+        'onFeatureFlags'.toJS,
+        ((JSAny _cb) {}).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('calls set_config maskCanvas when maskAllTexts is true', () async {
+      final config = PostHogConfig('test-token')
+        ..sessionReplay = true
+        ..sessionReplayConfig = (PostHogSessionReplayConfig()
+          ..maskAllTexts = true
+          ..maskAllImages = false);
+
+      await PosthogFlutterWeb().setup(config);
+
+      expect(setConfigCalled, isTrue);
+      final cfg = capturedConfig!.dartify()! as Map<Object?, Object?>;
+      final recording = cfg['session_recording'] as Map<Object?, Object?>;
+      expect(recording['maskCanvas'], isTrue);
+    });
+
+    test('calls set_config maskCanvas when maskAllImages is true', () async {
+      final config = PostHogConfig('test-token')
+        ..sessionReplay = true
+        ..sessionReplayConfig = (PostHogSessionReplayConfig()
+          ..maskAllTexts = false
+          ..maskAllImages = true);
+
+      await PosthogFlutterWeb().setup(config);
+
+      expect(setConfigCalled, isTrue);
+      final cfg = capturedConfig!.dartify()! as Map<Object?, Object?>;
+      final recording = cfg['session_recording'] as Map<Object?, Object?>;
+      expect(recording['maskCanvas'], isTrue);
+    });
+
+    test('does not call set_config maskCanvas when both masking flags are false',
+        () async {
+      final config = PostHogConfig('test-token')
+        ..sessionReplay = true
+        ..sessionReplayConfig = (PostHogSessionReplayConfig()
+          ..maskAllTexts = false
+          ..maskAllImages = false);
+
+      await PosthogFlutterWeb().setup(config);
+
+      expect(setConfigCalled, isFalse);
+    });
+
+    test('does not call set_config maskCanvas when sessionReplay is disabled',
+        () async {
+      final config = PostHogConfig('test-token')
+        ..sessionReplay = false
+        ..sessionReplayConfig = (PostHogSessionReplayConfig()
+          ..maskAllTexts = true
+          ..maskAllImages = true);
+
+      await PosthogFlutterWeb().setup(config);
+
+      expect(setConfigCalled, isFalse);
     });
   });
 

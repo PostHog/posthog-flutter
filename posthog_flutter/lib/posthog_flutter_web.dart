@@ -68,6 +68,15 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final ph = posthog;
     _config = config;
 
+    // NOTE: Flutter web with CanvasKit renderer — known masking limitation.
+    // posthog-js records the raw <canvas> element (not DOM nodes), so the
+    // Dart-side `maskAllTexts` / `maskAllImages` flags have no effect on web.
+    // rrweb treats a <canvas> as all-or-nothing (record vs. block); there is
+    // no per-region masking API in posthog-js today.  A future fix would
+    // overlay DOM block elements at widget bounds before recording, but that
+    // requires measuring widget positions across CanvasKit's compositing
+    // boundary and falls outside the scope of this SDK.
+
     if (config.onFeatureFlags != null && ph != null) {
       final dartCallback = config.onFeatureFlags!;
 
