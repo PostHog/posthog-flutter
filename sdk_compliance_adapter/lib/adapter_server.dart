@@ -496,22 +496,35 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     Object? value = false;
     try {
       final uri = Uri.parse(_host!).resolve('/flags/?v=2');
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(payload));
-      final response = await request.close();
-      final body = await utf8.decoder.bind(response).join();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        state.lastError =
-            'Feature flag request failed with HTTP ${response.statusCode}';
-        throw HttpException(state.lastError!, uri: uri);
-      }
-      final decoded = body.isEmpty ? null : jsonDecode(body);
-      if (decoded is Map) {
-        final flags = decoded['featureFlags'] ?? decoded['flags'];
-        if (flags is Map && flags.containsKey(key)) {
-          value = flags[key];
+      for (var attempt = 0; attempt <= _maxRetries; attempt++) {
+        final request = await client.postUrl(uri);
+        request.headers.contentType = ContentType.json;
+        request.write(jsonEncode(payload));
+        final response = await request.close();
+        final retryAfterMs = _retryAfterMs(response.headers);
+        final body = await utf8.decoder.bind(response).join();
+        final statusCode = response.statusCode;
+        if (attempt > 0) {
+          state.totalRetries++;
         }
+        if (statusCode < 200 || statusCode >= 300) {
+          if (attempt < _maxRetries && _shouldRetryFlags(statusCode)) {
+            await Future<void>.delayed(
+              Duration(milliseconds: retryAfterMs ?? 100),
+            );
+            continue;
+          }
+          state.lastError = 'Feature flag request failed with HTTP $statusCode';
+          throw HttpException(state.lastError!, uri: uri);
+        }
+        final decoded = body.isEmpty ? null : jsonDecode(body);
+        if (decoded is Map) {
+          final flags = decoded['featureFlags'] ?? decoded['flags'];
+          if (flags is Map && flags.containsKey(key)) {
+            value = flags[key];
+          }
+        }
+        break;
       }
     } finally {
       client.close(force: true);
@@ -537,6 +550,9 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
 
     return value;
   }
+
+  bool _shouldRetryFlags(int statusCode) =>
+      statusCode == 502 || statusCode == 504;
 
   int? _retryAfterMs(HttpHeaders headers) {
     final value = headers.value(HttpHeaders.retryAfterHeader);
