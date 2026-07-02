@@ -2,6 +2,8 @@
 // Copyright (c) 2020 Sentry
 // Licensed under the MIT License: https://github.com/getsentry/sentry-dart/blob/main/LICENSE
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 import 'package:stack_trace/stack_trace.dart';
@@ -13,6 +15,10 @@ import 'chunk_ids.dart';
 typedef ChunkIdMapType = Map<String, String>;
 
 class DartExceptionProcessor {
+  /// Maximum number of exception items in `$exception_list` when walking an
+  /// error's cause chain (outermost error plus its causes).
+  static const maxExceptionChainLength = 10;
+
   /// Converts Dart error/exception and stack trace to PostHog exception format
   static Map<String, dynamic> processException({
     required Object error,
@@ -52,7 +58,7 @@ class DartExceptionProcessor {
     // Check if we still have an empty stack trace
     final hasValidStackTrace = effectiveStackTrace != StackTrace.empty;
 
-    // Process single exception for now
+    // Process primary exception
     final frames = hasValidStackTrace
         ? _parseStackTrace(
             effectiveStackTrace,
@@ -98,14 +104,174 @@ class DartExceptionProcessor {
       exceptionData['thread_id'] = threadId;
     }
 
+    // Walk the error's cause chain into additional exception items,
+    // outermost-first (wrapper first, root cause last)
+    final exceptionList = <Map<String, dynamic>>[exceptionData];
+    _appendCauses(
+      exceptionList,
+      currentError,
+      handled: handled,
+      mechanismType: mechanismType,
+      threadId: threadId,
+      inAppIncludes: inAppIncludes,
+      inAppExcludes: inAppExcludes,
+      inAppByDefault: inAppByDefault,
+    );
+
     // Final result, merging system properties with user properties (user properties take precedence)
     final result = <String, dynamic>{
       '\$exception_level': 'error', // Never crashes, so always error
-      '\$exception_list': [exceptionData],
+      '\$exception_list': exceptionList,
       if (properties != null) ...properties,
     };
 
     return result;
+  }
+
+  /// Appends one exception item per cause of [error] to [exceptionList],
+  /// outermost-first, guarding against cycles and capping the chain at
+  /// [maxExceptionChainLength] items.
+  static void _appendCauses(
+    List<Map<String, dynamic>> exceptionList,
+    Object error, {
+    required bool handled,
+    required String mechanismType,
+    required int? threadId,
+    List<String>? inAppIncludes,
+    List<String>? inAppExcludes,
+    bool inAppByDefault = true,
+  }) {
+    final seen = Set<Object>.identity()..add(error);
+    _appendCauseItems(
+      exceptionList,
+      _getCauses(error),
+      seen,
+      handled: handled,
+      mechanismType: mechanismType,
+      threadId: threadId,
+      inAppIncludes: inAppIncludes,
+      inAppExcludes: inAppExcludes,
+      inAppByDefault: inAppByDefault,
+    );
+  }
+
+  static void _appendCauseItems(
+    List<Map<String, dynamic>> exceptionList,
+    Iterable<Object> causes,
+    Set<Object> seen, {
+    required bool handled,
+    required String mechanismType,
+    required int? threadId,
+    List<String>? inAppIncludes,
+    List<String>? inAppExcludes,
+    bool inAppByDefault = true,
+  }) {
+    for (final cause in causes) {
+      if (exceptionList.length >= maxExceptionChainLength || !seen.add(cause)) {
+        continue;
+      }
+
+      final causeType = _getExceptionType(cause);
+      final causeData = <String, dynamic>{
+        'type': causeType ?? 'Error',
+        'mechanism': {
+          'handled': handled,
+          'synthetic': causeType == null,
+          'type': mechanismType,
+        },
+      };
+
+      final causeMessage = cause.toString();
+      if (causeMessage.isNotEmpty) {
+        causeData['value'] = causeMessage;
+      }
+
+      // Only use the cause's own stack trace; never generate one for causes
+      final causeStackTrace = _extractOwnStackTrace(cause);
+      if (causeStackTrace != null) {
+        final frames = _parseStackTrace(
+          causeStackTrace,
+          inAppIncludes: inAppIncludes,
+          inAppExcludes: inAppExcludes,
+          inAppByDefault: inAppByDefault,
+        );
+        if (frames.isNotEmpty) {
+          causeData['stacktrace'] = {'frames': frames, 'type': 'raw'};
+        }
+      }
+
+      if (threadId != null) {
+        causeData['thread_id'] = threadId;
+      }
+
+      exceptionList.add(causeData);
+      _appendCauseItems(
+        exceptionList,
+        _getCauses(cause),
+        seen,
+        handled: handled,
+        mechanismType: mechanismType,
+        threadId: threadId,
+        inAppIncludes: inAppIncludes,
+        inAppExcludes: inAppExcludes,
+        inAppByDefault: inAppByDefault,
+      );
+    }
+  }
+
+  /// Extracts the causes of an error, if the error type exposes any.
+  ///
+  /// Supports [AsyncError] (unwraps to the original error),
+  /// [ParallelWaitError] (walks all non-null errors) and the common duck-typed
+  /// `cause` getter convention used by custom exceptions.
+  static Iterable<Object> _getCauses(Object error) sync* {
+    if (error is AsyncError) {
+      yield error.error;
+      return;
+    }
+
+    if (error is ParallelWaitError) {
+      yield* _parallelErrors(error.errors);
+      return;
+    }
+
+    try {
+      // ignore: avoid_dynamic_calls
+      final cause = (error as dynamic).cause;
+      if (cause is Object && !identical(cause, error)) {
+        yield cause;
+      }
+    } catch (_) {
+      // Error type doesn't expose a `cause` getter
+    }
+  }
+
+  /// Returns all non-null errors from a [ParallelWaitError.errors] collection,
+  /// if it is enumerable (e.g. `List<Future>.wait` produces a
+  /// `List<AsyncError?>`; record-based `wait` produces a record, skipped here)
+  static Iterable<Object> _parallelErrors(Object? errors) sync* {
+    if (errors is Iterable) {
+      for (final error in errors) {
+        if (error != null) {
+          yield error as Object;
+        }
+      }
+    }
+  }
+
+  /// Returns the error's own stack trace, if it carries a usable one
+  static StackTrace? _extractOwnStackTrace(Object error) {
+    StackTrace? stackTrace;
+    if (error is AsyncError) {
+      stackTrace = error.stackTrace;
+    } else if (error is Error) {
+      stackTrace = error.stackTrace;
+    }
+
+    if (stackTrace == null || stackTrace == StackTrace.empty) {
+      return null;
+    }
+    return stackTrace;
   }
 
   /// Determines if a stack frame belongs to PostHog SDK (just check package for now)
