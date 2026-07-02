@@ -142,11 +142,35 @@ class DartExceptionProcessor {
     bool inAppByDefault = true,
   }) {
     final seen = Set<Object>.identity()..add(error);
-    var cause = _getCause(error);
+    _appendCauseItems(
+      exceptionList,
+      _getCauses(error),
+      seen,
+      handled: handled,
+      mechanismType: mechanismType,
+      threadId: threadId,
+      inAppIncludes: inAppIncludes,
+      inAppExcludes: inAppExcludes,
+      inAppByDefault: inAppByDefault,
+    );
+  }
 
-    while (cause != null &&
-        exceptionList.length < maxExceptionChainLength &&
-        seen.add(cause)) {
+  static void _appendCauseItems(
+    List<Map<String, dynamic>> exceptionList,
+    Iterable<Object> causes,
+    Set<Object> seen, {
+    required bool handled,
+    required String mechanismType,
+    required int? threadId,
+    List<String>? inAppIncludes,
+    List<String>? inAppExcludes,
+    bool inAppByDefault = true,
+  }) {
+    for (final cause in causes) {
+      if (exceptionList.length >= maxExceptionChainLength || !seen.add(cause)) {
+        continue;
+      }
+
       final causeType = _getExceptionType(cause);
       final causeData = <String, dynamic>{
         'type': causeType ?? 'Error',
@@ -181,49 +205,58 @@ class DartExceptionProcessor {
       }
 
       exceptionList.add(causeData);
-      cause = _getCause(cause);
+      _appendCauseItems(
+        exceptionList,
+        _getCauses(cause),
+        seen,
+        handled: handled,
+        mechanismType: mechanismType,
+        threadId: threadId,
+        inAppIncludes: inAppIncludes,
+        inAppExcludes: inAppExcludes,
+        inAppByDefault: inAppByDefault,
+      );
     }
   }
 
-  /// Extracts the cause of an error, if the error type exposes one.
+  /// Extracts the causes of an error, if the error type exposes any.
   ///
   /// Supports [AsyncError] (unwraps to the original error),
-  /// [ParallelWaitError] (takes the first non-null error) and the common
-  /// duck-typed `cause` getter convention used by custom exceptions.
-  static Object? _getCause(Object error) {
+  /// [ParallelWaitError] (walks all non-null errors) and the common duck-typed
+  /// `cause` getter convention used by custom exceptions.
+  static Iterable<Object> _getCauses(Object error) sync* {
     if (error is AsyncError) {
-      return error.error;
+      yield error.error;
+      return;
     }
 
     if (error is ParallelWaitError) {
-      return _firstParallelError(error.errors);
+      yield* _parallelErrors(error.errors);
+      return;
     }
 
     try {
       // ignore: avoid_dynamic_calls
       final cause = (error as dynamic).cause;
       if (cause is Object && !identical(cause, error)) {
-        return cause;
+        yield cause;
       }
     } catch (_) {
       // Error type doesn't expose a `cause` getter
     }
-
-    return null;
   }
 
-  /// Returns the first non-null error from a [ParallelWaitError.errors]
-  /// collection, if it is enumerable (e.g. `List<Future>.wait` produces a
+  /// Returns all non-null errors from a [ParallelWaitError.errors] collection,
+  /// if it is enumerable (e.g. `List<Future>.wait` produces a
   /// `List<AsyncError?>`; record-based `wait` produces a record, skipped here)
-  static Object? _firstParallelError(Object? errors) {
+  static Iterable<Object> _parallelErrors(Object? errors) sync* {
     if (errors is Iterable) {
       for (final error in errors) {
         if (error != null) {
-          return error as Object;
+          yield error as Object;
         }
       }
     }
-    return null;
   }
 
   /// Returns the error's own stack trace, if it carries a usable one

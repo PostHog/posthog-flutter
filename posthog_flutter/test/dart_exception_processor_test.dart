@@ -594,70 +594,98 @@ void main() {
     });
 
     group('cause chain', () {
-      test('walks AsyncError into multiple exception items, outermost-first',
-          () {
-        late StateError rootError;
-        try {
-          throw StateError('root cause');
-        } catch (error) {
-          rootError = error as StateError;
-        }
+      final synchronousCases = <({
+        String description,
+        Object Function() buildError,
+        StackTrace? stackTrace,
+        List<String> expectedTypes,
+        Map<int, String> expectedValues,
+        void Function(List<Map<String, dynamic>>) extraExpectations,
+      })>[
+        (
+          description:
+              'walks AsyncError into multiple exception items, outermost-first',
+          buildError: () {
+            late StateError rootError;
+            try {
+              throw StateError('root cause');
+            } catch (error) {
+              rootError = error as StateError;
+            }
 
-        final asyncError = AsyncError(rootError, rootError.stackTrace!);
+            return AsyncError(rootError, rootError.stackTrace!);
+          },
+          stackTrace: null,
+          expectedTypes: ['AsyncError', 'StateError'],
+          expectedValues: {1: 'Bad state: root cause'},
+          extraExpectations: (exceptionList) {
+            // The cause carries its own (thrown) stack trace
+            expect(exceptionList[1]['stacktrace'], isNotNull);
+            expect(
+              (exceptionList[1]['stacktrace']['frames'] as List).isNotEmpty,
+              isTrue,
+            );
 
-        final result = DartExceptionProcessor.processException(
-          error: asyncError,
-        );
-
-        final exceptionList =
-            result['\$exception_list'] as List<Map<String, dynamic>>;
-
-        expect(exceptionList, hasLength(2));
-        // Wrapper first, root cause last
-        expect(exceptionList[0]['type'], equals('AsyncError'));
-        expect(exceptionList[1]['type'], equals('StateError'));
-        expect(exceptionList[1]['value'], equals('Bad state: root cause'));
-
-        // The cause carries its own (thrown) stack trace
-        expect(exceptionList[1]['stacktrace'], isNotNull);
-        expect(
-          (exceptionList[1]['stacktrace']['frames'] as List).isNotEmpty,
-          isTrue,
-        );
-
-        // Causes reuse the outer mechanism
-        expect(exceptionList[1]['mechanism']['handled'], isTrue);
-        expect(exceptionList[1]['mechanism']['type'], equals('generic'));
-        expect(exceptionList[1]['mechanism']['synthetic'], isFalse);
-      });
-
-      test('walks duck-typed cause getters', () {
-        final root = FormatException('root');
-        final middle = _ChainedException('middle', root);
-        final outer = _ChainedException('outer', middle);
-
-        final result = DartExceptionProcessor.processException(
-          error: outer,
+            // Causes reuse the outer mechanism
+            expect(exceptionList[1]['mechanism']['handled'], isTrue);
+            expect(exceptionList[1]['mechanism']['type'], equals('generic'));
+            expect(exceptionList[1]['mechanism']['synthetic'], isFalse);
+          },
+        ),
+        (
+          description: 'walks duck-typed cause getters',
+          buildError: () {
+            final root = FormatException('root');
+            final middle = _ChainedException('middle', root);
+            return _ChainedException('outer', middle);
+          },
           stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
-        );
+          expectedTypes: [
+            '_ChainedException',
+            '_ChainedException',
+            'FormatException',
+          ],
+          expectedValues: {0: 'outer', 1: 'middle'},
+          extraExpectations: (_) {},
+        ),
+        (
+          description: 'does not add causes for errors without one',
+          buildError: () => StateError('no cause'),
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+          expectedTypes: ['StateError'],
+          expectedValues: const {},
+          extraExpectations: (_) {},
+        ),
+      ];
 
-        final exceptionList =
-            result['\$exception_list'] as List<Map<String, dynamic>>;
+      for (final testCase in synchronousCases) {
+        test(testCase.description, () {
+          final result = DartExceptionProcessor.processException(
+            error: testCase.buildError(),
+            stackTrace: testCase.stackTrace,
+          );
 
-        expect(exceptionList, hasLength(3));
-        expect(exceptionList[0]['type'], equals('_ChainedException'));
-        expect(exceptionList[0]['value'], equals('outer'));
-        expect(exceptionList[1]['type'], equals('_ChainedException'));
-        expect(exceptionList[1]['value'], equals('middle'));
-        expect(exceptionList[2]['type'], equals('FormatException'));
-      });
+          final exceptionList =
+              result['\$exception_list'] as List<Map<String, dynamic>>;
 
-      test('walks ParallelWaitError to the first failed future', () async {
+          expect(exceptionList, hasLength(testCase.expectedTypes.length));
+          for (final (index, expectedType) in testCase.expectedTypes.indexed) {
+            expect(exceptionList[index]['type'], equals(expectedType));
+          }
+          for (final entry in testCase.expectedValues.entries) {
+            expect(exceptionList[entry.key]['value'], equals(entry.value));
+          }
+          testCase.extraExpectations(exceptionList);
+        });
+      }
+
+      test('walks ParallelWaitError to every failed future', () async {
         Object? caught;
         try {
           await [
-            Future<int>.error(StateError('parallel failure')),
+            Future<int>.error(StateError('first parallel failure')),
             Future<int>.value(1),
+            Future<int>.error(FormatException('second parallel failure')),
           ].wait;
         } catch (error) {
           caught = error;
@@ -670,13 +698,19 @@ void main() {
         final exceptionList =
             result['\$exception_list'] as List<Map<String, dynamic>>;
 
-        expect(exceptionList.length, greaterThanOrEqualTo(3));
+        expect(exceptionList, hasLength(5));
         expect(exceptionList[0]['type'], startsWith('ParallelWaitError'));
         expect(exceptionList[1]['type'], equals('AsyncError'));
         expect(exceptionList[2]['type'], equals('StateError'));
         expect(
           exceptionList[2]['value'],
-          equals('Bad state: parallel failure'),
+          equals('Bad state: first parallel failure'),
+        );
+        expect(exceptionList[3]['type'], equals('AsyncError'));
+        expect(exceptionList[4]['type'], equals('FormatException'));
+        expect(
+          exceptionList[4]['value'],
+          equals('FormatException: second parallel failure'),
         );
       });
 
@@ -718,18 +752,6 @@ void main() {
           hasLength(DartExceptionProcessor.maxExceptionChainLength),
         );
         expect(exceptionList.first['value'], equals('wrapper 19'));
-      });
-
-      test('does not add causes for errors without one', () {
-        final result = DartExceptionProcessor.processException(
-          error: StateError('no cause'),
-          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
-        );
-
-        final exceptionList =
-            result['\$exception_list'] as List<Map<String, dynamic>>;
-
-        expect(exceptionList, hasLength(1));
       });
     });
   });
