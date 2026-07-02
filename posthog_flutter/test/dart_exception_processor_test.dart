@@ -1,5 +1,7 @@
 // ignore_for_file: avoid_dynamic_calls
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
@@ -590,7 +592,169 @@ void main() {
         expect(exceptionData['mechanism']['type'], equals('test_mechanism'));
       }
     });
+
+    group('cause chain', () {
+      test('walks AsyncError into multiple exception items, outermost-first',
+          () {
+        late StateError rootError;
+        try {
+          throw StateError('root cause');
+        } catch (error) {
+          rootError = error as StateError;
+        }
+
+        final asyncError = AsyncError(rootError, rootError.stackTrace!);
+
+        final result = DartExceptionProcessor.processException(
+          error: asyncError,
+        );
+
+        final exceptionList =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(exceptionList, hasLength(2));
+        // Wrapper first, root cause last
+        expect(exceptionList[0]['type'], equals('AsyncError'));
+        expect(exceptionList[1]['type'], equals('StateError'));
+        expect(exceptionList[1]['value'], equals('Bad state: root cause'));
+
+        // The cause carries its own (thrown) stack trace
+        expect(exceptionList[1]['stacktrace'], isNotNull);
+        expect(
+          (exceptionList[1]['stacktrace']['frames'] as List).isNotEmpty,
+          isTrue,
+        );
+
+        // Causes reuse the outer mechanism
+        expect(exceptionList[1]['mechanism']['handled'], isTrue);
+        expect(exceptionList[1]['mechanism']['type'], equals('generic'));
+        expect(exceptionList[1]['mechanism']['synthetic'], isFalse);
+      });
+
+      test('walks duck-typed cause getters', () {
+        final root = FormatException('root');
+        final middle = _ChainedException('middle', root);
+        final outer = _ChainedException('outer', middle);
+
+        final result = DartExceptionProcessor.processException(
+          error: outer,
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+        );
+
+        final exceptionList =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(exceptionList, hasLength(3));
+        expect(exceptionList[0]['type'], equals('_ChainedException'));
+        expect(exceptionList[0]['value'], equals('outer'));
+        expect(exceptionList[1]['type'], equals('_ChainedException'));
+        expect(exceptionList[1]['value'], equals('middle'));
+        expect(exceptionList[2]['type'], equals('FormatException'));
+      });
+
+      test('walks ParallelWaitError to the first failed future', () async {
+        Object? caught;
+        try {
+          await [
+            Future<int>.error(StateError('parallel failure')),
+            Future<int>.value(1),
+          ].wait;
+        } catch (error) {
+          caught = error;
+        }
+
+        expect(caught, isA<ParallelWaitError>());
+
+        final result = DartExceptionProcessor.processException(error: caught!);
+
+        final exceptionList =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(exceptionList.length, greaterThanOrEqualTo(3));
+        expect(exceptionList[0]['type'], startsWith('ParallelWaitError'));
+        expect(exceptionList[1]['type'], equals('AsyncError'));
+        expect(exceptionList[2]['type'], equals('StateError'));
+        expect(
+          exceptionList[2]['value'],
+          equals('Bad state: parallel failure'),
+        );
+      });
+
+      test('guards against cause cycles', () {
+        final a = _MutableCauseException('a');
+        final b = _MutableCauseException('b');
+        a.cause = b;
+        b.cause = a;
+
+        final result = DartExceptionProcessor.processException(
+          error: a,
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+        );
+
+        final exceptionList =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(exceptionList, hasLength(2));
+        expect(exceptionList[0]['value'], equals('a'));
+        expect(exceptionList[1]['value'], equals('b'));
+      });
+
+      test('caps the cause chain length', () {
+        Object error = FormatException('root');
+        for (var i = 0; i < 20; i++) {
+          error = _ChainedException('wrapper $i', error);
+        }
+
+        final result = DartExceptionProcessor.processException(
+          error: error,
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+        );
+
+        final exceptionList =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(
+          exceptionList,
+          hasLength(DartExceptionProcessor.maxExceptionChainLength),
+        );
+        expect(exceptionList.first['value'], equals('wrapper 19'));
+      });
+
+      test('does not add causes for errors without one', () {
+        final result = DartExceptionProcessor.processException(
+          error: StateError('no cause'),
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+        );
+
+        final exceptionList =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+
+        expect(exceptionList, hasLength(1));
+      });
+    });
   });
+}
+
+/// Exception exposing the common duck-typed `cause` convention
+class _ChainedException implements Exception {
+  final String message;
+  final Object? cause;
+
+  _ChainedException(this.message, this.cause);
+
+  @override
+  String toString() => message;
+}
+
+/// Exception with a mutable cause, used to build cause cycles
+class _MutableCauseException implements Exception {
+  final String message;
+  Object? cause;
+
+  _MutableCauseException(this.message);
+
+  @override
+  String toString() => message;
 }
 
 // Helper functions to generate async stack traces for testing
