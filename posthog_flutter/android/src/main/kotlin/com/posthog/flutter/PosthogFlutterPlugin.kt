@@ -812,26 +812,31 @@ class PosthogFlutterPlugin :
         }
 
         val svBitmap = Bitmap.createBitmap(svLogW, svLogH, Bitmap.Config.ARGB_8888)
-        PixelCopy.request(
-            sv,
-            null,
-            svBitmap,
-            { svCopyResult ->
-                if (svCopyResult == PixelCopy.SUCCESS) {
-                    val canvas = android.graphics.Canvas(destBitmap)
-                    val paint =
-                        android.graphics.Paint().apply {
-                            // SRC replaces the destination, including any background fill in the
-                            // "hole" left by the SurfaceView in the window surface.
-                            xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC)
-                        }
-                    canvas.drawBitmap(svBitmap, destX.toFloat(), destY.toFloat(), paint)
-                }
-                svBitmap.recycle()
-                advance()
-            },
-            mainHandler,
-        )
+        try {
+            PixelCopy.request(
+                sv,
+                null,
+                svBitmap,
+                { svCopyResult ->
+                    if (svCopyResult == PixelCopy.SUCCESS) {
+                        val canvas = android.graphics.Canvas(destBitmap)
+                        val paint =
+                            android.graphics.Paint().apply {
+                                // SRC replaces the destination, including any background fill in the
+                                // "hole" left by the SurfaceView in the window surface.
+                                xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC)
+                            }
+                        canvas.drawBitmap(svBitmap, destX.toFloat(), destY.toFloat(), paint)
+                    }
+                    svBitmap.recycle()
+                    advance()
+                },
+                mainHandler,
+            )
+        } catch (e: Throwable) {
+            svBitmap.recycle()
+            advance()
+        }
     }
 
     private fun captureNativeScreenshotFallback(
