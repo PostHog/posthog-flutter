@@ -2307,6 +2307,17 @@
                         "name": "sampleRate",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "double?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "maskAllPlatformViews",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
                     }
                 ],
                 "isDeprecated": false,
@@ -4594,6 +4605,143 @@
                     "State<PostHogMaskWidget>",
                     "Object",
                     "Diagnosticable"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "key",
+                                "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                                "typeName": "Key?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "child",
+                                "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                                "typeName": "Widget"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "privacy",
+                                "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                                "typeName": "PostHogPlatformViewPrivacy"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                        "returnTypeName": "PostHogPlatformView",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "child",
+                        "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                        "typeName": "Widget"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "privacy",
+                        "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                        "typeName": "PostHogPlatformViewPrivacy"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogPlatformView",
+                "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                "superTypeNames": [
+                    "StatelessWidget",
+                    "Widget",
+                    "DiagnosticableTree",
+                    "Object",
+                    "Diagnosticable"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "mask",
+                        "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                        "typeName": "PostHogPlatformViewPrivacy"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "capture",
+                        "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                        "typeName": "PostHogPlatformViewPrivacy"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "values",
+                        "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                        "typeName": "List<PostHogPlatformViewPrivacy>"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogPlatformViewPrivacy",
+                "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
+                "superTypeNames": [
+                    "Enum",
+                    "Object"
                 ],
                 "typeParameterNames": []
             }

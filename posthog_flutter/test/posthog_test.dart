@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
@@ -137,6 +137,48 @@ void main() {
 
       expect(config.host, equals('https://us.i.posthog.com'));
       expect(config.toMap()['host'], equals('https://us.i.posthog.com'));
+    });
+
+    test('session replay masks all platform views by default', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.sessionReplayConfig.maskAllPlatformViews, isTrue);
+
+      final replayConfig =
+          config.toMap()['sessionReplayConfig'] as Map<String, dynamic>;
+      expect(replayConfig.containsKey('maskAllPlatformViews'), isTrue);
+      expect(replayConfig['maskAllPlatformViews'], isTrue);
+
+      config.sessionReplayConfig.maskAllPlatformViews = false;
+
+      final updatedReplayConfig =
+          config.toMap()['sessionReplayConfig'] as Map<String, dynamic>;
+      expect(updatedReplayConfig['maskAllPlatformViews'], isFalse);
+    });
+  });
+
+  group('PostHogPlatformView', () {
+    testWidgets('defaults privacy to mask', (tester) async {
+      const view = PostHogPlatformView(child: SizedBox());
+      expect(view.privacy, PostHogPlatformViewPrivacy.mask);
+    });
+
+    testWidgets('keeps the requested capture privacy', (tester) async {
+      const view = PostHogPlatformView(
+        privacy: PostHogPlatformViewPrivacy.capture,
+        child: SizedBox(),
+      );
+      expect(view.privacy, PostHogPlatformViewPrivacy.capture);
+    });
+
+    testWidgets('renders its child unchanged', (tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: PostHogPlatformView(child: Text('child')),
+        ),
+      );
+      expect(find.text('child'), findsOneWidget);
     });
   });
 
