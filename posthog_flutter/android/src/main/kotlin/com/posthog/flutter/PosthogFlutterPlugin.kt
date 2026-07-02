@@ -56,7 +56,7 @@ class PosthogFlutterPlugin :
     private var activity: Activity? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val screenshotCompressionExecutor = Executors.newSingleThreadExecutor()
+    private val bitmapExportExecutor = Executors.newSingleThreadExecutor()
     private val snapshotSender = SnapshotSender()
 
     // The surveys delegate
@@ -519,7 +519,7 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
-        screenshotCompressionExecutor.shutdown()
+        bitmapExportExecutor.shutdown()
     }
 
     private fun handleSendFullSnapshot(
@@ -907,7 +907,7 @@ class PosthogFlutterPlugin :
         // executor down. Guard the submission so it neither crashes the main
         // thread (RejectedExecutionException) nor leaks the bitmap.
         try {
-            screenshotCompressionExecutor.execute {
+            bitmapExportExecutor.execute {
                 try {
                     val rgbaBytes = bitmapToRawRgba(bitmap)
                     mainHandler.post { onResult(rgbaBytes) }

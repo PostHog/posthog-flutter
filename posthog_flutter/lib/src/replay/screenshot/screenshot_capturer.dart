@@ -119,8 +119,10 @@ class ScreenshotCapturer {
           rootElement, ancestor, masked, captured, seen, defaultPolicy);
     }
 
-    printIfDebug(
-        'Found ${masked.length} masked and ${captured.length} captured platform view rect(s)');
+    if (masked.isNotEmpty || captured.isNotEmpty) {
+      printIfDebug(
+          'Found ${masked.length} masked and ${captured.length} captured platform view rect(s)');
+    }
     return _PlatformViewRects(masked: masked, captured: captured);
   }
 
@@ -156,6 +158,11 @@ class ScreenshotCapturer {
     PostHogPlatformViewPrivacy policy,
   ) {
     if (!seen.add(identityHashCode(ro))) return;
+    // TextureBox content is already composited into the Flutter image, so no
+    // native screenshot is needed when revealing. Only mask it when requested.
+    if (ro is TextureBox && policy == PostHogPlatformViewPrivacy.capture) {
+      return;
+    }
     try {
       final transform = ro.getTransformTo(ancestor);
       final data = ElementData(
@@ -454,6 +461,12 @@ class ScreenshotCapturer {
               .toList();
           final bytesList =
               await _nativeCommunicator.captureNativeScreenshots(specs);
+          if (_cancelled) {
+            currentRecorder.endRecording().dispose();
+            recorder = null;
+            completer.complete(null);
+            return;
+          }
           for (var i = 0; i < pvRects.captured.length; i++) {
             final spec = specs[i];
             final bytes = i < bytesList.length ? bytesList[i] : null;

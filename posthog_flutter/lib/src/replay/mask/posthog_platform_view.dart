@@ -16,6 +16,9 @@ enum PostHogPlatformViewPrivacy {
   /// platform view types (Google Maps, ARKit, camera previews, etc.) are masked
   /// regardless of this policy, because the iOS compositor cannot safely
   /// snapshot arbitrary CALayer-backed views without leaking unmasked content.
+  ///
+  /// **macOS note:** capture is not supported on macOS; all platform views are
+  /// masked regardless of this policy.
   capture,
 }
 
