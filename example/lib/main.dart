@@ -10,6 +10,8 @@ import 'exception_steps_screen.dart';
 import 'masking_tests_screen.dart';
 import 'platform_views_screen.dart';
 
+const kMaskAllPlatformViews = true;
+
 Future<void> main() async {
   final config = PostHogConfig(
     'phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06',
@@ -48,7 +50,7 @@ Future<void> main() async {
   config.sessionReplay = true;
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
-  config.sessionReplayConfig.maskAllPlatformViews = true;
+  config.sessionReplayConfig.maskAllPlatformViews = kMaskAllPlatformViews;
   config.sessionReplayConfig.throttleDelay = const Duration(milliseconds: 1000);
   config.flushAt = 1;
 

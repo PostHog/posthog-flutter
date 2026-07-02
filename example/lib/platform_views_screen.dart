@@ -4,6 +4,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'main.dart' show kMaskAllPlatformViews;
+
 /// Demonstrates session replay with platform views.
 ///
 /// Shows two scenarios:
@@ -526,7 +528,12 @@ class _CapturedAndMaskedWebViewsState
               child: WebViewWidget(controller: _left),
             ),
           ),
-          Expanded(child: WebViewWidget(controller: _right)),
+          Expanded(
+            child: PostHogPlatformView(
+              privacy: PostHogPlatformViewPrivacy.mask,
+              child: WebViewWidget(controller: _right),
+            ),
+          ),
         ],
       ),
     );
@@ -571,7 +578,8 @@ class _ExplicitMaskGlobalFalseState extends State<_ExplicitMaskGlobalFalse> {
             padding: EdgeInsets.all(8),
             child: Text(
               'LEFT: PostHogPlatformView(privacy: .mask) → always BLACK\n'
-              'RIGHT: no wrapper → follows global maskAllPlatformViews',
+              'RIGHT: no wrapper → follows global maskAllPlatformViews '
+              '(currently: $kMaskAllPlatformViews)',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12),
             ),
