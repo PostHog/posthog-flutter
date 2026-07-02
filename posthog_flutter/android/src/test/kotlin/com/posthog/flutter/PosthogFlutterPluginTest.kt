@@ -4,6 +4,8 @@ import android.app.Activity
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.mockito.Mockito
 import kotlin.test.Test
 
@@ -169,8 +171,8 @@ internal class PosthogFlutterPluginTest {
         @Suppress("UNCHECKED_CAST")
         val captor = org.mockito.ArgumentCaptor.forClass(List::class.java) as org.mockito.ArgumentCaptor<List<ByteArray?>>
         Mockito.verify(mockResult).success(captor.capture())
-        assert(captor.value.size == 1) { "Expected result list of size 1, got ${captor.value.size}" }
-        assert(captor.value[0] == null) { "Expected null for zero-dimension entry" }
+        assertEquals(1, captor.value.size)
+        assertNull(captor.value[0])
     }
 
     @Test
