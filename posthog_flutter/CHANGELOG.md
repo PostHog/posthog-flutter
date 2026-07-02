@@ -1,5 +1,11 @@
 ## Next
 
+## 5.29.0
+
+### Minor Changes
+
+- de7b5e8: Platform views are now masked by default in session replay (they now appear as a black box). Use `maskAllPlatformViews = false` to disable masking globally, or wrap individual views in `PostHogPlatformView(privacy: PostHogPlatformViewPrivacy.capture)` to reveal them selectively.
+
 ## 5.28.0
 
 ### Minor Changes
