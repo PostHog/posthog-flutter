@@ -98,16 +98,24 @@ jobs:
       # Notify in case of failure
       - name: Send failure event to PostHog
         if: ${{ failure() }}
-        uses: PostHog/posthog-github-action@58dea254b598fb5d469c0699c98af8288a7f7650 # v1.2.0
+        continue-on-error: true
+        uses: PostHog/posthog-github-action@9a6a19d360820ab4d95ecc4a5a7564062c895f84 # v1.3.0
         with:
           posthog-token: '${{ secrets.POSTHOG_PROJECT_API_KEY }}'
-          event: 'posthog-flutter-release-workflow-failure'
+          event: 'posthog-sdk-github-release-workflow-failure'
           properties: >-
             {
               "commitSha": "${{ github.sha }}",
               "jobStatus": "${{ job.status }}",
               "ref": "${{ github.ref }}",
-              "packageVersion": "${{ steps.get-version.outputs.version }}"
+              "repository": "${{ github.repository }}",
+              "sdk": "posthog-flutter",
+              "jobName": "publish",
+              "packageName": "posthog_flutter",
+              "packageVersion": "${{ steps.get-version.outputs.version || 'unknown' }}",
+              "actionUrl": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "alertText": ":rotating_light: Failed to publish posthog_flutter@${{ steps.get-version.outputs.version }} to pub.dev :rotating_light:",
+              "alertContext": "The pub.dev publish workflow failed."
             }
 
       - name: Restore Slack thread_ts from cache
@@ -130,7 +138,7 @@ jobs:
       - name: Notify Slack - Failed
         continue-on-error: true
         if: ${{ failure() && steps.slack-thread-for-failure.outputs.thread_ts != '' }}
-        uses: PostHog/.github/.github/actions/slack-thread-reply@5fc4680761e8ac29a61b212756230eba0e276d8c
+        uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
@@ -172,7 +180,7 @@ jobs:
       - name: Notify Slack - Released
         if: needs.publish.result == 'success'
         continue-on-error: true
-        uses: PostHog/.github/.github/actions/slack-thread-reply@5fc4680761e8ac29a61b212756230eba0e276d8c
+        uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
@@ -183,7 +191,7 @@ jobs:
       - name: Notify Slack - Failed
         if: needs.publish.result == 'failure'
         continue-on-error: true
-        uses: PostHog/.github/.github/actions/slack-thread-reply@5fc4680761e8ac29a61b212756230eba0e276d8c
+        uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}

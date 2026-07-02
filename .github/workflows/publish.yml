@@ -67,7 +67,7 @@ jobs:
     steps:
       - name: Notify Slack - Approved
         continue-on-error: true
-        uses: PostHog/.github/.github/actions/slack-thread-reply@5fc4680761e8ac29a61b212756230eba0e276d8c
+        uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
@@ -160,10 +160,32 @@ jobs:
           git tag -a "$NEW_VERSION" -m "$NEW_VERSION"
           git push origin "$NEW_VERSION"
 
+      - name: Send failure event to PostHog
+        if: ${{ failure() }}
+        continue-on-error: true
+        uses: PostHog/posthog-github-action@9a6a19d360820ab4d95ecc4a5a7564062c895f84 # v1.3.0
+        with:
+          posthog-token: '${{ secrets.POSTHOG_PROJECT_API_KEY }}'
+          event: 'posthog-sdk-github-release-workflow-failure'
+          properties: >-
+            {
+              "commitSha": "${{ github.sha }}",
+              "jobStatus": "${{ job.status }}",
+              "ref": "${{ github.ref }}",
+              "repository": "${{ github.repository }}",
+              "sdk": "posthog-flutter",
+              "jobName": "version-bump",
+              "packageName": "posthog_flutter",
+              "packageVersion": "${{ steps.apply-changesets.outputs.new-version || 'unknown' }}",
+              "actionUrl": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "alertText": ":rotating_light: Failed to prepare release posthog_flutter@${{ steps.apply-changesets.outputs.new-version }} :rotating_light:",
+              "alertContext": "The version bump/changelog step failed before packages were published."
+            }
+
       - name: Notify Slack - Failed
         continue-on-error: true
         if: ${{ failure() && needs.notify-approval-needed.outputs.slack_ts != '' }}
-        uses: PostHog/.github/.github/actions/slack-thread-reply@5fc4680761e8ac29a61b212756230eba0e276d8c
+        uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
@@ -203,7 +225,7 @@ jobs:
       - name: Notify Slack - Rejected
         if: steps.check-rejection.outputs.was_rejected == 'true'
         continue-on-error: true
-        uses: PostHog/.github/.github/actions/slack-thread-reply@5fc4680761e8ac29a61b212756230eba0e276d8c
+        uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
           slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
