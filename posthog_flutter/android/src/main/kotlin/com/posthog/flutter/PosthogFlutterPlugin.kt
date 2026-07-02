@@ -693,6 +693,11 @@ class PosthogFlutterPlugin :
                 return
             }
 
+            if (flutterSv.width <= 0 || flutterSv.height <= 0) {
+                bitmap.recycle()
+                onResult(null)
+                return
+            }
             val fsvLocation = IntArray(2)
             flutterSv.getLocationInWindow(fsvLocation)
             val fsvSrcLeft = (locationInWindow[0] + cropLeft - fsvLocation[0]).coerceIn(0, flutterSv.width - 1)
