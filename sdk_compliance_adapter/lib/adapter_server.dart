@@ -501,10 +501,17 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
         request.headers.contentType = ContentType.json;
         request.write(jsonEncode(payload));
         final response = await request.close();
+        final retryAfterMs = _retryAfterMs(response.headers);
         final body = await utf8.decoder.bind(response).join();
         final statusCode = response.statusCode;
+        if (attempt > 0) {
+          state.totalRetries++;
+        }
         if (statusCode < 200 || statusCode >= 300) {
           if (attempt < _maxRetries && _shouldRetryFlags(statusCode)) {
+            await Future<void>.delayed(
+              Duration(milliseconds: retryAfterMs ?? 100),
+            );
             continue;
           }
           state.lastError = 'Feature flag request failed with HTTP $statusCode';
