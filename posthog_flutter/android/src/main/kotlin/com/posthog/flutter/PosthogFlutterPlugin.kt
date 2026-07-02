@@ -39,6 +39,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import kotlin.math.roundToInt
 
+private const val FLUTTER_VIEW_CLASS_PREFIX = "io.flutter"
+
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
     FlutterPlugin,
@@ -654,8 +656,8 @@ class PosthogFlutterPlugin :
             // on top.
             val allSurfaceViews = collectAllSurfaceViews(contentView)
 
-            val flutterSv = allSurfaceViews.firstOrNull { it.javaClass.name.startsWith("io.flutter") }
-            val platformViewSvs = allSurfaceViews.filter { !it.javaClass.name.startsWith("io.flutter") }
+            val flutterSv = allSurfaceViews.firstOrNull { it.javaClass.name.startsWith(FLUTTER_VIEW_CLASS_PREFIX) }
+            val platformViewSvs = allSurfaceViews.filter { !it.javaClass.name.startsWith(FLUTTER_VIEW_CLASS_PREFIX) }
 
             if (flutterSv == null) {
                 val srcRect =

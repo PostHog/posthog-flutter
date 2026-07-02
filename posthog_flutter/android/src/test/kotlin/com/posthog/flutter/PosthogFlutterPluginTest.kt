@@ -121,6 +121,59 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun onMethodCall_captureNativeScreenshots_noActivity_returnsEmptyList() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call =
+            MethodCall(
+                "captureNativeScreenshots",
+                mapOf("views" to listOf(mapOf("x" to 0, "y" to 0, "width" to 10, "height" to 10))),
+            )
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(emptyList<ByteArray?>())
+    }
+
+    @Test
+    fun onMethodCall_captureNativeScreenshots_emptyViews_returnsEmptyList() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = Mockito.mock(ActivityPluginBinding::class.java)
+        Mockito.`when`(binding.activity).thenReturn(Mockito.mock(Activity::class.java))
+        plugin.onAttachedToActivity(binding)
+
+        val call = MethodCall("captureNativeScreenshots", mapOf("views" to emptyList<Map<String, Int>>()))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(emptyList<ByteArray?>())
+    }
+
+    @Test
+    fun onMethodCall_captureNativeScreenshots_zeroDimensionEntry_producesNullInResult() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = Mockito.mock(ActivityPluginBinding::class.java)
+        Mockito.`when`(binding.activity).thenReturn(Mockito.mock(Activity::class.java))
+        plugin.onAttachedToActivity(binding)
+
+        // Zero-dimension guard fires before any activity view access, so
+        // captureNext inserts null and advances without crashing.
+        val call =
+            MethodCall(
+                "captureNativeScreenshots",
+                mapOf("views" to listOf(mapOf("x" to 0, "y" to 0, "width" to 0, "height" to 0))),
+            )
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        @Suppress("UNCHECKED_CAST")
+        val captor = org.mockito.ArgumentCaptor.forClass(List::class.java) as org.mockito.ArgumentCaptor<List<ByteArray?>>
+        Mockito.verify(mockResult).success(captor.capture())
+        assert(captor.value.size == 1) { "Expected result list of size 1, got ${captor.value.size}" }
+        assert(captor.value[0] == null) { "Expected null for zero-dimension entry" }
+    }
+
+    @Test
     fun onMethodCall_getFeatureFlagResult_missingKey_returnsError() {
         val plugin = PosthogFlutterPlugin()
 
