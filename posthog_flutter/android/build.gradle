@@ -69,6 +69,9 @@ android {
     }
 
     testOptions {
+        // The plugin constructs a main-looper Handler; without default-value
+        // stubs every test dies in the constructor with "not mocked".
+        unitTests.returnDefaultValues = true
         unitTests.all {
             useJUnitPlatform()
 

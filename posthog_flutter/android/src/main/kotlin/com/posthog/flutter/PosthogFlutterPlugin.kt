@@ -1,6 +1,7 @@
 package com.posthog.flutter
 
 import android.app.Activity
+import android.app.Application
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -26,6 +27,8 @@ import com.posthog.PostHogOnFeatureFlags
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
+import com.posthog.android.replay.PostHogInternalReplayApi
+import com.posthog.android.replay.PostHogReplayIntegration
 import com.posthog.logs.PostHogLogSeverity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -40,6 +43,9 @@ import java.util.concurrent.RejectedExecutionException
 import kotlin.math.roundToInt
 
 private const val FLUTTER_VIEW_CLASS_PREFIX = "io.flutter"
+private const val OCCLUSION_TICK_MS = 1000L
+
+private const val BRIDGE_FAILURE_STRIKE_LIMIT = 3
 
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
@@ -54,12 +60,72 @@ class PosthogFlutterPlugin :
 
     private lateinit var applicationContext: Context
     private var activity: Activity? = null
+    private var application: Application? = null
+
+    private var postHogConfig: PostHogAndroidConfig? = null
+
+    // Occluded = host activity STOPPED (not just paused — a translucent/dialog
+    // activity pauses the host while Flutter stays visible) AND one of our own
+    // activities resumed on top (a stopped host alone is just backgrounding).
+    // Out-of-process covers (Custom Tabs, Google Pay) are intentionally missed.
+    @Volatile
+    private var isHostActivityStopped = false
+
+    // A count, not a boolean: under multi-resume (Android 10+ split-screen)
+    // two non-host activities can be resumed at once, and pausing one must
+    // not read as "nothing covers the host" while the other still does.
+    @Volatile
+    private var otherResumedCount = 0
+
+    private val activityLifecycleCallbacks =
+        object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityResumed(act: Activity) {
+                if (act !== activity) {
+                    otherResumedCount++
+                    nudgeOcclusionDetector()
+                }
+            }
+
+            override fun onActivityPaused(act: Activity) {
+                // Floor at zero: a pause for a resume we never observed (the
+                // callbacks registered while it was already resumed) must not
+                // underflow the count.
+                if (act !== activity && otherResumedCount > 0) {
+                    otherResumedCount--
+                }
+            }
+
+            override fun onActivityCreated(
+                act: Activity,
+                savedInstanceState: Bundle?,
+            ) {}
+
+            override fun onActivityStarted(act: Activity) {
+                if (act === activity) {
+                    isHostActivityStopped = false
+                    nudgeOcclusionDetector()
+                }
+            }
+
+            override fun onActivityStopped(act: Activity) {
+                if (act === activity) {
+                    isHostActivityStopped = true
+                    nudgeOcclusionDetector()
+                }
+            }
+
+            override fun onActivitySaveInstanceState(
+                act: Activity,
+                outState: Bundle,
+            ) {}
+
+            override fun onActivityDestroyed(act: Activity) {}
+        }
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val bitmapExportExecutor = Executors.newSingleThreadExecutor()
     private val snapshotSender = SnapshotSender()
 
-    // The surveys delegate
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -265,6 +331,23 @@ class PosthogFlutterPlugin :
                 handleCaptureNativeScreenshots(call, result)
             }
 
+            "enableNativeBridge" -> {
+                // Accept only when the bridge can deliver frames, and only for
+                // the episode Dart is reacting to: a stale enable that lands
+                // after its episode ended must not re-arm the bridge for a
+                // later episode Dart never handed off. Declines never disarm,
+                // so a stale decline can't stomp a live episode.
+                val episode = call.argument<Int>("episode")
+                val accepted =
+                    isOccluded && episode == occlusionEpisode &&
+                        replayIntegration() != null && isSessionReplayActive()
+                if (accepted) {
+                    bridgeEnabled = true
+                    nudgeOcclusionDetector()
+                }
+                result.success(accepted)
+            }
+
             "isSessionReplayActive" -> {
                 result.success(isSessionReplayActive())
             }
@@ -422,13 +505,27 @@ class PosthogFlutterPlugin :
                     replayConfig.getIfNotNull<Double>("sampleRate") {
                         this.sessionReplayConfig.sampleRate = it
                     }
+                    if (sessionReplay) {
+                        val captureNativeScreens =
+                            replayConfig["captureNativeScreens"] as? Boolean ?: false
+                        // Unconditional: only bridged captures read these, so a
+                        // runtime bridge toggle honors them.
+                        (replayConfig["maskAllTexts"] as? Boolean)?.let {
+                            this.sessionReplayConfig.maskAllTextInputs = it
+                        }
+                        (replayConfig["maskAllImages"] as? Boolean)?.let {
+                            this.sessionReplayConfig.maskAllImages = it
+                        }
+                        if (captureNativeScreens) {
+                            mainHandler.post { startOcclusionDetector() }
+                        }
+                    }
                 }
 
                 // Configure surveys
                 posthogConfig.getIfNotNull<Boolean>("surveys") {
                     surveys = it
                     if (surveys) {
-                        // If surveys are enabled, create and assign the surveys delegate
                         val delegate = PostHogFlutterSurveysDelegate(channel)
                         surveysConfig.surveysDelegate = delegate
                         flutterSurveysDelegate = delegate
@@ -499,27 +596,304 @@ class PosthogFlutterPlugin :
             }
 
         PostHogAndroid.setup(applicationContext, config)
+        postHogConfig = config
+        cachedReplayIntegration = null
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        application = binding.activity.application
+        // Only if the detector is already running; else the setup path registers
+        // it. Keeps a default-off feature from installing app-wide callbacks.
+        if (occlusionDetectorRunning) {
+            registerLifecycleTracking()
+        }
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
+        unregisterLifecycleTracking()
         activity = null
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
+        application = binding.activity.application
+        if (occlusionDetectorRunning) {
+            registerLifecycleTracking()
+        }
     }
 
     override fun onDetachedFromActivity() {
+        unregisterLifecycleTracking()
         activity = null
     }
 
+    // Idempotent: registering the same callbacks twice makes them fire twice.
+    private fun registerLifecycleTracking() {
+        val app = application ?: return
+        if (lifecycleCallbacksRegistered) {
+            return
+        }
+        isHostActivityStopped = false
+        otherResumedCount = 0
+        app.registerActivityLifecycleCallbacks(activityLifecycleCallbacks)
+        lifecycleCallbacksRegistered = true
+    }
+
+    private fun unregisterLifecycleTracking() {
+        if (!lifecycleCallbacksRegistered) {
+            return
+        }
+        application?.unregisterActivityLifecycleCallbacks(activityLifecycleCallbacks)
+        lifecycleCallbacksRegistered = false
+    }
+
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        stopOcclusionDetector()
         channel.setMethodCallHandler(null)
         bitmapExportExecutor.shutdown()
+    }
+
+    private var cachedReplayIntegration: PostHogReplayIntegration? = null
+
+    private fun replayIntegration(): PostHogReplayIntegration? {
+        cachedReplayIntegration?.let { return it }
+        return postHogConfig
+            ?.integrations
+            ?.filterIsInstance<PostHogReplayIntegration>()
+            ?.firstOrNull()
+            .also { cachedReplayIntegration = it }
+    }
+
+    // Occlusion episode protocol: a main-thread ticker — independent of Flutter's
+    // frame lifecycle, which can pause under a native cover — pushes occlusion
+    // transitions to Dart and drives bridge captures. State below is @Volatile
+    // for the capture executor.
+    @Volatile
+    internal var isOccluded = false
+
+    @Volatile
+    internal var bridgeEnabled = false
+
+    // Whether the episode has delivered its first bridged frame.
+    private var bridgeEpisodeStarted = false
+
+    // End-transition debounce: ticks reading not-occluded while an episode is active.
+    private var notOccludedTicks = 0
+
+    // Monotonic episode id, stamped into every push so Dart drops stale-episode
+    // async work. Volatile: re-read on the capture executor.
+    @Volatile
+    internal var occlusionEpisode = 0
+
+    // Failed captures before the episode's first delivered frame; at the limit it
+    // falls back (bridgeFailed). In-flight captures don't count; after first
+    // delivery, failures never demote.
+    private var bridgeFailureStrikes = 0
+
+    // Set while a capture is scheduled but its result hasn't posted back — stops
+    // stacking captures and mistaking in-flight for a delivery gap.
+    private var bridgeCaptureInFlight = false
+
+    private var occlusionDetectorRunning = false
+
+    private var lifecycleCallbacksRegistered = false
+
+    // One guarded tick. The running check no-ops a stale runnable (ticker or nudge)
+    // that removeCallbacks missed post-teardown; the catch stops a throw (channel
+    // invoke / peekDecorView on a dead window) from crashing the app.
+    private fun runTickSafely() {
+        if (!occlusionDetectorRunning) {
+            return
+        }
+        try {
+            occlusionTick()
+        } catch (e: Throwable) {
+            Log.w("PostHog", "Occlusion tick failed: $e")
+        }
+    }
+
+    private val occlusionTicker =
+        object : Runnable {
+            override fun run() {
+                runTickSafely()
+                // Reschedule while running, even after a caught throw, so a
+                // transient failure never kills the detector.
+                if (occlusionDetectorRunning) {
+                    mainHandler.postDelayed(this, OCCLUSION_TICK_MS)
+                }
+            }
+        }
+
+    // A named instance (not an anonymous lambda) so stopOcclusionDetector can
+    // actually cancel a pending nudge.
+    private val nudgeRunnable = Runnable { runTickSafely() }
+
+    private fun startOcclusionDetector() {
+        if (occlusionDetectorRunning) {
+            return
+        }
+        occlusionDetectorRunning = true
+        // Callbacks feed the detector and only run while it does — registered
+        // here, not on attach, so a disabled bridge installs nothing.
+        registerLifecycleTracking()
+        mainHandler.postDelayed(occlusionTicker, OCCLUSION_TICK_MS)
+    }
+
+    // Runs a tick immediately on a lifecycle transition instead of waiting for
+    // the next poll, so a native screen appears in replay within a frame or two.
+    // Never reschedules the ticker.
+    private fun nudgeOcclusionDetector() {
+        if (!occlusionDetectorRunning) {
+            return
+        }
+        // Coalesce a burst of lifecycle callbacks into one immediate tick.
+        mainHandler.removeCallbacks(nudgeRunnable)
+        mainHandler.post(nudgeRunnable)
+    }
+
+    private fun stopOcclusionDetector() {
+        occlusionDetectorRunning = false
+        mainHandler.removeCallbacks(occlusionTicker)
+        mainHandler.removeCallbacks(nudgeRunnable)
+        unregisterLifecycleTracking()
+    }
+
+    private fun pushOcclusionEvent(
+        occluded: Boolean,
+        bridgeFailed: Boolean = false,
+    ) {
+        channel.invokeMethod(
+            "onNativeOcclusionChanged",
+            mapOf(
+                "occluded" to occluded,
+                "episode" to occlusionEpisode,
+                "bridgeFailed" to bridgeFailed,
+            ),
+        )
+    }
+
+    @OptIn(PostHogInternalReplayApi::class)
+    private fun occlusionTick() {
+        if (!isSessionReplayActive()) {
+            if (isOccluded || bridgeEnabled) {
+                isOccluded = false
+                bridgeEnabled = false
+                bridgeEpisodeStarted = false
+                bridgeFailureStrikes = 0
+                bridgeCaptureInFlight = false
+                // Dart must learn the episode ended, otherwise the next
+                // occluded=true push looks like unchanged state.
+                pushOcclusionEvent(occluded = false)
+            }
+            return
+        }
+        // Null activity (config-change detach) fails open — the captured Flutter
+        // tree has no native pixels. Known limitation: a host recreation
+        // mid-episode never re-fires onActivityResumed, ending the episode early.
+        val occludedNow =
+            activity != null && isHostActivityStopped && otherResumedCount > 0
+        // Debounce END only: a native→native handoff (A pauses before B resumes)
+        // briefly reads not-occluded; ending the episode there would flash a
+        // stale Flutter frame into the native flow.
+        if (!occludedNow && isOccluded && notOccludedTicks < 1) {
+            notOccludedTicks++
+            return
+        }
+        notOccludedTicks = 0
+        if (occludedNow != isOccluded) {
+            val previousOccluded = isOccluded
+            val previousEpisode = occlusionEpisode
+            isOccluded = occludedNow
+            if (occludedNow) {
+                occlusionEpisode++
+            } else {
+                bridgeEnabled = false
+            }
+            bridgeEpisodeStarted = false
+            bridgeFailureStrikes = 0
+            bridgeCaptureInFlight = false
+            try {
+                pushOcclusionEvent(occluded = occludedNow)
+            } catch (e: Throwable) {
+                // The transition never reached Dart. Roll the episode state
+                // back so the next tick re-detects and re-pushes it, instead
+                // of advancing to an episode Dart never heard begin — whose
+                // bridge frames it would then silently drop as stale.
+                isOccluded = previousOccluded
+                occlusionEpisode = previousEpisode
+                throw e
+            }
+        }
+        if (occludedNow && bridgeEnabled && !bridgeCaptureInFlight) {
+            // excludeView and validity are resolved at call time (surviving host
+            // recreation); the first capture resets the decor view's snapshot
+            // state so a reused activity opens with a full snapshot.
+            val isFirst = !bridgeEpisodeStarted
+            val episode = occlusionEpisode
+            bridgeCaptureInFlight = true
+
+            // Applies a capture outcome on the main thread (the capture callback
+            // fires off it), ignoring a result that lands after the episode
+            // moved on. Posted so it never runs re-entrantly within this tick.
+            fun postResult(delivered: Boolean) {
+                mainHandler.post {
+                    // Engine detach can land between capture and result; the
+                    // channel is dead then and a strike-limit push would throw
+                    // uncaught on the main looper.
+                    if (!occlusionDetectorRunning || occlusionEpisode != episode) {
+                        return@post
+                    }
+                    bridgeCaptureInFlight = false
+                    try {
+                        onBridgeCaptureResult(delivered)
+                    } catch (e: Throwable) {
+                        Log.w("PostHog", "Occlusion bridge result failed: $e")
+                    }
+                }
+            }
+            val scheduled =
+                try {
+                    replayIntegration()?.captureSessionReplaySnapshot(
+                        activity?.window?.peekDecorView(),
+                        isFirst,
+                        { isOccluded && bridgeEnabled && occlusionEpisode == episode },
+                    ) { delivered -> postResult(delivered) } ?: false
+                } catch (e: Throwable) {
+                    // peekDecorView / captureSessionReplaySnapshot can throw on
+                    // a torn-down window. Treat as not-scheduled so postResult
+                    // below clears the in-flight latch; leaving it set would
+                    // block every later capture for the rest of the episode.
+                    Log.w("PostHog", "Occlusion bridge capture failed to schedule: $e")
+                    false
+                }
+            // Nothing was queued, so the capture callback will never fire —
+            // record the delivery gap.
+            if (!scheduled) {
+                postResult(false)
+            }
+        }
+    }
+
+    // Demotion is gated on the episode never having delivered: captures fail
+    // transiently during interaction (the SDK rejects redraw-racing captures to
+    // keep masks aligned), so demoting a working episode would swap real frames
+    // for the fallback. After the first delivered frame, failures just hold the
+    // last good frame.
+    private fun onBridgeCaptureResult(delivered: Boolean) {
+        if (!isOccluded || !bridgeEnabled) {
+            return
+        }
+        if (delivered) {
+            bridgeEpisodeStarted = true
+            bridgeFailureStrikes = 0
+        } else if (!bridgeEpisodeStarted) {
+            bridgeFailureStrikes++
+            if (bridgeFailureStrikes >= BRIDGE_FAILURE_STRIKE_LIMIT) {
+                bridgeEnabled = false
+                pushOcclusionEvent(occluded = true, bridgeFailed = true)
+            }
+        }
     }
 
     private fun handleSendFullSnapshot(

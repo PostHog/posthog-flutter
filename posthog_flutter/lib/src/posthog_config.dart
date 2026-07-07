@@ -448,6 +448,10 @@ class PostHogSessionReplayConfig {
 
   /// Enable masking of all text and text input fields.
   /// Default: true.
+  ///
+  /// With [captureNativeScreens] enabled, setting this false also unmasks text
+  /// on captured native screens, including native input fields (passwords,
+  /// card numbers) you may not have built.
   var maskAllTexts = true;
 
   /// Enable masking of all images.
@@ -485,7 +489,40 @@ class PostHogSessionReplayConfig {
   /// When true, every platform view is covered with a black rectangle in
   /// session replay screenshots. Set to false to opt out globally, or wrap
   /// individual views with [PostHogPlatformView] for per-view control.
+  ///
+  /// Setting this false reveals every texture-backed view, including camera
+  /// previews (e.g. the `camera` plugin) — prefer per-view
+  /// [PostHogPlatformView] opt-ins over the global opt-out.
+  ///
+  /// Applies only to native views embedded in the Flutter layout. For native
+  /// screens presented over the whole app, see [captureNativeScreens].
   var maskAllPlatformViews = true;
+
+  /// Capture native screens that cover the Flutter UI (full-screen paywalls,
+  /// presented view controllers, native activities) via the native replay
+  /// SDK, so they appear in replay instead of a frozen Flutter frame.
+  /// When enabled and a detected screen cannot be captured, a single black
+  /// placeholder frame is sent instead; if that also fails, replay keeps
+  /// showing the last Flutter frame. With this flag off there is no
+  /// placeholder — nothing about replay changes.
+  ///
+  /// Only full-screen, same-process screens are detected. Not captured:
+  /// partial-height sheets (e.g. Apple Pay, share sheet), other-process
+  /// content, Android dialogs/Custom Tabs, and iOS covers without an opaque
+  /// background — replay keeps showing the covered Flutter UI for those.
+  ///
+  /// Opt-in: enabling this starts a lightweight occlusion detector. When false
+  /// (the default), the covered Flutter tree keeps recording, as before.
+  ///
+  /// Captured native frames honor your [maskAllTexts] / [maskAllImages]
+  /// settings — with the defaults (both true) all native text and images are
+  /// masked; setting either false reveals it on native screens too.
+  ///
+  /// Applies only to native screens presented over the whole app. For native
+  /// views embedded in the Flutter layout, see [maskAllPlatformViews].
+  ///
+  /// Default: false. Requires native SDK support for on-demand capture.
+  var captureNativeScreens = false;
 
   /// Converts this session replay configuration to a platform-channel map.
   ///
@@ -497,6 +534,7 @@ class PostHogSessionReplayConfig {
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
       'maskAllPlatformViews': maskAllPlatformViews,
+      'captureNativeScreens': captureNativeScreens,
       if (sampleRate != null) 'sampleRate': sampleRate,
     };
   }

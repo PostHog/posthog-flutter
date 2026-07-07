@@ -20,6 +20,7 @@ import 'posthog_config.dart';
 import 'posthog_constants.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'posthog_internal_events.dart';
 
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
@@ -80,6 +81,16 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         return null;
       case 'onFeatureFlagsCallback':
         _onFeatureFlagsCallback?.call();
+        break;
+      case 'onNativeOcclusionChanged':
+        final arguments = Map<String, dynamic>.from(call.arguments as Map);
+        PostHogInternalEvents.nativeOcclusionActive =
+            arguments['occluded'] == true;
+        PostHogInternalEvents.nativeOcclusionEpisode =
+            arguments['episode'] as int? ?? 0;
+        PostHogInternalEvents.nativeBridgeFailed =
+            arguments['bridgeFailed'] == true;
+        PostHogInternalEvents.nativeOcclusionEvent.value++;
         break;
       default:
         printIfDebug(

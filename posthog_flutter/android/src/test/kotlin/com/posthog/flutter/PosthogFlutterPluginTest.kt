@@ -4,10 +4,10 @@ import android.app.Activity
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.mockito.Mockito
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /*
  * This demonstrates a simple unit test of the Kotlin portion of this plugin's implementation.
@@ -28,7 +28,7 @@ internal class PosthogFlutterPluginTest {
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success(true)
+        Mockito.verify(mockResult).success(null)
     }
 
     @Test
@@ -41,7 +41,7 @@ internal class PosthogFlutterPluginTest {
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success(true)
+        Mockito.verify(mockResult).success(null)
     }
 
     @Test
@@ -173,6 +173,43 @@ internal class PosthogFlutterPluginTest {
         Mockito.verify(mockResult).success(captor.capture())
         assertEquals(1, captor.value.size)
         assertNull(captor.value[0])
+    }
+
+    @Test
+    fun onMethodCall_enableNativeBridge_declinesWhenNotOccluded() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("enableNativeBridge", mapOf("episode" to 1))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(false)
+    }
+
+    @Test
+    fun onMethodCall_enableNativeBridge_declinesStaleEpisode() {
+        val plugin = PosthogFlutterPlugin()
+        plugin.isOccluded = true
+        plugin.occlusionEpisode = 5
+
+        val call = MethodCall("enableNativeBridge", mapOf("episode" to 4))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(false)
+    }
+
+    @Test
+    fun onMethodCall_enableNativeBridge_declineDoesNotDisarmBridge() {
+        val plugin = PosthogFlutterPlugin()
+        plugin.bridgeEnabled = true
+
+        val call = MethodCall("enableNativeBridge", mapOf("episode" to 9))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(false)
+        assertEquals(true, plugin.bridgeEnabled)
     }
 
     @Test

@@ -1,10 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'main.dart' show kMaskAllPlatformViews;
+import 'main.dart' show exampleReplayConfig, kMaskAllPlatformViews;
+
+const _exampleChannel = MethodChannel('posthog_flutter_example');
+
+void _presentNativeScreen({required bool capture, bool ownWindow = false}) {
+  exampleReplayConfig?.captureNativeScreens = capture;
+  _exampleChannel.invokeMethod(
+    ownWindow ? 'presentNativeScreenOwnWindow' : 'presentNativeScreen',
+  );
+}
 
 /// Demonstrates session replay with platform views.
 ///
@@ -135,6 +145,35 @@ class PlatformViewsScreen extends StatelessWidget {
                   _push(context, const _NonWebViewCapture(), 'map_captured'),
             ),
           ],
+          const SizedBox(height: 8),
+          const Text(
+            'Out-of-engine native screens (captureNativeScreens)',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          _CaseCard(
+            title: 'Native screen — captured (capture on)',
+            subtitle:
+                'Presents a fully native screen on top of Flutter. The native '
+                'replay SDK snapshots it, so its content shows in replay.',
+            onTap: () => _presentNativeScreen(capture: true),
+          ),
+          _CaseCard(
+            title: 'Native screen — capture off',
+            subtitle:
+                'Same native screen with captureNativeScreens off — replay '
+                'keeps showing the covered Flutter screen (previous behavior).',
+            onTap: () => _presentNativeScreen(capture: false),
+          ),
+          if (defaultTargetPlatform == TargetPlatform.iOS)
+            _CaseCard(
+              title: 'Own-window native screen — captured (Superwall-style)',
+              subtitle:
+                  'Presented in a dedicated key UIWindow like Superwall, not '
+                  'on the Flutter view controller. Verifies foreign-key-window '
+                  'occlusion detection.',
+              onTap: () => _presentNativeScreen(capture: true, ownWindow: true),
+            ),
         ],
       ),
     );
@@ -175,12 +214,6 @@ class _CaseCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Google Maps mixed screen: the exact use-case from the PR comments.
-// GoogleMap (hybrid-composition SurfaceView) inside a Scaffold.
-// API key is intentionally invalid — we test capture/mask, not map tiles.
-// ---------------------------------------------------------------------------
-
 class _GoogleMapsMixedScreen extends StatefulWidget {
   const _GoogleMapsMixedScreen();
 
@@ -200,9 +233,6 @@ class _GoogleMapsMixedScreenState extends State<_GoogleMapsMixedScreen> {
       appBar: AppBar(title: const Text('Google Maps in Scaffold')),
       body: Stack(
         children: [
-          // The real google_maps_flutter platform view.
-          // With an invalid API key it shows grey/error tiles but the
-          // SurfaceView is present in the hierarchy — that is what we test.
           const GoogleMap(initialCameraPosition: _initialCamera),
           Positioned(
             top: 12,
@@ -233,10 +263,6 @@ class _GoogleMapsMixedScreenState extends State<_GoogleMapsMixedScreen> {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Mixed screen: Flutter Scaffold + embedded WebView + Flutter overlays
-// ---------------------------------------------------------------------------
 
 class _MixedScreen extends StatefulWidget {
   const _MixedScreen();
@@ -270,12 +296,8 @@ class _MixedScreenState extends State<_MixedScreen> {
       ),
       body: Stack(
         children: [
-          // The platform view (WebView / native map)
           WebViewWidget(controller: _controller),
 
-          // Flutter overlay on top of the platform view — simulates a search
-          // bar or FAB rendered over a map. This Flutter content should be
-          // visible in session replay; the WebView underneath is auto-masked.
           Positioned(
             top: 12,
             left: 12,
@@ -294,7 +316,6 @@ class _MixedScreenState extends State<_MixedScreen> {
             ),
           ),
 
-          // FAB-style Flutter button over the map
           Positioned(
             bottom: 80,
             right: 16,
@@ -315,11 +336,6 @@ class _MixedScreenState extends State<_MixedScreen> {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Mixed screen (captured): same as _MixedScreen but wrapped in
-// PostHogPlatformView(privacy: .capture) — should reveal WebView in replay.
-// ---------------------------------------------------------------------------
 
 class _MixedScreenCapture extends StatefulWidget {
   const _MixedScreenCapture();
@@ -387,10 +403,6 @@ class _MixedScreenCaptureState extends State<_MixedScreenCapture> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Full-screen native view: WebView fills the entire screen
-// ---------------------------------------------------------------------------
-
 class _FullScreenMasked extends StatefulWidget {
   const _FullScreenMasked();
 
@@ -441,10 +453,6 @@ class _FullScreenCapturedState extends State<_FullScreenCaptured> {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Two captured WebViews: tests multiple platform views with capture policy
-// ---------------------------------------------------------------------------
 
 class _TwoCapturedWebViews extends StatefulWidget {
   const _TwoCapturedWebViews();
@@ -540,11 +548,6 @@ class _CapturedAndMaskedWebViewsState
   }
 }
 
-// ---------------------------------------------------------------------------
-// Security fix regression: maskAllPlatformViews=false + explicit .mask wrapper.
-// The left WebView must still be black in replay; the right must be captured.
-// ---------------------------------------------------------------------------
-
 class _ExplicitMaskGlobalFalse extends StatefulWidget {
   const _ExplicitMaskGlobalFalse();
 
@@ -602,11 +605,6 @@ class _ExplicitMaskGlobalFalseState extends State<_ExplicitMaskGlobalFalse> {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Non-WebView capture: GoogleMap wrapped with capture policy.
-// Android: map content visible. iOS: no WKWebView → falls back to mask.
-// ---------------------------------------------------------------------------
 
 class _NonWebViewCapture extends StatefulWidget {
   const _NonWebViewCapture();
