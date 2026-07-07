@@ -438,19 +438,46 @@ class PostHogLogsConfig {
       duration.inSeconds < 1 ? 1 : duration.inSeconds;
 }
 
-/// Configuration for mobile session replay capture and masking.
+/// Configuration for session replay capture and masking.
 ///
 /// Assign an instance to [PostHogConfig.sessionReplayConfig] before calling
 /// `Posthog().setup(config)`.
+///
+/// **Platform behaviour**
+///
+/// On iOS and Android, the Flutter SDK captures screenshots of the widget tree
+/// and applies masking by walking the render tree and painting opaque rectangles
+/// over sensitive render objects (text, images, or [PostHogMaskWidget] subtrees)
+/// before encoding the snapshot.
+///
+/// On Flutter web (CanvasKit renderer), the posthog-js library records the raw
+/// `<canvas>` element directly rather than walking the DOM.  Because all widget
+/// content is painted as canvas pixels, [maskAllTexts] and [maskAllImages] have
+/// **no effect** on web — the Dart-side masking pipeline is bypassed entirely.
+/// rrweb has no per-region canvas masking API; a `<canvas>` can only be recorded
+/// or blocked as a whole.  Granular widget-level masking on web requires a
+/// separate approach (overlaying DOM block elements at widget bounds across the
+/// CanvasKit compositing boundary) and is not yet implemented.
 class PostHogSessionReplayConfig {
   /// Creates a session replay configuration with default masking enabled.
   PostHogSessionReplayConfig();
 
   /// Enable masking of all text and text input fields.
+  ///
+  /// On iOS/Android: masks [RenderParagraph], [RenderTransform], and
+  /// [RenderEditable] nodes in the captured screenshot.
+  ///
+  /// On Flutter web (CanvasKit): no effect — see class-level docs.
+  ///
   /// Default: true.
   var maskAllTexts = true;
 
   /// Enable masking of all images.
+  ///
+  /// On iOS/Android: masks [RenderImage] nodes in the captured screenshot.
+  ///
+  /// On Flutter web (CanvasKit): no effect — see class-level docs.
+  ///
   /// Default: true.
   var maskAllImages = true;
 
@@ -478,15 +505,6 @@ class PostHogSessionReplayConfig {
   /// If null, sampling is controlled by remote config (when available).
   double? sampleRate;
 
-  /// Mask all platform views (WebView, Maps, etc.) in session replay.
-  ///
-  /// Default: true.
-  ///
-  /// When true, every platform view is covered with a black rectangle in
-  /// session replay screenshots. Set to false to opt out globally, or wrap
-  /// individual views with [PostHogPlatformView] for per-view control.
-  var maskAllPlatformViews = true;
-
   /// Converts this session replay configuration to a platform-channel map.
   ///
   /// Returns values consumed by the Android and Apple session replay
@@ -496,7 +514,6 @@ class PostHogSessionReplayConfig {
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,
-      'maskAllPlatformViews': maskAllPlatformViews,
       if (sampleRate != null) 'sampleRate': sampleRate,
     };
   }
