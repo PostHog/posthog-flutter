@@ -97,6 +97,18 @@ class ComplianceAdapter {
         ..preloadFeatureFlags = false
         ..captureApplicationLifecycleEvents = false
         ..debug = true;
+
+      final bootstrap = _readNullableObjectMap(body['bootstrap']);
+      if (bootstrap != null) {
+        config.bootstrap = PostHogBootstrapConfig(
+          distinctId: bootstrap['distinct_id'] as String?,
+          isIdentifiedId: bootstrap['is_identified_id'] == true,
+          featureFlags: _readObjectMap(bootstrap['feature_flags']),
+          featureFlagPayloads:
+              _readObjectMap(bootstrap['feature_flag_payloads']),
+        );
+      }
+
       await Posthog().setup(config);
 
       await _sendJson(request, {'success': true});
