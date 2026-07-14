@@ -782,7 +782,7 @@ extension PosthogFlutterPlugin {
                 // afterScreenUpdates; steady-state ticks avoid it because it
                 // visibly flickers secure text fields.
                 let isFirst = !bridgeEpisodeStarted
-                if PostHogSDK.shared.captureSessionReplaySnapshot(afterScreenUpdates: isFirst) {
+                if PostHogSDK.shared.captureSessionReplaySnapshot(episodeFirstFrame: isFirst) {
                     bridgeEpisodeStarted = true
                     bridgeFailureStrikes = 0
                 } else if !bridgeEpisodeStarted {
