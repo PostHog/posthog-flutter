@@ -175,6 +175,23 @@ class PostHogConfig {
   /// `Posthog().logger` facade).
   final logsConfig = PostHogLogsConfig();
 
+  /// Pre-seeded identity and feature-flag state applied on the very first SDK
+  /// launch, before any network request completes.
+  ///
+  /// Set this before calling `Posthog().setup(config)` so events captured during
+  /// cold start carry a caller-controlled `$distinct_id` and feature-flag reads
+  /// return caller-provided values before the first `/flags` response. Mirrors
+  /// the [`bootstrap` option in `posthog-js`](https://posthog.com/docs/feature-flags/bootstrapping).
+  ///
+  /// Forwarded to the native iOS/Android SDKs, which apply all precedence rules
+  /// (never overwrite persisted identity, overlay loaded flags over bootstrapped
+  /// ones, drop the bootstrap on `reset()`). Defaults to `null` (no bootstrap).
+  ///
+  /// **Flutter web:** not applied. The web SDK hooks onto an already-initialized
+  /// posthog-js instance, so configure `bootstrap` in your `posthog.init({...})`
+  /// call instead.
+  PostHogBootstrapConfig? bootstrap;
+
   /// Callback to be invoked when feature flags are loaded.
   ///
   /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
@@ -303,6 +320,75 @@ class PostHogConfig {
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
       'logs': logsConfig.toMap(),
+      if (bootstrap != null) 'bootstrap': bootstrap!.toMap(),
+    };
+  }
+}
+
+/// Pre-seeded identity and feature-flag state applied on the very first SDK
+/// launch, before any network request completes.
+///
+/// Assign an instance to [PostHogConfig.bootstrap] before calling
+/// `Posthog().setup(config)`. The values are forwarded to the native iOS/Android
+/// SDKs, which own all bootstrap behavior:
+///
+/// - Bootstrapped identity seeds the very first session only. It is applied only
+///   when no identity is persisted for that scope, and never overwrites an
+///   existing user. An anonymous bootstrap ([isIdentifiedId] `false`) seeds the
+///   anonymous id; an identified bootstrap ([isIdentifiedId] `true`) seeds the
+///   distinct id and marks the user identified (merging an existing anonymous
+///   user via `identify()`, or preserving a different identified user with a
+///   warning) — it never becomes the device id.
+/// - Bootstrapped feature flags form a base layer only: values loaded from
+///   `/flags` overlay them for overlapping keys, while bootstrapped-only keys
+///   remain available. The base layer is dropped on `reset()`.
+///
+/// **Flutter web:** not applied. Configure `bootstrap` in your
+/// `posthog.init({...})` call instead.
+class PostHogBootstrapConfig {
+  /// Creates a bootstrap configuration.
+  ///
+  /// Pass only the dimensions you want to seed; leave the rest `null`.
+  const PostHogBootstrapConfig({
+    this.distinctId,
+    this.isIdentifiedId = false,
+    this.featureFlags,
+    this.featureFlagPayloads,
+  });
+
+  /// The distinct id to seed on first launch.
+  ///
+  /// When [isIdentifiedId] is `false` (the default) this becomes the anonymous
+  /// id — the `$distinct_id` on pre-identify events. When `true` it is treated
+  /// as an already-identified user's distinct id.
+  final String? distinctId;
+
+  /// Whether [distinctId] represents an already-identified user.
+  ///
+  /// Defaults to `false`. Set to `true` when the host application resolved the
+  /// user's identity outside the SDK (for example from a backend session token).
+  final bool isIdentifiedId;
+
+  /// Feature flag values served until the first `/flags` response arrives,
+  /// keyed by flag key. Each value is a `bool` for boolean flags or a `String`
+  /// for multivariate flags.
+  final Map<String, Object>? featureFlags;
+
+  /// JSON payloads paired with [featureFlags], keyed by flag key. Each value is
+  /// the already-decoded payload (map, list, string, number, ...).
+  final Map<String, Object>? featureFlagPayloads;
+
+  /// Converts this configuration to a platform-channel map.
+  ///
+  /// Only the dimensions that were set are included; [isIdentifiedId] is always
+  /// sent so the native SDK doesn't have to infer it.
+  Map<String, dynamic> toMap() {
+    return {
+      if (distinctId != null) 'distinctId': distinctId,
+      'isIdentifiedId': isIdentifiedId,
+      if (featureFlags != null) 'featureFlags': featureFlags,
+      if (featureFlagPayloads != null)
+        'featureFlagPayloads': featureFlagPayloads,
     };
   }
 }

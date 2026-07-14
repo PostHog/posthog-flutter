@@ -155,6 +155,60 @@ void main() {
           config.toMap()['sessionReplayConfig'] as Map<String, dynamic>;
       expect(updatedReplayConfig['maskAllPlatformViews'], isFalse);
     });
+
+    test('omits bootstrap from toMap when not set', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.bootstrap, isNull);
+      expect(config.toMap().containsKey('bootstrap'), isFalse);
+    });
+
+    test('serializes an identified identity bootstrap', () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(
+          distinctId: 'user-123',
+          isIdentifiedId: true,
+        );
+
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, dynamic>;
+      expect(bootstrap['distinctId'], equals('user-123'));
+      expect(bootstrap['isIdentifiedId'], isTrue);
+      expect(bootstrap.containsKey('featureFlags'), isFalse);
+      expect(bootstrap.containsKey('featureFlagPayloads'), isFalse);
+    });
+
+    test('defaults isIdentifiedId to false and serializes it', () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(distinctId: 'anon-abc');
+
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, dynamic>;
+      expect(bootstrap['distinctId'], equals('anon-abc'));
+      expect(bootstrap['isIdentifiedId'], isFalse);
+    });
+
+    test('serializes feature flags and payloads without identity', () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(
+          featureFlags: {'beta-ui': 'variant-a', 'legacy': true},
+          featureFlagPayloads: {
+            'beta-ui': {'color': 'blue'},
+          },
+        );
+
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, dynamic>;
+      expect(bootstrap.containsKey('distinctId'), isFalse);
+      expect(bootstrap['isIdentifiedId'], isFalse);
+      expect(
+        bootstrap['featureFlags'],
+        equals({'beta-ui': 'variant-a', 'legacy': true}),
+      );
+      expect(
+        bootstrap['featureFlagPayloads'],
+        equals({
+          'beta-ui': {'color': 'blue'},
+        }),
+      );
+    });
   });
 
   group('PostHogPlatformView', () {

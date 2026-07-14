@@ -253,6 +253,18 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
 
+        // Bootstrap precedence and flag layering live in the native SDK; forward values only.
+        if let bootstrap = posthogConfig["bootstrap"] as? [String: Any] {
+            let bootstrapConfig = PostHogBootstrapConfig()
+            bootstrapConfig.distinctId = bootstrap["distinctId"] as? String
+            if let isIdentifiedId = bootstrap["isIdentifiedId"] as? Bool {
+                bootstrapConfig.isIdentifiedId = isIdentifiedId
+            }
+            bootstrapConfig.featureFlags = bootstrap["featureFlags"] as? [String: Any]
+            bootstrapConfig.featureFlagPayloads = bootstrap["featureFlagPayloads"] as? [String: Any]
+            config.bootstrap = bootstrapConfig
+        }
+
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
         postHogVersion = postHogFlutterVersion
