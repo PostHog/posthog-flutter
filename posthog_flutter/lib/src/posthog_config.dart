@@ -339,9 +339,10 @@ class PostHogConfig {
 ///   distinct id and marks the user identified (merging an existing anonymous
 ///   user via `identify()`, or preserving a different identified user with a
 ///   warning) — it never becomes the device id.
-/// - Bootstrapped feature flags form a base layer only: values loaded from
-///   `/flags` overlay them for overlapping keys, while bootstrapped-only keys
-///   remain available. The base layer is dropped on `reset()`.
+/// - Only enabled bootstrapped flags are served (a `true` or a non-empty
+///   variant string; `false` or empty values are dropped). They are served
+///   until the first `/flags` response, which then takes over, and they are
+///   dropped on `reset()`.
 ///
 /// **Flutter web:** not applied. Configure `bootstrap` in your
 /// `posthog.init({...})` call instead.
@@ -371,7 +372,8 @@ class PostHogBootstrapConfig {
 
   /// Feature flag values served until the first `/flags` response arrives,
   /// keyed by flag key. Each value is a `bool` for boolean flags or a `String`
-  /// for multivariate flags.
+  /// for multivariate flags. Only enabled values are served: `false` or an
+  /// empty string is dropped.
   final Map<String, Object>? featureFlags;
 
   /// JSON payloads paired with [featureFlags], keyed by flag key. Each value is
