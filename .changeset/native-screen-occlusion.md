@@ -12,3 +12,5 @@ Not captured:
 - iOS: covers without an opaque background (camera previews, image/blur backdrops)
 
 Screens that are not captured keep the previous behavior: replay keeps showing the covered Flutter UI.
+
+Requires posthog-ios >= 3.65.0 and posthog-android >= 3.54.0 (resolved automatically by the bundled dependency ranges).

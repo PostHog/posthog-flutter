@@ -2318,6 +2318,17 @@
                         "name": "maskAllPlatformViews",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureNativeScreens",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
                     }
                 ],
                 "isDeprecated": false,
@@ -4488,6 +4499,37 @@
                         "entryPoints": [],
                         "isDeprecated": false,
                         "isExperimental": false,
+                        "isStatic": true,
+                        "name": "episodeStillCurrent",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "episode",
+                                "relativePath": "lib/src/posthog_widget.dart",
+                                "typeName": "int"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "occluded",
+                                "relativePath": "lib/src/posthog_widget.dart",
+                                "typeName": "bool"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "returnTypeName": "bool",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
                         "isStatic": false,
                         "name": "new",
                         "parameters": [],
@@ -4497,7 +4539,19 @@
                         "typeParameterNames": []
                     }
                 ],
-                "fieldDeclarations": [],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "debugFlutterCaptureSuppressed",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "bool"
+                    }
+                ],
                 "isDeprecated": false,
                 "isExperimental": false,
                 "isRequired": false,
