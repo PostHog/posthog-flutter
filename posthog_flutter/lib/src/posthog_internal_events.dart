@@ -19,4 +19,12 @@ class PostHogInternalEvents {
   static bool nativeOcclusionActive = false;
   static int nativeOcclusionEpisode = 0;
   static bool nativeBridgeFailed = false;
+
+  /// Whether an async operation started in [episode]/[occluded] is still acting
+  /// on the world it saw — the episode id distinguishes "still episode A" from
+  /// "a new episode started mid-flight".
+  static bool episodeStillCurrent(int episode, {required bool occluded}) {
+    return nativeOcclusionEpisode == episode &&
+        nativeOcclusionActive == occluded;
+  }
 }

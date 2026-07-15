@@ -518,7 +518,11 @@ class PosthogFlutterPlugin :
                         }
                         if (captureNativeScreens) {
                             mainHandler.post { startOcclusionDetector() }
+                        } else {
+                            mainHandler.post { disableOcclusionDetector() }
                         }
+                    } else {
+                        mainHandler.post { disableOcclusionDetector() }
                     }
                 }
 
@@ -757,6 +761,21 @@ class PosthogFlutterPlugin :
         mainHandler.removeCallbacks(occlusionTicker)
         mainHandler.removeCallbacks(nudgeRunnable)
         unregisterLifecycleTracking()
+    }
+
+    // For a setup() re-run that drops the feature: unlike a bare stop, ends any
+    // active episode, otherwise Dart never learns and keeps its capture
+    // suppressed.
+    private fun disableOcclusionDetector() {
+        stopOcclusionDetector()
+        if (isOccluded || bridgeEnabled) {
+            isOccluded = false
+            bridgeEnabled = false
+            bridgeEpisodeStarted = false
+            bridgeFailureStrikes = 0
+            bridgeCaptureInFlight = false
+            pushOcclusionEvent(occluded = false)
+        }
     }
 
     private fun pushOcclusionEvent(

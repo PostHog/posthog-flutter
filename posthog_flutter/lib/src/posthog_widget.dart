@@ -69,15 +69,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
     );
   }
 
-  /// Whether an async operation started in [episode]/[occluded] is still acting
-  /// on the world it saw — the episode id distinguishes "still episode A" from
-  /// "a new episode started mid-flight".
-  @visibleForTesting
-  static bool episodeStillCurrent(int episode, {required bool occluded}) {
-    return PostHogInternalEvents.nativeOcclusionEpisode == episode &&
-        PostHogInternalEvents.nativeOcclusionActive == occluded;
-  }
-
   /// A native screen started/stopped covering Flutter (pushed by the native
   /// detector). On entry: hand off to the bridge, else emit one black
   /// placeholder. On exit: invalidate dedup hashes so the first Flutter frame
@@ -118,7 +109,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
       final accepted =
           await _nativeCommunicator?.enableNativeBridge(episode: episode) ??
               false;
-      if (_disposed || !episodeStillCurrent(episode, occluded: true)) {
+      if (_disposed ||
+          !PostHogInternalEvents.episodeStillCurrent(episode, occluded: true)) {
         return;
       }
       if (accepted) {
@@ -132,7 +124,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // A placeholder is only valid while its own episode is occluding.
       await _sendSnapshot(
         imageInfo,
-        isStillValid: () => episodeStillCurrent(episode, occluded: true),
+        isStillValid: () =>
+            PostHogInternalEvents.episodeStillCurrent(episode, occluded: true),
       );
     }
   }
@@ -215,7 +208,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // episode starting mid-pipeline makes it stale.
       await _sendSnapshot(
         imageInfo,
-        isStillValid: () => episodeStillCurrent(episode, occluded: occluded),
+        isStillValid: () => PostHogInternalEvents.episodeStillCurrent(episode,
+            occluded: occluded),
       );
     } finally {
       _isCapturing = false;

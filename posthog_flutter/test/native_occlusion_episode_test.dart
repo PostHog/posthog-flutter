@@ -115,26 +115,27 @@ void main() {
       PostHogInternalEvents.nativeOcclusionEpisode = 3;
       PostHogInternalEvents.nativeOcclusionActive = true;
 
-      expect(PostHogWidgetState.episodeStillCurrent(3, occluded: true), isTrue);
       expect(
-        PostHogWidgetState.episodeStillCurrent(3, occluded: false),
+          PostHogInternalEvents.episodeStillCurrent(3, occluded: true), isTrue);
+      expect(
+        PostHogInternalEvents.episodeStillCurrent(3, occluded: false),
         isFalse,
         reason: 'occlusion state flipped',
       );
       expect(
-        PostHogWidgetState.episodeStillCurrent(2, occluded: true),
+        PostHogInternalEvents.episodeStillCurrent(2, occluded: true),
         isFalse,
         reason: 'a new episode started while the operation was in flight',
       );
 
       PostHogInternalEvents.nativeOcclusionActive = false;
       expect(
-        PostHogWidgetState.episodeStillCurrent(3, occluded: true),
+        PostHogInternalEvents.episodeStillCurrent(3, occluded: true),
         isFalse,
         reason: 'episode ended',
       );
       expect(
-        PostHogWidgetState.episodeStillCurrent(3, occluded: false),
+        PostHogInternalEvents.episodeStillCurrent(3, occluded: false),
         isTrue,
       );
     });

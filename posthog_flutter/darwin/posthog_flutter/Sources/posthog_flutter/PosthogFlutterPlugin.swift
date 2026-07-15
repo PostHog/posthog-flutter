@@ -206,6 +206,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 }
                 if config.sessionReplay, captureNativeScreens {
                     PosthogFlutterPlugin.instance?.startOcclusionDetector()
+                } else {
+                    PosthogFlutterPlugin.instance?.disableOcclusionDetector()
                 }
             }
 
@@ -720,6 +722,23 @@ extension PosthogFlutterPlugin {
             occlusionTimer = nil
             NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeVisibleNotification, object: nil)
             NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeKeyNotification, object: nil)
+        }
+
+        /// For a setup() re-run that drops the feature: unlike a bare stop,
+        /// ends any active episode, otherwise Dart never learns and keeps its
+        /// capture suppressed.
+        func disableOcclusionDetector() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.stopOcclusionDetector()
+                if self.isOccluded || self.bridgeEnabled {
+                    self.isOccluded = false
+                    self.bridgeEnabled = false
+                    self.bridgeEpisodeStarted = false
+                    self.bridgeFailureStrikes = 0
+                    self.pushOcclusionEvent(occluded: false)
+                }
+            }
         }
 
         // Notifications fire on main; the guard drops a stray one after stop.

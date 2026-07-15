@@ -358,8 +358,18 @@ class ScreenshotCapturer {
   }
 
   /// Builds one black placeholder frame for an occlusion episode, shown when a
-  /// bridged capture can't be produced. Null when the view is not ready.
+  /// bridged capture can't be produced. Null when the view is not ready or
+  /// rendering fails — like [captureScreenshot], it never throws.
   Future<ImageInfo?> buildOcclusionPlaceholder() async {
+    try {
+      return await _buildOcclusionPlaceholder();
+    } catch (error) {
+      printIfDebug('Error building occlusion placeholder: $error');
+      return null;
+    }
+  }
+
+  Future<ImageInfo?> _buildOcclusionPlaceholder() async {
     final target = _resolveCaptureTarget();
     if (target == null) {
       return null;
