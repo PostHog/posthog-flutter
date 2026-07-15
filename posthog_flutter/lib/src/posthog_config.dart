@@ -3,6 +3,7 @@ import 'dart:async';
 import 'logs/posthog_log_record.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'util/logging.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
 ///
@@ -385,6 +386,20 @@ class PostHogBootstrapConfig {
   /// Only the dimensions that were set are included; [isIdentifiedId] is always
   /// sent so the native SDK doesn't have to infer it.
   Map<String, dynamic> toMap() {
+    final flags = featureFlags;
+    if (flags != null) {
+      for (final entry in flags.entries) {
+        // Only bool/String are served (see [featureFlags]); the native SDKs drop
+        // anything else silently, so warn instead of leaving no trace.
+        if (entry.value is! bool && entry.value is! String) {
+          printIfDebug(
+            '[PostHog] bootstrap featureFlags["${entry.key}"] is '
+            '${entry.value.runtimeType}; only bool and String values are served, '
+            'so this entry will be ignored.',
+          );
+        }
+      }
+    }
     return {
       if (distinctId != null) 'distinctId': distinctId,
       'isIdentifiedId': isIdentifiedId,

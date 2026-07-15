@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -208,6 +210,33 @@ void main() {
           'beta-ui': {'color': 'blue'},
         }),
       );
+    });
+
+    test('warns on a non-bool/String featureFlags value but still forwards it',
+        () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(
+          featureFlags: {'discount-tier': 2, 'beta-ui': 'variant-a'},
+        );
+
+      final logs = <String>[];
+      final map = runZoned(
+        config.toMap,
+        zoneSpecification: ZoneSpecification(
+          print: (_, __, ___, line) => logs.add(line),
+        ),
+      );
+
+      // The mismatched value is still forwarded; the native SDK drops it.
+      final bootstrap = map['bootstrap'] as Map<String, dynamic>;
+      expect(
+        bootstrap['featureFlags'],
+        equals({'discount-tier': 2, 'beta-ui': 'variant-a'}),
+      );
+      // ...but the caller gets a breadcrumb for the ignored entry, and no
+      // false warning for the valid String value.
+      expect(logs.where((l) => l.contains('discount-tier')), isNotEmpty);
+      expect(logs.where((l) => l.contains('beta-ui')), isEmpty);
     });
   });
 
