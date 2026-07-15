@@ -494,7 +494,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
 
     final client = HttpClient();
     Object? value = false;
-    var hasExperiment = false;
+    bool? hasExperiment;
     try {
       final uri = Uri.parse(_host!).resolve('/flags/?v=2');
       for (var attempt = 0; attempt <= _maxRetries; attempt++) {
@@ -543,7 +543,8 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
         r'$lib_version': postHogFlutterVersion,
         r'$feature_flag': key,
         r'$feature_flag_response': value,
-        r'$feature_flag_has_experiment': hasExperiment,
+        if (hasExperiment != null)
+          r'$feature_flag_has_experiment': hasExperiment,
         r'$feature/' + key: value,
       },
       'timestamp': DateTime.now().toUtc().toIso8601String(),
@@ -556,14 +557,16 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
 
   /// Reads `metadata.has_experiment` from the `/flags?v=2` entry for [key].
   ///
-  /// Defaults to `false` when the server does not send it (e.g. legacy
-  /// `featureFlags` responses).
-  bool _flagHasExperiment(Object? flags, String key) {
-    if (flags is! Map) return false;
+  /// Returns `null` when the server does not report it (e.g. legacy
+  /// `featureFlags` responses or metadata without a boolean value).
+  bool? _flagHasExperiment(Object? flags, String key) {
+    if (flags is! Map) return null;
     final details = flags[key];
-    if (details is! Map) return false;
+    if (details is! Map) return null;
     final metadata = details['metadata'];
-    return metadata is Map && metadata['has_experiment'] == true;
+    if (metadata is! Map) return null;
+    final hasExperiment = metadata['has_experiment'];
+    return hasExperiment is bool ? hasExperiment : null;
   }
 
   bool _shouldRetryFlags(int statusCode) =>

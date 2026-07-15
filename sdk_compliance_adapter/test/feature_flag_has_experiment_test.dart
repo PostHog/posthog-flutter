@@ -34,7 +34,34 @@ void main() {
   );
 
   test(
-    r'$feature_flag_has_experiment defaults to false without metadata',
+    r'$feature_flag_has_experiment is sent when the server reports false',
+    () async {
+      final mockServer = await _MockPostHogServer.start({
+        'flags': {
+          'plain-flag': {
+            'key': 'plain-flag',
+            'enabled': true,
+            'metadata': {'has_experiment': false},
+          },
+        },
+        'featureFlags': {'plain-flag': true},
+      });
+      addTearDown(mockServer.close);
+
+      final properties = await _captureFeatureFlagCalled(
+        mockServer,
+        key: 'plain-flag',
+      );
+
+      expect(properties[r'$feature_flag'], 'plain-flag');
+      expect(properties[r'$feature_flag_response'], isTrue);
+      expect(properties[r'$feature_flag_has_experiment'], isFalse);
+    },
+  );
+
+  test(
+    r'$feature_flag_has_experiment is omitted when the server does not '
+    'report it',
     () async {
       final mockServer = await _MockPostHogServer.start({
         'featureFlags': {'plain-flag': true},
@@ -48,7 +75,7 @@ void main() {
 
       expect(properties[r'$feature_flag'], 'plain-flag');
       expect(properties[r'$feature_flag_response'], isTrue);
-      expect(properties[r'$feature_flag_has_experiment'], isFalse);
+      expect(properties, isNot(contains(r'$feature_flag_has_experiment')));
     },
   );
 }
