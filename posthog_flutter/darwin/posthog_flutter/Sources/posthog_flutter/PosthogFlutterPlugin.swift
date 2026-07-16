@@ -625,10 +625,14 @@ extension PosthogFlutterPlugin {
             if let webView = view as? WKWebView {
                 let frameInWindow = webView.convert(webView.bounds, to: nil)
                 // 1pt slack absorbs rounding between Flutter's rect and the native frame.
-                if rect.insetBy(dx: -1, dy: -1).contains(frameInWindow) { return webView }
+                if rect.insetBy(dx: -1, dy: -1).contains(frameInWindow) {
+                    return webView
+                }
             }
             for sub in view.subviews {
-                if let found = findWKWebView(in: sub, containedBy: rect) { return found }
+                if let found = findWKWebView(in: sub, containedBy: rect) {
+                    return found
+                }
             }
             return nil
         }
