@@ -2834,7 +2834,7 @@
                                 "isRequired": false,
                                 "name": "featureFlagPayloads",
                                 "relativePath": "lib/src/posthog_config.dart",
-                                "typeName": "Map<String, Object>?"
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_config.dart",
@@ -2886,7 +2886,7 @@
                         "isWriteable": false,
                         "name": "featureFlagPayloads",
                         "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "Map<String, Object>?"
+                        "typeName": "Map<String, Object?>?"
                     }
                 ],
                 "isDeprecated": false,

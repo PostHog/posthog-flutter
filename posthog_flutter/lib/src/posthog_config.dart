@@ -378,8 +378,8 @@ class PostHogBootstrapConfig {
   final Map<String, Object>? featureFlags;
 
   /// JSON payloads paired with [featureFlags], keyed by flag key. Each value is
-  /// the already-decoded payload (map, list, string, number, ...).
-  final Map<String, Object>? featureFlagPayloads;
+  /// the already-decoded payload (map, list, string, number, `null`, ...).
+  final Map<String, Object?>? featureFlagPayloads;
 
   /// Converts this configuration to a platform-channel map.
   ///

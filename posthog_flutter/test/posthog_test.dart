@@ -194,6 +194,7 @@ void main() {
           featureFlags: {'beta-ui': 'variant-a', 'legacy': true},
           featureFlagPayloads: {
             'beta-ui': {'color': 'blue'},
+            'legacy': null,
           },
         );
 
@@ -208,6 +209,7 @@ void main() {
         bootstrap['featureFlagPayloads'],
         equals({
           'beta-ui': {'color': 'blue'},
+          'legacy': null,
         }),
       );
     });

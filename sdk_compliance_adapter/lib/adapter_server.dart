@@ -105,7 +105,7 @@ class ComplianceAdapter {
           isIdentifiedId: bootstrap['is_identified_id'] == true,
           featureFlags: _readObjectMap(bootstrap['feature_flags']),
           featureFlagPayloads:
-              _readObjectMap(bootstrap['feature_flag_payloads']),
+              _readNullableObjectMap(bootstrap['feature_flag_payloads']),
         );
       }
 
