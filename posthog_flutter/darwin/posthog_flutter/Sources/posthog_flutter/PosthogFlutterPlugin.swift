@@ -375,19 +375,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendMetaEvent(call, result: result)
         case "sendFullSnapshot":
             sendFullSnapshot(call, result: result)
-        case "captureNativeScreenshot":
-            captureNativeScreenshot(call, result: result)
         case "captureNativeScreenshots":
             captureNativeScreenshots(call, result: result)
         case "enableNativeBridge":
             #if os(iOS)
                 let episode = (call.arguments as? [String: Any])?["episode"] as? Int
                 DispatchQueue.main.async {
-                    // Accept only when the bridge can deliver frames, and only
-                    // for the episode Dart is reacting to: a stale enable that
-                    // lands after its episode ended must not re-arm the bridge
-                    // for a later episode Dart never handed off. Declines never
-                    // disarm, so a stale decline can't stomp a live episode.
+                    // Episode-scoped: a stale enable must not re-arm the bridge
+                    // for an episode Dart never handed off.
                     let accepted = self.isOccluded
                         && episode == self.occlusionEpisode
                         && PostHogSDK.shared.isSessionReplayActive()
@@ -399,6 +394,16 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             #else
                 result(false)
             #endif
+        case "setCaptureNativeScreens":
+            #if os(iOS)
+                let enabled = (call.arguments as? [String: Any])?["enabled"] as? Bool ?? false
+                if enabled {
+                    startOcclusionDetector()
+                } else {
+                    disableOcclusionDetector()
+                }
+            #endif
+            result(nil)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
         case "startSessionRecording":
@@ -533,30 +538,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 #endif
 
 extension PosthogFlutterPlugin {
-    private func captureNativeScreenshot(_ call: FlutterMethodCall,
-                                         result: @escaping FlutterResult)
-    {
-        #if os(iOS)
-            guard let args = call.arguments as? [String: Any] else {
-                _badArgumentError(result)
-                return
-            }
-            let x = args["x"] as? Int ?? 0
-            let y = args["y"] as? Int ?? 0
-            let width = args["width"] as? Int ?? 0
-            let height = args["height"] as? Int ?? 0
-            guard width > 0, height > 0 else {
-                _badArgumentError(result)
-                return
-            }
-            captureOneNative(x: x, y: y, width: width, height: height) { bytes in
-                result(bytes)
-            }
-        #else
-            result(nil)
-        #endif
-    }
-
     private func captureNativeScreenshots(_ call: FlutterMethodCall,
                                           result: @escaping FlutterResult)
     {
@@ -800,6 +781,10 @@ extension PosthogFlutterPlugin {
                 notOccludedTicks += 1
                 return
             }
+            // Occluded again after a blip = the cover was swapped. The old
+            // cover's bridge grant must not carry over; re-handshake under a
+            // new episode id. No end event, so Dart's suppression never lapses.
+            let coverSwapped = occluded && isOccluded && notOccludedTicks > 0
             notOccludedTicks = 0
             if occluded != isOccluded {
                 isOccluded = occluded
@@ -811,6 +796,12 @@ extension PosthogFlutterPlugin {
                 }
                 bridgeFailureStrikes = 0
                 pushOcclusionEvent(occluded: occluded)
+            } else if coverSwapped {
+                occlusionEpisode += 1
+                bridgeEnabled = false
+                bridgeEpisodeStarted = false
+                bridgeFailureStrikes = 0
+                pushOcclusionEvent(occluded: true)
             }
             if occluded, bridgeEnabled {
                 // First capture of an episode settles the presentation with

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'logs/posthog_log_record.dart';
+import 'posthog.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'util/logging.dart';
@@ -624,8 +625,26 @@ class PostHogSessionReplayConfig {
   /// Applies only to native screens presented over the whole app. For native
   /// views embedded in the Flutter layout, see [maskAllPlatformViews].
   ///
+  /// Can be changed at runtime after setup — turning it off before presenting
+  /// a sensitive native screen guarantees that screen is not captured.
+  ///
   /// Default: false. Requires native SDK support for on-demand capture.
-  var captureNativeScreens = false;
+  bool get captureNativeScreens => _captureNativeScreens;
+
+  bool _captureNativeScreens = false;
+
+  set captureNativeScreens(bool value) {
+    if (_captureNativeScreens == value) {
+      return;
+    }
+    _captureNativeScreens = value;
+    // Propagated immediately (not lazily at the next episode) so a toggle-off
+    // right before presenting a native screen can never race the detector into
+    // capturing it. Before setup the value crosses inside the config instead.
+    if (identical(Posthog().config?.sessionReplayConfig, this)) {
+      PosthogFlutterPlatformInterface.instance.setCaptureNativeScreens(value);
+    }
+  }
 
   /// Converts this session replay configuration to a platform-channel map.
   ///

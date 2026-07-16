@@ -13,4 +13,6 @@ Not captured:
 
 Screens that are not captured keep the previous behavior: replay keeps showing the covered Flutter UI.
 
+The flag can also be toggled at runtime. Turning it off takes effect immediately: toggling off right before presenting a sensitive native screen guarantees that screen is not captured. Enable it before presenting a screen you want captured — enabling while a native screen is already up may not capture that screen.
+
 Requires posthog-ios >= 3.66.0 and posthog-android >= 3.55.0 (resolved automatically by the bundled dependency ranges).

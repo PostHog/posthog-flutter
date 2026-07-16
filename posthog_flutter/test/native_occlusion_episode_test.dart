@@ -110,6 +110,31 @@ void main() {
     messenger.setMockMethodCallHandler(channel, null);
   });
 
+  group('captureNativeScreens runtime toggle', () {
+    test('propagates only from the active config, only on real changes',
+        () async {
+      final fake = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fake;
+      final config = replayConfig(captureNativeScreens: true);
+
+      // Before setup the value crosses inside the config map instead.
+      config.sessionReplayConfig.captureNativeScreens = false;
+      expect(fake.captureNativeScreensChanges, isEmpty);
+
+      await Posthog().setup(config);
+      config.sessionReplayConfig.captureNativeScreens = true;
+      config.sessionReplayConfig.captureNativeScreens = true;
+      config.sessionReplayConfig.captureNativeScreens = false;
+      expect(fake.captureNativeScreensChanges, [true, false],
+          reason: 'each real change crosses once; the no-op set does not');
+
+      final inactive = PostHogConfig('other_token');
+      inactive.sessionReplayConfig.captureNativeScreens = true;
+      expect(fake.captureNativeScreensChanges, [true, false],
+          reason: 'a config that is not the active one must not propagate');
+    });
+  });
+
   group('episodeStillCurrent', () {
     test('true only while both the episode id and occlusion state match', () {
       PostHogInternalEvents.nativeOcclusionEpisode = 3;
@@ -304,6 +329,13 @@ void main() {
       );
       expect(enable.arguments, {'episode': 7},
           reason: 'the native side declines a stale enable by episode id');
+      expect(
+        recordedCalls.map((c) => c.method),
+        isNot(anyOf(contains('sendMetaEvent'), contains('sendFullSnapshot'))),
+        reason:
+            'an accepted bridge owns the episode: Dart must not also ship a '
+            'placeholder or snapshot for it (no double frame)',
+      );
 
       await unmountAndFlush(tester);
     });
@@ -326,6 +358,70 @@ void main() {
       expect(state.debugFlutterCaptureSuppressed, isTrue,
           reason: 'the placeholder owns the episode now');
       expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'));
+
+      await unmountAndFlush(tester);
+    });
+
+    // A native→native cover swap inside the end-debounce window arrives as a
+    // new occluded=true episode with no occluded=false between.
+    testWidgets('cover swap with the flag now off releases the bridge grant',
+        (tester) async {
+      enableNativeBridgeResult = true;
+      final config = replayConfig(captureNativeScreens: true);
+      await setupPosthog(config);
+      final state = await pumpReplayWidget(tester);
+
+      pushOcclusion(occluded: true, episode: 1);
+      await settleRealAsync(tester);
+      expect(state.debugFlutterCaptureSuppressed, isTrue,
+          reason: 'episode 1 was granted while the flag was on');
+
+      config.sessionReplayConfig.captureNativeScreens = false;
+      recordedCalls.clear();
+      pushOcclusion(occluded: true, episode: 2);
+      await settleRealAsync(tester);
+
+      expect(state.debugFlutterCaptureSuppressed, isFalse,
+          reason: 'flag off: Flutter keeps recording the covered tree');
+      expect(
+        recordedCalls.map((c) => c.method),
+        isNot(contains('enableNativeBridge')),
+        reason: 'no grant may be negotiated for the swapped cover',
+      );
+      expect(
+        recordedCalls.map((c) => c.method),
+        isNot(contains('sendFullSnapshot')),
+        reason: 'flag off also means no placeholder',
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('cover swap with the flag still on re-negotiates seamlessly',
+        (tester) async {
+      enableNativeBridgeResult = true;
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      final state = await pumpReplayWidget(tester);
+
+      pushOcclusion(occluded: true, episode: 1);
+      await settleRealAsync(tester);
+      recordedCalls.clear();
+
+      pushOcclusion(occluded: true, episode: 2);
+      await settleRealAsync(tester);
+
+      final enable = recordedCalls.firstWhere(
+        (c) => c.method == 'enableNativeBridge',
+      );
+      expect(enable.arguments, {'episode': 2},
+          reason: 'the swapped cover gets its own grant');
+      expect(state.debugFlutterCaptureSuppressed, isTrue,
+          reason: 'no end event between episodes: suppression never lapses');
+      expect(
+        recordedCalls.map((c) => c.method),
+        isNot(anyOf(contains('sendMetaEvent'), contains('sendFullSnapshot'))),
+        reason: 'the re-granted bridge owns the frame, no placeholder',
+      );
 
       await unmountAndFlush(tester);
     });

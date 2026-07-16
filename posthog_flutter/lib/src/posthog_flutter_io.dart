@@ -195,6 +195,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setCaptureNativeScreens(bool enabled) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+    try {
+      await _methodChannel.invokeMethod(
+        'setCaptureNativeScreens',
+        {'enabled': enabled},
+      );
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on setCaptureNativeScreens: $exception');
+    }
+  }
+
+  @override
   Future<void> identify({
     required String userId,
     Map<String, Object>? userProperties,

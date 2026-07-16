@@ -271,6 +271,18 @@ void main() {
       );
     });
 
+    test('setCaptureNativeScreens sends the enabled flag', () async {
+      await posthogFlutterIO.setCaptureNativeScreens(false);
+      await posthogFlutterIO.setCaptureNativeScreens(true);
+
+      final calls =
+          log.where((c) => c.method == 'setCaptureNativeScreens').toList();
+      expect(calls.map((c) => c.arguments), [
+        {'enabled': false},
+        {'enabled': true},
+      ]);
+    });
+
     test('setGroupPropertiesForFlags sends groupType and properties', () async {
       await posthogFlutterIO.setGroupPropertiesForFlags(
         'organization',

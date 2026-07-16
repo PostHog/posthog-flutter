@@ -332,29 +332,40 @@ class PosthogFlutterPlugin :
                 handleSendFullSnapshot(call, result)
             }
 
-            "captureNativeScreenshot" -> {
-                handleCaptureNativeScreenshot(call, result)
-            }
-
             "captureNativeScreenshots" -> {
                 handleCaptureNativeScreenshots(call, result)
             }
 
             "enableNativeBridge" -> {
-                // Accept only when the bridge can deliver frames, and only for
-                // the episode Dart is reacting to: a stale enable that lands
-                // after its episode ended must not re-arm the bridge for a
-                // later episode Dart never handed off. Declines never disarm,
-                // so a stale decline can't stomp a live episode.
-                val episode = call.argument<Int>("episode")
-                val accepted =
-                    isOccluded && episode == occlusionEpisode &&
-                        replayIntegration() != null && isSessionReplayActive()
-                if (accepted) {
-                    bridgeEnabled = true
-                    nudgeOcclusionDetector()
+                try {
+                    // Episode-scoped: a stale enable must not re-arm the bridge
+                    // for an episode Dart never handed off.
+                    val episode = call.argument<Int>("episode")
+                    val accepted =
+                        isOccluded && episode == occlusionEpisode &&
+                            replayIntegration() != null && isSessionReplayActive()
+                    if (accepted) {
+                        bridgeEnabled = true
+                        nudgeOcclusionDetector()
+                    }
+                    result.success(accepted)
+                } catch (e: Throwable) {
+                    // A decline never throws across the channel; Dart falls
+                    // back to the placeholder.
+                    result.success(false)
                 }
-                result.success(accepted)
+            }
+
+            "setCaptureNativeScreens" -> {
+                val enabled = call.argument<Boolean>("enabled") ?: false
+                mainHandler.post {
+                    if (enabled) {
+                        startOcclusionDetector()
+                    } else {
+                        disableOcclusionDetector()
+                    }
+                }
+                result.success(null)
             }
 
             "isSessionReplayActive" -> {
@@ -833,6 +844,10 @@ class PosthogFlutterPlugin :
             notOccludedTicks++
             return
         }
+        // Occluded again after a blip = the cover was swapped. The old cover's
+        // bridge grant must not carry over; re-handshake under a new episode
+        // id. No end event, so Dart's suppression never lapses.
+        val coverSwapped = occludedNow && isOccluded && notOccludedTicks > 0
         notOccludedTicks = 0
         if (occludedNow != isOccluded) {
             val previousOccluded = isOccluded
@@ -854,6 +869,22 @@ class PosthogFlutterPlugin :
                 // of advancing to an episode Dart never heard begin — whose
                 // bridge frames it would then silently drop as stale.
                 isOccluded = previousOccluded
+                occlusionEpisode = previousEpisode
+                throw e
+            }
+        } else if (coverSwapped) {
+            val previousEpisode = occlusionEpisode
+            occlusionEpisode++
+            bridgeEnabled = false
+            bridgeEpisodeStarted = false
+            bridgeFailureStrikes = 0
+            bridgeCaptureInFlight = false
+            try {
+                pushOcclusionEvent(occluded = true)
+            } catch (e: Throwable) {
+                // The re-handshake never reached Dart; the bridge stays
+                // disarmed (failing toward not capturing), but roll the episode
+                // back so in-flight results still match their episode.
                 occlusionEpisode = previousEpisode
                 throw e
             }
@@ -943,32 +974,6 @@ class PosthogFlutterPlugin :
                 result.success(null)
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)
-            }
-        } catch (e: Throwable) {
-            result.error("PosthogFlutterException", e.localizedMessage, null)
-        }
-    }
-
-    private fun handleCaptureNativeScreenshot(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val currentActivity =
-                activity ?: run {
-                    result.success(null)
-                    return
-                }
-            val x = call.argument<Int>("x") ?: 0
-            val y = call.argument<Int>("y") ?: 0
-            val width = call.argument<Int>("width") ?: 0
-            val height = call.argument<Int>("height") ?: 0
-            if (width <= 0 || height <= 0) {
-                result.error("INVALID_ARGUMENT", "Width or height is 0", null)
-                return
-            }
-            captureOneNative(currentActivity, x, y, width, height) { bytes ->
-                result.success(bytes)
             }
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
