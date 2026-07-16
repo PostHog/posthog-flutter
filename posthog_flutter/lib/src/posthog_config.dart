@@ -3,6 +3,7 @@ import 'dart:async';
 import 'logs/posthog_log_record.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'util/logging.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
 ///
@@ -175,6 +176,23 @@ class PostHogConfig {
   /// `Posthog().logger` facade).
   final logsConfig = PostHogLogsConfig();
 
+  /// Pre-seeded identity and feature-flag state applied on the very first SDK
+  /// launch, before any network request completes.
+  ///
+  /// Set this before calling `Posthog().setup(config)` so events captured during
+  /// cold start carry a caller-controlled `$distinct_id` and feature-flag reads
+  /// return caller-provided values before the first `/flags` response. Mirrors
+  /// the [`bootstrap` option in `posthog-js`](https://posthog.com/docs/feature-flags/bootstrapping).
+  ///
+  /// Forwarded to the native iOS/Android SDKs, which apply all precedence rules
+  /// (never overwrite persisted identity, overlay loaded flags over bootstrapped
+  /// ones, drop the bootstrap on `reset()`). Defaults to `null` (no bootstrap).
+  ///
+  /// **Flutter web:** not applied. The web SDK hooks onto an already-initialized
+  /// posthog-js instance, so configure `bootstrap` in your `posthog.init({...})`
+  /// call instead.
+  PostHogBootstrapConfig? bootstrap;
+
   /// Callback to be invoked when feature flags are loaded.
   ///
   /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
@@ -303,6 +321,91 @@ class PostHogConfig {
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
       'logs': logsConfig.toMap(),
+      if (bootstrap != null) 'bootstrap': bootstrap!.toMap(),
+    };
+  }
+}
+
+/// Pre-seeded identity and feature-flag state applied on the very first SDK
+/// launch, before any network request completes.
+///
+/// Assign an instance to [PostHogConfig.bootstrap] before calling
+/// `Posthog().setup(config)`. The values are forwarded to the native iOS/Android
+/// SDKs, which own all bootstrap behavior:
+///
+/// - Bootstrapped identity seeds the very first session only. It is applied only
+///   when no identity is persisted for that scope, and never overwrites an
+///   existing user. An anonymous bootstrap ([isIdentifiedId] `false`) seeds the
+///   anonymous id; an identified bootstrap ([isIdentifiedId] `true`) seeds the
+///   distinct id and marks the user identified (merging an existing anonymous
+///   user via `identify()`, or preserving a different identified user with a
+///   warning) — it never becomes the device id.
+/// - Only enabled bootstrapped flags are served (a `true` or a non-empty
+///   variant string; `false` or empty values are dropped). They are served
+///   until the first `/flags` response, which then takes over, and they are
+///   dropped on `reset()`.
+///
+/// **Flutter web:** not applied. Configure `bootstrap` in your
+/// `posthog.init({...})` call instead.
+class PostHogBootstrapConfig {
+  /// Creates a bootstrap configuration.
+  ///
+  /// Pass only the dimensions you want to seed; leave the rest `null`.
+  const PostHogBootstrapConfig({
+    this.distinctId,
+    this.isIdentifiedId = false,
+    this.featureFlags,
+    this.featureFlagPayloads,
+  });
+
+  /// The distinct id to seed on first launch.
+  ///
+  /// When [isIdentifiedId] is `false` (the default) this becomes the anonymous
+  /// id — the `$distinct_id` on pre-identify events. When `true` it is treated
+  /// as an already-identified user's distinct id.
+  final String? distinctId;
+
+  /// Whether [distinctId] represents an already-identified user.
+  ///
+  /// Defaults to `false`. Set to `true` when the host application resolved the
+  /// user's identity outside the SDK (for example from a backend session token).
+  final bool isIdentifiedId;
+
+  /// Feature flag values served until the first `/flags` response arrives,
+  /// keyed by flag key. Each value is a `bool` for boolean flags or a `String`
+  /// for multivariate flags. Only enabled values are served: `false` or an
+  /// empty string is dropped.
+  final Map<String, Object>? featureFlags;
+
+  /// JSON payloads paired with [featureFlags], keyed by flag key. Each value is
+  /// the already-decoded payload (map, list, string, number, `null`, ...).
+  final Map<String, Object?>? featureFlagPayloads;
+
+  /// Converts this configuration to a platform-channel map.
+  ///
+  /// Only the dimensions that were set are included; [isIdentifiedId] is always
+  /// sent so the native SDK doesn't have to infer it.
+  Map<String, Object?> toMap() {
+    final flags = featureFlags;
+    if (flags != null) {
+      for (final entry in flags.entries) {
+        // Only bool/String are served (see [featureFlags]); the native SDKs drop
+        // anything else silently, so warn instead of leaving no trace.
+        if (entry.value is! bool && entry.value is! String) {
+          printIfDebug(
+            '[PostHog] bootstrap featureFlags["${entry.key}"] is '
+            '${entry.value.runtimeType}; only bool and String values are served, '
+            'so this entry will be ignored.',
+          );
+        }
+      }
+    }
+    return {
+      if (distinctId != null) 'distinctId': distinctId,
+      'isIdentifiedId': isIdentifiedId,
+      if (featureFlags != null) 'featureFlags': featureFlags,
+      if (featureFlagPayloads != null)
+        'featureFlagPayloads': featureFlagPayloads,
     };
   }
 }

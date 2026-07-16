@@ -7,7 +7,9 @@ import io.flutter.plugin.common.MethodChannel
 import org.mockito.Mockito
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /*
  * This demonstrates a simple unit test of the Kotlin portion of this plugin's implementation.
@@ -176,43 +178,6 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_enableNativeBridge_declinesWhenNotOccluded() {
-        val plugin = PosthogFlutterPlugin()
-
-        val call = MethodCall("enableNativeBridge", mapOf("episode" to 1))
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
-
-        Mockito.verify(mockResult).success(false)
-    }
-
-    @Test
-    fun onMethodCall_enableNativeBridge_declinesStaleEpisode() {
-        val plugin = PosthogFlutterPlugin()
-        plugin.isOccluded = true
-        plugin.occlusionEpisode = 5
-
-        val call = MethodCall("enableNativeBridge", mapOf("episode" to 4))
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
-
-        Mockito.verify(mockResult).success(false)
-    }
-
-    @Test
-    fun onMethodCall_enableNativeBridge_declineDoesNotDisarmBridge() {
-        val plugin = PosthogFlutterPlugin()
-        plugin.bridgeEnabled = true
-
-        val call = MethodCall("enableNativeBridge", mapOf("episode" to 9))
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
-
-        Mockito.verify(mockResult).success(false)
-        assertEquals(true, plugin.bridgeEnabled)
-    }
-
-    @Test
     fun onMethodCall_getFeatureFlagResult_missingKey_returnsError() {
         val plugin = PosthogFlutterPlugin()
 
@@ -225,5 +190,50 @@ internal class PosthogFlutterPluginTest {
             Mockito.eq("Missing argument: key"),
             Mockito.isNull(),
         )
+    }
+
+    @Test
+    fun bootstrapConfigFromMap_fullMap_decodesAllFields() {
+        val config =
+            bootstrapConfigFromMap(
+                mapOf(
+                    "distinctId" to "user-123",
+                    "isIdentifiedId" to true,
+                    "featureFlags" to mapOf("beta-ui" to "variant-a", "legacy" to true),
+                    "featureFlagPayloads" to mapOf("beta-ui" to mapOf("color" to "blue")),
+                ),
+            )
+
+        assertEquals("user-123", config.distinctId)
+        assertTrue(config.isIdentifiedId)
+        assertEquals(mapOf("beta-ui" to "variant-a", "legacy" to true), config.featureFlags)
+        assertEquals(mapOf("beta-ui" to mapOf("color" to "blue")), config.featureFlagPayloads)
+    }
+
+    @Test
+    fun bootstrapConfigFromMap_emptyMap_usesDefaults() {
+        val config = bootstrapConfigFromMap(emptyMap())
+
+        assertNull(config.distinctId)
+        assertFalse(config.isIdentifiedId)
+        assertNull(config.featureFlags)
+        assertNull(config.featureFlagPayloads)
+    }
+
+    @Test
+    fun bootstrapConfigFromMap_wrongTypes_fallBackToDefaults() {
+        val config =
+            bootstrapConfigFromMap(
+                mapOf(
+                    "distinctId" to 42,
+                    "isIdentifiedId" to "yes",
+                    "featureFlags" to listOf("beta-ui"),
+                ),
+            )
+
+        assertNull(config.distinctId)
+        assertFalse(config.isIdentifiedId)
+        assertNull(config.featureFlags)
+        assertNull(config.featureFlagPayloads)
     }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -171,6 +173,89 @@ void main() {
       // app-wide masking choice regardless of when the bridge is toggled.
       expect(replayConfig['maskAllTexts'], isTrue);
       expect(replayConfig['maskAllImages'], isTrue);
+    });
+
+    test('omits bootstrap from toMap when not set', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.bootstrap, isNull);
+      expect(config.toMap().containsKey('bootstrap'), isFalse);
+    });
+
+    test('serializes an identified identity bootstrap', () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(
+          distinctId: 'user-123',
+          isIdentifiedId: true,
+        );
+
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, Object?>;
+      expect(bootstrap['distinctId'], equals('user-123'));
+      expect(bootstrap['isIdentifiedId'], isTrue);
+      expect(bootstrap.containsKey('featureFlags'), isFalse);
+      expect(bootstrap.containsKey('featureFlagPayloads'), isFalse);
+    });
+
+    test('defaults isIdentifiedId to false and serializes it', () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(distinctId: 'anon-abc');
+
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, Object?>;
+      expect(bootstrap['distinctId'], equals('anon-abc'));
+      expect(bootstrap['isIdentifiedId'], isFalse);
+    });
+
+    test('serializes feature flags and payloads without identity', () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(
+          featureFlags: {'beta-ui': 'variant-a', 'legacy': true},
+          featureFlagPayloads: {
+            'beta-ui': {'color': 'blue'},
+            'legacy': null,
+          },
+        );
+
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, Object?>;
+      expect(bootstrap.containsKey('distinctId'), isFalse);
+      expect(bootstrap['isIdentifiedId'], isFalse);
+      expect(
+        bootstrap['featureFlags'],
+        equals({'beta-ui': 'variant-a', 'legacy': true}),
+      );
+      expect(
+        bootstrap['featureFlagPayloads'],
+        equals({
+          'beta-ui': {'color': 'blue'},
+          'legacy': null,
+        }),
+      );
+    });
+
+    test('warns on a non-bool/String featureFlags value but still forwards it',
+        () {
+      final config = PostHogConfig('test_project_token')
+        ..bootstrap = const PostHogBootstrapConfig(
+          featureFlags: {'discount-tier': 2, 'beta-ui': 'variant-a'},
+        );
+
+      final logs = <String>[];
+      final map = runZoned(
+        config.toMap,
+        zoneSpecification: ZoneSpecification(
+          print: (_, __, ___, line) => logs.add(line),
+        ),
+      );
+
+      // The mismatched value is still forwarded; the native SDK drops it.
+      final bootstrap = map['bootstrap'] as Map<String, Object?>;
+      expect(
+        bootstrap['featureFlags'],
+        equals({'discount-tier': 2, 'beta-ui': 'variant-a'}),
+      );
+      // ...but the caller gets a breadcrumb for the ignored entry, and no
+      // false warning for the valid String value.
+      expect(logs.where((l) => l.contains('discount-tier')), isNotEmpty);
+      expect(logs.where((l) => l.contains('beta-ui')), isEmpty);
     });
   });
 

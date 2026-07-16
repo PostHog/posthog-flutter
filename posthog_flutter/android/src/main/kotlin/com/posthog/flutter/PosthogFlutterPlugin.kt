@@ -22,6 +22,7 @@ import android.view.ViewGroup
 import androidx.annotation.RequiresApi
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
+import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogConfig
 import com.posthog.PostHogOnFeatureFlags
 import com.posthog.android.PostHogAndroid
@@ -595,6 +596,11 @@ class PosthogFlutterPlugin :
                     logsConfig.getIfNotNull<Int>("rateCapWindowSeconds") {
                         logs.rateCapWindowSeconds = it
                     }
+                }
+
+                // Bootstrap precedence and flag layering live in the native SDK; forward values only.
+                posthogConfig.getIfNotNull<Map<String, Any>>("bootstrap") {
+                    this.bootstrap = bootstrapConfigFromMap(it)
                 }
 
                 sdkName = "posthog-flutter"
@@ -1211,7 +1217,8 @@ class PosthogFlutterPlugin :
         // different platform view (e.g. a masked map) that merely overlaps, so
         // compositing it would leak masked content. Slack absorbs rounding.
         val tolerance = 8
-        if (destX < -tolerance || destY < -tolerance ||
+        if (destX < -tolerance ||
+            destY < -tolerance ||
             destX + svLogW > destBitmap.width + tolerance ||
             destY + svLogH > destBitmap.height + tolerance
         ) {
@@ -1824,3 +1831,12 @@ class PosthogFlutterPlugin :
         flutterSurveysDelegate?.handleSurveyAction(type, args, result)
     }
 }
+
+@Suppress("UNCHECKED_CAST")
+internal fun bootstrapConfigFromMap(bootstrap: Map<String, Any>): PostHogBootstrapConfig =
+    PostHogBootstrapConfig(
+        distinctId = bootstrap["distinctId"] as? String,
+        isIdentifiedId = bootstrap["isIdentifiedId"] as? Boolean ?: false,
+        featureFlags = bootstrap["featureFlags"] as? Map<String, Any>,
+        featureFlagPayloads = bootstrap["featureFlagPayloads"] as? Map<String, Any?>,
+    )
