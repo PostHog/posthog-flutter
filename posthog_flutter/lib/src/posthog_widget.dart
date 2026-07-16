@@ -85,7 +85,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
     final episode = PostHogInternalEvents.nativeOcclusionEpisode;
     final bridgeFailed = PostHogInternalEvents.nativeBridgeFailed;
     if (!occluded) {
-      printIfDebug('Native occlusion ended: resuming Flutter capture.');
+      printIfDebug(
+          'Native occlusion ended (episode $episode): resuming Flutter capture.');
       _setSuppressFlutterCapture(false);
       _screenshotCapturer?.onOcclusionEnded();
       // A static screen renders no frame after the cover dismisses
@@ -100,6 +101,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
     }
     if (!replayConfig.captureNativeScreens) {
       // Fail open in case the bridge was toggled off mid-episode.
+      printIfDebug('Native occlusion started (episode $episode): '
+          'captureNativeScreens is off, keeping Flutter capture.');
       _setSuppressFlutterCapture(false);
       return;
     }
@@ -114,11 +117,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
         return;
       }
       if (accepted) {
-        printIfDebug('Native occlusion started: bridged to native capture.');
+        printIfDebug('Native occlusion started (episode $episode): '
+            'bridged to native capture.');
         return;
       }
     }
-    printIfDebug('Native occlusion started: emitting placeholder.');
+    printIfDebug(
+        'Native occlusion started (episode $episode): emitting placeholder.');
     final imageInfo = await _screenshotCapturer?.buildOcclusionPlaceholder();
     if (imageInfo != null && !_disposed) {
       // A placeholder is only valid while its own episode is occluding.

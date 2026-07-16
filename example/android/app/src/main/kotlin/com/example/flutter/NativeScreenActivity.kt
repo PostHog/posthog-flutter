@@ -20,11 +20,14 @@ class NativeScreenActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val captured = intent.getBooleanExtra("captured", true)
+        val background = if (captured) "#3F51B5" else "#E65100"
+
         val root =
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
-                setBackgroundColor(Color.parseColor("#3F51B5"))
+                setBackgroundColor(Color.parseColor(background))
                 setPadding(56, 96, 56, 96)
             }
 
@@ -58,7 +61,7 @@ class NativeScreenActivity : Activity() {
 
         setContentView(
             ScrollView(this).apply {
-                setBackgroundColor(Color.parseColor("#3F51B5"))
+                setBackgroundColor(Color.parseColor(background))
                 addView(
                     root,
                     ViewGroup.LayoutParams(

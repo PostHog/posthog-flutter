@@ -13,6 +13,7 @@ void _presentNativeScreen({required bool capture, bool ownWindow = false}) {
   exampleReplayConfig?.captureNativeScreens = capture;
   _exampleChannel.invokeMethod(
     ownWindow ? 'presentNativeScreenOwnWindow' : 'presentNativeScreen',
+    {'capture': capture},
   );
 }
 

@@ -18,7 +18,8 @@ import Flutter
       if call.method == "triggerNativeCrash" {
         NativeCrashHelper().triggerCrash()
       } else if call.method == "presentNativeScreen" {
-        self.presentNativeScreen()
+        let captured = (call.arguments as? [String: Any])?["capture"] as? Bool ?? true
+        self.presentNativeScreen(captured: captured)
         result(nil)
       } else if call.method == "presentNativeScreenOwnWindow" {
         self.presentNativeScreenOwnWindow()
@@ -29,24 +30,27 @@ import Flutter
     }
   }
 
-  private func makePaywallViewController(dismiss: @escaping (UIViewController) -> Void) -> UIViewController {
+  private func makePaywallViewController(
+    captured: Bool = true,
+    dismiss: @escaping (UIViewController) -> Void
+  ) -> UIViewController {
     let vc = UIViewController()
     vc.modalPresentationStyle = .fullScreen
-    vc.view.backgroundColor = .systemIndigo
+    vc.view.backgroundColor = captured ? .systemIndigo : .systemOrange
     let onDismiss: () -> Void = { [weak vc] in if let vc { dismiss(vc) } }
     addPaywall(to: vc.view, dismiss: onDismiss)
     vc.view.addGestureRecognizer(DismissTapRecognizer(onTap: onDismiss))
     return vc
   }
 
-  private func presentNativeScreen() {
+  private func presentNativeScreen(captured: Bool) {
     DispatchQueue.main.async {
       guard let root = UIApplication.shared.connectedScenes
         .compactMap({ $0 as? UIWindowScene })
         .flatMap({ $0.windows })
         .first(where: { $0.isKeyWindow })?.rootViewController else { return }
 
-      let vc = self.makePaywallViewController { $0.dismiss(animated: true) }
+      let vc = self.makePaywallViewController(captured: captured) { $0.dismiss(animated: true) }
       root.present(vc, animated: true)
     }
   }

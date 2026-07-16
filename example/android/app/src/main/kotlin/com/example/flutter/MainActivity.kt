@@ -16,11 +16,19 @@ class MainActivity : FlutterActivity() {
                         NativeCrashHelper().triggerCrash()
                         result.success(null)
                     }
+
                     "presentNativeScreen" -> {
-                        startActivity(Intent(this, NativeScreenActivity::class.java))
+                        val captured = call.argument<Boolean>("capture") ?: true
+                        startActivity(
+                            Intent(this, NativeScreenActivity::class.java)
+                                .putExtra("captured", captured),
+                        )
                         result.success(null)
                     }
-                    else -> result.notImplemented()
+
+                    else -> {
+                        result.notImplemented()
+                    }
                 }
             }
     }
