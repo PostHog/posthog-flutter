@@ -27,6 +27,9 @@ Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
 Runner/GeneratedPluginRegistrant.*
 
+# Local development override for an unreleased PostHog iOS SDK (see CONTRIBUTING.md).
+Podfile.local
+
 # Exceptions to above rules.
 !default.mode1v3
 !default.mode2v3
