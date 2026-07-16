@@ -385,7 +385,7 @@ class PostHogBootstrapConfig {
   ///
   /// Only the dimensions that were set are included; [isIdentifiedId] is always
   /// sent so the native SDK doesn't have to infer it.
-  Map<String, dynamic> toMap() {
+  Map<String, Object?> toMap() {
     final flags = featureFlags;
     if (flags != null) {
       for (final entry in flags.entries) {

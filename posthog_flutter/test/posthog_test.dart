@@ -172,7 +172,7 @@ void main() {
           isIdentifiedId: true,
         );
 
-      final bootstrap = config.toMap()['bootstrap'] as Map<String, dynamic>;
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, Object?>;
       expect(bootstrap['distinctId'], equals('user-123'));
       expect(bootstrap['isIdentifiedId'], isTrue);
       expect(bootstrap.containsKey('featureFlags'), isFalse);
@@ -183,7 +183,7 @@ void main() {
       final config = PostHogConfig('test_project_token')
         ..bootstrap = const PostHogBootstrapConfig(distinctId: 'anon-abc');
 
-      final bootstrap = config.toMap()['bootstrap'] as Map<String, dynamic>;
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, Object?>;
       expect(bootstrap['distinctId'], equals('anon-abc'));
       expect(bootstrap['isIdentifiedId'], isFalse);
     });
@@ -197,7 +197,7 @@ void main() {
           },
         );
 
-      final bootstrap = config.toMap()['bootstrap'] as Map<String, dynamic>;
+      final bootstrap = config.toMap()['bootstrap'] as Map<String, Object?>;
       expect(bootstrap.containsKey('distinctId'), isFalse);
       expect(bootstrap['isIdentifiedId'], isFalse);
       expect(
@@ -228,7 +228,7 @@ void main() {
       );
 
       // The mismatched value is still forwarded; the native SDK drops it.
-      final bootstrap = map['bootstrap'] as Map<String, dynamic>;
+      final bootstrap = map['bootstrap'] as Map<String, Object?>;
       expect(
         bootstrap['featureFlags'],
         equals({'discount-tier': 2, 'beta-ui': 'variant-a'}),
