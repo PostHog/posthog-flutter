@@ -47,6 +47,17 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun onMethodCall_setCaptureNativeScreens_returnsSuccess() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("setCaptureNativeScreens", mapOf("enabled" to false))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
     fun onMethodCall_captureLog_routesToCaptureLogAndSucceeds() {
         val plugin = PosthogFlutterPlugin()
 

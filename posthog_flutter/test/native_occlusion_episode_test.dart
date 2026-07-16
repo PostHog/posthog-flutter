@@ -133,6 +133,24 @@ void main() {
       expect(fake.captureNativeScreensChanges, [true, false],
           reason: 'a config that is not the active one must not propagate');
     });
+
+    test('a second setup hands propagation to the new config', () async {
+      final fake = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fake;
+      final first = replayConfig(captureNativeScreens: true);
+      await Posthog().setup(first);
+
+      final second = replayConfig(captureNativeScreens: false);
+      await Posthog().setup(second);
+
+      first.sessionReplayConfig.captureNativeScreens = false;
+      expect(fake.captureNativeScreensChanges, isEmpty,
+          reason: 'the replaced config must stop propagating');
+
+      second.sessionReplayConfig.captureNativeScreens = true;
+      expect(fake.captureNativeScreensChanges, [true],
+          reason: 'the active config propagates');
+    });
   });
 
   group('episodeStillCurrent', () {
