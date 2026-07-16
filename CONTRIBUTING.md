@@ -63,7 +63,7 @@ changes.
 
 ### Android
 
-- Create `example/android/settings.local.gradle.kts` (gitignored) with a composite
+- Create `example/android/local.settings.gradle.kts` (gitignored) with a composite
   build of your checkout:
 
 ```kotlin

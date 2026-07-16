@@ -26,6 +26,7 @@ plugins {
 include(":app")
 
 // Local development against an unreleased posthog-android. Inert unless a
-// gitignored settings.local.gradle.kts exists; see CONTRIBUTING.md.
-val localSettings = file("settings.local.gradle.kts")
+// gitignored local.settings.gradle.kts exists; see CONTRIBUTING.md. The name must
+// end in .settings.gradle.kts so Kotlin DSL compiles it against Settings.
+val localSettings = file("local.settings.gradle.kts")
 if (localSettings.exists()) apply(from = localSettings)
