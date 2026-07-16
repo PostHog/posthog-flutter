@@ -124,7 +124,15 @@ class PosthogFlutterPlugin :
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val bitmapExportExecutor = Executors.newSingleThreadExecutor()
-    private val snapshotSender = SnapshotSender()
+
+    // The native SDK stamps its replay events (touches, bridged frames) with
+    // config.dateProvider, which prefers the network-time clock on API 33+ and
+    // can diverge from System.currentTimeMillis. Replay is ordered by
+    // timestamp, so Flutter frames must use the same clock.
+    private val snapshotSender =
+        SnapshotSender {
+            postHogConfig?.dateProvider?.currentTimeMillis() ?: System.currentTimeMillis()
+        }
 
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
