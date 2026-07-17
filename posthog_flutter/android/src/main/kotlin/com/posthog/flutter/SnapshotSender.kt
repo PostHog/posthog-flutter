@@ -17,6 +17,7 @@ class SnapshotSender(
         id: Int,
         x: Int,
         y: Int,
+        timestampMs: Long = currentTimeMillis(),
     ) {
         val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
         val base64String = bitmap.base64()
@@ -38,7 +39,7 @@ class SnapshotSender(
                 listOf(wireframe),
                 initialOffsetTop = 0,
                 initialOffsetLeft = 0,
-                timestamp = currentTimeMillis(),
+                timestamp = timestampMs,
             )
 
         listOf(snapshotEvent).capture()
@@ -48,9 +49,10 @@ class SnapshotSender(
         width: Int,
         height: Int,
         screen: String,
+        timestampMs: Long = currentTimeMillis(),
     ) {
         val events = mutableListOf<RREvent>()
-        events.add(buildMetaEvent(width, height, screen))
+        events.add(buildMetaEvent(width, height, screen, timestampMs))
 
         events.capture()
     }
@@ -59,11 +61,12 @@ class SnapshotSender(
         width: Int,
         height: Int,
         screen: String,
+        timestampMs: Long = currentTimeMillis(),
     ): RRMetaEvent =
         RRMetaEvent(
             href = screen,
             width = width,
             height = height,
-            timestamp = currentTimeMillis(),
+            timestamp = timestampMs,
         )
 }

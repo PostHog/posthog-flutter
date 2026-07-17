@@ -50,7 +50,7 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_sendMetaEvent_succeedsBeforeAndAfterEngineDetach() {
+    fun onMethodCall_sendMetaEvent_repliesAfterWorkDropsOnDetachRecoversOnReattach() {
         val plugin = PosthogFlutterPlugin()
         val binding = Mockito.mock(FlutterPlugin.FlutterPluginBinding::class.java)
         Mockito.`when`(binding.applicationContext).thenReturn(Mockito.mock(Context::class.java))
@@ -58,16 +58,27 @@ internal class PosthogFlutterPluginTest {
         plugin.onAttachedToEngine(binding)
 
         val call = MethodCall("sendMetaEvent", mapOf("width" to 10, "height" to 20, "screen" to "Home"))
+
+        // The reply completes after the worker runs, never synchronously in
+        // the handler — that await is the Dart-side backpressure.
         val whileAttached: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, whileAttached)
-        Mockito.verify(whileAttached).success(null)
+        Mockito.verify(whileAttached, Mockito.never()).success(null)
 
         plugin.onDetachedFromEngine(binding)
 
-        // The executor is shut down: the submission is dropped, never thrown.
+        // Shut-down executor: the submission is dropped and answered
+        // immediately, never thrown.
         val afterDetach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, afterDetach)
         Mockito.verify(afterDetach).success(null)
+
+        // Reattach recreates the executor: submissions are accepted again
+        // instead of hitting the immediate drop path.
+        plugin.onAttachedToEngine(binding)
+        val afterReattach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, afterReattach)
+        Mockito.verify(afterReattach, Mockito.never()).success(null)
     }
 
     @Test
