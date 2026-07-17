@@ -126,10 +126,9 @@ class PosthogFlutterPlugin :
     private val mainHandler = Handler(Looper.getMainLooper())
     private val bitmapExportExecutor = Executors.newSingleThreadExecutor()
 
-    // Replay frames are decoded and re-encoded before sending — 25-75ms on
-    // midrange hardware, too slow for the main thread (iOS moved the same
-    // work off-main for the same reason). Single-threaded so a meta event
-    // can never be overtaken by the frame it describes.
+    // Frame sends decode and re-encode the image — too slow for the main
+    // thread. Single-threaded so a meta event can never be overtaken by the
+    // frame it describes.
     private val snapshotSendExecutor = Executors.newSingleThreadExecutor()
 
     // The native SDK stamps its replay events (touches, bridged frames) with
