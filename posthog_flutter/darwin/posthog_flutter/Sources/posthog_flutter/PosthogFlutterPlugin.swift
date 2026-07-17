@@ -388,6 +388,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                         && PostHogSDK.shared.isSessionReplayActive()
                     if accepted {
                         self.bridgeEnabled = true
+                        self.nudgeOcclusionDetector()
                     }
                     result(accepted)
                 }
