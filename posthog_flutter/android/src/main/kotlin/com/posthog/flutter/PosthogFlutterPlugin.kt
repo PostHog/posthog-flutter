@@ -126,6 +126,12 @@ class PosthogFlutterPlugin :
     private val mainHandler = Handler(Looper.getMainLooper())
     private val bitmapExportExecutor = Executors.newSingleThreadExecutor()
 
+    // Replay frames are decoded and re-encoded before sending — 25-75ms on
+    // midrange hardware, too slow for the main thread (iOS moved the same
+    // work off-main for the same reason). Single-threaded so a meta event
+    // can never be overtaken by the frame it describes.
+    private val snapshotSendExecutor = Executors.newSingleThreadExecutor()
+
     // The native SDK stamps its replay events (touches, bridged frames) with
     // config.dateProvider, which prefers the network-time clock on API 33+ and
     // can diverge from System.currentTimeMillis. Replay is ordered by
@@ -428,10 +434,26 @@ class PosthogFlutterPlugin :
                 return
             }
 
-            snapshotSender.sendMetaEvent(width, height, screen)
+            submitSnapshotWork { snapshotSender.sendMetaEvent(width, height, screen) }
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    // Rejection only happens after engine detach; the frame is not
+    // recoverable then, so it is dropped rather than thrown.
+    private fun submitSnapshotWork(work: () -> Unit) {
+        try {
+            snapshotSendExecutor.execute {
+                try {
+                    work()
+                } catch (e: Throwable) {
+                    Log.w("PostHog", "Replay snapshot send failed: $e")
+                }
+            }
+        } catch (e: RejectedExecutionException) {
+            Log.w("PostHog", "Replay snapshot dropped, executor is shut down: $e")
         }
     }
 
@@ -681,6 +703,7 @@ class PosthogFlutterPlugin :
         stopOcclusionDetector()
         channel.setMethodCallHandler(null)
         bitmapExportExecutor.shutdown()
+        snapshotSendExecutor.shutdown()
     }
 
     private var cachedReplayIntegration: PostHogReplayIntegration? = null
@@ -970,7 +993,7 @@ class PosthogFlutterPlugin :
             val x = call.argument<Int>("x") ?: 0
             val y = call.argument<Int>("y") ?: 0
             if (imageBytes != null) {
-                snapshotSender.sendFullSnapshot(imageBytes, id, x, y)
+                submitSnapshotWork { snapshotSender.sendFullSnapshot(imageBytes, id, x, y) }
                 result.success(null)
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)
