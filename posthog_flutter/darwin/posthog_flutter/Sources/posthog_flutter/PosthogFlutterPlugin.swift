@@ -910,8 +910,12 @@ extension PosthogFlutterPlugin {
 
     #if os(iOS)
         private static func containsFlutterViewController(_ viewController: UIViewController?) -> Bool {
-            guard let viewController else { return false }
-            if viewController is FlutterViewController { return true }
+            guard let viewController else {
+                return false
+            }
+            if viewController is FlutterViewController {
+                return true
+            }
             return viewController.children.contains { $0 is FlutterViewController }
         }
 
