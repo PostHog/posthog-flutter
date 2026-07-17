@@ -67,4 +67,46 @@ void main() {
       expect(result, [null]);
     });
   });
+
+  group('NativeCommunicator.enableNativeBridge', () {
+    tearDown(() {
+      messenger.setMockMethodCallHandler(channel, null);
+    });
+
+    test('returns native acceptance and carries the episode id', () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'enableNativeBridge');
+        expect(call.arguments, {'episode': 7},
+            reason: 'the native side declines a stale enable by episode id');
+        return true;
+      });
+
+      expect(await NativeCommunicator().enableNativeBridge(episode: 7), isTrue);
+    });
+
+    test('returns false when native declines', () async {
+      messenger.setMockMethodCallHandler(channel, (_) async => false);
+
+      expect(
+        await NativeCommunicator().enableNativeBridge(episode: 1),
+        isFalse,
+      );
+    });
+
+    test('returns false on null result or channel error', () async {
+      messenger.setMockMethodCallHandler(channel, (_) async => null);
+      expect(
+        await NativeCommunicator().enableNativeBridge(episode: 1),
+        isFalse,
+      );
+
+      messenger.setMockMethodCallHandler(channel, (_) async {
+        throw PlatformException(code: 'boom');
+      });
+      expect(
+        await NativeCommunicator().enableNativeBridge(episode: 1),
+        isFalse,
+      );
+    });
+  });
 }

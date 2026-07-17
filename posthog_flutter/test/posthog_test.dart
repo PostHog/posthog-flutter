@@ -158,6 +158,23 @@ void main() {
       expect(updatedReplayConfig['maskAllPlatformViews'], isFalse);
     });
 
+    test('native screen bridge is opt-in (default false)', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.sessionReplayConfig.captureNativeScreens, isFalse);
+
+      // The flag crosses the channel so the plugins can decide whether to
+      // start the occlusion detector.
+      final replayConfig =
+          config.toMap()['sessionReplayConfig'] as Map<String, dynamic>;
+      expect(replayConfig['captureNativeScreens'], isFalse);
+      // The mask flags cross too: the native plugins forward them to the
+      // native SDK unconditionally so bridged native screens honor the
+      // app-wide masking choice regardless of when the bridge is toggled.
+      expect(replayConfig['maskAllTexts'], isTrue);
+      expect(replayConfig['maskAllImages'], isTrue);
+    });
+
     test('omits bootstrap from toMap when not set', () {
       final config = PostHogConfig('test_project_token');
 

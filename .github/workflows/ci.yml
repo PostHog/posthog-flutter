@@ -282,6 +282,11 @@ jobs:
         working-directory: ./example
         run: flutter build apk
 
+      - name: Android unit tests
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        working-directory: ./example/android
+        run: ./gradlew :posthog_flutter:testDebugUnitTest
+
   # Web build
   build-web:
     needs: detect-markdown-only

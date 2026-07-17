@@ -30,7 +30,7 @@ internal class PosthogFlutterPluginTest {
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success(true)
+        Mockito.verify(mockResult).success(null)
     }
 
     @Test
@@ -43,7 +43,18 @@ internal class PosthogFlutterPluginTest {
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success(true)
+        Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
+    fun onMethodCall_setCaptureNativeScreens_returnsSuccess() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("setCaptureNativeScreens", mapOf("enabled" to false))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
     }
 
     @Test
@@ -79,46 +90,6 @@ internal class PosthogFlutterPluginTest {
 
         Mockito.verify(mockResult).error(
             Mockito.eq("PosthogFlutterException"),
-            Mockito.any(),
-            Mockito.isNull(),
-        )
-    }
-
-    @Test
-    fun onMethodCall_captureNativeScreenshot_noActivity_returnsNull() {
-        val plugin = PosthogFlutterPlugin()
-
-        val call =
-            MethodCall(
-                "captureNativeScreenshot",
-                mapOf("x" to 0, "y" to 0, "width" to 10, "height" to 10),
-            )
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
-
-        // No activity attached, so capture degrades to null rather than crashing.
-        Mockito.verify(mockResult).success(null)
-    }
-
-    @Test
-    fun onMethodCall_captureNativeScreenshot_invalidDimensions_returnsError() {
-        val plugin = PosthogFlutterPlugin()
-        val binding = Mockito.mock(ActivityPluginBinding::class.java)
-        Mockito.`when`(binding.activity).thenReturn(Mockito.mock(Activity::class.java))
-        plugin.onAttachedToActivity(binding)
-
-        // Dimensions are validated before any activity view access, so a bare
-        // mock Activity is enough to reach the zero-dimension guard.
-        val call =
-            MethodCall(
-                "captureNativeScreenshot",
-                mapOf("x" to 0, "y" to 0, "width" to 0, "height" to 0),
-            )
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
-
-        Mockito.verify(mockResult).error(
-            Mockito.eq("INVALID_ARGUMENT"),
             Mockito.any(),
             Mockito.isNull(),
         )

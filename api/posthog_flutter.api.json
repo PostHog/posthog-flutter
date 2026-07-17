@@ -156,6 +156,28 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "setCaptureNativeScreens",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "enabled",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "identify",
                         "parameters": [
                             {
@@ -1004,6 +1026,28 @@
                                 "name": "config",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "PostHogConfig"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "setCaptureNativeScreens",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "enabled",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2327,6 +2371,17 @@
                         "isStatic": false,
                         "isWriteable": true,
                         "name": "maskAllPlatformViews",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureNativeScreens",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
                     }
@@ -4632,7 +4687,19 @@
                         "typeParameterNames": []
                     }
                 ],
-                "fieldDeclarations": [],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "debugFlutterCaptureSuppressed",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "bool"
+                    }
+                ],
                 "isDeprecated": false,
                 "isExperimental": false,
                 "isRequired": false,

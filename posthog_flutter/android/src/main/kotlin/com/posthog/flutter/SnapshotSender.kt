@@ -9,7 +9,9 @@ import com.posthog.internal.replay.RRStyle
 import com.posthog.internal.replay.RRWireframe
 import com.posthog.internal.replay.capture
 
-class SnapshotSender {
+class SnapshotSender(
+    private val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
+) {
     fun sendFullSnapshot(
         imageBytes: ByteArray,
         id: Int,
@@ -36,7 +38,7 @@ class SnapshotSender {
                 listOf(wireframe),
                 initialOffsetTop = 0,
                 initialOffsetLeft = 0,
-                timestamp = System.currentTimeMillis(),
+                timestamp = currentTimeMillis(),
             )
 
         listOf(snapshotEvent).capture()
@@ -47,17 +49,21 @@ class SnapshotSender {
         height: Int,
         screen: String,
     ) {
-        val metaEvent =
-            RRMetaEvent(
-                href = screen,
-                width = width,
-                height = height,
-                timestamp = System.currentTimeMillis(),
-            )
-
         val events = mutableListOf<RREvent>()
-        events.add(metaEvent)
+        events.add(buildMetaEvent(width, height, screen))
 
         events.capture()
     }
+
+    internal fun buildMetaEvent(
+        width: Int,
+        height: Int,
+        screen: String,
+    ): RRMetaEvent =
+        RRMetaEvent(
+            href = screen,
+            width = width,
+            height = height,
+            timestamp = currentTimeMillis(),
+        )
 }
