@@ -39,6 +39,8 @@ void main() {
           r'$feature_flag_has_experiment',
         ]),
       );
+      expect(properties['distinct_id'], 'test-user');
+      expect(properties['token'], 'test-api-key');
       expect(properties[r'$feature_flag'], 'plain-flag');
       expect(properties[r'$feature_flag_response'], isTrue);
       expect(properties[r'$feature_flag_has_experiment'], isFalse);
@@ -82,6 +84,23 @@ void main() {
       description: 'gated flag with unreported has_experiment sends the '
           'full event',
       response: <String, Object?>{
+        'featureFlags': {'plain-flag': true},
+        'minimalFlagCalledEvents': true,
+      },
+      key: 'plain-flag',
+      expectedHasExperiment: isNull,
+    ),
+    (
+      description: 'gated flag with malformed has_experiment metadata sends '
+          'the full event',
+      response: <String, Object?>{
+        'flags': {
+          'plain-flag': {
+            'key': 'plain-flag',
+            'enabled': true,
+            'metadata': {'has_experiment': 'not-a-bool'},
+          },
+        },
         'featureFlags': {'plain-flag': true},
         'minimalFlagCalledEvents': true,
       },
