@@ -59,8 +59,9 @@ internal class PosthogFlutterPluginTest {
 
         val call = MethodCall("sendMetaEvent", mapOf("width" to 10, "height" to 20, "screen" to "Home"))
 
-        // The reply completes after the worker runs, never synchronously in
-        // the handler — that await is the Dart-side backpressure.
+        // Asserts only that no reply happens synchronously in the handler.
+        // Actual delivery after the worker runs is not observable here (the
+        // stubbed test looper drops posts) and is covered end to end.
         val whileAttached: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, whileAttached)
         Mockito.verify(whileAttached, Mockito.never()).success(null)
