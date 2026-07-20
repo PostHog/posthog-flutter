@@ -507,6 +507,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     final client = HttpClient();
     Object? value = false;
     bool? hasExperiment;
+    var minimalFlagCalledEvents = false;
     try {
       final uri = Uri.parse(_host!).resolve('/flags/?v=2');
       for (var attempt = 0; attempt <= _maxRetries; attempt++) {
@@ -537,6 +538,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
             value = flags[key];
           }
           hasExperiment = _flagHasExperiment(decoded['flags'], key);
+          minimalFlagCalledEvents = decoded['minimalFlagCalledEvents'] == true;
         }
         break;
       }
@@ -548,23 +550,56 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       'uuid': _uuidV4(),
       'event': r'$feature_flag_called',
       'distinct_id': distinctId,
-      'properties': <String, Object?>{
-        'distinct_id': distinctId,
-        'token': _apiKey,
-        r'$lib': postHogFlutterSdkName,
-        r'$lib_version': postHogFlutterVersion,
-        r'$feature_flag': key,
-        r'$feature_flag_response': value,
-        if (hasExperiment != null)
-          r'$feature_flag_has_experiment': hasExperiment,
-        r'$feature/' + key: value,
-      },
+      'properties': _featureFlagCalledProperties(
+        key: key,
+        value: value,
+        distinctId: distinctId,
+        hasExperiment: hasExperiment,
+        minimalFlagCalledEvents: minimalFlagCalledEvents,
+      ),
       'timestamp': DateTime.now().toUtc().toIso8601String(),
     });
     state.totalEventsCaptured++;
     state.pendingEvents = state.queue.length;
 
     return value;
+  }
+
+  /// Builds the `$feature_flag_called` properties.
+  ///
+  /// When the `/flags?v=2` response carries top-level
+  /// `minimalFlagCalledEvents == true` and the flag is not linked to an
+  /// experiment (`has_experiment == false`), only the cross-SDK minimal
+  /// allowlist is sent. Any missing signal (either field absent, a legacy
+  /// response shape, or `has_experiment` unreported) falls back to the full
+  /// legacy shape. `distinct_id` and `token` are transport fields this
+  /// adapter carries in every event's properties and stay in both shapes.
+  Map<String, Object?> _featureFlagCalledProperties({
+    required String key,
+    required Object? value,
+    required String distinctId,
+    required bool? hasExperiment,
+    required bool minimalFlagCalledEvents,
+  }) {
+    final allowlisted = <String, Object?>{
+      'distinct_id': distinctId,
+      'token': _apiKey,
+      r'$lib': postHogFlutterSdkName,
+      r'$lib_version': postHogFlutterVersion,
+      r'$feature_flag': key,
+      r'$feature_flag_response': value,
+    };
+    if (minimalFlagCalledEvents && hasExperiment == false) {
+      return <String, Object?>{
+        ...allowlisted,
+        r'$feature_flag_has_experiment': false,
+      };
+    }
+    return <String, Object?>{
+      ...allowlisted,
+      if (hasExperiment != null) r'$feature_flag_has_experiment': hasExperiment,
+      r'$feature/' + key: value,
+    };
   }
 
   /// Reads `metadata.has_experiment` from the `/flags?v=2` entry for [key].
