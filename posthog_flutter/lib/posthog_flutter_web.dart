@@ -365,6 +365,13 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> displaySurvey(String surveyId) async {
+    return handleWebMethodCall(
+      MethodCall('displaySurvey', {'surveyId': surveyId}),
+    );
+  }
+
+  @override
   Future<void> captureException({
     required Object error,
     StackTrace? stackTrace,
