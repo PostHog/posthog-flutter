@@ -1,7 +1,10 @@
 package com.posthog.flutter
 
 import android.app.Activity
+import android.content.Context
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.mockito.Mockito
@@ -44,6 +47,36 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, mockResult)
 
         Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
+    fun onMethodCall_sendMetaEvent_repliesAfterWorkDropsOnDetachRecoversOnReattach() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = Mockito.mock(FlutterPlugin.FlutterPluginBinding::class.java)
+        Mockito.`when`(binding.applicationContext).thenReturn(Mockito.mock(Context::class.java))
+        Mockito.`when`(binding.binaryMessenger).thenReturn(Mockito.mock(BinaryMessenger::class.java))
+        plugin.onAttachedToEngine(binding)
+
+        val call = MethodCall("sendMetaEvent", mapOf("width" to 10, "height" to 20, "screen" to "Home"))
+
+        // Asserts only that no reply happens synchronously in the handler.
+        // Actual delivery after the worker runs is not observable here (the
+        // stubbed test looper drops posts) and is covered end to end.
+        val whileAttached: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, whileAttached)
+        Mockito.verify(whileAttached, Mockito.never()).success(null)
+
+        plugin.onDetachedFromEngine(binding)
+
+        val afterDetach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, afterDetach)
+        Mockito.verify(afterDetach).success(null)
+
+        // No immediate drop reply proves the executor was recreated.
+        plugin.onAttachedToEngine(binding)
+        val afterReattach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, afterReattach)
+        Mockito.verify(afterReattach, Mockito.never()).success(null)
     }
 
     @Test

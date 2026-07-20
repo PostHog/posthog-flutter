@@ -16,4 +16,13 @@ internal class SnapshotSenderTest {
         assertEquals(20, data["height"])
         assertEquals("Home", data["href"])
     }
+
+    @Test
+    fun buildMetaEvent_prefersAnExplicitTimestamp() {
+        val sender = SnapshotSender(currentTimeMillis = { 1234L })
+
+        val metaEvent = sender.buildMetaEvent(width = 1, height = 2, screen = "s", timestampMs = 99L)
+
+        assertEquals(99L, metaEvent.timestamp)
+    }
 }
