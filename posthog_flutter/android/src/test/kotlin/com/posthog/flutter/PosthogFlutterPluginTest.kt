@@ -68,14 +68,11 @@ internal class PosthogFlutterPluginTest {
 
         plugin.onDetachedFromEngine(binding)
 
-        // Shut-down executor: the submission is dropped and answered
-        // immediately, never thrown.
         val afterDetach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, afterDetach)
         Mockito.verify(afterDetach).success(null)
 
-        // Reattach recreates the executor: submissions are accepted again
-        // instead of hitting the immediate drop path.
+        // No immediate drop reply proves the executor was recreated.
         plugin.onAttachedToEngine(binding)
         val afterReattach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, afterReattach)

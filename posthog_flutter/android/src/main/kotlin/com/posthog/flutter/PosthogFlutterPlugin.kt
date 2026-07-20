@@ -126,9 +126,8 @@ class PosthogFlutterPlugin :
     private val mainHandler = Handler(Looper.getMainLooper())
     private var bitmapExportExecutor = Executors.newSingleThreadExecutor()
 
-    // Frame sends decode and re-encode the image — too slow for the main
-    // thread. Single-threaded so a meta event can never be overtaken by the
-    // frame it describes.
+    // Single-threaded so a meta event can never be overtaken by the frame
+    // it describes.
     private var snapshotSendExecutor = Executors.newSingleThreadExecutor()
 
     // The native SDK stamps its replay events (touches, bridged frames) with
@@ -445,11 +444,9 @@ class PosthogFlutterPlugin :
         }
     }
 
-    // The reply is completed after the worker finishes so Dart's await spans
-    // the encode: a throttleDelay below the encode time then self-regulates
-    // instead of growing the queue without bound. Rejection only happens after
-    // engine detach; the frame is not recoverable then, so it is dropped
-    // rather than thrown.
+    // Replying after the work keeps Dart's await as backpressure: a
+    // throttleDelay below the encode time self-regulates instead of growing
+    // the queue. Rejection means the engine detached; drop, don't throw.
     private fun submitSnapshotWork(
         result: Result,
         work: () -> Unit,
