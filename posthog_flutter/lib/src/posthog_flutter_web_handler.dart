@@ -66,6 +66,8 @@ extension PostHogExtension on PostHog {
   external void startSessionRecording();
   external void stopSessionRecording();
   external bool sessionRecordingStarted();
+  // May be absent on older posthog-js builds; the call site guards with try/catch.
+  external void displaySurvey(JSAny surveyId, JSAny options);
   external SessionManager? get sessionManager;
   // ignore: non_constant_identifier_names
   external void _overrideSDKInfo(JSAny sdkName, JSAny sdkVersion);
@@ -419,6 +421,17 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'surveyAction':
       // not supported on Web
+      break;
+    case 'displaySurvey':
+      final surveyId = args['surveyId'] as String;
+      try {
+        posthog?.displaySurvey(
+          stringToJSAny(surveyId),
+          mapToJSAny({'displayType': 'popover'}),
+        );
+      } catch (e) {
+        printIfDebug('Exception on displaySurvey: $e');
+      }
       break;
     case 'captureException':
       final properties = safeMapConversion(args['properties']);

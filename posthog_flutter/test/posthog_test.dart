@@ -680,6 +680,22 @@ void main() {
     });
   });
 
+  group('Posthog displaySurvey', () {
+    late PosthogFlutterPlatformFake fake;
+
+    setUp(() async {
+      fake = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fake;
+      await Posthog().close();
+    });
+
+    test('forwards the survey ID to the platform interface', () async {
+      await Posthog().displaySurvey('survey-123');
+
+      expect(fake.displaySurveyCalls, ['survey-123']);
+    });
+  });
+
   group('PostHogExceptionStepsConfig', () {
     test('toMap serializes the native defaults', () {
       final config = PostHogConfig('test_project_token');

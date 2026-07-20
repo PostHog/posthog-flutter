@@ -512,6 +512,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> displaySurvey(String surveyId) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('displaySurvey', {
+        'surveyId': surveyId,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on displaySurvey: $exception');
+    }
+  }
+
+  @override
   Future<bool> isFeatureEnabled(String key) async {
     if (!isSupportedPlatform()) {
       return false;
