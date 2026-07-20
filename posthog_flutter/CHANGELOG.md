@@ -1,5 +1,11 @@
 ## Next
 
+## 5.32.1
+
+### Patch Changes
+
+- bbf20fa: Android: session replay screenshots are decoded, re-encoded, and queued off the main thread. Previously each frame cost the main thread 25-75ms on midrange hardware (up to once per second while recording), a visible per-second hitch during scrolling — iOS already did this work on a background queue.
+
 ## 5.32.0
 
 ### Minor Changes
