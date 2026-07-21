@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 ///
 /// Wrap sensitive UI with [PostHogMaskWidget] to hide that area in captured
 /// screenshots, regardless of the global session replay masking settings.
+///
+/// **Flutter web:** this has no effect unless canvas masking is enabled, since
+/// the canvas is masked by posthog-js rather than by this plugin. Declare
+/// `session_recording: { captureCanvas: { canvasMaskRegionsFn: () => null } }`
+/// in your `posthog.init` call to turn it on. iOS and Android need no setup.
 class PostHogMaskWidget extends StatefulWidget {
   /// The widget subtree to mask in session replay snapshots.
   final Widget child;

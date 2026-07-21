@@ -66,6 +66,9 @@ extension PostHogExtension on PostHog {
   external void startSessionRecording();
   external void stopSessionRecording();
   external bool sessionRecordingStarted();
+  // ignore: non_constant_identifier_names
+  external void set_config(JSAny config);
+  external JSObject? get config;
   external SessionManager? get sessionManager;
   // ignore: non_constant_identifier_names
   external void _overrideSDKInfo(JSAny sdkName, JSAny sdkVersion);

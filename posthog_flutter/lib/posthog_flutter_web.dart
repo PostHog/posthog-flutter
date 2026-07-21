@@ -14,6 +14,7 @@ import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
+import 'src/replay/web/web_canvas_mask_provider.dart';
 import 'src/utils/capture_utils.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
@@ -67,6 +68,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     final ph = posthog;
     _config = config;
+
+    WebCanvasMaskProvider(config).register();
 
     if (config.onFeatureFlags != null && ph != null) {
       final dartCallback = config.onFeatureFlags!;

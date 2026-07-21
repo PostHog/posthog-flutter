@@ -1,0 +1,305 @@
+import 'dart:async';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:web/web.dart' as web;
+
+import '../../posthog_config.dart';
+import '../../posthog_flutter_web_handler.dart';
+import '../../util/logging.dart';
+import '../mask/posthog_mask_controller.dart';
+import 'web_canvas_mask_geometry.dart';
+
+extension type _JSMaskRegion._(JSObject _) implements JSObject {
+  external factory _JSMaskRegion({
+    required double x,
+    required double y,
+    required double width,
+    required double height,
+  });
+}
+
+@JS('Object.assign')
+external JSObject _objectAssign(JSObject target, JSObject source);
+
+const _semanticsBlockSelector = 'flt-semantics-host';
+
+/// Supplies widget-tree mask rectangles to posthog-js canvas recording via
+/// `session_recording.captureCanvas.canvasMaskRegionsFn`, so text painted
+/// into the CanvasKit canvas can be masked even though DOM masking cannot
+/// see it.
+///
+/// An app opts in by declaring `canvasMaskRegionsFn` in its `posthog.init`
+/// call; declaring it as `() => null` also covers the frames captured before
+/// this provider takes over. Without that key nothing is registered, so
+/// recording is left exactly as posthog-js configured it.
+///
+/// Fails closed: a failed widget-tree walk returns null, which makes
+/// posthog-js skip the frame instead of shipping it unmasked.
+class WebCanvasMaskProvider {
+  WebCanvasMaskProvider(this._config);
+
+  final PostHogConfig _config;
+
+  List<Rect>? _cachedContainerRects;
+  int _cachedAtFrame = -1;
+  int _consecutiveWalkFailures = 0;
+  bool _warnedWalkFailure = false;
+
+  // shared so a second provider's cache is not compared against a counter that
+  // never advances; the callback cannot be removed once added
+  static int _frameCount = 0;
+  static bool _frameCallbackRegistered = false;
+
+  void register() {
+    try {
+      _registerUnsafe();
+    } catch (e) {
+      printIfDebug('PostHog: failed to register web canvas masking: $e');
+    }
+  }
+
+  void _registerUnsafe() {
+    final ph = posthog;
+    if (ph != null && _tryApplyConfig(ph)) {
+      return;
+    }
+    // the posthog-js snippet installs a config-less stub and array.js later
+    // REPLACES window.posthog with the real instance, so each retry must
+    // re-read the getter; set_config against the stub would merge onto an
+    // empty base and wipe the user's session_recording config
+    printIfDebug(
+      'PostHog: posthog-js not fully loaded yet, '
+      'retrying canvas mask registration.',
+    );
+    _scheduleRetry(const Duration(milliseconds: 250), Duration.zero);
+  }
+
+  void _scheduleRetry(Duration delay, Duration elapsed) {
+    if (elapsed >= const Duration(minutes: 2)) {
+      printIfDebug(
+        'PostHog: posthog-js did not become available, '
+        'web canvas masking disabled.',
+      );
+      return;
+    }
+    Timer(delay, () {
+      try {
+        final current = posthog;
+        if (current != null && _tryApplyConfig(current)) {
+          return;
+        }
+        final doubled = delay * 2;
+        final next = doubled > const Duration(seconds: 4)
+            ? const Duration(seconds: 4)
+            : doubled;
+        _scheduleRetry(next, elapsed + delay);
+      } catch (e) {
+        printIfDebug('PostHog: web canvas masking retry failed: $e');
+      }
+    });
+  }
+
+  void _ensureFrameCounter() {
+    if (_frameCallbackRegistered) {
+      return;
+    }
+    _frameCallbackRegistered = true;
+    SchedulerBinding.instance.addPersistentFrameCallback((_) {
+      _frameCount++;
+    });
+  }
+
+  bool _tryApplyConfig(PostHog ph) {
+    if (ph.config == null) {
+      return false;
+    }
+
+    // shallow-merge on top of any user-provided session_recording config —
+    // posthog-js set_config replaces the whole session_recording object
+    final sessionRecording = JSObject();
+    final existing = ph.config?.getProperty<JSAny?>('session_recording'.toJS);
+    if (existing.isA<JSObject>()) {
+      _objectAssign(sessionRecording, existing as JSObject);
+    }
+
+    final captureCanvas = JSObject();
+    final existingCaptureCanvas =
+        sessionRecording.getProperty<JSAny?>('captureCanvas'.toJS);
+    if (existingCaptureCanvas.isA<JSObject>()) {
+      _objectAssign(captureCanvas, existingCaptureCanvas as JSObject);
+    }
+    // the app opts into canvas masking by declaring canvasMaskRegionsFn in
+    // posthog.init — registering regardless would restart an in-flight
+    // recording and drop the semantics tree for apps that never asked
+    if (!captureCanvas.has('canvasMaskRegionsFn')) {
+      _warnNotOptedIn(captureCanvas);
+      return true;
+    }
+    _ensureFrameCounter();
+    captureCanvas.setProperty(
+      'canvasMaskRegionsFn'.toJS,
+      _computeMaskRegions.toJS,
+    );
+    sessionRecording.setProperty('captureCanvas'.toJS, captureCanvas);
+
+    _blockSemanticsHost(sessionRecording);
+
+    final config = JSObject();
+    config.setProperty('session_recording'.toJS, sessionRecording);
+    ph.set_config(config);
+
+    // blockSelector is only read when rrweb's record() starts, so an in-flight
+    // recording must be restarted
+    if (ph.sessionRecordingStarted()) {
+      ph.stopSessionRecording();
+      ph.startSessionRecording();
+    }
+    return true;
+  }
+
+  // canvas recording can also be switched on from project settings, which the
+  // plugin cannot read — so only the posthog.init half of the leak is warnable
+  void _warnNotOptedIn(JSObject captureCanvas) {
+    printIfDebug(
+      'PostHog: canvasMaskRegionsFn is not declared in posthog.init, '
+      'so Flutter web canvas masking is off.',
+    );
+    final replayConfig = _config.sessionReplayConfig;
+    if (!replayConfig.maskAllTexts && !replayConfig.maskAllImages) {
+      return;
+    }
+    final recordCanvas = captureCanvas.getProperty<JSAny?>('recordCanvas'.toJS);
+    if (recordCanvas.isA<JSBoolean>() && (recordCanvas as JSBoolean).toDart) {
+      web.console.warn(
+        'PostHog: canvas session recording is enabled but canvasMaskRegionsFn '
+                'is missing from posthog.init, so text painted by Flutter is recorded '
+                'unmasked. See the posthog_flutter CHANGELOG for the snippet.'
+            .toJS,
+      );
+    }
+  }
+
+  // with accessibility enabled, Flutter mirrors widget text into the
+  // flt-semantics DOM tree, which rrweb would otherwise record in plaintext
+  void _blockSemanticsHost(JSObject sessionRecording) {
+    final existing = sessionRecording.getProperty<JSAny?>('blockSelector'.toJS);
+    var selector = _semanticsBlockSelector;
+    if (existing.isA<JSString>()) {
+      final current = (existing as JSString).toDart;
+      if (current.contains(_semanticsBlockSelector)) {
+        return;
+      }
+      selector = '$current, $_semanticsBlockSelector';
+    }
+    sessionRecording.setProperty('blockSelector'.toJS, selector.toJS);
+  }
+
+  // null tells posthog-js to skip the frame rather than ship it unmasked
+  JSArray<JSObject>? _computeMaskRegions(web.HTMLCanvasElement canvas) {
+    try {
+      return _unsafeComputeMaskRegions(canvas);
+    } catch (e) {
+      printIfDebug('PostHog: error computing canvas mask regions: $e');
+      return null;
+    }
+  }
+
+  JSArray<JSObject>? _unsafeComputeMaskRegions(web.HTMLCanvasElement canvas) {
+    final host = _flutterViewHost(canvas);
+    if (host == null) {
+      return JSArray<JSObject>();
+    }
+
+    final containerRects = _currentContainerRects();
+    if (containerRects == null) {
+      _noteWalkFailure();
+      return null;
+    }
+    _consecutiveWalkFailures = 0;
+    if (containerRects.isEmpty) {
+      return JSArray<JSObject>();
+    }
+
+    // Flutter logical pixels == CSS pixels on web, but localToGlobal is
+    // relative to the flutter-view host, which may itself be embedded away
+    // from the viewport origin — hence the extra hostRect term
+    var containerOrigin = Offset.zero;
+    final containerObject = PostHogMaskController
+        .instance.containerKey.currentContext
+        ?.findRenderObject();
+    if (containerObject is RenderBox && containerObject.hasSize) {
+      containerOrigin = containerObject.localToGlobal(Offset.zero);
+    }
+    final canvasRect = canvas.getBoundingClientRect();
+    final hostRect = host.getBoundingClientRect();
+    final offset = containerOrigin +
+        Offset(hostRect.left, hostRect.top) -
+        Offset(canvasRect.left, canvasRect.top);
+
+    final regions = <JSObject>[];
+    for (final rect in containerRects) {
+      final shifted = rect.shift(offset);
+      regions.add(_JSMaskRegion(
+        x: shifted.left,
+        y: shifted.top,
+        width: shifted.width,
+        height: shifted.height,
+      ));
+    }
+    return regions.toJS;
+  }
+
+  // rects only change when Flutter paints a frame, so cache per frame instead
+  // of recomputing on every posthog-js canvas tick
+  List<Rect>? _currentContainerRects() {
+    if (_cachedContainerRects != null && _cachedAtFrame == _frameCount) {
+      return _cachedContainerRects;
+    }
+
+    final replayConfig = _config.sessionReplayConfig;
+    final elements = PostHogMaskController.instance.getMaskElements(
+      includeAllWidgets:
+          replayConfig.maskAllTexts || replayConfig.maskAllImages,
+    );
+    if (elements == null) {
+      _cachedContainerRects = null;
+      return null;
+    }
+
+    final rects = containerMaskRects(elements);
+    _cachedContainerRects = rects;
+    _cachedAtFrame = _frameCount;
+    return rects;
+  }
+
+  // PostHogWidget can mount a moment after recording starts, so a few
+  // fail-closed frames during boot are normal; only a persistent failure
+  // means the canvas is never recorded
+  void _noteWalkFailure() {
+    if (_warnedWalkFailure) {
+      return;
+    }
+    _consecutiveWalkFailures++;
+    if (_consecutiveWalkFailures >= 10) {
+      _warnedWalkFailure = true;
+      web.console.warn(
+        'PostHog: session replay masking cannot find the PostHogWidget '
+                'widget tree, so canvas frames are not being recorded. '
+                'Wrap your app in PostHogWidget, or remove canvasMaskRegionsFn '
+                'from your posthog.init to disable canvas masking (the canvas '
+                'is then recorded unmasked).'
+            .toJS,
+      );
+    }
+  }
+
+  web.Element? _flutterViewHost(web.HTMLCanvasElement canvas) {
+    final root = canvas.getRootNode();
+    final web.Element start =
+        root.isA<web.ShadowRoot>() ? (root as web.ShadowRoot).host : canvas;
+    return start.closest('flutter-view');
+  }
+}

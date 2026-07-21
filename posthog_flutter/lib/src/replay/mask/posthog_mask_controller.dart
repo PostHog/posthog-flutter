@@ -61,6 +61,39 @@ class PostHogMaskController {
     }
   }
 
+  /// Single-walk variant used by web canvas masking: one [parseRenderTree]
+  /// producing both the explicit-mask set and (optionally) the full text/image
+  /// set, instead of two separate walks. Returns null when the tree can't be
+  /// walked (no [PostHogWidget] mounted, or parsing failed) so callers can
+  /// fail closed.
+  List<ElementData>? getMaskElements({required bool includeAllWidgets}) {
+    final context = containerKey.currentContext;
+
+    if (context == null) {
+      printIfDebug('Error: containerKey.currentContext is null.');
+      return null;
+    }
+
+    try {
+      final widgetElementsTree = _widgetScraper.parseRenderTree(context);
+
+      if (widgetElementsTree == null) {
+        printIfDebug('Error: widgetElementsTree is null after parsing.');
+        return null;
+      }
+
+      return [
+        ...widgetElementsTree.extractMaskWidgetRects(),
+        if (includeAllWidgets) ...widgetElementsTree.extractRects(),
+      ];
+    } catch (e) {
+      printIfDebug(
+        'Error during render tree parsing or rectangle extraction: $e',
+      );
+      return null;
+    }
+  }
+
   List<ElementData>? getPostHogWidgetWrapperElements() {
     final context = containerKey.currentContext;
 
