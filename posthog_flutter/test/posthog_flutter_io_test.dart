@@ -4,6 +4,7 @@ import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
+import 'package:posthog_flutter/src/posthog_internal_events.dart';
 
 // Simplified void callback for feature flags
 void emptyCallback() {}
@@ -268,6 +269,18 @@ void main() {
         log.any((c) => c.method == 'resetPersonPropertiesForFlags'),
         isTrue,
       );
+    });
+
+    test('setCaptureNativeScreens sends the enabled flag', () async {
+      await posthogFlutterIO.setCaptureNativeScreens(false);
+      await posthogFlutterIO.setCaptureNativeScreens(true);
+
+      final calls =
+          log.where((c) => c.method == 'setCaptureNativeScreens').toList();
+      expect(calls.map((c) => c.arguments), [
+        {'enabled': false},
+        {'enabled': true},
+      ]);
     });
 
     test('setGroupPropertiesForFlags sends groupType and properties', () async {
@@ -968,6 +981,59 @@ void main() {
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args['message'], 'Opened modal');
       expect(args.containsKey('properties'), isFalse);
+    });
+  });
+
+  group('onNativeOcclusionChanged', () {
+    Future<void> pushOcclusion(Map<String, Object?> arguments) async {
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(
+          MethodCall('onNativeOcclusionChanged', arguments),
+        ),
+        (ByteData? data) {},
+      );
+    }
+
+    setUp(() async {
+      testConfig = PostHogConfig('test_project_token');
+      await posthogFlutterIO.setup(testConfig);
+      PostHogInternalEvents.nativeOcclusionActive = false;
+      PostHogInternalEvents.nativeOcclusionEpisode = 0;
+      PostHogInternalEvents.nativeBridgeFailed = false;
+      PostHogInternalEvents.nativeOcclusionEvent.value = 0;
+    });
+
+    test('maps arguments into the occlusion state and notifies', () async {
+      await pushOcclusion(
+        {'occluded': true, 'episode': 7, 'bridgeFailed': true},
+      );
+
+      expect(PostHogInternalEvents.nativeOcclusionActive, isTrue);
+      expect(PostHogInternalEvents.nativeOcclusionEpisode, 7);
+      expect(PostHogInternalEvents.nativeBridgeFailed, isTrue);
+      expect(PostHogInternalEvents.nativeOcclusionEvent.value, 1);
+    });
+
+    test('missing arguments reset to not-occluded episode 0', () async {
+      await pushOcclusion(
+        {'occluded': true, 'episode': 7, 'bridgeFailed': true},
+      );
+      await pushOcclusion(<String, Object?>{});
+
+      expect(PostHogInternalEvents.nativeOcclusionActive, isFalse);
+      expect(PostHogInternalEvents.nativeOcclusionEpisode, 0);
+      expect(PostHogInternalEvents.nativeBridgeFailed, isFalse);
+      expect(PostHogInternalEvents.nativeOcclusionEvent.value, 2);
+    });
+
+    test('an unchanged payload still notifies listeners', () async {
+      final payload = {'occluded': true, 'episode': 3, 'bridgeFailed': false};
+      await pushOcclusion(payload);
+      await pushOcclusion(payload);
+
+      expect(PostHogInternalEvents.nativeOcclusionEvent.value, 2);
     });
   });
 }

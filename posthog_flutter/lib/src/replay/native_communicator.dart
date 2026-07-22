@@ -35,7 +35,7 @@ class NativeCommunicator {
         'screen': screen,
       });
     } catch (e) {
-      printIfDebug('Error sending full snapshot to native: $e');
+      printIfDebug('Error sending meta event to native: $e');
     }
   }
 
@@ -70,6 +70,28 @@ class NativeCommunicator {
     } catch (e) {
       printIfDebug('Error capturing native screenshots: $e');
       return List.filled(views.length, null);
+    }
+  }
+
+  /// Asks the native occlusion detector to bridge-capture native screens for
+  /// the current occlusion episode; the native side disables bridging itself
+  /// when the episode ends. [episode] lets the native side decline a stale
+  /// request that arrives after its episode ended — accepting one would re-arm
+  /// the bridge for an episode Dart never asked about. Returns false when the
+  /// native side declined, so the caller can fall back to a placeholder.
+  Future<bool> enableNativeBridge({required int episode}) async {
+    if (kIsWeb) {
+      return false;
+    }
+    try {
+      return await _channel.invokeMethod<bool>(
+            'enableNativeBridge',
+            {'episode': episode},
+          ) ??
+          false;
+    } catch (e) {
+      printIfDebug('Error enabling native bridge: $e');
+      return false;
     }
   }
 }

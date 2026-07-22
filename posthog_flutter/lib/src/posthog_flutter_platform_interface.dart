@@ -36,6 +36,13 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('setup() has not been implemented.');
   }
 
+  /// Applies a runtime [PostHogSessionReplayConfig.captureNativeScreens]
+  /// change by starting or stopping the native occlusion detector.
+  ///
+  /// A no-op by default: only the mobile platforms have a detector, and web
+  /// must not throw when the config setter fires.
+  Future<void> setCaptureNativeScreens(bool enabled) async {}
+
   Future<void> identify({
     required String userId,
     Map<String, Object>? userProperties,

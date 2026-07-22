@@ -12,14 +12,4 @@ class SnapshotManager {
   void clear() {
     _snapshotStatuses = Expando();
   }
-
-  void updateStatus(
-    RenderObject renderObject, {
-    required bool shouldSendMetaEvent,
-  }) {
-    final status = getStatus(renderObject);
-    if (shouldSendMetaEvent) {
-      status.sentMetaEvent = true;
-    }
-  }
 }

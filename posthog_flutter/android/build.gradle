@@ -64,11 +64,13 @@ android {
     dependencies {
         testImplementation 'org.jetbrains.kotlin:kotlin-test'
         testImplementation 'org.mockito:mockito-core:5.0.0'
-        // + Version 3.51.0 and the versions up to 4.0.0, not including 4.0.0 and higher
-        implementation 'com.posthog:posthog-android:[3.51.0,4.0.0]'
+        implementation 'com.posthog:posthog-android:[3.55.0,4.0.0)'
     }
 
     testOptions {
+        // The plugin constructs a main-looper Handler; without default-value
+        // stubs every test dies in the constructor with "not mocked".
+        unitTests.returnDefaultValues = true
         unitTests.all {
             useJUnitPlatform()
 

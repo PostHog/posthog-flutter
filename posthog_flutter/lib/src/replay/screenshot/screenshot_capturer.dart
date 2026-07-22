@@ -65,10 +65,61 @@ class ScreenshotCapturer {
 
   bool hasCapturedPlatformViews = false;
 
+  // Held so confirmDelivered/onOcclusionEnded act on the exact status a frame
+  // was built against, avoiding a containerKey re-lookup that can transiently fail.
+  int? _lastTargetViewId;
+  ViewTreeSnapshotStatus? _lastTargetStatus;
+
+  // Dedup hashes of the latest capture, held until the sender confirms delivery.
+  // Committing at capture time would poison dedup against a dropped frame,
+  // freezing the replay until the pixels next change.
+  int? _pendingImageBytesHash;
+  int? _pendingCompositedBytesHash;
+
+  @visibleForTesting
+  ViewTreeSnapshotStatus? get debugLastTargetStatus => _lastTargetStatus;
+
   ScreenshotCapturer(this._config);
 
   void cancel() {
     _cancelled = true;
+  }
+
+  /// Called when an occlusion episode ends: invalidates the dedup hashes (else
+  /// the first Flutter frame matches the placeholder/bridged hash and freezes
+  /// the replay) and re-arms meta (the bridge sent the native screen's meta).
+  /// Uses the held status so it can't no-op on a transient lookup failure.
+  void onOcclusionEnded() {
+    final statusView = _lastTargetStatus;
+    if (statusView == null) {
+      return;
+    }
+    statusView.imageBytesHash = null;
+    statusView.compositedBytesHash = null;
+    statusView.sentMetaEvent = false;
+  }
+
+  /// Commits delivery state for [viewId]: the pending dedup hashes, and the meta
+  /// latch when [metaSent]. Only the sender calls this, after actual delivery —
+  /// capture paths must not self-commit, or a dropped frame poisons dedup and
+  /// swallows the meta. An id mismatch means the RepaintBoundary was recreated.
+  void confirmDelivered(int viewId, {required bool metaSent}) {
+    if (viewId != _lastTargetViewId) {
+      return;
+    }
+    final statusView = _lastTargetStatus;
+    if (statusView == null) {
+      return;
+    }
+    if (_pendingImageBytesHash != null) {
+      statusView.imageBytesHash = _pendingImageBytesHash;
+    }
+    if (_pendingCompositedBytesHash != null) {
+      statusView.compositedBytesHash = _pendingCompositedBytesHash;
+    }
+    if (metaSent) {
+      statusView.sentMetaEvent = true;
+    }
   }
 
   double _getPixelRatio({
@@ -272,27 +323,118 @@ class ScreenshotCapturer {
     return hash;
   }
 
-  Future<ImageInfo?> captureScreenshot() {
+  /// Shared prologue of [captureScreenshot]/[buildOcclusionPlaceholder]: resolves
+  /// the container render object and per-view status, and resets [_cancelled] so a
+  /// prior stop's cancel() can't veto a fresh capture. Null when not ready.
+  ({
+    RenderRepaintBoundary renderObject,
+    ViewTreeSnapshotStatus statusView,
+    bool shouldSendMetaEvent,
+    Offset globalPosition,
+  })? _resolveCaptureTarget() {
     _cancelled = false;
 
     final context = PostHogMaskController.instance.containerKey.currentContext;
-    if (context == null) {
-      return Future.value(null);
-    }
-
-    final renderObject = context.findRenderObject() as RenderRepaintBoundary?;
+    final renderObject = context?.findRenderObject() as RenderRepaintBoundary?;
     if (renderObject == null ||
         !renderObject.hasSize ||
         !renderObject.size.isValidSize) {
-      return Future.value(null);
+      return null;
     }
 
     final statusView = _snapshotManager.getStatus(renderObject);
+    _lastTargetViewId = identityHashCode(renderObject);
+    _lastTargetStatus = statusView;
+    // A new capture owns the pending slots; a dropped predecessor's hashes
+    // must not commit on this frame's delivery.
+    _pendingImageBytesHash = null;
+    _pendingCompositedBytesHash = null;
+    return (
+      renderObject: renderObject,
+      statusView: statusView,
+      shouldSendMetaEvent: !statusView.sentMetaEvent,
+      globalPosition: renderObject.localToGlobal(Offset.zero),
+    );
+  }
 
-    final shouldSendMetaEvent = !statusView.sentMetaEvent;
+  /// Builds one black placeholder frame for an occlusion episode, shown when a
+  /// bridged capture can't be produced. Null when the view is not ready or
+  /// rendering fails — like [captureScreenshot], it never throws.
+  Future<ImageInfo?> buildOcclusionPlaceholder() async {
+    try {
+      return await _buildOcclusionPlaceholder();
+    } catch (error) {
+      printIfDebug('Error building occlusion placeholder: $error');
+      return null;
+    }
+  }
 
-    // Get the global position of the widget
-    final globalPosition = renderObject.localToGlobal(Offset.zero);
+  Future<ImageInfo?> _buildOcclusionPlaceholder() async {
+    final target = _resolveCaptureTarget();
+    if (target == null) {
+      return null;
+    }
+    final renderObject = target.renderObject;
+    // Always with meta: a bridged episode already shipped the native screen's
+    // meta, so without re-sending, the placeholder renders against its viewport.
+    const shouldSendMetaEvent = true;
+    final globalPosition = target.globalPosition;
+    final srcWidth = renderObject.size.width;
+    final srcHeight = renderObject.size.height;
+    final width = srcWidth.toInt();
+    final height = srcHeight.toInt();
+
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder).drawRect(
+      Rect.fromLTWH(0, 0, srcWidth, srcHeight),
+      Paint()..color = const Color(0xFF000000),
+    );
+    final picture = recorder.endRecording();
+
+    ui.Image placeholderImage;
+    try {
+      placeholderImage = await picture.toImage(width, height);
+    } finally {
+      picture.dispose();
+    }
+
+    if (_cancelled || !placeholderImage.isValidSize) {
+      placeholderImage.dispose();
+      return null;
+    }
+
+    Uint8List? pngBytes;
+    try {
+      pngBytes = await _getImageBytes(placeholderImage);
+    } finally {
+      placeholderImage.dispose();
+    }
+
+    if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
+      return null;
+    }
+
+    // No status update here — the sender commits via [confirmDelivered].
+    return ImageInfo(
+      identityHashCode(renderObject),
+      globalPosition.dx.toInt(),
+      globalPosition.dy.toInt(),
+      width,
+      height,
+      shouldSendMetaEvent,
+      pngBytes,
+    );
+  }
+
+  Future<ImageInfo?> captureScreenshot() {
+    final target = _resolveCaptureTarget();
+    if (target == null) {
+      return Future.value(null);
+    }
+    final renderObject = target.renderObject;
+    final statusView = target.statusView;
+    final shouldSendMetaEvent = target.shouldSendMetaEvent;
+    final globalPosition = target.globalPosition;
 
     final viewId = identityHashCode(renderObject);
 
@@ -506,7 +648,7 @@ class ScreenshotCapturer {
           }
 
           try {
-            statusView.imageBytesHash = preMaskHash;
+            _pendingImageBytesHash = preMaskHash;
 
             final pngBytes = await _getImageBytes(currentFinalImage);
             if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
@@ -523,7 +665,7 @@ class ScreenshotCapturer {
                 completer.complete(null);
                 return;
               }
-              statusView.compositedBytesHash = compositedHash;
+              _pendingCompositedBytesHash = compositedHash;
             }
 
             final imageInfo = ImageInfo(
@@ -535,10 +677,9 @@ class ScreenshotCapturer {
               shouldSendMetaEvent,
               pngBytes,
             );
-            _snapshotManager.updateStatus(
-              renderObject,
-              shouldSendMetaEvent: shouldSendMetaEvent,
-            );
+            // No status commit here: the sender may still drop this frame, and
+            // committing for a never-sent frame breaks playback / freezes dedup.
+            // The sender commits via [confirmDelivered] after delivery.
             completer.complete(imageInfo);
           } finally {
             currentFinalImage.dispose();

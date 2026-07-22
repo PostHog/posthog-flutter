@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+// The replay capturer defines its own ImageInfo; hide Flutter's.
+import 'package:flutter/material.dart' hide ImageInfo;
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/util/logging.dart';
 
 import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
@@ -32,6 +34,19 @@ class PostHogWidgetState extends State<PostHogWidget> {
   bool _isCapturing = false;
   bool _disposed = false;
 
+  /// Whether a substitute source (bridge or placeholder) owns the current
+  /// episode. Not the same as "occluded": with the bridge off, occlusion is
+  /// ignored and Flutter capture keeps running.
+  bool _suppressFlutterCapture = false;
+
+  @visibleForTesting
+  bool get debugFlutterCaptureSuppressed => _suppressFlutterCapture;
+
+  void _setSuppressFlutterCapture(bool value) {
+    _suppressFlutterCapture = value;
+    _changeDetector?.suppressForcedFrames = value;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,10 +61,78 @@ class PostHogWidgetState extends State<PostHogWidget> {
       _changeDetector?.start();
     }
 
-    // start listening for session recording toggles
     PostHogInternalEvents.sessionRecordingActive.addListener(
       _onSessionRecordingChanged,
     );
+    PostHogInternalEvents.nativeOcclusionEvent.addListener(
+      _onNativeOcclusionChanged,
+    );
+  }
+
+  /// A native screen started/stopped covering Flutter (pushed by the native
+  /// detector). On entry: hand off to the bridge, else emit one black
+  /// placeholder. On exit: invalidate dedup hashes so the first Flutter frame
+  /// isn't dropped. With the bridge off, episodes are ignored.
+  Future<void> _onNativeOcclusionChanged() async {
+    if (_disposed) {
+      return;
+    }
+    final replayConfig = Posthog().config?.sessionReplayConfig;
+    if (replayConfig == null) {
+      return;
+    }
+    final occluded = PostHogInternalEvents.nativeOcclusionActive;
+    final episode = PostHogInternalEvents.nativeOcclusionEpisode;
+    final bridgeFailed = PostHogInternalEvents.nativeBridgeFailed;
+    if (!occluded) {
+      printIfDebug(
+          'Native occlusion ended (episode $episode): resuming Flutter capture.');
+      _setSuppressFlutterCapture(false);
+      _screenshotCapturer?.onOcclusionEnded();
+      // A static screen renders no frame after the cover dismisses
+      // (addPostFrameCallback does not request one), so without forcing a
+      // frame here the replay would stay on the episode's last frame forever.
+      if (_changeDetector?.isRunning ?? false) {
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _onChangeDetected());
+        WidgetsBinding.instance.scheduleFrame();
+      }
+      return;
+    }
+    if (!replayConfig.captureNativeScreens) {
+      // Fail open in case the bridge was toggled off mid-episode.
+      printIfDebug('Native occlusion started (episode $episode): '
+          'captureNativeScreens is off, keeping Flutter capture.');
+      _setSuppressFlutterCapture(false);
+      return;
+    }
+    // Suppress synchronously so no covered frame slips out during the handshake.
+    _setSuppressFlutterCapture(true);
+    if (!bridgeFailed) {
+      final accepted =
+          await _nativeCommunicator?.enableNativeBridge(episode: episode) ??
+              false;
+      if (_disposed ||
+          !PostHogInternalEvents.episodeStillCurrent(episode, occluded: true)) {
+        return;
+      }
+      if (accepted) {
+        printIfDebug('Native occlusion started (episode $episode): '
+            'bridged to native capture.');
+        return;
+      }
+    }
+    printIfDebug(
+        'Native occlusion started (episode $episode): emitting placeholder.');
+    final imageInfo = await _screenshotCapturer?.buildOcclusionPlaceholder();
+    if (imageInfo != null && !_disposed) {
+      // A placeholder is only valid while its own episode is occluding.
+      await _sendSnapshot(
+        imageInfo,
+        isStillValid: () =>
+            PostHogInternalEvents.episodeStillCurrent(episode, occluded: true),
+      );
+    }
   }
 
   void _initComponents(PostHogConfig config) {
@@ -93,6 +176,12 @@ class PostHogWidgetState extends State<PostHogWidget> {
     if (_isCapturing) {
       return;
     }
+    // The covered Flutter tree must not be captured while a substitute source
+    // owns the episode: Flutter keeps rendering (spinners, clocks) behind an
+    // opaque cover, and those frames would interleave with bridged ones.
+    if (_suppressFlutterCapture) {
+      return;
+    }
 
     _generateSnapshot();
   }
@@ -105,39 +194,71 @@ class PostHogWidgetState extends State<PostHogWidget> {
     // Ensure no asynchronous calls occur before this function,
     // as it relies on a consistent state.
     _isCapturing = true;
+    final episode = PostHogInternalEvents.nativeOcclusionEpisode;
+    // Live value (not false): with the bridge off, occlusion is ignored and
+    // covered frames are still recorded — hardcoding false would drop them.
+    final occluded = PostHogInternalEvents.nativeOcclusionActive;
 
     try {
       final imageInfo = await _screenshotCapturer?.captureScreenshot();
-      // Refresh this before the null check: a dropped frame (null) on a static
-      // captured-view screen must still keep forced frames scheduled, otherwise
-      // the screen would never produce another snapshot.
+      // Refresh before the null check: a dropped frame on a static captured-view
+      // screen must still keep forced frames scheduled.
       _changeDetector?.hasCapturedPlatformViews =
           _screenshotCapturer?.hasCapturedPlatformViews ?? false;
       if (imageInfo == null || _disposed) {
         return;
       }
 
-      if (imageInfo.shouldSendMetaEvent) {
-        await _nativeCommunicator?.sendMetaEvent(
-          width: imageInfo.width,
-          height: imageInfo.height,
-          screen: Posthog().currentScreen,
-        );
-      }
-
-      if (_disposed) {
-        return;
-      }
-
-      await _nativeCommunicator?.sendFullSnapshot(
-        imageInfo.imageBytes,
-        id: imageInfo.id,
-        x: imageInfo.x,
-        y: imageInfo.y,
+      // Only valid while the world it was captured in is still current — an
+      // episode starting mid-pipeline makes it stale.
+      await _sendSnapshot(
+        imageInfo,
+        isStillValid: () => PostHogInternalEvents.episodeStillCurrent(episode,
+            occluded: occluded),
       );
     } finally {
       _isCapturing = false;
     }
+  }
+
+  /// Sends [imageInfo] (meta first when flagged) and commits the capturer's
+  /// delivery state only after delivery — the single delivery→commit path.
+  /// [isStillValid] is re-checked after every await so a stale frame never
+  /// ships into another episode. Returns whether the frame was delivered.
+  Future<bool> _sendSnapshot(
+    ImageInfo imageInfo, {
+    required bool Function() isStillValid,
+  }) async {
+    if (_disposed || !isStillValid()) {
+      return false;
+    }
+    if (imageInfo.shouldSendMetaEvent) {
+      await _nativeCommunicator?.sendMetaEvent(
+        width: imageInfo.width,
+        height: imageInfo.height,
+        screen: Posthog().currentScreen,
+      );
+      if (_disposed || !isStillValid()) {
+        return false;
+      }
+    }
+
+    await _nativeCommunicator?.sendFullSnapshot(
+      imageInfo.imageBytes,
+      id: imageInfo.id,
+      x: imageInfo.x,
+      y: imageInfo.y,
+    );
+    // Also guards the commit below: a validity flip means a boundary handler
+    // already re-armed, and committing now would clobber it.
+    if (_disposed || !isStillValid()) {
+      return false;
+    }
+    _screenshotCapturer?.confirmDelivered(
+      imageInfo.id,
+      metaSent: imageInfo.shouldSendMetaEvent,
+    );
+    return true;
   }
 
   @override
@@ -156,6 +277,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
     PostHogInternalEvents.sessionRecordingActive.removeListener(
       _onSessionRecordingChanged,
+    );
+    PostHogInternalEvents.nativeOcclusionEvent.removeListener(
+      _onNativeOcclusionChanged,
     );
 
     _changeDetector?.stop();

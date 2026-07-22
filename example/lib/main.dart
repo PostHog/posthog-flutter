@@ -12,6 +12,8 @@ import 'platform_views_screen.dart';
 
 const kMaskAllPlatformViews = true;
 
+PostHogSessionReplayConfig? exampleReplayConfig;
+
 Future<void> main() async {
   final config = PostHogConfig(
     'phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06',
@@ -20,25 +22,21 @@ Future<void> main() async {
     debugPrint('[PostHog] Feature flags loaded!');
   };
 
-  // Configure beforeSend callbacks to filter/modify events
   config.beforeSend = [
     (event) {
       debugPrint('[beforeSend] Event: ${event.event}');
 
-      // Test case 1: Drop specific events
       if (event.event == 'drop me') {
         debugPrint('[beforeSend] Dropping event: ${event.event}');
         return null;
       }
 
-      // Test case 2: Modify event properties
       if (event.event == 'modify me') {
         event.properties ??= {};
         event.properties?['modified_by_before_send'] = true;
         debugPrint('[beforeSend] Modified event: ${event.event}');
       }
 
-      // Pass through all other events unchanged
       return event;
     },
   ];
@@ -51,10 +49,11 @@ Future<void> main() async {
   config.sessionReplayConfig.maskAllTexts = false;
   config.sessionReplayConfig.maskAllImages = false;
   config.sessionReplayConfig.maskAllPlatformViews = kMaskAllPlatformViews;
+  config.sessionReplayConfig.captureNativeScreens = true;
   config.sessionReplayConfig.throttleDelay = const Duration(milliseconds: 1000);
+  exampleReplayConfig = config.sessionReplayConfig;
   config.flushAt = 1;
 
-  // Configure error tracking and exception capture
   config.errorTrackingConfig.captureFlutterErrors =
       true; // Capture Flutter framework errors
   config.errorTrackingConfig.capturePlatformDispatcherErrors =

@@ -1,4 +1,4 @@
-import PostHog
+@_spi(PostHogInternal) import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
@@ -9,6 +9,25 @@ import PostHog
 #endif
 
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
+    #if os(iOS)
+        // Occlusion episode protocol: a main-thread timer — independent of
+        // Flutter's frame lifecycle, which can pause under a native cover —
+        // pushes occlusion transitions to Dart and drives bridge captures.
+        private var occlusionTimer: Timer?
+        private var isOccluded = false
+        var bridgeEnabled = false
+        // Whether the episode has delivered its first bridged frame.
+        private var bridgeEpisodeStarted = false
+        // End-transition debounce: ticks reading not-occluded while an episode is active.
+        private var notOccludedTicks = 0
+        // Monotonic episode id, stamped into every push so Dart drops stale-episode work.
+        private var occlusionEpisode = 0
+        // Failed captures before the episode's first delivered frame; at the limit it
+        // falls back (bridgeFailed). After first delivery, failures never demote.
+        private var bridgeFailureStrikes = 0
+        private static let bridgeFailureStrikeLimit = 3
+    #endif
+
     private static var instance: PosthogFlutterPlugin?
     private var channel: FlutterMethodChannel?
 
@@ -171,10 +190,25 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
             config.sessionReplayConfig.captureNetworkTelemetry = false
 
-            if let sessionReplayConfigMap = posthogConfig["sessionReplayConfig"] as? [String: Any],
-               let sampleRate = sessionReplayConfigMap["sampleRate"] as? NSNumber
-            {
-                config.sessionReplayConfig.sampleRate = sampleRate
+            if let sessionReplayConfigMap = posthogConfig["sessionReplayConfig"] as? [String: Any] {
+                if let sampleRate = sessionReplayConfigMap["sampleRate"] as? NSNumber {
+                    config.sessionReplayConfig.sampleRate = sampleRate
+                }
+                let captureNativeScreens =
+                    sessionReplayConfigMap["captureNativeScreens"] as? Bool ?? false
+                // Unconditional: only bridged captures read these, so a runtime
+                // bridge toggle honors them.
+                if let maskAllTexts = sessionReplayConfigMap["maskAllTexts"] as? Bool {
+                    config.sessionReplayConfig.maskAllTextInputs = maskAllTexts
+                }
+                if let maskAllImages = sessionReplayConfigMap["maskAllImages"] as? Bool {
+                    config.sessionReplayConfig.maskAllImages = maskAllImages
+                }
+                if config.sessionReplay, captureNativeScreens {
+                    PosthogFlutterPlugin.instance?.startOcclusionDetector()
+                } else {
+                    PosthogFlutterPlugin.instance?.disableOcclusionDetector()
+                }
             }
 
             // configure surveys
@@ -253,6 +287,18 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
 
+        // Bootstrap precedence and flag layering live in the native SDK; forward values only.
+        if let bootstrap = posthogConfig["bootstrap"] as? [String: Any] {
+            let bootstrapConfig = PostHogBootstrapConfig()
+            bootstrapConfig.distinctId = bootstrap["distinctId"] as? String
+            if let isIdentifiedId = bootstrap["isIdentifiedId"] as? Bool {
+                bootstrapConfig.isIdentifiedId = isIdentifiedId
+            }
+            bootstrapConfig.featureFlags = bootstrap["featureFlags"] as? [String: Any]
+            bootstrapConfig.featureFlagPayloads = bootstrap["featureFlagPayloads"] as? [String: Any]
+            config.bootstrap = bootstrapConfig
+        }
+
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
         postHogVersion = postHogFlutterVersion
@@ -329,10 +375,36 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             sendMetaEvent(call, result: result)
         case "sendFullSnapshot":
             sendFullSnapshot(call, result: result)
-        case "captureNativeScreenshot":
-            captureNativeScreenshot(call, result: result)
         case "captureNativeScreenshots":
             captureNativeScreenshots(call, result: result)
+        case "enableNativeBridge":
+            #if os(iOS)
+                let episode = (call.arguments as? [String: Any])?["episode"] as? Int
+                DispatchQueue.main.async {
+                    // Episode-scoped: a stale enable must not re-arm the bridge
+                    // for an episode Dart never handed off.
+                    let accepted = self.isOccluded
+                        && episode == self.occlusionEpisode
+                        && PostHogSDK.shared.isSessionReplayActive()
+                    if accepted {
+                        self.bridgeEnabled = true
+                        self.nudgeOcclusionDetector()
+                    }
+                    result(accepted)
+                }
+            #else
+                result(false)
+            #endif
+        case "setCaptureNativeScreens":
+            #if os(iOS)
+                let enabled = (call.arguments as? [String: Any])?["enabled"] as? Bool ?? false
+                if enabled {
+                    startOcclusionDetector()
+                } else {
+                    disableOcclusionDetector()
+                }
+            #endif
+            result(nil)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
         case "startSessionRecording":
@@ -467,30 +539,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 #endif
 
 extension PosthogFlutterPlugin {
-    private func captureNativeScreenshot(_ call: FlutterMethodCall,
-                                         result: @escaping FlutterResult)
-    {
-        #if os(iOS)
-            guard let args = call.arguments as? [String: Any] else {
-                _badArgumentError(result)
-                return
-            }
-            let x = args["x"] as? Int ?? 0
-            let y = args["y"] as? Int ?? 0
-            let width = args["width"] as? Int ?? 0
-            let height = args["height"] as? Int ?? 0
-            guard width > 0, height > 0 else {
-                _badArgumentError(result)
-                return
-            }
-            captureOneNative(x: x, y: y, width: width, height: height) { bytes in
-                result(bytes)
-            }
-        #else
-            result(nil)
-        #endif
-    }
-
     private func captureNativeScreenshots(_ call: FlutterMethodCall,
                                           result: @escaping FlutterResult)
     {
@@ -603,22 +651,286 @@ extension PosthogFlutterPlugin {
         }
 
         private func captureWindow() -> UIWindow? {
-            return UIApplication.shared.connectedScenes
+            let windows = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap(\.windows)
-                .first(where: \.isKeyWindow) ?? UIApplication.shared.windows.first
+            // Prefer the window hosting Flutter: the key window can be a
+            // foreign overlay (or the occluding screen itself), and searching
+            // it would miss the platform views embedded in the Flutter tree.
+            return windows.first(where: {
+                Self.containsFlutterViewController($0.rootViewController)
+            })
+                ?? windows.first(where: \.isKeyWindow)
+                ?? UIApplication.shared.windows.first
         }
 
         private func findWKWebView(in view: UIView, containedBy rect: CGRect) -> WKWebView? {
             if let webView = view as? WKWebView {
                 let frameInWindow = webView.convert(webView.bounds, to: nil)
                 // 1pt slack absorbs rounding between Flutter's rect and the native frame.
-                if rect.insetBy(dx: -1, dy: -1).contains(frameInWindow) { return webView }
+                if rect.insetBy(dx: -1, dy: -1).contains(frameInWindow) {
+                    return webView
+                }
             }
             for sub in view.subviews {
-                if let found = findWKWebView(in: sub, containedBy: rect) { return found }
+                if let found = findWKWebView(in: sub, containedBy: rect) {
+                    return found
+                }
             }
             return nil
+        }
+    #endif
+
+    // The occlusion timer retains its closure until invalidated; without this
+    // it would survive engine detach and push zombie occlusion events.
+    public func detachFromEngine(for _: FlutterPluginRegistrar) {
+        #if os(iOS)
+            DispatchQueue.main.async { [weak self] in
+                self?.stopOcclusionDetector()
+            }
+        #endif
+    }
+
+    #if os(iOS)
+        func startOcclusionDetector() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.occlusionTimer == nil else { return }
+                let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+                    self?.occlusionTick()
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                self.occlusionTimer = timer
+                // Event-driven nudge: an own-window paywall (Superwall-style) is
+                // caught within a frame, not on the next poll, so covered frames
+                // don't leak at episode start. Same-window modal has no global
+                // hook, so it still relies on the ~1 s poll.
+                for name in [UIWindow.didBecomeVisibleNotification, UIWindow.didBecomeKeyNotification] {
+                    NotificationCenter.default.addObserver(
+                        self,
+                        selector: #selector(self.nudgeOcclusionDetector),
+                        name: name,
+                        object: nil
+                    )
+                }
+            }
+        }
+
+        func stopOcclusionDetector() {
+            occlusionTimer?.invalidate()
+            occlusionTimer = nil
+            NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeVisibleNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeKeyNotification, object: nil)
+        }
+
+        /// For a setup() re-run that drops the feature: unlike a bare stop,
+        /// ends any active episode, otherwise Dart never learns and keeps its
+        /// capture suppressed.
+        func disableOcclusionDetector() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.stopOcclusionDetector()
+                if self.isOccluded || self.bridgeEnabled {
+                    self.isOccluded = false
+                    self.bridgeEnabled = false
+                    self.bridgeEpisodeStarted = false
+                    self.bridgeFailureStrikes = 0
+                    self.pushOcclusionEvent(occluded: false)
+                }
+            }
+        }
+
+        // Notifications fire on main; the guard drops a stray one after stop.
+        @objc private func nudgeOcclusionDetector() {
+            guard occlusionTimer != nil else { return }
+            occlusionTick()
+        }
+
+        private func pushOcclusionEvent(occluded: Bool, bridgeFailed: Bool = false) {
+            channel?.invokeMethod(
+                "onNativeOcclusionChanged",
+                arguments: [
+                    "occluded": occluded,
+                    "episode": occlusionEpisode,
+                    "bridgeFailed": bridgeFailed,
+                ]
+            )
+        }
+
+        private func occlusionTick() {
+            // Freeze while not active: the SDK only snapshots foreground-active
+            // windows, so every capture would fail and burn the episode's
+            // pre-first-frame strikes during app switches or backgrounding.
+            guard UIApplication.shared.applicationState == .active else {
+                return
+            }
+            guard PostHogSDK.shared.isSessionReplayActive() else {
+                if isOccluded || bridgeEnabled {
+                    isOccluded = false
+                    bridgeEnabled = false
+                    bridgeEpisodeStarted = false
+                    bridgeFailureStrikes = 0
+                    // Dart must learn the episode ended, otherwise the next
+                    // occluded=true push looks like unchanged state.
+                    pushOcclusionEvent(occluded: false)
+                }
+                return
+            }
+            let occluded = Self.isFlutterOccluded()
+            // Debounce END only: a native→native handoff briefly reads
+            // not-occluded; ending the episode there would flash a stale frame.
+            if !occluded, isOccluded, notOccludedTicks < 1 {
+                notOccludedTicks += 1
+                return
+            }
+            // Occluded again after a blip = the cover was swapped. The old
+            // cover's bridge grant must not carry over; re-handshake under a
+            // new episode id. No end event, so Dart's suppression never lapses.
+            let coverSwapped = occluded && isOccluded && notOccludedTicks > 0
+            notOccludedTicks = 0
+            if occluded != isOccluded {
+                isOccluded = occluded
+                if occluded {
+                    occlusionEpisode += 1
+                } else {
+                    bridgeEnabled = false
+                    bridgeEpisodeStarted = false
+                }
+                bridgeFailureStrikes = 0
+                pushOcclusionEvent(occluded: occluded)
+            } else if coverSwapped {
+                occlusionEpisode += 1
+                bridgeEnabled = false
+                bridgeEpisodeStarted = false
+                bridgeFailureStrikes = 0
+                pushOcclusionEvent(occluded: true)
+            }
+            if occluded, bridgeEnabled {
+                // First capture of an episode settles the presentation with
+                // afterScreenUpdates; steady-state ticks avoid it because it
+                // visibly flickers secure text fields.
+                let isFirst = !bridgeEpisodeStarted
+                if PostHogSDK.shared.captureSessionReplaySnapshot(episodeFirstFrame: isFirst) {
+                    bridgeEpisodeStarted = true
+                    bridgeFailureStrikes = 0
+                } else if !bridgeEpisodeStarted {
+                    // Demotion is gated on the episode never having delivered:
+                    // captures fail transiently during interaction (mid-transition
+                    // skips), so demoting a working episode would swap real frames
+                    // for the fallback. After first delivery, failures just hold
+                    // the last good frame.
+                    bridgeFailureStrikes += 1
+                    if bridgeFailureStrikes >= Self.bridgeFailureStrikeLimit {
+                        bridgeEnabled = false
+                        pushOcclusionEvent(occluded: true, bridgeFailed: true)
+                    }
+                }
+            }
+        }
+
+        /// Whether the Flutter surface is NOT what the user currently sees,
+        /// evaluated live — no cached identities. Single windows pass per tick.
+        private static func isFlutterOccluded() -> Bool {
+            let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+            guard let flutterWindow = windows.first(where: {
+                containsFlutterViewController($0.rootViewController)
+            }) else {
+                // Fail open: without a Flutter window there is nothing to blank.
+                return false
+            }
+            // Walk the whole presentation chain: native SDKs routinely present
+            // full-screen from the top of an existing chain. A single geometric
+            // + opacity test covers every presentation style: popovers, alerts,
+            // and portrait sheets fail the coverage check; full-screen covers
+            // (including compact-height sheets) pass it.
+            var top = flutterWindow.rootViewController
+            while let presented = top?.presentedViewController {
+                if let view = presented.view,
+                   Self.containsOpaqueCoveringView(view, window: flutterWindow)
+                {
+                    return true
+                }
+                top = presented
+            }
+            // An SDK-owned window made key above Flutter (e.g. Superwall
+            // presents its paywall in its own UIWindow + makeKeyAndVisible).
+            // It must actually cover the screen with opaque content —
+            // floating-button, banner, or transparent passthrough windows that
+            // hold key status do not count. Scoped to the Flutter window's
+            // scene: on multi-scene (iPad) apps another scene's key window
+            // does not cover this one.
+            let sceneWindows = flutterWindow.windowScene?.windows ?? windows
+            if let keyWindow = sceneWindows.first(where: \.isKeyWindow),
+               keyWindow !== flutterWindow,
+               !isSystemWindow(keyWindow),
+               coversScreen(keyWindow),
+               containsOpaqueCoveringView(keyWindow, window: keyWindow)
+            {
+                return true
+            }
+            return false
+        }
+
+        /// Whether [view]'s tree contains an opaque view that covers the
+        /// window — a hierarchy test, because a single-view background check
+        /// misses the common clear-container-with-opaque-child pattern of
+        /// payment/auth SDKs. isOpaque is a rendering hint (defaults true), so
+        /// only background-color alpha counts. Known bias: covers drawn purely
+        /// by layers (camera previews) without an opaque background are missed
+        /// and fall back to pre-feature stale-frame behavior.
+        private static func containsOpaqueCoveringView(
+            _ view: UIView,
+            window: UIWindow,
+            depth: Int = 0
+        ) -> Bool {
+            // Depth bound is a runaway guard, not a search budget — complex
+            // SDK view trees nest far deeper than a handful of levels, and a
+            // missed opaque cover silently disables the feature for that
+            // screen. The walk early-exits on the first hit.
+            guard depth <= 16, !view.isHidden, view.alpha >= 0.99 else {
+                return false
+            }
+            let frameInWindow = view.convert(view.bounds, to: window)
+            let windowArea = window.bounds.width * window.bounds.height
+            guard windowArea > 0 else { return false }
+            let covered = frameInWindow.intersection(window.bounds)
+            let coversBounds = (covered.width * covered.height) >= windowArea * 0.95
+            if coversBounds,
+               let background = view.backgroundColor,
+               background.cgColor.alpha >= 0.99
+            {
+                return true
+            }
+            // A child can cover even when its container is clear.
+            return view.subviews.contains {
+                containsOpaqueCoveringView($0, window: window, depth: depth + 1)
+            }
+        }
+    #endif
+
+    #if os(iOS)
+        private static func containsFlutterViewController(_ viewController: UIViewController?) -> Bool {
+            guard let viewController else {
+                return false
+            }
+            if viewController is FlutterViewController {
+                return true
+            }
+            return viewController.children.contains { $0 is FlutterViewController }
+        }
+
+        private static func isSystemWindow(_ window: UIWindow) -> Bool {
+            let className = String(describing: type(of: window))
+            return className.contains("Keyboard") || className.contains("TextEffects")
+        }
+
+        private static func coversScreen(_ window: UIWindow) -> Bool {
+            guard !window.isHidden, window.alpha > 0.01 else { return false }
+            let screen = window.screen.bounds.size
+            guard screen.width > 0, screen.height > 0 else { return false }
+            let size = window.frame.size
+            return size.width >= screen.width * 0.95 && size.height >= screen.height * 0.95
         }
     #endif
 

@@ -1,5 +1,46 @@
 ## Next
 
+## 5.32.1
+
+### Patch Changes
+
+- bbf20fa: Android: session replay screenshots are decoded, re-encoded, and queued off the main thread. Previously each frame cost the main thread 25-75ms on midrange hardware (up to once per second while recording), a visible per-second hitch during scrolling — iOS already did this work on a background queue.
+
+## 5.32.0
+
+### Minor Changes
+
+- 22dbde4: Session replay can now capture native screens that cover the Flutter app (full-screen paywalls, presented view controllers, native activities). Opt in with `captureNativeScreens = true`: while a native screen is up, capture is handed to the native PostHog SDK so it becomes visible in replay (requires native SDK support). When enabled but the capture cannot be produced, a black placeholder frame is shown for that screen instead. Off by default — with the flag off nothing is captured or blanked, and replay keeps showing the covered Flutter UI as before. Captured native screens honor your app-wide `maskAllTexts`/`maskAllImages` settings; setting them false reveals native text/images too, including native input fields.
+
+  Not captured:
+
+  - Partial-height sheets (Apple Pay, share sheet, `.pageSheet`/`.formSheet` modals)
+  - Content rendered by another process (Apple Pay, photo picker) — blank if the surrounding screen is captured
+  - Android: anything that is not a full activity in your app's process (Chrome Custom Tabs, Google Pay, dialogs, bottom sheets, permission prompts)
+  - iOS: covers without an opaque background (camera previews, image/blur backdrops)
+
+  Screens that are not captured keep the previous behavior: replay keeps showing the covered Flutter UI.
+
+  The flag can also be toggled at runtime. Turning it off takes effect immediately: toggling off right before presenting a sensitive native screen guarantees that screen is not captured. Enable it before presenting a screen you want captured — enabling while a native screen is already up may not capture that screen.
+
+  Requires posthog-ios >= 3.66.0 and posthog-android >= 3.55.0 (resolved automatically by the bundled dependency ranges).
+
+### Patch Changes
+
+- 22dbde4: Android: session replay screenshots are now timestamped with the native SDK's clock instead of the system clock. The two can diverge (the SDK prefers the network-time clock on API 33+), which scrambled the replay timeline — frames appeared at a different time than touch events and native-captured screens.
+
+## 5.31.0
+
+### Minor Changes
+
+- db486b0: Add a `bootstrap` option to `PostHogConfig` for pre-seeding identity and feature flags before the first `/flags` response. Set `config.bootstrap = PostHogBootstrapConfig(...)` before `setup()` so early events carry a caller-controlled distinct ID and flag reads return your values during cold start. The values are forwarded to the native iOS and Android SDKs and mirror the `bootstrap` option in posthog-js. On Flutter web, configure `bootstrap` in your `posthog.init` call instead.
+
+## 5.30.1
+
+### Patch Changes
+
+- d4c7fb8: Require posthog-android 3.54.1 or newer. Earlier 3.x versions performed replay work on every touch (a network-time Binder call, a `MotionEvent` copy, and a replay-executor submission) even when session replay was disabled or sampled out, which could cause ANRs on Android. Projects with a Gradle lockfile or cached dependency resolution could stay pinned to an affected version; the raised floor guarantees the fixed SDK.
+
 ## 5.30.0
 
 ### Minor Changes

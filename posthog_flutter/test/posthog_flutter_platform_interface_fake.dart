@@ -41,6 +41,13 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   final List<CapturedExceptionCall> capturedExceptions = [];
   PostHogConfig? receivedConfig;
 
+  final List<bool> captureNativeScreensChanges = [];
+
+  @override
+  Future<void> setCaptureNativeScreens(bool enabled) async {
+    captureNativeScreensChanges.add(enabled);
+  }
+
   // Tracking for setPersonProperties calls
   final List<Map<String, dynamic>> setPersonPropertiesCalls = [];
 

@@ -1,13 +1,18 @@
 package com.posthog.flutter
 
 import android.app.Activity
+import android.content.Context
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.mockito.Mockito
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /*
  * This demonstrates a simple unit test of the Kotlin portion of this plugin's implementation.
@@ -28,7 +33,7 @@ internal class PosthogFlutterPluginTest {
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success(true)
+        Mockito.verify(mockResult).success(null)
     }
 
     @Test
@@ -41,7 +46,48 @@ internal class PosthogFlutterPluginTest {
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success(true)
+        Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
+    fun onMethodCall_sendMetaEvent_repliesAfterWorkDropsOnDetachRecoversOnReattach() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = Mockito.mock(FlutterPlugin.FlutterPluginBinding::class.java)
+        Mockito.`when`(binding.applicationContext).thenReturn(Mockito.mock(Context::class.java))
+        Mockito.`when`(binding.binaryMessenger).thenReturn(Mockito.mock(BinaryMessenger::class.java))
+        plugin.onAttachedToEngine(binding)
+
+        val call = MethodCall("sendMetaEvent", mapOf("width" to 10, "height" to 20, "screen" to "Home"))
+
+        // Asserts only that no reply happens synchronously in the handler.
+        // Actual delivery after the worker runs is not observable here (the
+        // stubbed test looper drops posts) and is covered end to end.
+        val whileAttached: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, whileAttached)
+        Mockito.verify(whileAttached, Mockito.never()).success(null)
+
+        plugin.onDetachedFromEngine(binding)
+
+        val afterDetach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, afterDetach)
+        Mockito.verify(afterDetach).success(null)
+
+        // No immediate drop reply proves the executor was recreated.
+        plugin.onAttachedToEngine(binding)
+        val afterReattach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, afterReattach)
+        Mockito.verify(afterReattach, Mockito.never()).success(null)
+    }
+
+    @Test
+    fun onMethodCall_setCaptureNativeScreens_returnsSuccess() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("setCaptureNativeScreens", mapOf("enabled" to false))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
     }
 
     @Test
@@ -77,46 +123,6 @@ internal class PosthogFlutterPluginTest {
 
         Mockito.verify(mockResult).error(
             Mockito.eq("PosthogFlutterException"),
-            Mockito.any(),
-            Mockito.isNull(),
-        )
-    }
-
-    @Test
-    fun onMethodCall_captureNativeScreenshot_noActivity_returnsNull() {
-        val plugin = PosthogFlutterPlugin()
-
-        val call =
-            MethodCall(
-                "captureNativeScreenshot",
-                mapOf("x" to 0, "y" to 0, "width" to 10, "height" to 10),
-            )
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
-
-        // No activity attached, so capture degrades to null rather than crashing.
-        Mockito.verify(mockResult).success(null)
-    }
-
-    @Test
-    fun onMethodCall_captureNativeScreenshot_invalidDimensions_returnsError() {
-        val plugin = PosthogFlutterPlugin()
-        val binding = Mockito.mock(ActivityPluginBinding::class.java)
-        Mockito.`when`(binding.activity).thenReturn(Mockito.mock(Activity::class.java))
-        plugin.onAttachedToActivity(binding)
-
-        // Dimensions are validated before any activity view access, so a bare
-        // mock Activity is enough to reach the zero-dimension guard.
-        val call =
-            MethodCall(
-                "captureNativeScreenshot",
-                mapOf("x" to 0, "y" to 0, "width" to 0, "height" to 0),
-            )
-        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
-        plugin.onMethodCall(call, mockResult)
-
-        Mockito.verify(mockResult).error(
-            Mockito.eq("INVALID_ARGUMENT"),
             Mockito.any(),
             Mockito.isNull(),
         )
@@ -188,5 +194,50 @@ internal class PosthogFlutterPluginTest {
             Mockito.eq("Missing argument: key"),
             Mockito.isNull(),
         )
+    }
+
+    @Test
+    fun bootstrapConfigFromMap_fullMap_decodesAllFields() {
+        val config =
+            bootstrapConfigFromMap(
+                mapOf(
+                    "distinctId" to "user-123",
+                    "isIdentifiedId" to true,
+                    "featureFlags" to mapOf("beta-ui" to "variant-a", "legacy" to true),
+                    "featureFlagPayloads" to mapOf("beta-ui" to mapOf("color" to "blue")),
+                ),
+            )
+
+        assertEquals("user-123", config.distinctId)
+        assertTrue(config.isIdentifiedId)
+        assertEquals(mapOf("beta-ui" to "variant-a", "legacy" to true), config.featureFlags)
+        assertEquals(mapOf("beta-ui" to mapOf("color" to "blue")), config.featureFlagPayloads)
+    }
+
+    @Test
+    fun bootstrapConfigFromMap_emptyMap_usesDefaults() {
+        val config = bootstrapConfigFromMap(emptyMap())
+
+        assertNull(config.distinctId)
+        assertFalse(config.isIdentifiedId)
+        assertNull(config.featureFlags)
+        assertNull(config.featureFlagPayloads)
+    }
+
+    @Test
+    fun bootstrapConfigFromMap_wrongTypes_fallBackToDefaults() {
+        val config =
+            bootstrapConfigFromMap(
+                mapOf(
+                    "distinctId" to 42,
+                    "isIdentifiedId" to "yes",
+                    "featureFlags" to listOf("beta-ui"),
+                ),
+            )
+
+        assertNull(config.distinctId)
+        assertFalse(config.isIdentifiedId)
+        assertNull(config.featureFlags)
+        assertNull(config.featureFlagPayloads)
     }
 }
