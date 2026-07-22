@@ -136,9 +136,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Find frames by package
       final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
@@ -170,9 +169,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Find frames by package
       final myAppFrame = frames.firstWhere((f) => f['package'] == 'my_app');
@@ -207,9 +205,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Find any frame from test_package
       final testFrame = frames.firstWhere(
@@ -398,7 +395,8 @@ void main() {
       expect(tail[0]['filename'], 'lib.dart');
     });
 
-    test('emits frames in canonical bottom-up order (entry point first, '
+    test(
+        'emits frames in canonical bottom-up order (entry point first, '
         'crash site last)', () {
       final exception = Exception('Test exception');
 
@@ -418,9 +416,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       final entryIndex = frames.indexWhere(
         (frame) => frame['function'] == 'entryPoint',
@@ -533,9 +530,8 @@ void main() {
 
       final exceptionData =
           result['\$exception_list'] as List<Map<String, dynamic>>;
-      final frames =
-          exceptionData.first['stacktrace']['frames']
-              as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
 
       // Look for asynchronous gap frames
       final gapFrames = frames
@@ -675,75 +671,69 @@ void main() {
     });
 
     group('cause chain', () {
-      final synchronousCases =
-          <
-            ({
-              String description,
-              Object Function() buildError,
-              StackTrace? stackTrace,
-              List<String> expectedTypes,
-              Map<int, String> expectedValues,
-              void Function(List<Map<String, dynamic>>) extraExpectations,
-            })
-          >[
-            (
-              description:
-                  'walks AsyncError into multiple exception items, outermost-first',
-              buildError: () {
-                late StateError rootError;
-                try {
-                  throw StateError('root cause');
-                } catch (error) {
-                  rootError = error as StateError;
-                }
+      final synchronousCases = <({
+        String description,
+        Object Function() buildError,
+        StackTrace? stackTrace,
+        List<String> expectedTypes,
+        Map<int, String> expectedValues,
+        void Function(List<Map<String, dynamic>>) extraExpectations,
+      })>[
+        (
+          description:
+              'walks AsyncError into multiple exception items, outermost-first',
+          buildError: () {
+            late StateError rootError;
+            try {
+              throw StateError('root cause');
+            } catch (error) {
+              rootError = error as StateError;
+            }
 
-                return AsyncError(rootError, rootError.stackTrace!);
-              },
-              stackTrace: null,
-              expectedTypes: ['AsyncError', 'StateError'],
-              expectedValues: {1: 'Bad state: root cause'},
-              extraExpectations: (exceptionList) {
-                // The cause carries its own (thrown) stack trace
-                expect(exceptionList[1]['stacktrace'], isNotNull);
-                expect(
-                  (exceptionList[1]['stacktrace']['frames'] as List).isNotEmpty,
-                  isTrue,
-                );
+            return AsyncError(rootError, rootError.stackTrace!);
+          },
+          stackTrace: null,
+          expectedTypes: ['AsyncError', 'StateError'],
+          expectedValues: {1: 'Bad state: root cause'},
+          extraExpectations: (exceptionList) {
+            // The cause carries its own (thrown) stack trace
+            expect(exceptionList[1]['stacktrace'], isNotNull);
+            expect(
+              (exceptionList[1]['stacktrace']['frames'] as List).isNotEmpty,
+              isTrue,
+            );
 
-                // Causes reuse the outer mechanism
-                expect(exceptionList[1]['mechanism']['handled'], isTrue);
-                expect(
-                  exceptionList[1]['mechanism']['type'],
-                  equals('generic'),
-                );
-                expect(exceptionList[1]['mechanism']['synthetic'], isFalse);
-              },
-            ),
-            (
-              description: 'walks duck-typed cause getters',
-              buildError: () {
-                final root = FormatException('root');
-                final middle = _ChainedException('middle', root);
-                return _ChainedException('outer', middle);
-              },
-              stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
-              expectedTypes: [
-                '_ChainedException',
-                '_ChainedException',
-                'FormatException',
-              ],
-              expectedValues: {0: 'outer', 1: 'middle'},
-              extraExpectations: (_) {},
-            ),
-            (
-              description: 'does not add causes for errors without one',
-              buildError: () => StateError('no cause'),
-              stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
-              expectedTypes: ['StateError'],
-              expectedValues: const {},
-              extraExpectations: (_) {},
-            ),
-          ];
+            // Causes reuse the outer mechanism
+            expect(exceptionList[1]['mechanism']['handled'], isTrue);
+            expect(exceptionList[1]['mechanism']['type'], equals('generic'));
+            expect(exceptionList[1]['mechanism']['synthetic'], isFalse);
+          },
+        ),
+        (
+          description: 'walks duck-typed cause getters',
+          buildError: () {
+            final root = FormatException('root');
+            final middle = _ChainedException('middle', root);
+            return _ChainedException('outer', middle);
+          },
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+          expectedTypes: [
+            '_ChainedException',
+            '_ChainedException',
+            'FormatException',
+          ],
+          expectedValues: {0: 'outer', 1: 'middle'},
+          extraExpectations: (_) {},
+        ),
+        (
+          description: 'does not add causes for errors without one',
+          buildError: () => StateError('no cause'),
+          stackTrace: StackTrace.fromString('#0 test (test.dart:1:1)'),
+          expectedTypes: ['StateError'],
+          expectedValues: const {},
+          extraExpectations: (_) {},
+        ),
+      ];
 
       for (final testCase in synchronousCases) {
         test(testCase.description, () {
