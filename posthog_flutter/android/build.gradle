@@ -64,7 +64,7 @@ android {
     dependencies {
         testImplementation 'org.jetbrains.kotlin:kotlin-test'
         testImplementation 'org.mockito:mockito-core:5.0.0'
-        implementation 'com.posthog:posthog-android:[3.55.0,4.0.0)'
+        implementation 'com.posthog:posthog-android:[3.56.0,4.0.0)'
     }
 
     testOptions {
@@ -85,6 +85,6 @@ android {
 
 tasks.withType(KotlinCompile).configureEach {
     compilerOptions {
-        jvmTarget = JvmTarget.JVM_1_8
+        jvmTarget = Jvmtarget.JVM_1_8
     }
 }
