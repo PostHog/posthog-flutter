@@ -83,15 +83,27 @@ void main() {
       final frames = stackTraceData['frames'] as List<Map<String, dynamic>>;
       expect(frames, isNotEmpty);
 
-      // Verify first frame structure (should be main function)
-      final firstFrame = frames.first;
-      expect(firstFrame.containsKey('function'), isTrue);
-      expect(firstFrame.containsKey('filename'), isTrue);
-      expect(firstFrame.containsKey('lineno'), isTrue);
-      expect(firstFrame['platform'], equals('dart'));
+      // Frames use PostHog's canonical bottom-up order: the crash site is the
+      // last frame. Here the innermost frame of the input trace is
+      // `Object.noSuchMethod`, so it must end up last.
+      final crashFrame = frames.last;
+      expect(crashFrame.containsKey('function'), isTrue);
+      expect(crashFrame['function'], equals('Object.noSuchMethod'));
+      expect(crashFrame['platform'], equals('dart'));
 
-      // Verify inApp detection works - just check that the field exists and is boolean
-      expect(firstFrame['in_app'], isTrue);
+      // The application entry point (`main`) must appear before the crash site.
+      final mainIndex = frames.indexWhere(
+        (frame) => frame['filename'] == 'test.dart',
+      );
+      final noSuchMethodIndex = frames.lastIndexWhere(
+        (frame) => frame['function'] == 'Object.noSuchMethod',
+      );
+      expect(mainIndex, greaterThanOrEqualTo(0));
+      expect(
+        mainIndex,
+        lessThan(noSuchMethodIndex),
+        reason: 'entry point should precede the crash site',
+      );
 
       // Check that dart core frames are marked as not inApp
       final dartFrame = frames.firstWhere(
@@ -366,14 +378,79 @@ void main() {
           result['\$exception_list'] as List<Map<String, dynamic>>;
       final frames = exceptionData.first['stacktrace']['frames'] as List;
 
-      // Should include frames since we provided the stack trace
-      expect(frames[0]['package'], 'my_app');
-      expect(frames[0]['filename'], 'main.dart');
-      // earlier PH frames should be untouched
-      expect(frames[1]['package'], 'posthog_flutter');
-      expect(frames[1]['filename'], 'posthog.dart');
-      expect(frames[2]['package'], 'some_lib');
-      expect(frames[2]['filename'], 'lib.dart');
+      // Frames are emitted in canonical bottom-up order (crash site last), so
+      // the three surviving user frames occupy the tail. The leading PostHog
+      // wrapper frames (innermost) are stripped; the interior PostHog frame is
+      // kept.
+      final tail = frames.sublist(frames.length - 3);
+
+      // Crash site (innermost of the input) is last.
+      expect(tail[2]['package'], 'my_app');
+      expect(tail[2]['filename'], 'main.dart');
+      // Interior PostHog frame is preserved (only leading ones are stripped).
+      expect(tail[1]['package'], 'posthog_flutter');
+      expect(tail[1]['filename'], 'posthog.dart');
+      // Entry point is first of the three.
+      expect(tail[0]['package'], 'some_lib');
+      expect(tail[0]['filename'], 'lib.dart');
+    });
+
+    test(
+        'emits frames in canonical bottom-up order (entry point first, '
+        'crash site last)', () {
+      final exception = Exception('Test exception');
+
+      // A linear (single-trace) synthetic stack in Dart's native
+      // innermost-first order: the crash site is #0 and the entry point is #2.
+      final stackTrace = StackTrace.fromString('''
+#0      crashSite (package:my_app/crash.dart:10:3)
+#1      middle (package:my_app/middle.dart:20:5)
+#2      entryPoint (package:my_app/main.dart:30:7)
+''');
+
+      final result = DartExceptionProcessor.processException(
+        error: exception,
+        stackTrace: stackTrace,
+        inAppByDefault: true,
+      );
+
+      final exceptionData =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+      final frames = exceptionData.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
+
+      final entryIndex = frames.indexWhere(
+        (frame) => frame['function'] == 'entryPoint',
+      );
+      final middleIndex = frames.indexWhere(
+        (frame) => frame['function'] == 'middle',
+      );
+      final crashIndex = frames.indexWhere(
+        (frame) => frame['function'] == 'crashSite',
+      );
+
+      expect(entryIndex, greaterThanOrEqualTo(0));
+      expect(middleIndex, greaterThanOrEqualTo(0));
+      expect(crashIndex, greaterThanOrEqualTo(0));
+
+      // Canonical bottom-up: entry point precedes the crash site.
+      expect(
+        entryIndex,
+        lessThan(middleIndex),
+        reason: 'entry point must come before intermediate frames',
+      );
+      expect(
+        middleIndex,
+        lessThan(crashIndex),
+        reason: 'crash site must be the last of the application frames',
+      );
+
+      // The crash site is the very last frame emitted.
+      expect(
+        frames.last['function'],
+        equals('crashSite'),
+        reason: 'the last frame must be the crash site',
+      );
     });
 
     test('marks generated stack frames as synthetic', () {

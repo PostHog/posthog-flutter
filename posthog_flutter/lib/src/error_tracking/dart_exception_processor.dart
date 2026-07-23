@@ -332,7 +332,12 @@ class DartExceptionProcessor {
       }
     }
 
-    return frames;
+    // The stack_trace package yields frames innermost-first (crash site first,
+    // entry point last). PostHog's canonical wire order is bottom-up:
+    // frames[0] is the outermost/entry point and the last frame is the crash
+    // site. Reverse to match; this also keeps async gap frames positioned
+    // correctly between their surrounding traces.
+    return frames.reversed.toList();
   }
 
   /// Converts a Frame from stack_trace package to PostHog format
