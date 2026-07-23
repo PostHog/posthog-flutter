@@ -401,6 +401,10 @@ class PosthogFlutterPlugin :
                 handleSurveyAction(call, result)
             }
 
+            "displaySurvey" -> {
+                displaySurvey(call, result)
+            }
+
             else -> {
                 result.notImplemented()
             }
@@ -1858,6 +1862,19 @@ class PosthogFlutterPlugin :
             Handler(Looper.getMainLooper()).post {
                 channel.invokeMethod(method, arguments)
             }
+        }
+    }
+
+    private fun displaySurvey(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val surveyId: String = call.argument("surveyId")!!
+            PostHog.displaySurvey(surveyId)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
 

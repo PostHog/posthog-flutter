@@ -283,6 +283,14 @@ void main() {
       ]);
     });
 
+    test('displaySurvey sends the surveyId over the method channel', () async {
+      await posthogFlutterIO.displaySurvey('survey-123');
+
+      final call = log.firstWhere((c) => c.method == 'displaySurvey');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      expect(args, {'surveyId': 'survey-123'});
+    });
+
     test('setGroupPropertiesForFlags sends groupType and properties', () async {
       await posthogFlutterIO.setGroupPropertiesForFlags(
         'organization',

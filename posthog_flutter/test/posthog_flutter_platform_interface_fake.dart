@@ -187,6 +187,14 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     });
   }
 
+  // Call tracking for displaySurvey
+  final List<String> displaySurveyCalls = [];
+
+  @override
+  Future<void> displaySurvey(String surveyId) async {
+    displaySurveyCalls.add(surveyId);
+  }
+
   @override
   Future<Object?> getFeatureFlag({required String key}) async {
     return featureFlagValues[key];
