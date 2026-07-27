@@ -4,7 +4,7 @@ library;
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/web/web_canvas_mask_provider.dart';
@@ -14,6 +14,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   JSObject? capturedConfig;
+  var setConfigCalls = 0;
   var stopRecordingCalls = 0;
   var startRecordingCalls = 0;
 
@@ -24,6 +25,7 @@ void main() {
     bool declaresMaskProvider = true,
   }) {
     capturedConfig = null;
+    setConfigCalls = 0;
     stopRecordingCalls = 0;
     startRecordingCalls = 0;
     final stub = JSObject();
@@ -47,6 +49,7 @@ void main() {
       'set_config'.toJS,
       ((JSObject cfg) {
         capturedConfig = cfg;
+        setConfigCalls++;
       }).toJS,
     );
     stub.setProperty(
@@ -68,6 +71,8 @@ void main() {
     web.window.setProperty('posthog'.toJS, stub);
     return stub;
   }
+
+  setUp(WebCanvasMaskProvider.resetForTesting);
 
   tearDown(() {
     web.window.setProperty('posthog'.toJS, null);
@@ -91,6 +96,83 @@ void main() {
     expect(capturedConfig, isNull);
     expect(stopRecordingCalls, 0);
     expect(startRecordingCalls, 0);
+  });
+
+  testWidgets('opts in when a PostHogMaskWidget mounted before register()',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(setConfigCalls, 0);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets('a mounted PostHogMaskWidget opts the app in on its own',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(capturedConfig, isNull);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+
+    final sessionRecording = capturedSessionRecording();
+    expect(
+      sessionRecording
+          .getProperty<JSObject>('captureCanvas'.toJS)
+          .getProperty<JSAny?>('canvasMaskRegionsFn'.toJS)
+          .isA<JSFunction>(),
+      isTrue,
+    );
+    expect(
+      sessionRecording.getProperty<JSAny?>('blockSelector'.toJS).dartify(),
+      'flt-semantics-host',
+    );
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets('registers once however many PostHogMaskWidgets mount',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    Widget maskWidgets(int count) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: List.generate(
+              count,
+              (_) => const PostHogMaskWidget(child: SizedBox.shrink()),
+            ),
+          ),
+        );
+    await tester.pumpWidget(maskWidgets(3));
+    await tester.pumpWidget(maskWidgets(5));
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets('opts in once posthog-js arrives after the widget mounted',
+      (tester) async {
+    web.window.setProperty('posthog'.toJS, null);
+    capturedConfig = null;
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(capturedConfig, isNull);
+
+    installPosthogStub(declaresMaskProvider: false);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(setConfigCalls, 1);
   });
 
   test('registers the mask provider via set_config', () {

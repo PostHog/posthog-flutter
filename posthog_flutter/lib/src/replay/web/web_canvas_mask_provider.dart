@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:web/web.dart' as web;
@@ -26,20 +27,56 @@ external JSObject _objectAssign(JSObject target, JSObject source);
 
 const _semanticsBlockSelector = 'flt-semantics-host';
 
+enum _ApplyResult {
+  applied,
+
+  /// posthog-js is up but the app has not opted into canvas masking.
+  notOptedIn,
+  posthogNotReady,
+}
+
 /// Supplies widget-tree mask rectangles to posthog-js canvas recording via
 /// `session_recording.captureCanvas.canvasMaskRegionsFn`, so text painted
 /// into the CanvasKit canvas can be masked even though DOM masking cannot
 /// see it.
 ///
-/// An app opts in by declaring `canvasMaskRegionsFn` in its `posthog.init`
-/// call; declaring it as `() => null` also covers the frames captured before
-/// this provider takes over. Without that key nothing is registered, so
-/// recording is left exactly as posthog-js configured it.
+/// An app opts in either by declaring `canvasMaskRegionsFn` in its
+/// `posthog.init` call — declaring it as `() => null` also covers the frames
+/// captured before this provider takes over — or by mounting a
+/// `PostHogMaskWidget`, which registers the provider on first mount. Without
+/// either, nothing is registered and recording is left exactly as posthog-js
+/// configured it.
 ///
 /// Fails closed: a failed widget-tree walk returns null, which makes
 /// posthog-js skip the frame instead of shipping it unmasked.
 class WebCanvasMaskProvider {
   WebCanvasMaskProvider(this._config);
+
+  static WebCanvasMaskProvider? _active;
+  static bool _maskWidgetSeen = false;
+
+  /// Opts the app into canvas masking because a `PostHogMaskWidget` mounted.
+  ///
+  /// Called from shared widget code through a conditional import, so it must
+  /// stay safe to call any number of times; a mount that happens before
+  /// [register] is remembered and applied when [register] runs.
+  static void notifyMaskWidgetMounted() {
+    if (_maskWidgetSeen) {
+      return;
+    }
+    _maskWidgetSeen = true;
+    try {
+      _active?._onMaskWidgetMounted();
+    } catch (e) {
+      printIfDebug('PostHog: error enabling web canvas masking: $e');
+    }
+  }
+
+  @visibleForTesting
+  static void resetForTesting() {
+    _active = null;
+    _maskWidgetSeen = false;
+  }
 
   final PostHogConfig _config;
 
@@ -47,6 +84,9 @@ class WebCanvasMaskProvider {
   int _cachedAtFrame = -1;
   int _consecutiveWalkFailures = 0;
   bool _warnedWalkFailure = false;
+  bool _applied = false;
+  bool _maskWidgetMounted = false;
+  bool _polling = false;
 
   // shared so a second provider's cache is not compared against a counter that
   // never advances; the callback cannot be removed once added
@@ -55,15 +95,27 @@ class WebCanvasMaskProvider {
 
   void register() {
     try {
-      _registerUnsafe();
+      _active = this;
+      _maskWidgetMounted = _maskWidgetSeen;
+      _pump();
     } catch (e) {
       printIfDebug('PostHog: failed to register web canvas masking: $e');
     }
   }
 
-  void _registerUnsafe() {
-    final ph = posthog;
-    if (ph != null && _tryApplyConfig(ph)) {
+  void _onMaskWidgetMounted() {
+    if (_maskWidgetMounted) {
+      return;
+    }
+    _maskWidgetMounted = true;
+    // a retry chain still in flight picks the flag up on its next tick
+    if (!_applied && !_polling) {
+      _pump();
+    }
+  }
+
+  void _pump() {
+    if (_apply() != _ApplyResult.posthogNotReady) {
       return;
     }
     // the posthog-js snippet installs a config-less stub and array.js later
@@ -74,11 +126,13 @@ class WebCanvasMaskProvider {
       'PostHog: posthog-js not fully loaded yet, '
       'retrying canvas mask registration.',
     );
+    _polling = true;
     _scheduleRetry(const Duration(milliseconds: 250), Duration.zero);
   }
 
   void _scheduleRetry(Duration delay, Duration elapsed) {
     if (elapsed >= const Duration(minutes: 2)) {
+      _polling = false;
       printIfDebug(
         'PostHog: posthog-js did not become available, '
         'web canvas masking disabled.',
@@ -87,8 +141,8 @@ class WebCanvasMaskProvider {
     }
     Timer(delay, () {
       try {
-        final current = posthog;
-        if (current != null && _tryApplyConfig(current)) {
+        if (_apply() != _ApplyResult.posthogNotReady) {
+          _polling = false;
           return;
         }
         final doubled = delay * 2;
@@ -97,6 +151,7 @@ class WebCanvasMaskProvider {
             : doubled;
         _scheduleRetry(next, elapsed + delay);
       } catch (e) {
+        _polling = false;
         printIfDebug('PostHog: web canvas masking retry failed: $e');
       }
     });
@@ -112,9 +167,13 @@ class WebCanvasMaskProvider {
     });
   }
 
-  bool _tryApplyConfig(PostHog ph) {
-    if (ph.config == null) {
-      return false;
+  _ApplyResult _apply() {
+    if (_applied) {
+      return _ApplyResult.applied;
+    }
+    final ph = posthog;
+    if (ph == null || ph.config == null) {
+      return _ApplyResult.posthogNotReady;
     }
 
     // shallow-merge on top of any user-provided session_recording config —
@@ -132,11 +191,12 @@ class WebCanvasMaskProvider {
       _objectAssign(captureCanvas, existingCaptureCanvas as JSObject);
     }
     // the app opts into canvas masking by declaring canvasMaskRegionsFn in
-    // posthog.init — registering regardless would restart an in-flight
-    // recording and drop the semantics tree for apps that never asked
-    if (!captureCanvas.has('canvasMaskRegionsFn')) {
+    // posthog.init or by mounting a PostHogMaskWidget — registering regardless
+    // would restart an in-flight recording and drop the semantics tree for
+    // apps that never asked
+    if (!captureCanvas.has('canvasMaskRegionsFn') && !_maskWidgetMounted) {
       _warnNotOptedIn(captureCanvas);
-      return true;
+      return _ApplyResult.notOptedIn;
     }
     _ensureFrameCounter();
     captureCanvas.setProperty(
@@ -150,14 +210,17 @@ class WebCanvasMaskProvider {
     final config = JSObject();
     config.setProperty('session_recording'.toJS, sessionRecording);
     ph.set_config(config);
+    _applied = true;
 
     // blockSelector is only read when rrweb's record() starts, so an in-flight
-    // recording must be restarted
+    // recording must be restarted — worth it even with canvas capture off,
+    // since the semantics exclusion applies to plain DOM recording too (and
+    // recordCanvas can arrive from remote config after init anyway)
     if (ph.sessionRecordingStarted()) {
       ph.stopSessionRecording();
       ph.startSessionRecording();
     }
-    return true;
+    return _ApplyResult.applied;
   }
 
   // canvas recording can also be switched on from project settings, which the
@@ -288,9 +351,7 @@ class WebCanvasMaskProvider {
       web.console.warn(
         'PostHog: session replay masking cannot find the PostHogWidget '
                 'widget tree, so canvas frames are not being recorded. '
-                'Wrap your app in PostHogWidget, or remove canvasMaskRegionsFn '
-                'from your posthog.init to disable canvas masking (the canvas '
-                'is then recorded unmasked).'
+                'Wrap your app in PostHogWidget.'
             .toJS,
       );
     }
