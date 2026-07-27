@@ -252,6 +252,43 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
                 const _MaskedPasswordField(),
               ),
 
+              // Test 15: PostHogMaskWidget around several masked children.
+              // The avatar is not masked on its own when maskAllImages is off,
+              // so it is only covered if the wrapper itself is masked.
+              _buildTestSection(
+                'Test 15: PostHogMaskWidget with multiple children',
+                PostHogMaskWidget(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Flexible(
+                        child: Text(
+                          'Jane Doe',
+                          style: TextStyle(fontSize: 14, color: Colors.black),
+                        ),
+                      ),
+                      Image.network(
+                        'https://picsum.photos/60/60',
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Container(
+                          width: 48,
+                          height: 48,
+                          color: Colors.amber,
+                        ),
+                      ),
+                      const Flexible(
+                        child: Text(
+                          'Balance: 1234',
+                          style: TextStyle(fontSize: 14, color: Colors.black),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 40),
             ],
           ),

@@ -34,18 +34,12 @@ class PostHogMaskController {
     Posthog().config?.sessionReplayConfig,
   );
 
-  /// Extracts a flattened list of [ElementData] objects representing the
-  /// renderable elements in the widget tree.
-  ///
-  /// This method traverses the tree of [ElementData] objects and returns a
-  /// list of elements that have no children or only one child.
-  ///
-  /// The method is designed to extract the elements that are directly
-  /// renderable on the screen.
+  /// Extracts a flattened list of [ElementData] objects for every element in
+  /// the widget tree that matched a masking rule, at any depth.
   ///
   /// **Returns:**
   ///   - `List<ElementData>`: A list of [ElementData] objects representing the
-  ///     renderable elements.
+  ///     elements to mask.
   ///
   List<ElementData>? getCurrentWidgetsElements() {
     final context = containerKey.currentContext;
