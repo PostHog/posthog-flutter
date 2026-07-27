@@ -184,6 +184,19 @@ void main() {
     });
   });
 
+  group('capture gate', () {
+    // Counterpart to posthog_widget_web_test.dart, which pins the opposite on
+    // web: the kIsWeb guard must not disable capture off web.
+    testWidgets('runs off web while session replay is on', (tester) async {
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      final state = await pumpReplayWidget(tester);
+
+      expect(state.debugCaptureRunning, isTrue);
+
+      await unmountAndFlush(tester);
+    });
+  });
+
   group('occlusion episode handling', () {
     testWidgets('placeholder ships as a meta + full snapshot pair',
         (tester) async {

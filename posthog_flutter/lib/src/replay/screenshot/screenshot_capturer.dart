@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart' show Element, WidgetsBinding;
@@ -427,6 +427,12 @@ class ScreenshotCapturer {
   }
 
   Future<ImageInfo?> captureScreenshot() {
+    // The render-tree walks below run before the isSessionReplayActive() gate,
+    // which is always false on web — bail first so they never run there.
+    if (kIsWeb) {
+      return Future.value(null);
+    }
+
     final target = _resolveCaptureTarget();
     if (target == null) {
       return Future.value(null);
