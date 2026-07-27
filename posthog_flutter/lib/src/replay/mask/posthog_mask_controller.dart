@@ -36,11 +36,6 @@ class PostHogMaskController {
 
   /// Extracts a flattened list of [ElementData] objects for every element in
   /// the widget tree that matched a masking rule, at any depth.
-  ///
-  /// **Returns:**
-  ///   - `List<ElementData>`: A list of [ElementData] objects representing the
-  ///     elements to mask.
-  ///
   List<ElementData>? getCurrentWidgetsElements() {
     final context = containerKey.currentContext;
 

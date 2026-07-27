@@ -60,15 +60,15 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
                   text: const TextSpan(
                     style: TextStyle(fontSize: 16, color: Colors.black),
                     children: [
-                      TextSpan(text: 'This is '),
+                      TextSpan(text: 'This RichText is masked '),
                       TextSpan(
-                        text: 'sensitive data',
+                        text: 'when maskAllTexts',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.red,
                         ),
                       ),
-                      TextSpan(text: ' that should be masked.'),
+                      TextSpan(text: ' is enabled'),
                     ],
                   ),
                 ),
@@ -78,7 +78,7 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
               _buildTestSection(
                 'Test 3: SelectableText',
                 const SelectableText(
-                  'This SelectableText should also be masked',
+                  'This SelectableText is masked when maskAllTexts is enabled',
                   style: TextStyle(fontSize: 14, color: Colors.blue),
                 ),
               ),
@@ -253,10 +253,10 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
               ),
 
               // Test 15: PostHogMaskWidget around several masked children.
-              // The avatar is not masked on its own when maskAllImages is off,
-              // so it is only covered if the wrapper itself is masked.
+              // The amber box matches no masking rule on its own, so it is
+              // covered only if the wrapper contributes its own rect.
               _buildTestSection(
-                'Test 15: PostHogMaskWidget with multiple children',
+                'Test 15: PostHogMaskWidget with multiple children (needs maskAllTexts or maskAllImages)',
                 PostHogMaskWidget(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -267,17 +267,7 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
                           style: TextStyle(fontSize: 14, color: Colors.black),
                         ),
                       ),
-                      Image.network(
-                        'https://picsum.photos/60/60',
-                        width: 48,
-                        height: 48,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Container(
-                          width: 48,
-                          height: 48,
-                          color: Colors.amber,
-                        ),
-                      ),
+                      Container(width: 48, height: 48, color: Colors.amber),
                       const Flexible(
                         child: Text(
                           'Balance: 1234',

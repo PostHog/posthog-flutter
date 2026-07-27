@@ -17,18 +17,17 @@ List<String> _types(List<ElementData> elements) =>
     elements.map((e) => e.type).toList();
 
 /// Mask rects are local paint bounds plus a transform to the capture
-/// container, which is what the native SDK paints with.
+/// container, which is what ImageMaskPainter draws with.
 Rect _resolved(ElementData element) => MatrixUtils.transformRect(
     element.transform ?? Matrix4.identity(), element.rect);
 
 bool _covers(List<ElementData> elements, Rect target) {
-  const epsilon = 1.0;
   return elements.any((element) {
     final rect = _resolved(element);
-    return rect.left <= target.left + epsilon &&
-        rect.top <= target.top + epsilon &&
-        rect.right >= target.right - epsilon &&
-        rect.bottom >= target.bottom - epsilon;
+    return rect.left <= target.left &&
+        rect.top <= target.top &&
+        rect.right >= target.right &&
+        rect.bottom >= target.bottom;
   });
 }
 
@@ -64,8 +63,6 @@ void main() {
     });
 
     test('keeps a node that has several children alongside the children', () {
-      // The parent matched a masking rule too, and its rect is the only one
-      // covering the gaps between the children.
       final root = _node('Root', children: [
         _node('parent', children: [_node('a'), _node('b')]),
       ]);
@@ -188,6 +185,33 @@ void main() {
 
       expect(
           _covers(elements, tester.getRect(find.byType(EditableText))), isTrue);
+    });
+
+    testWidgets('does not mask a sibling that matched no rule', (tester) async {
+      await _pumpMaskedApp(
+        tester,
+        SizedBox(
+          width: 400,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('secret'),
+              Container(
+                key: const Key('plain'),
+                width: 48,
+                height: 48,
+                color: Colors.amber,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final elements =
+          PostHogMaskController.instance.getCurrentWidgetsElements()!;
+      final plain = tester.getRect(find.byKey(const Key('plain')));
+
+      expect(elements.any((e) => _resolved(e).overlaps(plain)), isFalse);
     });
   });
 }

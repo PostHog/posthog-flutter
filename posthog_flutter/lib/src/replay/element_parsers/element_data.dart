@@ -1,5 +1,3 @@
-// ignore_for_file: avoid_dynamic_calls
-
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_widget.dart';
 
@@ -31,7 +29,8 @@ class ElementData {
 
   /// Every node below the root is an element that already matched a masking
   /// rule, so the whole subtree is collected — a match can sit at any depth
-  /// (a `SelectableText` puts its `RenderParagraph` several levels down).
+  /// (a `ListTile` title nests `AnimatedDefaultTextStyle` → `DefaultTextStyle`
+  /// → `Text` → `RichText`).
   List<ElementData> extractRects() {
     final rects = <ElementData>[];
 
