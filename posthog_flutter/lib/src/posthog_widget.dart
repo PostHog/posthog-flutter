@@ -43,9 +43,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
   @visibleForTesting
   bool get debugFlutterCaptureSuppressed => _suppressFlutterCapture;
 
-  @visibleForTesting
-  bool get debugCaptureRunning => _changeDetector?.isRunning ?? false;
-
   void _setSuppressFlutterCapture(bool value) {
     _suppressFlutterCapture = value;
     _changeDetector?.suppressForcedFrames = value;
@@ -60,8 +57,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
       return;
     }
 
-    // On web, session replay is recorded by posthog-js; the screenshot pipeline
-    // has no consumer there, so starting it would only burn frames.
+    // On web, session replay is recorded by posthog-js; this pipeline has no
+    // consumer there, so every snapshot it produces is discarded.
     if (!kIsWeb && config.sessionReplay) {
       _initComponents(config);
       _changeDetector?.start();

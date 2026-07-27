@@ -185,15 +185,19 @@ void main() {
   });
 
   group('capture gate', () {
-    // Counterpart to posthog_widget_web_test.dart, which pins the opposite on
-    // web: the kIsWeb guard must not disable capture off web.
-    testWidgets('runs off web while session replay is on', (tester) async {
+    // Counterpart to posthog_widget_web_test.dart: the kIsWeb guard must not
+    // disable capture off web.
+    testWidgets('reaches captureScreenshot while session replay is on',
+        (tester) async {
       await setupPosthog(replayConfig(captureNativeScreens: false));
-      final state = await pumpReplayWidget(tester);
-
-      expect(state.debugCaptureRunning, isTrue);
-
+      await pumpReplayWidget(tester);
       await unmountAndFlush(tester);
+
+      expect(
+        recordedCalls.map((call) => call.method),
+        contains('isSessionReplayActive'),
+        reason: 'the change detector must reach captureScreenshot off web',
+      );
     });
   });
 

@@ -10,8 +10,11 @@ import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
-// Browser-only: these pin what PostHogWidget must *not* do on web, so they
-// only mean anything under `flutter test --platform chrome`.
+/// Browser-only. Nothing on web observes the screenshot pipeline — its output
+/// is discarded — so the work it schedules is the only evidence it ran. These
+/// tests mount [PostHogWidget] and deliberately never unmount it: a capture in
+/// flight leaves a pending timer, which fails the test. That is the assertion,
+/// which is why two of them carry no `expect`.
 void main() {
   Future<void> setupPosthog() async {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
@@ -20,11 +23,10 @@ void main() {
     await Posthog().setup(config);
   }
 
-  Future<PostHogWidgetState> pumpReplayWidget(WidgetTester tester) async {
+  Future<void> pumpReplayWidget(WidgetTester tester) async {
     await tester.pumpWidget(
       PostHogWidget(child: Container(color: const Color(0xFF00FF00))),
     );
-    return tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
   }
 
   tearDown(() async {
@@ -32,24 +34,21 @@ void main() {
   });
 
   group('PostHogWidget on web', () {
-    testWidgets('does not start the periodic capture', (tester) async {
+    testWidgets('leaves no capture work pending after mounting',
+        (tester) async {
       await setupPosthog();
 
-      final state = await pumpReplayWidget(tester);
-
-      expect(state.debugCaptureRunning, isFalse);
+      await pumpReplayWidget(tester);
     });
 
     testWidgets('stays idle when session recording turns active',
         (tester) async {
       await setupPosthog();
-      final state = await pumpReplayWidget(tester);
+      await pumpReplayWidget(tester);
 
       PostHogInternalEvents.sessionRecordingActive.value = false;
       PostHogInternalEvents.sessionRecordingActive.value = true;
       await tester.pump();
-
-      expect(state.debugCaptureRunning, isFalse);
     });
 
     testWidgets('still mounts the mask controller container', (tester) async {

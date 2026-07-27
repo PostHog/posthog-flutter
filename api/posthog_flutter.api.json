@@ -4698,17 +4698,6 @@
                         "name": "debugFlutterCaptureSuppressed",
                         "relativePath": "lib/src/posthog_widget.dart",
                         "typeName": "bool"
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isReadable": true,
-                        "isStatic": false,
-                        "isWriteable": false,
-                        "name": "debugCaptureRunning",
-                        "relativePath": "lib/src/posthog_widget.dart",
-                        "typeName": "bool"
                     }
                 ],
                 "isDeprecated": false,
