@@ -8,7 +8,7 @@ On Flutter web your app is painted into a single `<canvas>`, so PostHog's DOM-ba
 masking could not see any of your text — session recordings captured it in the clear
 even if you had masking configured. Masking now applies inside the canvas.
 
-To enable it, add `canvasMaskRegionsFn` to the `posthog.init` call in your
+To enable it, add `maskRegionsFn` to the `posthog.init` call in your
 `web/index.html`:
 
 ```js
@@ -16,9 +16,11 @@ posthog.init('<your-token>', {
   session_recording: {
     captureCanvas: {
       recordCanvas: true,
+    },
+    canvasCapture: {
       // the plugin replaces this once Flutter has started; until then
       // frames are skipped rather than recorded unmasked
-      canvasMaskRegionsFn: () => null,
+      maskRegionsFn: () => null,
     },
   },
 })
@@ -31,7 +33,7 @@ it either.
 
 Notes:
 
-- Declaring `canvasMaskRegionsFn` is one of two ways to opt in: mounting a
+- Declaring `maskRegionsFn` is one of two ways to opt in: mounting a
   `PostHogMaskWidget` also switches canvas masking on, with no HTML setup.
   Declaring the key in `posthog.init` is still the only way to cover the frames
   captured before Flutter boots, and it moves the restart of an in-flight
@@ -61,4 +63,4 @@ Notes:
   platform view does not mask it on web.
 - Your app must be wrapped in `PostHogWidget`. If it is not, canvas frames are
   skipped instead of recorded unmasked, and a console warning explains the fix.
-- Requires a posthog-js version that supports `captureCanvas.canvasMaskRegionsFn`.
+- Requires a posthog-js version that supports `canvasCapture.maskRegionsFn`.

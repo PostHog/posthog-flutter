@@ -36,11 +36,11 @@ enum _ApplyResult {
 }
 
 /// Supplies widget-tree mask rectangles to posthog-js canvas recording via
-/// `session_recording.captureCanvas.canvasMaskRegionsFn`, so text painted
+/// `session_recording.canvasCapture.maskRegionsFn`, so text painted
 /// into the CanvasKit canvas can be masked even though DOM masking cannot
 /// see it.
 ///
-/// An app opts in either by declaring `canvasMaskRegionsFn` in its
+/// An app opts in either by declaring `maskRegionsFn` in its
 /// `posthog.init` call — declaring it as `() => null` also covers the frames
 /// captured before this provider takes over — or by mounting a
 /// `PostHogMaskWidget`, which registers the provider on first mount. Without
@@ -143,7 +143,7 @@ class WebCanvasMaskProvider {
 
   // polls forever once backed off to 4s: a consent-gated app can call
   // posthog.init minutes after Flutter boots, and giving up would silently
-  // leave its canvas frames skipped (canvasMaskRegionsFn stuck at () => null)
+  // leave its canvas frames skipped (maskRegionsFn stuck at () => null)
   void _scheduleRetry(Duration delay) {
     _retryTimer = Timer(delay, () {
       var next = delay;
@@ -202,26 +202,26 @@ class WebCanvasMaskProvider {
       _objectAssign(sessionRecording, existing as JSObject);
     }
 
-    final captureCanvas = JSObject();
-    final existingCaptureCanvas =
-        sessionRecording.getProperty<JSAny?>('captureCanvas'.toJS);
-    if (existingCaptureCanvas.isA<JSObject>()) {
-      _objectAssign(captureCanvas, existingCaptureCanvas as JSObject);
+    final canvasCapture = JSObject();
+    final existingCanvasCapture =
+        sessionRecording.getProperty<JSAny?>('canvasCapture'.toJS);
+    if (existingCanvasCapture.isA<JSObject>()) {
+      _objectAssign(canvasCapture, existingCanvasCapture as JSObject);
     }
-    // the app opts into canvas masking by declaring canvasMaskRegionsFn in
+    // the app opts into canvas masking by declaring maskRegionsFn in
     // posthog.init or by mounting a PostHogMaskWidget — registering regardless
     // would restart an in-flight recording and drop the semantics tree for
     // apps that never asked
-    if (!captureCanvas.has('canvasMaskRegionsFn') && !_maskWidgetMounted) {
-      _warnNotOptedIn(captureCanvas);
+    if (!canvasCapture.has('maskRegionsFn') && !_maskWidgetMounted) {
+      _warnNotOptedIn(sessionRecording);
       return _ApplyResult.notOptedIn;
     }
     _ensureFrameCounter();
-    captureCanvas.setProperty(
-      'canvasMaskRegionsFn'.toJS,
+    canvasCapture.setProperty(
+      'maskRegionsFn'.toJS,
       _computeMaskRegions.toJS,
     );
-    sessionRecording.setProperty('captureCanvas'.toJS, captureCanvas);
+    sessionRecording.setProperty('canvasCapture'.toJS, canvasCapture);
 
     _blockSemanticsHost(sessionRecording);
 
@@ -243,22 +243,28 @@ class WebCanvasMaskProvider {
 
   // canvas recording can also be switched on from project settings, which the
   // plugin cannot read — so only the posthog.init half of the leak is warnable
-  void _warnNotOptedIn(JSObject captureCanvas) {
+  void _warnNotOptedIn(JSObject sessionRecording) {
     printIfDebug(
       'PostHog: Flutter web canvas masking is off — mount a PostHogMaskWidget '
-      'or declare canvasMaskRegionsFn in posthog.init to enable it.',
+      'or declare maskRegionsFn in posthog.init to enable it.',
     );
     final replayConfig = _config.sessionReplayConfig;
     if (!replayConfig.maskAllTexts && !replayConfig.maskAllImages) {
       return;
     }
-    final recordCanvas = captureCanvas.getProperty<JSAny?>('recordCanvas'.toJS);
+    final captureCanvas =
+        sessionRecording.getProperty<JSAny?>('captureCanvas'.toJS);
+    if (!captureCanvas.isA<JSObject>()) {
+      return;
+    }
+    final recordCanvas =
+        (captureCanvas as JSObject).getProperty<JSAny?>('recordCanvas'.toJS);
     if (recordCanvas.isA<JSBoolean>() && (recordCanvas as JSBoolean).toDart) {
       web.console.warn(
         'PostHog: canvas session recording is enabled but masking is not, so '
                 'text painted by Flutter is recorded unmasked. Mount a '
                 'PostHogMaskWidget to enable masking, or declare '
-                'canvasMaskRegionsFn in posthog.init (see the posthog_flutter '
+                'maskRegionsFn in posthog.init (see the posthog_flutter '
                 'CHANGELOG for the snippet).'
             .toJS,
       );

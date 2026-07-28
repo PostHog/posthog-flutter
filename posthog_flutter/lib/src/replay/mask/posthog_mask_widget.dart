@@ -15,7 +15,7 @@ import 'canvas_mask_registration_io.dart'
 /// reads that when recording starts. Frames captured before that first
 /// mount are recorded unmasked; to cover the window between `posthog.init` and
 /// Flutter booting, declare
-/// `session_recording: { captureCanvas: { canvasMaskRegionsFn: () => null } }`
+/// `session_recording: { canvasCapture: { maskRegionsFn: () => null } }`
 /// in your `posthog.init` call — until this plugin takes over, those frames are
 /// skipped instead of recorded. Your app must be wrapped in `PostHogWidget`,
 /// or canvas frames are skipped instead of recorded unmasked. iOS and Android

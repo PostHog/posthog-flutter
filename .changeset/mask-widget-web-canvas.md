@@ -6,7 +6,7 @@
 
 Wrapping a widget in `PostHogMaskWidget` is the most explicit way to say "never
 record this", so on web the first one to mount now switches canvas masking on by
-itself — no `canvasMaskRegionsFn` in `posthog.init` required. `PostHogMaskWidget`
+itself — no `maskRegionsFn` in `posthog.init` required. `PostHogMaskWidget`
 therefore behaves the same on web as it does on iOS and Android.
 
 Things to know:
@@ -18,7 +18,7 @@ Things to know:
   excludes the Flutter semantics DOM tree via `blockSelector`, which posthog-js only
   reads when recording starts. You will see the recording split at that point.
 - Frames captured before the first `PostHogMaskWidget` mounts are recorded unmasked.
-  Declaring `canvasMaskRegionsFn: () => null` in `posthog.init` is still the only
+  Declaring `maskRegionsFn: () => null` in `posthog.init` is still the only
   way to cover the window between page load and Flutter booting, and it moves the
   restart to Flutter boot rather than to whenever your first `PostHogMaskWidget`
   mounts.
