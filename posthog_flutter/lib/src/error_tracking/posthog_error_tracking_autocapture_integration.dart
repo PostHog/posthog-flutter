@@ -9,7 +9,7 @@ import 'package:posthog_flutter/src/util/platform_io_stub.dart'
     if (dart.library.io) 'package:posthog_flutter/src/util/platform_io_real.dart';
 
 import 'isolate_handler_io.dart'
-    if (dart.library.html) 'isolate_handler_web.dart';
+    if (dart.library.js_interop) 'isolate_handler_web.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 import '../posthog_flutter_platform_interface.dart';
@@ -210,8 +210,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     }
 
     // https://docs.flutter.dev/perf/isolates#web-platforms-and-compute
-    // web has no isolates support
-    if (!isSupportedPlatform()) {
+    // web has no isolates support, and isSupportedPlatform() returns true
+    // there (its web stub reports kIsWeb), so check kIsWeb explicitly
+    if (kIsWeb || !isSupportedPlatform()) {
       return;
     }
 
