@@ -82,7 +82,10 @@ class WebCanvasMaskProvider {
       _active = this;
       _registerUnsafe();
     } catch (e) {
+      // a partial first apply (set_config landed, restart threw) must not end
+      // the chain — the retry re-runs the whole apply, which is idempotent
       printIfDebug('PostHog: failed to register web canvas masking: $e');
+      _scheduleRetry(const Duration(milliseconds: 250));
     }
   }
 
