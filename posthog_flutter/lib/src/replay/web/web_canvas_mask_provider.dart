@@ -246,7 +246,6 @@ class WebCanvasMaskProvider {
     final config = JSObject();
     config.setProperty('session_recording'.toJS, sessionRecording);
     ph.set_config(config);
-    _applied = true;
 
     // blockSelector is only read when rrweb's record() starts, so an in-flight
     // recording must be restarted — worth it even with canvas capture off,
@@ -256,6 +255,9 @@ class WebCanvasMaskProvider {
       ph.stopSessionRecording();
       ph.startSessionRecording();
     }
+    // only after the restart: a throw above must leave the apply retryable,
+    // or the selector never takes effect for this recording
+    _applied = true;
     return _ApplyResult.applied;
   }
 
