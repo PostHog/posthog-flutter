@@ -108,6 +108,9 @@ class WebCanvasMaskProvider {
 
   void register() {
     try {
+      // a second setup() must not leave the predecessor's retry chain
+      // polling — it would apply config captured from the old Posthog config
+      _active?._retryTimer?.cancel();
       _active = this;
       _maskWidgetMounted = _maskWidgetSeen;
       _pump();

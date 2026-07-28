@@ -518,6 +518,30 @@ void main() {
     expect(capturedConfig, isNotNull);
   });
 
+  test("a second register cancels the predecessor's retry chain", () async {
+    web.window.setProperty('posthog'.toJS, null);
+    capturedConfig = null;
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    final stub = installPosthogStub(recordingStarted: true);
+    var setConfigCalls = 0;
+    stub.setProperty(
+      'set_config'.toJS,
+      ((JSObject cfg) {
+        setConfigCalls++;
+        capturedConfig = cfg;
+      }).toJS,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(capturedConfig, isNotNull);
+  });
+
   test('restarts an in-flight recording so the new config applies', () {
     installPosthogStub(recordingStarted: true);
 
