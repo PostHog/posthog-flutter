@@ -51,10 +51,13 @@ Notes:
   list it in `posthog.init` as well — the plugin merges with what is there and cannot
   see the project-level value. posthog-js may also log a notice about `blockSelector`
   in `posthog.init` for this reason.
-- rrweb's DOM full snapshot serializes 2D-context canvases inline (`rr_dataURL`)
-  without applying mask regions. Flutter's CanvasKit renderer draws to WebGL, which
-  that path does not serialize, so your Flutter canvas is not exposed through it —
-  but keep it in mind if your page contains additional 2D canvases of its own.
+- rrweb's DOM full snapshot serializes canvas pixels on a separate path
+  (`rr_dataURL`) that mask regions do not touch, and on current Flutter the
+  CanvasKit canvas is readable through it — a full snapshot can embed an
+  unmasked screenshot of your whole app. posthog-js therefore skips canvas
+  pixel serialization in full snapshots whenever `maskRegionsFn` is configured.
+  Declaring it in `posthog.init` covers this from the moment recording starts,
+  and the plugin's registration restart carries it through every later snapshot.
 - Widgets rendered as DOM rather than canvas pixels — `HtmlElementView`-based platform
   views such as maps, webviews and iframes — are recorded as DOM and masked by
   posthog-js's DOM rules, not by canvas mask regions. `PostHogMaskWidget` around a
