@@ -31,12 +31,14 @@ it either.
 
 Notes:
 
-- If you leave `canvasMaskRegionsFn` out, the plugin changes nothing and recording
-  behaves exactly as posthog-js is configured — as it did before this release.
-  **This includes `PostHogMaskWidget`**: on web it has no effect unless
-  `canvasMaskRegionsFn` is declared, because the canvas is masked by posthog-js and
-  the plugin only supplies rectangles to it once you have opted in. On iOS and
-  Android `PostHogMaskWidget` continues to work with no extra setup.
+- Declaring `canvasMaskRegionsFn` is one of two ways to opt in: mounting a
+  `PostHogMaskWidget` also switches canvas masking on, with no HTML setup.
+  Declaring the key in `posthog.init` is still the only way to cover the frames
+  captured before Flutter boots, and it moves the restart of an in-flight
+  recording (opting in restarts it once so the new config applies) to Flutter
+  boot instead of first mount. If you do neither, the plugin changes nothing and
+  recording behaves exactly as posthog-js is configured — as it did before this
+  release.
   If canvas recording is enabled in your project settings rather than in
   `posthog.init`, the plugin cannot detect it and will not warn.
 - Web replay is configured entirely in `posthog.init`. The `config.sessionReplay`

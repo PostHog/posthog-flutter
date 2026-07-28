@@ -111,8 +111,17 @@ class WebCanvasMaskProvider {
     }
     _maskWidgetMounted = true;
     // a retry chain still in flight picks the flag up on its next tick
-    if (!_applied && !_polling) {
+    if (_applied || _polling) {
+      return;
+    }
+    try {
       _pump();
+    } catch (e) {
+      printIfDebug('PostHog: error enabling web canvas masking: $e');
+      // the opt-in is latched, so keep a chain alive to apply it later —
+      // otherwise a failed first apply would consume the opt-in for good
+      _polling = true;
+      _scheduleRetry(const Duration(milliseconds: 250));
     }
   }
 
@@ -236,8 +245,8 @@ class WebCanvasMaskProvider {
   // plugin cannot read — so only the posthog.init half of the leak is warnable
   void _warnNotOptedIn(JSObject captureCanvas) {
     printIfDebug(
-      'PostHog: canvasMaskRegionsFn is not declared in posthog.init, '
-      'so Flutter web canvas masking is off.',
+      'PostHog: Flutter web canvas masking is off — mount a PostHogMaskWidget '
+      'or declare canvasMaskRegionsFn in posthog.init to enable it.',
     );
     final replayConfig = _config.sessionReplayConfig;
     if (!replayConfig.maskAllTexts && !replayConfig.maskAllImages) {
@@ -246,9 +255,11 @@ class WebCanvasMaskProvider {
     final recordCanvas = captureCanvas.getProperty<JSAny?>('recordCanvas'.toJS);
     if (recordCanvas.isA<JSBoolean>() && (recordCanvas as JSBoolean).toDart) {
       web.console.warn(
-        'PostHog: canvas session recording is enabled but canvasMaskRegionsFn '
-                'is missing from posthog.init, so text painted by Flutter is recorded '
-                'unmasked. See the posthog_flutter CHANGELOG for the snippet.'
+        'PostHog: canvas session recording is enabled but masking is not, so '
+                'text painted by Flutter is recorded unmasked. Mount a '
+                'PostHogMaskWidget to enable masking, or declare '
+                'canvasMaskRegionsFn in posthog.init (see the posthog_flutter '
+                'CHANGELOG for the snippet).'
             .toJS,
       );
     }

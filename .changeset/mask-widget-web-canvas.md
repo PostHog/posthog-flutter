@@ -9,7 +9,11 @@ record this", so on web the first one to mount now switches canvas masking on by
 itself — no `canvasMaskRegionsFn` in `posthog.init` required. `PostHogMaskWidget`
 therefore behaves the same on web as it does on iOS and Android.
 
-Three things to know:
+Things to know:
+- Mounting one `PostHogMaskWidget` enables your whole masking configuration, not
+  just the wrapped subtree: `maskAllTexts` and `maskAllImages` default to true, so
+  a single mask widget turns on full text and image canvas masking — the same
+  semantics as mounting one on iOS and Android.
 - Switching masking on restarts an in-flight recording once, because masking also
   excludes the Flutter semantics DOM tree via `blockSelector`, which posthog-js only
   reads when recording starts. You will see the recording split at that point.

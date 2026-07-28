@@ -167,6 +167,47 @@ void main() {
     expect(startRecordingCalls, 1);
   });
 
+  testWidgets(
+      'a PostHogMaskWidget mount is a no-op when posthog.init already '
+      'opted in', (tester) async {
+    installPosthogStub(recordingStarted: true);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(setConfigCalls, 1);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets(
+      'an exception during the mount-triggered apply does not consume the '
+      'opt-in', (tester) async {
+    final stub = installPosthogStub(declaresMaskProvider: false);
+    var calls = 0;
+    stub.setProperty(
+      'set_config'.toJS,
+      ((JSObject cfg) {
+        calls++;
+        if (calls == 1) {
+          throw StateError('stub failure');
+        }
+        capturedConfig = cfg;
+      }).toJS,
+    );
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(capturedConfig, isNull);
+
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(calls, 2);
+    expect(capturedConfig, isNotNull);
+  });
+
   testWidgets('opts in once posthog-js arrives after the widget mounted',
       (tester) async {
     web.window.setProperty('posthog'.toJS, null);
