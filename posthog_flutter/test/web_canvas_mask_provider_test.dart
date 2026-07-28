@@ -21,6 +21,7 @@ void main() {
   JSObject installPosthogStub({
     JSObject? sessionRecording,
     bool withConfig = true,
+    bool loaded = true,
     bool recordingStarted = false,
     bool declaresMaskProvider = true,
   }) {
@@ -44,6 +45,9 @@ void main() {
         config.setProperty('session_recording'.toJS, sessionRecording);
       }
       stub.setProperty('config'.toJS, config);
+      // the real instance carries __loaded; the snippet stub (withConfig:
+      // false) has neither config nor __loaded
+      stub.setProperty('__loaded'.toJS, loaded.toJS);
     }
     stub.setProperty(
       'set_config'.toJS,
@@ -72,9 +76,12 @@ void main() {
     return stub;
   }
 
+  // cancel the previous test's retry chain so a stale chain cannot apply
+  // config against this test's stub
   setUp(WebCanvasMaskProvider.resetForTesting);
 
   tearDown(() {
+    WebCanvasMaskProvider.resetForTesting();
     web.window.setProperty('posthog'.toJS, null);
   });
 
@@ -389,6 +396,53 @@ void main() {
     installPosthogStub();
     await Future<void>.delayed(const Duration(milliseconds: 1500));
 
+    expect(capturedConfig, isNotNull);
+  });
+
+  test(
+      'keeps retrying while posthog is present but uninitialized, then '
+      'applies once init declares the mask provider', () async {
+    final stub = installPosthogStub(loaded: false, declaresMaskProvider: false);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    // present-but-uninitialized must not be classified as not-opted-in
+    expect(capturedConfig, isNull);
+
+    final captureCanvas = JSObject()
+      ..setProperty('canvasMaskRegionsFn'.toJS, null);
+    final sessionRecording = JSObject()
+      ..setProperty('captureCanvas'.toJS, captureCanvas);
+    stub
+        .getProperty<JSObject>('config'.toJS)
+        .setProperty('session_recording'.toJS, sessionRecording);
+    stub.setProperty('__loaded'.toJS, true.toJS);
+
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    expect(capturedConfig, isNotNull);
+  });
+
+  test('an exception during one retry tick does not kill the chain', () async {
+    web.window.setProperty('posthog'.toJS, null);
+    capturedConfig = null;
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    final stub = installPosthogStub();
+    var setConfigCalls = 0;
+    stub.setProperty(
+      'set_config'.toJS,
+      ((JSObject cfg) {
+        setConfigCalls++;
+        if (setConfigCalls == 1) {
+          throw StateError('stub failure');
+        }
+        capturedConfig = cfg;
+      }).toJS,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    expect(setConfigCalls, 2);
     expect(capturedConfig, isNotNull);
   });
 

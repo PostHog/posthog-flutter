@@ -74,12 +74,14 @@ class WebCanvasMaskProvider {
 
   @visibleForTesting
   static void resetForTesting() {
+    _active?._retryTimer?.cancel();
     _active = null;
     _maskWidgetSeen = false;
   }
 
   final PostHogConfig _config;
 
+  Timer? _retryTimer;
   List<Rect>? _cachedContainerRects;
   int _cachedAtFrame = -1;
   int _consecutiveWalkFailures = 0;
@@ -127,33 +129,28 @@ class WebCanvasMaskProvider {
       'retrying canvas mask registration.',
     );
     _polling = true;
-    _scheduleRetry(const Duration(milliseconds: 250), Duration.zero);
+    _scheduleRetry(const Duration(milliseconds: 250));
   }
 
-  void _scheduleRetry(Duration delay, Duration elapsed) {
-    if (elapsed >= const Duration(minutes: 2)) {
-      _polling = false;
-      printIfDebug(
-        'PostHog: posthog-js did not become available, '
-        'web canvas masking disabled.',
-      );
-      return;
-    }
-    Timer(delay, () {
+  // polls forever once backed off to 4s: a consent-gated app can call
+  // posthog.init minutes after Flutter boots, and giving up would silently
+  // leave its canvas frames skipped (canvasMaskRegionsFn stuck at () => null)
+  void _scheduleRetry(Duration delay) {
+    _retryTimer = Timer(delay, () {
+      var next = delay;
       try {
         if (_apply() != _ApplyResult.posthogNotReady) {
           _polling = false;
           return;
         }
         final doubled = delay * 2;
-        final next = doubled > const Duration(seconds: 4)
+        next = doubled > const Duration(seconds: 4)
             ? const Duration(seconds: 4)
             : doubled;
-        _scheduleRetry(next, elapsed + delay);
       } catch (e) {
-        _polling = false;
         printIfDebug('PostHog: web canvas masking retry failed: $e');
       }
+      _scheduleRetry(next);
     });
   }
 
@@ -161,10 +158,22 @@ class WebCanvasMaskProvider {
     if (_frameCallbackRegistered) {
       return;
     }
-    _frameCallbackRegistered = true;
     SchedulerBinding.instance.addPersistentFrameCallback((_) {
       _frameCount++;
     });
+    _frameCallbackRegistered = true;
+  }
+
+  // posthog-js constructs its instance with a default config before init()
+  // runs, so a present config does not mean the app has called init — a
+  // consent-gated app may init long after Flutter boots. Only __loaded
+  // (set when init completes) distinguishes the two.
+  bool _isInitialized(PostHog ph) {
+    if (ph.config == null) {
+      return false;
+    }
+    final loaded = (ph as JSObject).getProperty<JSAny?>('__loaded'.toJS);
+    return loaded.isA<JSBoolean>() && (loaded as JSBoolean).toDart;
   }
 
   _ApplyResult _apply() {
@@ -172,7 +181,7 @@ class WebCanvasMaskProvider {
       return _ApplyResult.applied;
     }
     final ph = posthog;
-    if (ph == null || ph.config == null) {
+    if (ph == null || !_isInitialized(ph)) {
       return _ApplyResult.posthogNotReady;
     }
 
