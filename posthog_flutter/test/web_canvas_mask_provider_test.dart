@@ -24,6 +24,7 @@ void main() {
     bool loaded = true,
     bool recordingStarted = false,
     bool declaresMaskProvider = true,
+    String? version,
   }) {
     capturedConfig = null;
     setConfigCalls = 0;
@@ -72,8 +73,25 @@ void main() {
         startRecordingCalls++;
       }).toJS,
     );
+    if (version != null) {
+      stub.setProperty('version'.toJS, version.toJS);
+    }
     web.window.setProperty('posthog'.toJS, stub);
     return stub;
+  }
+
+  int Function() interceptWarns() {
+    final consoleObject = web.window.getProperty<JSObject>('console'.toJS);
+    final originalWarn = consoleObject.getProperty<JSAny?>('warn'.toJS);
+    var warnCalls = 0;
+    consoleObject.setProperty(
+      'warn'.toJS,
+      ((JSAny? message) {
+        warnCalls++;
+      }).toJS,
+    );
+    addTearDown(() => consoleObject.setProperty('warn'.toJS, originalWarn));
+    return () => warnCalls;
   }
 
   // cancel the previous test's retry chain so a stale chain cannot apply
@@ -516,5 +534,75 @@ void main() {
 
     expect(stopRecordingCalls, 0);
     expect(startRecordingCalls, 0);
+  });
+
+  test('warns once but still registers when posthog-js is too old', () {
+    installPosthogStub(version: '1.399.2');
+    WebCanvasMaskProvider.debugMinPosthogJsVersionOverride = '1.407.0';
+    final warns = interceptWarns();
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(warns(), 1);
+    expect(capturedConfig, isNotNull);
+  });
+
+  test('does not warn when posthog-js meets the minimum', () {
+    installPosthogStub(version: '1.407.0');
+    WebCanvasMaskProvider.debugMinPosthogJsVersionOverride = '1.407.0';
+    final warns = interceptWarns();
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(warns(), 0);
+    expect(capturedConfig, isNotNull);
+  });
+
+  test('does not warn when posthog-js exposes no version', () {
+    installPosthogStub();
+    WebCanvasMaskProvider.debugMinPosthogJsVersionOverride = '1.407.0';
+    final warns = interceptWarns();
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(warns(), 0);
+    expect(capturedConfig, isNotNull);
+  });
+
+  test('does not warn on an unparseable version', () {
+    installPosthogStub(version: 'not-a-version');
+    WebCanvasMaskProvider.debugMinPosthogJsVersionOverride = '1.407.0';
+    final warns = interceptWarns();
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(warns(), 0);
+    expect(capturedConfig, isNotNull);
+  });
+
+  test('warns at most once across repeated applies', () {
+    installPosthogStub(version: '1.399.2');
+    WebCanvasMaskProvider.debugMinPosthogJsVersionOverride = '1.407.0';
+    final warns = interceptWarns();
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(warns(), 1);
+  });
+
+  testWidgets('warns about an old posthog-js on the mount-triggered apply',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, version: '1.399.2');
+    WebCanvasMaskProvider.debugMinPosthogJsVersionOverride = '1.407.0';
+    final warns = interceptWarns();
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(warns(), 0);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+
+    expect(warns(), 1);
+    expect(capturedConfig, isNotNull);
   });
 }

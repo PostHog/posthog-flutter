@@ -27,6 +27,11 @@ external JSObject _objectAssign(JSObject target, JSObject source);
 
 const _semanticsBlockSelector = 'flt-semantics-host';
 
+// Placeholder that keeps the gate inert: must be pinned to the first
+// posthog-js release containing canvasCapture.maskRegionsFn support
+// (github.com/PostHog/posthog-js#4270) before this package releases.
+const _minPosthogJsVersion = '0.0.0';
+
 enum _ApplyResult {
   applied,
 
@@ -54,6 +59,10 @@ class WebCanvasMaskProvider {
 
   static WebCanvasMaskProvider? _active;
   static bool _maskWidgetSeen = false;
+  static bool _warnedOldPosthogJs = false;
+
+  @visibleForTesting
+  static String? debugMinPosthogJsVersionOverride;
 
   /// Opts the app into canvas masking because a `PostHogMaskWidget` mounted.
   ///
@@ -77,6 +86,8 @@ class WebCanvasMaskProvider {
     _active?._retryTimer?.cancel();
     _active = null;
     _maskWidgetSeen = false;
+    _warnedOldPosthogJs = false;
+    debugMinPosthogJsVersionOverride = null;
   }
 
   final PostHogConfig _config;
@@ -216,6 +227,7 @@ class WebCanvasMaskProvider {
       _warnNotOptedIn(sessionRecording);
       return _ApplyResult.notOptedIn;
     }
+    _warnIfPosthogJsTooOld(ph);
     _ensureFrameCounter();
     canvasCapture.setProperty(
       'maskRegionsFn'.toJS,
@@ -269,6 +281,59 @@ class WebCanvasMaskProvider {
             .toJS,
       );
     }
+  }
+
+  // warns only on a version confirmed older than the minimum: an absent or
+  // unparseable version (custom bundle, future scheme) is assumed new so the
+  // gate can never misfire, and registration always proceeds — blockSelector
+  // still protects the accessibility DOM on old posthog-js
+  void _warnIfPosthogJsTooOld(PostHog ph) {
+    if (_warnedOldPosthogJs) {
+      return;
+    }
+    try {
+      final min = debugMinPosthogJsVersionOverride ?? _minPosthogJsVersion;
+      final raw = (ph as JSObject).getProperty<JSAny?>('version'.toJS);
+      if (!raw.isA<JSString>()) {
+        return;
+      }
+      final observed = (raw as JSString).toDart;
+      if (!_isConfirmedOlder(observed, min)) {
+        return;
+      }
+      _warnedOldPosthogJs = true;
+      web.console.warn(
+        'PostHog: this posthog-js version ($observed) does not support '
+                'canvasCapture.maskRegionsFn, so canvas frames are NOT masked '
+                '— upgrade to at least $min for canvas masking. The '
+                'accessibility-DOM exclusion is still applied.'
+            .toJS,
+      );
+    } catch (e) {
+      printIfDebug('PostHog: could not check the posthog-js version: $e');
+    }
+  }
+
+  static bool _isConfirmedOlder(String observed, String min) {
+    final observedParts = _parseSemVerPrefix(observed);
+    final minParts = _parseSemVerPrefix(min);
+    if (observedParts == null || minParts == null) {
+      return false;
+    }
+    for (var i = 0; i < 3; i++) {
+      if (observedParts[i] != minParts[i]) {
+        return observedParts[i] < minParts[i];
+      }
+    }
+    return false;
+  }
+
+  static List<int>? _parseSemVerPrefix(String version) {
+    final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)').firstMatch(version.trim());
+    if (match == null) {
+      return null;
+    }
+    return [for (var i = 1; i <= 3; i++) int.parse(match.group(i)!)];
   }
 
   // with accessibility enabled, Flutter mirrors widget text into the
