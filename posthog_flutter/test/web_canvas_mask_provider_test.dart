@@ -542,6 +542,30 @@ void main() {
     expect(capturedConfig, isNotNull);
   });
 
+  test('retries the full apply when the restart throws on first register',
+      () async {
+    final stub = installPosthogStub(recordingStarted: true);
+    var stopAttempts = 0;
+    stub.setProperty(
+      'stopSessionRecording'.toJS,
+      (() {
+        stopAttempts++;
+        if (stopAttempts == 1) {
+          throw StateError('stub stop failure');
+        }
+      }).toJS,
+    );
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(startRecordingCalls, 0);
+
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    expect(stopAttempts, 2);
+    expect(startRecordingCalls, 1);
+    expect(capturedConfig, isNotNull);
+  });
+
   test('restarts an in-flight recording so the new config applies', () {
     installPosthogStub(recordingStarted: true);
 
