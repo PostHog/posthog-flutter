@@ -184,6 +184,49 @@ void main() {
     });
   });
 
+  group('capture gate', () {
+    // Counterpart to posthog_widget_web_test.dart: the kIsWeb guard must not
+    // disable capture off web.
+    testWidgets('reaches captureScreenshot while session replay is on',
+        (tester) async {
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await unmountAndFlush(tester);
+
+      expect(
+        recordedCalls.map((call) => call.method),
+        contains('isSessionReplayActive'),
+        reason: 'the change detector must reach captureScreenshot off web',
+      );
+    });
+
+    testWidgets('resumes capture after recording is toggled off and on',
+        (tester) async {
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await tester.pump(const Duration(milliseconds: 1));
+
+      PostHogInternalEvents.sessionRecordingActive.value = false;
+      await tester.pump(const Duration(milliseconds: 1));
+      recordedCalls.clear();
+
+      PostHogInternalEvents.sessionRecordingActive.value = true;
+      // A restarted detector only arms a post-frame callback, so something has
+      // to render a frame for it to fire.
+      tester.binding.scheduleFrame();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1));
+
+      expect(
+        recordedCalls.map((call) => call.method),
+        contains('isSessionReplayActive'),
+        reason: 'a recording restart must re-arm Flutter capture off web',
+      );
+
+      await unmountAndFlush(tester);
+    });
+  });
+
   group('occlusion episode handling', () {
     testWidgets('placeholder ships as a meta + full snapshot pair',
         (tester) async {

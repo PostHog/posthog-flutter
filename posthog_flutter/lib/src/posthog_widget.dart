@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 // The replay capturer defines its own ImageInfo; hide Flutter's.
 import 'package:flutter/material.dart' hide ImageInfo;
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -56,7 +57,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
       return;
     }
 
-    if (config.sessionReplay) {
+    // On web, session replay is recorded by posthog-js; this pipeline has no
+    // consumer there, so every snapshot it produces is discarded.
+    if (!kIsWeb && config.sessionReplay) {
       _initComponents(config);
       _changeDetector?.start();
     }
@@ -154,6 +157,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   void _startRecording() {
+    if (kIsWeb) {
+      return;
+    }
+
     final config = Posthog().config;
     if (config == null) {
       return;
