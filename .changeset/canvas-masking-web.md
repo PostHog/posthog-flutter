@@ -64,4 +64,7 @@ Notes:
   platform view does not mask it on web.
 - Your app must be wrapped in `PostHogWidget`. If it is not, canvas frames are
   skipped instead of recorded unmasked, and a console warning explains the fix.
-- Requires a posthog-js version that supports `canvasCapture.maskRegionsFn`.
+- Requires a posthog-js version that supports `canvasCapture.maskRegionsFn`
+  (minimum version pinned at release). On an older posthog-js the plugin still
+  registers — the accessibility-tree exclusion works there — but canvas frames
+  are NOT masked, and a console warning tells you to upgrade.
