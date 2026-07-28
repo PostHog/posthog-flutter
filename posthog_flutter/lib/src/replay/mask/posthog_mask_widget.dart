@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 ///
 /// **Flutter web:** this has no effect unless canvas masking is enabled, since
 /// the canvas is masked by posthog-js rather than by this plugin. Declare
-/// `session_recording: { captureCanvas: { canvasMaskRegionsFn: () => null } }`
+/// `session_recording: { canvasCapture: { maskRegionsFn: () => null } }`
 /// in your `posthog.init` call to turn it on. iOS and Android need no setup.
 class PostHogMaskWidget extends StatefulWidget {
   /// The widget subtree to mask in session replay snapshots.

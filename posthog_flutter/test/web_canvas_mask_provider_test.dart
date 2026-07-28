@@ -33,11 +33,11 @@ void main() {
       if (declaresMaskProvider) {
         sessionRecording ??= JSObject();
         final existing =
-            sessionRecording.getProperty<JSAny?>('captureCanvas'.toJS);
-        final captureCanvas =
+            sessionRecording.getProperty<JSAny?>('canvasCapture'.toJS);
+        final canvasCapture =
             existing.isA<JSObject>() ? existing as JSObject : JSObject();
-        captureCanvas.setProperty('canvasMaskRegionsFn'.toJS, null);
-        sessionRecording.setProperty('captureCanvas'.toJS, captureCanvas);
+        canvasCapture.setProperty('maskRegionsFn'.toJS, null);
+        sessionRecording.setProperty('canvasCapture'.toJS, canvasCapture);
       }
       if (sessionRecording != null) {
         config.setProperty('session_recording'.toJS, sessionRecording);
@@ -108,12 +108,10 @@ void main() {
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
 
     final sessionRecording = capturedSessionRecording();
-    final captureCanvas =
-        sessionRecording.getProperty<JSObject>('captureCanvas'.toJS);
+    final canvasCapture =
+        sessionRecording.getProperty<JSObject>('canvasCapture'.toJS);
     expect(
-      captureCanvas
-          .getProperty<JSAny?>('canvasMaskRegionsFn'.toJS)
-          .isA<JSFunction>(),
+      canvasCapture.getProperty<JSAny?>('maskRegionsFn'.toJS).isA<JSFunction>(),
       isTrue,
     );
     expect(
@@ -123,11 +121,15 @@ void main() {
   });
 
   test('preserves existing session_recording config when merging', () {
+    final existingCanvasCapture = JSObject()
+      ..setProperty('resolutionScale'.toJS, 0.5.toJS);
     final existingCaptureCanvas = JSObject()
+      ..setProperty('recordCanvas'.toJS, true.toJS)
       ..setProperty('canvasFps'.toJS, 2.toJS);
     final existingSessionRecording = JSObject()
       ..setProperty('blockSelector'.toJS, '.secret'.toJS)
       ..setProperty('maskAllInputs'.toJS, false.toJS)
+      ..setProperty('canvasCapture'.toJS, existingCanvasCapture)
       ..setProperty('captureCanvas'.toJS, existingCaptureCanvas);
     installPosthogStub(sessionRecording: existingSessionRecording);
 
@@ -142,17 +144,29 @@ void main() {
       sessionRecording.getProperty<JSAny?>('blockSelector'.toJS).dartify(),
       '.secret, flt-semantics-host',
     );
+    final canvasCapture =
+        sessionRecording.getProperty<JSObject>('canvasCapture'.toJS);
+    expect(
+      canvasCapture.getProperty<JSAny?>('resolutionScale'.toJS).dartify(),
+      0.5,
+    );
+    expect(
+      canvasCapture.getProperty<JSAny?>('maskRegionsFn'.toJS).isA<JSFunction>(),
+      isTrue,
+    );
     final captureCanvas =
         sessionRecording.getProperty<JSObject>('captureCanvas'.toJS);
+    expect(
+      captureCanvas.getProperty<JSAny?>('recordCanvas'.toJS).dartify(),
+      true,
+    );
     expect(
       captureCanvas.getProperty<JSAny?>('canvasFps'.toJS).dartify(),
       2,
     );
     expect(
-      captureCanvas
-          .getProperty<JSAny?>('canvasMaskRegionsFn'.toJS)
-          .isA<JSFunction>(),
-      isTrue,
+      captureCanvas.getProperty<JSAny?>('maskRegionsFn'.toJS),
+      isNull,
     );
   });
 
@@ -175,8 +189,8 @@ void main() {
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
 
     final regionsFn = capturedSessionRecording()
-        .getProperty<JSObject>('captureCanvas'.toJS)
-        .getProperty<JSFunction>('canvasMaskRegionsFn'.toJS);
+        .getProperty<JSObject>('canvasCapture'.toJS)
+        .getProperty<JSFunction>('maskRegionsFn'.toJS);
     final canvas = web.document.createElement('canvas');
     final regions = regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>;
 
@@ -190,8 +204,8 @@ void main() {
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
 
     final regionsFn = capturedSessionRecording()
-        .getProperty<JSObject>('captureCanvas'.toJS)
-        .getProperty<JSFunction>('canvasMaskRegionsFn'.toJS);
+        .getProperty<JSObject>('canvasCapture'.toJS)
+        .getProperty<JSFunction>('maskRegionsFn'.toJS);
     final flutterView = web.document.createElement('flutter-view');
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
@@ -223,8 +237,8 @@ void main() {
     web.document.body!.appendChild(flutterView);
     try {
       final regionsFn = capturedSessionRecording()
-          .getProperty<JSObject>('captureCanvas'.toJS)
-          .getProperty<JSFunction>('canvasMaskRegionsFn'.toJS);
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
       for (var i = 0; i < 12; i++) {
         expect(regionsFn.callAsFunction(null, canvas), isNull);
       }
@@ -267,8 +281,8 @@ void main() {
       WebCanvasMaskProvider(config).register();
 
       final regionsFn = capturedSessionRecording()
-          .getProperty<JSObject>('captureCanvas'.toJS)
-          .getProperty<JSFunction>('canvasMaskRegionsFn'.toJS);
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
       final regions =
           regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>;
 
@@ -329,10 +343,9 @@ void main() {
     // present-but-uninitialized must not be classified as not-opted-in
     expect(capturedConfig, isNull);
 
-    final captureCanvas = JSObject()
-      ..setProperty('canvasMaskRegionsFn'.toJS, null);
+    final canvasCapture = JSObject()..setProperty('maskRegionsFn'.toJS, null);
     final sessionRecording = JSObject()
-      ..setProperty('captureCanvas'.toJS, captureCanvas);
+      ..setProperty('canvasCapture'.toJS, canvasCapture);
     stub
         .getProperty<JSObject>('config'.toJS)
         .setProperty('session_recording'.toJS, sessionRecording);

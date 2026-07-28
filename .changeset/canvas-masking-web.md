@@ -8,7 +8,7 @@ On Flutter web your app is painted into a single `<canvas>`, so PostHog's DOM-ba
 masking could not see any of your text — session recordings captured it in the clear
 even if you had masking configured. Masking now applies inside the canvas.
 
-To enable it, add `canvasMaskRegionsFn` to the `posthog.init` call in your
+To enable it, add `maskRegionsFn` to the `posthog.init` call in your
 `web/index.html`:
 
 ```js
@@ -16,9 +16,11 @@ posthog.init('<your-token>', {
   session_recording: {
     captureCanvas: {
       recordCanvas: true,
+    },
+    canvasCapture: {
       // the plugin replaces this once Flutter has started; until then
       // frames are skipped rather than recorded unmasked
-      canvasMaskRegionsFn: () => null,
+      maskRegionsFn: () => null,
     },
   },
 })
@@ -31,10 +33,10 @@ it either.
 
 Notes:
 
-- If you leave `canvasMaskRegionsFn` out, the plugin changes nothing and recording
+- If you leave `maskRegionsFn` out, the plugin changes nothing and recording
   behaves exactly as posthog-js is configured — as it did before this release.
   **This includes `PostHogMaskWidget`**: on web it has no effect unless
-  `canvasMaskRegionsFn` is declared, because the canvas is masked by posthog-js and
+  `maskRegionsFn` is declared, because the canvas is masked by posthog-js and
   the plugin only supplies rectangles to it once you have opted in. On iOS and
   Android `PostHogMaskWidget` continues to work with no extra setup.
   If canvas recording is enabled in your project settings rather than in
@@ -59,4 +61,4 @@ Notes:
   platform view does not mask it on web.
 - Your app must be wrapped in `PostHogWidget`. If it is not, canvas frames are
   skipped instead of recorded unmasked, and a console warning explains the fix.
-- Requires a posthog-js version that supports `captureCanvas.canvasMaskRegionsFn`.
+- Requires a posthog-js version that supports `canvasCapture.maskRegionsFn`.
