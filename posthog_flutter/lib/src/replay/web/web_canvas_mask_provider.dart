@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
+import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart' show View;
 import 'package:web/web.dart' as web;
 
 import '../../posthog_config.dart';
@@ -64,6 +66,11 @@ class WebCanvasMaskProvider {
   @visibleForTesting
   static String? debugMinPosthogJsVersionOverride;
 
+  // the test harness runs full-page, where the real host is <body> and can
+  // never be distinguished from a foreign view's host
+  @visibleForTesting
+  static web.Element? debugOwnViewHostOverride;
+
   /// Opts the app into canvas masking because a `PostHogMaskWidget` mounted.
   ///
   /// Called from shared widget code through a conditional import, so it must
@@ -88,6 +95,7 @@ class WebCanvasMaskProvider {
     _maskWidgetSeen = false;
     _warnedOldPosthogJs = false;
     debugMinPosthogJsVersionOverride = null;
+    debugOwnViewHostOverride = null;
   }
 
   final PostHogConfig _config;
@@ -100,6 +108,7 @@ class WebCanvasMaskProvider {
   bool _applied = false;
   bool _maskWidgetMounted = false;
   bool _polling = false;
+  bool _pendingRestart = false;
 
   // shared so a second provider's cache is not compared against a counter that
   // never advances; the callback cannot be removed once added
@@ -113,6 +122,10 @@ class WebCanvasMaskProvider {
       _active?._retryTimer?.cancel();
       _active = this;
       _maskWidgetMounted = _maskWidgetSeen;
+      // the controller singleton may predate this setup() and still hold a
+      // parser map built from an older config's masking flags
+      PostHogMaskController.instance
+          .refreshParsers(_config.sessionReplayConfig);
       _pump();
     } catch (e) {
       // a partial first apply (set_config landed, restart threw) must not end
@@ -250,10 +263,17 @@ class WebCanvasMaskProvider {
     // blockSelector is only read when rrweb's record() starts, so an in-flight
     // recording must be restarted — worth it even with canvas capture off,
     // since the semantics exclusion applies to plain DOM recording too (and
-    // recordCanvas can arrive from remote config after init anyway)
+    // recordCanvas can arrive from remote config after init anyway).
+    // _pendingRestart survives a stop that succeeded while the matching start
+    // threw: the retry sees the recording as already stopped and must still
+    // finish the restart.
     if (ph.sessionRecordingStarted()) {
+      _pendingRestart = true;
       ph.stopSessionRecording();
+    }
+    if (_pendingRestart) {
       ph.startSessionRecording();
+      _pendingRestart = false;
     }
     // only after the restart: a throw above must leave the apply retryable,
     // or the selector never takes effect for this recording
@@ -351,7 +371,13 @@ class WebCanvasMaskProvider {
     var selector = _semanticsBlockSelector;
     if (existing.isA<JSString>()) {
       final current = (existing as JSString).toDart;
-      if (current.contains(_semanticsBlockSelector)) {
+      // token-exact: a user selector like `.not-flt-semantics-host` must not
+      // pass for the semantics-host selector itself
+      final alreadyBlocked = current
+          .split(',')
+          .map((token) => token.trim())
+          .contains(_semanticsBlockSelector);
+      if (alreadyBlocked) {
         return;
       }
       selector = '$current, $_semanticsBlockSelector';
@@ -381,29 +407,41 @@ class WebCanvasMaskProvider {
       return null;
     }
     _consecutiveWalkFailures = 0;
+
+    // our rects always describe PostHogWidget's tree — shipping them with a
+    // different flutter-view's canvas would record that view unmasked
+    if (!_isOwnViewCanvas(host)) {
+      return null;
+    }
     if (containerRects.isEmpty) {
       return JSArray<JSObject>();
     }
 
-    // Flutter logical pixels == CSS pixels on web, but localToGlobal is
-    // relative to the flutter-view host, which may itself be embedded away
-    // from the viewport origin — hence the extra hostRect term
-    var containerOrigin = Offset.zero;
+    // rects are container-local, so map them through the container's full
+    // transform (an ancestor Transform.scale scales painted content, and a
+    // plain origin shift would leave the masks at the unscaled size); the
+    // hostRect term covers a flutter-view embedded away from the viewport
+    // origin, since Flutter logical pixels == CSS pixels on web
+    Matrix4? containerTransform;
     final containerObject = PostHogMaskController
         .instance.containerKey.currentContext
         ?.findRenderObject();
     if (containerObject is RenderBox && containerObject.hasSize) {
-      containerOrigin = containerObject.localToGlobal(Offset.zero);
+      containerTransform = containerObject.getTransformTo(null);
     }
     final canvasRect = canvas.getBoundingClientRect();
     final hostRect = host.getBoundingClientRect();
-    final offset = containerOrigin +
-        Offset(hostRect.left, hostRect.top) -
-        Offset(canvasRect.left, canvasRect.top);
+    final offset = Offset(
+      hostRect.left - canvasRect.left,
+      hostRect.top - canvasRect.top,
+    );
 
     final regions = <JSObject>[];
     for (final rect in containerRects) {
-      final shifted = rect.shift(offset);
+      final globalRect = containerTransform == null
+          ? rect
+          : MatrixUtils.transformRect(containerTransform, rect);
+      final shifted = globalRect.shift(offset);
       regions.add(_JSMaskRegion(
         x: shifted.left,
         y: shifted.top,
@@ -412,6 +450,39 @@ class WebCanvasMaskProvider {
       ));
     }
     return regions.toJS;
+  }
+
+  // In full-page mode the embedder host is <body>, which contains every
+  // flutter-view on the page, so only a view embedded in a dedicated host
+  // element (multi-view) can be told apart from ours.
+  bool _isOwnViewCanvas(web.Element canvasViewHost) {
+    final ownHost = debugOwnViewHostOverride ?? _resolveOwnViewHost();
+    if (ownHost != null) {
+      return ownHost.contains(canvasViewHost);
+    }
+    // unresolvable: with a single flutter-view it can only be ours
+    return web.document.querySelectorAll('flutter-view').length <= 1;
+  }
+
+  web.Element? _resolveOwnViewHost() {
+    try {
+      final context =
+          PostHogMaskController.instance.containerKey.currentContext;
+      if (context == null) {
+        return null;
+      }
+      final viewId = View.maybeOf(context)?.viewId;
+      if (viewId == null) {
+        return null;
+      }
+      final hostElement = ui_web.views.getHostElement(viewId);
+      if (hostElement != null && hostElement.isA<web.Element>()) {
+        return hostElement as web.Element;
+      }
+    } catch (e) {
+      printIfDebug('PostHog: could not resolve the Flutter view host: $e');
+    }
+    return null;
   }
 
   // rects only change when Flutter paints a frame, so cache per frame instead

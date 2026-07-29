@@ -22,11 +22,16 @@ class ElementObjectParser {
     }
 
     if (element.widget is Text) {
-      final elementData = _elementParser.relate(element);
+      final config = Posthog().config?.sessionReplayConfig;
+      final maskAllTexts = config?.maskAllTexts ?? true;
 
-      if (elementData != null) {
-        activeElementData.addChildren(elementData);
-        return elementData;
+      if (maskAllTexts) {
+        final elementData = _elementParser.relate(element);
+
+        if (elementData != null) {
+          activeElementData.addChildren(elementData);
+          return elementData;
+        }
       }
     }
 
