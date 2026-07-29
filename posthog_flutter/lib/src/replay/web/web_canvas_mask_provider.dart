@@ -29,10 +29,9 @@ external JSObject _objectAssign(JSObject target, JSObject source);
 
 const _semanticsBlockSelector = 'flt-semantics-host';
 
-// Placeholder that keeps the gate inert: must be pinned to the first
-// posthog-js release containing canvasCapture.maskRegionsFn support
-// (github.com/PostHog/posthog-js#4270) before this package releases.
-const _minPosthogJsVersion = '0.0.0';
+// First posthog-js release with canvasCapture.maskRegionsFn support
+// (github.com/PostHog/posthog-js#4270).
+const _minPosthogJsVersion = '1.408.0';
 
 /// Supplies widget-tree mask rectangles to posthog-js canvas recording via
 /// `session_recording.canvasCapture.maskRegionsFn`, so text painted

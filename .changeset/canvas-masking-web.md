@@ -36,9 +36,9 @@ The contract is fail-closed:
   warning explains the fix.
 - Full DOM snapshots skip canvas pixel serialization while `maskRegionsFn` is
   configured, so they can't embed an unmasked screenshot of the app.
-- On a posthog-js without `canvasCapture.maskRegionsFn` support (minimum version
-  pinned at release) canvas frames are NOT masked — a console warning tells you
-  to upgrade.
+- On a posthog-js without `canvasCapture.maskRegionsFn` support (older than
+  1.408.0) canvas frames are NOT masked — a console warning tells you to
+  upgrade.
 
 Caveats: web replay is configured in `posthog.init` (the Dart `sessionReplay`
 flag drives iOS/Android only); list any project-level `blockSelector` in
