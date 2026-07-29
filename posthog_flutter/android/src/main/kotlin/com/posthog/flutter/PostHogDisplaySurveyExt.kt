@@ -24,7 +24,7 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                         )
 
                     questionMap["questionDescription"] = question.questionDescription
-                    questionMap["questionDescriptionContentType"] = question.questionDescriptionContentType?.value
+                    questionMap["questionDescriptionContentType"] = question.questionDescriptionContentType.value
                     questionMap["buttonText"] = question.buttonText
 
                     // Add question type-specific properties
