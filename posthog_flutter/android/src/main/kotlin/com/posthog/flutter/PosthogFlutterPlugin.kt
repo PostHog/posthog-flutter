@@ -1402,7 +1402,7 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val featureFlagKey: String = call.argument("key")!!
-            val flag = PostHog.getFeatureFlagPayload(featureFlagKey)
+            val flag = PostHog.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent = false)?.payload
             result.success(flag)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1737,12 +1737,14 @@ class PosthogFlutterPlugin :
         result: Result,
     ) {
         try {
+            @Suppress("UNCHECKED_CAST")
             val arguments =
                 call.arguments as? Map<String, Any> ?: run {
                     result.error("INVALID_ARGUMENTS", "Invalid arguments for captureException", null)
                     return
                 }
 
+            @Suppress("UNCHECKED_CAST")
             val properties = arguments["properties"] as? Map<String, Any>
             val timestampMs = arguments["timestamp"] as? Long
 
@@ -1867,6 +1869,7 @@ class PosthogFlutterPlugin :
         call: MethodCall,
         result: Result,
     ) {
+        @Suppress("UNCHECKED_CAST")
         val args = call.arguments as? Map<String, Any>
         val type = args?.get("type") as? String
 
