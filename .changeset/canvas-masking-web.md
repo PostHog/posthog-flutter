@@ -44,7 +44,9 @@ Caveats: web replay is configured in `posthog.init` (the Dart `sessionReplay`
 flag drives iOS/Android only); list any project-level `blockSelector` in
 `posthog.init` too, as the client-side selector takes precedence; DOM-rendered
 platform views (`HtmlElementView`) follow posthog-js's DOM masking rules, not
-canvas mask regions.
+canvas mask regions; on a page embedding multiple Flutter views, canvases
+belonging to other Flutter views are skipped entirely (not recorded), since this
+plugin's mask regions only describe its own view.
 
 Also fixes `maskAllTexts: false` still masking `Text` widgets when
 `maskAllImages` is on — this applies to iOS/Android screenshot masking too.
