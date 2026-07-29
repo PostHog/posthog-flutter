@@ -2,4 +2,4 @@
 'posthog_flutter': patch
 ---
 
-Clean up Android and macOS build warnings.
+Clean up Android build warnings.
