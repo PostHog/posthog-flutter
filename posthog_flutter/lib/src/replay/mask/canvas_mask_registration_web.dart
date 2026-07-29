@@ -32,6 +32,11 @@ void notifyMaskWidgetMounted(BuildContext context) {
 /// no tracked tree at all the opt-in stays allowed: every walk then fails and
 /// frames are skipped (fail closed), which is the documented behavior for an
 /// app missing PostHogWidget.
+///
+/// The check runs once, in the mount's post-frame callback: a null tracked
+/// context at that moment is treated as the no-PostHogWidget shape and
+/// allowed, even if a PostHogWidget later mounts without containing this
+/// widget.
 bool _isInTrackedTree(BuildContext context) {
   final trackedContext =
       PostHogMaskController.instance.containerKey.currentContext;

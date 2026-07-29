@@ -302,6 +302,33 @@ void main() {
     expect(startRecordingCalls, 0);
   });
 
+  testWidgets(
+      'a mask widget that mounts before any PostHogWidget opts in '
+      '(no-PostHogWidget shape)', (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    Widget layout({required bool withPostHogWidget}) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              if (withPostHogWidget)
+                Expanded(child: PostHogWidget(child: Container())),
+              const PostHogMaskWidget(child: SizedBox.shrink()),
+            ],
+          ),
+        );
+
+    await tester.pumpWidget(layout(withPostHogWidget: false));
+    expect(setConfigCalls, 1);
+
+    await tester.pumpWidget(layout(withPostHogWidget: true));
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
   testWidgets('a mask widget inside the tracked PostHogWidget tree opts in',
       (tester) async {
     installPosthogStub(declaresMaskProvider: false, recordingStarted: true);

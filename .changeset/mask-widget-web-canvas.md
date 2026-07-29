@@ -27,6 +27,9 @@ Things to know:
   skipped instead of recorded unmasked, and a console warning explains the fix.
 - A `PostHogMaskWidget` mounted outside the `PostHogWidget` tree does not opt the
   app in: masking could never cover it, so opting in would expose it instead of
-  failing closed. A debug log explains the misplacement.
+  failing closed. A debug log explains the misplacement. This check runs once, at
+  the mask widget's first mount: a mask widget that mounts before any
+  `PostHogWidget` exists is treated as the no-`PostHogWidget` shape above and
+  does opt in.
 
 Apps that declare neither are untouched, exactly as before.
