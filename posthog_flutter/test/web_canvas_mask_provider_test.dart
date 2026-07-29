@@ -54,20 +54,23 @@ void main() {
         capturedConfig = cfg;
       }).toJS,
     );
+    var recordingState = recordingStarted;
     stub.setProperty(
       'sessionRecordingStarted'.toJS,
-      (() => recordingStarted.toJS).toJS,
+      (() => recordingState.toJS).toJS,
     );
     stub.setProperty(
       'stopSessionRecording'.toJS,
       (() {
         stopRecordingCalls++;
+        recordingState = false;
       }).toJS,
     );
     stub.setProperty(
       'startSessionRecording'.toJS,
       (() {
         startRecordingCalls++;
+        recordingState = true;
       }).toJS,
     );
     if (version != null) {
@@ -185,6 +188,23 @@ void main() {
     expect(
       captureCanvas.getProperty<JSAny?>('maskRegionsFn'.toJS),
       isNull,
+    );
+  });
+
+  test(
+      'appends the semantics selector when an existing one only contains it '
+      'as a substring', () {
+    final existingSessionRecording = JSObject()
+      ..setProperty('blockSelector'.toJS, '.not-flt-semantics-host'.toJS);
+    installPosthogStub(sessionRecording: existingSessionRecording);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(
+      capturedSessionRecording()
+          .getProperty<JSAny?>('blockSelector'.toJS)
+          .dartify(),
+      '.not-flt-semantics-host, flt-semantics-host',
     );
   });
 
@@ -315,6 +335,108 @@ void main() {
     }
   });
 
+  testWidgets('scales mask rects by an ancestor transform around the container',
+      (tester) async {
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+
+    await tester.pumpWidget(
+      Transform.scale(
+        scale: 2,
+        alignment: Alignment.topLeft,
+        child: PostHogWidget(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: PostHogMaskWidget(
+              child: const SizedBox(width: 30, height: 40),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final flutterView = web.document.createElement('flutter-view');
+    flutterView.setAttribute('style', 'position: fixed; left: 0; top: 0');
+    final canvas = web.document.createElement('canvas');
+    canvas.setAttribute('style', 'position: absolute; left: 0; top: 0');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+
+    installPosthogStub();
+    try {
+      WebCanvasMaskProvider(config).register();
+
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      final regions =
+          regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>;
+
+      // container-local (0,0,30,40) outsets to (-1,-1,32,42), then doubles
+      expect(regions.toDart, hasLength(1));
+      final region = regions.toDart.first;
+      expect(region.getProperty<JSNumber>('x'.toJS).toDartDouble, -2);
+      expect(region.getProperty<JSNumber>('y'.toJS).toDartDouble, -2);
+      expect(region.getProperty<JSNumber>('width'.toJS).toDartDouble, 64);
+      expect(region.getProperty<JSNumber>('height'.toJS).toDartDouble, 84);
+    } finally {
+      flutterView.remove();
+    }
+  });
+
+  testWidgets(
+      'fails closed for a canvas in a foreign flutter-view on a multi-view '
+      'page', (tester) async {
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+
+    await tester.pumpWidget(
+      PostHogWidget(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: PostHogMaskWidget(
+            child: const SizedBox(width: 30, height: 40),
+          ),
+        ),
+      ),
+    );
+
+    web.Element embeddedView(web.Element host) {
+      final view = web.document.createElement('flutter-view');
+      final canvas = web.document.createElement('canvas');
+      view.appendChild(canvas);
+      host.appendChild(view);
+      return canvas;
+    }
+
+    final ownHost = web.document.createElement('div');
+    final ownCanvas = embeddedView(ownHost);
+    final foreignHost = web.document.createElement('div');
+    final foreignCanvas = embeddedView(foreignHost);
+    web.document.body!.appendChild(ownHost);
+    web.document.body!.appendChild(foreignHost);
+
+    installPosthogStub();
+    try {
+      WebCanvasMaskProvider.debugOwnViewHostOverride = ownHost;
+      WebCanvasMaskProvider(config).register();
+
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+
+      expect(regionsFn.callAsFunction(null, foreignCanvas), isNull);
+      final regions =
+          regionsFn.callAsFunction(null, ownCanvas) as JSArray<JSObject>;
+      expect(regions.toDart, hasLength(1));
+    } finally {
+      ownHost.remove();
+      foreignHost.remove();
+    }
+  });
+
   test('defers set_config until posthog-js exposes its config', () {
     installPosthogStub(withConfig: false);
 
@@ -442,6 +564,32 @@ void main() {
 
     expect(stopAttempts, 2);
     expect(startRecordingCalls, 1);
+    expect(capturedConfig, isNotNull);
+  });
+
+  test('finishes the restart when stop succeeds but start throws', () async {
+    final stub = installPosthogStub(recordingStarted: true);
+    var startAttempts = 0;
+    stub.setProperty(
+      'startSessionRecording'.toJS,
+      (() {
+        startAttempts++;
+        if (startAttempts == 1) {
+          throw StateError('stub start failure');
+        }
+      }).toJS,
+    );
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    // the stub now reports the recording as stopped, so the retry must not
+    // skip the restart block
+    expect(stopRecordingCalls, 1);
+    expect(startAttempts, 1);
+
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    expect(startAttempts, 2);
+    expect(stopRecordingCalls, 1);
     expect(capturedConfig, isNotNull);
   });
 

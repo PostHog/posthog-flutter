@@ -11,22 +11,34 @@ import 'package:posthog_flutter/src/replay/mask/widget_elements_decipher.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 class PostHogMaskController {
-  late final Map<String, ElementParser> parsers;
+  Map<String, ElementParser> parsers;
 
   final GlobalKey containerKey = GlobalKey();
 
   final WidgetElementsDecipher _widgetScraper;
 
   PostHogMaskController._privateConstructor(PostHogSessionReplayConfig? config)
-      : _widgetScraper = WidgetElementsDecipher(
+      : parsers = _buildParsers(config),
+        _widgetScraper = WidgetElementsDecipher(
           elementDataFactory: ElementDataFactory(),
           elementObjectParser: ElementObjectParser(),
           rootElementProvider: RootElementProvider(),
-        ) {
-    parsers = ElementParsersConst(
+        );
+
+  static Map<String, ElementParser> _buildParsers(
+    PostHogSessionReplayConfig? config,
+  ) {
+    return ElementParsersConst(
       DefaultElementParserFactory(),
       config,
     ).parsersMap;
+  }
+
+  /// Rebuilds the parser map for [config]. The singleton captures the config
+  /// present at first access, which a later `setup()` with different masking
+  /// flags would otherwise never update.
+  void refreshParsers(PostHogSessionReplayConfig? config) {
+    parsers = _buildParsers(config);
   }
 
   static final PostHogMaskController instance =

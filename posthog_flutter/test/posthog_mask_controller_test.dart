@@ -64,4 +64,19 @@ void main() {
       isNull,
     );
   });
+
+  test('refreshParsers rebuilds the parser map from the new config', () {
+    final controller = PostHogMaskController.instance;
+    addTearDown(() => controller.refreshParsers(null));
+
+    final textsOnly = PostHogConfig('phc_test').sessionReplayConfig
+      ..maskAllImages = false;
+    controller.refreshParsers(textsOnly);
+    expect(controller.parsers.keys, isNot(contains('RenderImage')));
+    expect(controller.parsers.keys, contains('RenderParagraph'));
+
+    final imagesToo = PostHogConfig('phc_test').sessionReplayConfig;
+    controller.refreshParsers(imagesToo);
+    expect(controller.parsers.keys, contains('RenderImage'));
+  });
 }
