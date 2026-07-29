@@ -150,7 +150,6 @@ class WebCanvasMaskProvider {
       printIfDebug('PostHog: error enabling web canvas masking: $e');
       // the opt-in is latched, so keep a chain alive to apply it later —
       // otherwise a failed first apply would consume the opt-in for good
-      _polling = true;
       _scheduleRetry(const Duration(milliseconds: 250));
     }
   }
@@ -167,7 +166,6 @@ class WebCanvasMaskProvider {
       'PostHog: posthog-js not fully loaded yet, '
       'retrying canvas mask registration.',
     );
-    _polling = true;
     _scheduleRetry(const Duration(milliseconds: 250));
   }
 
@@ -175,6 +173,11 @@ class WebCanvasMaskProvider {
   // posthog.init minutes after Flutter boots, and giving up would silently
   // leave its canvas frames skipped (maskRegionsFn stuck at () => null)
   void _scheduleRetry(Duration delay) {
+    // every scheduling path must set _polling, and at most one timer may be
+    // outstanding — a sibling chain surviving here could outlive the
+    // cancellation in register() and reapply a stale provider's config
+    _retryTimer?.cancel();
+    _polling = true;
     _retryTimer = Timer(delay, () {
       var next = delay;
       try {

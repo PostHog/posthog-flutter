@@ -244,6 +244,78 @@ void main() {
     expect(setConfigCalls, 1);
   });
 
+  testWidgets(
+      'a retry chain from a throw-path apply cannot outlive a second '
+      'register()', (tester) async {
+    final stub = installPosthogStub(recordingStarted: true);
+    var successfulSetConfigs = 0;
+    var failing = true;
+    stub.setProperty(
+      'set_config'.toJS,
+      ((JSObject cfg) {
+        if (failing) {
+          throw StateError('stub failure');
+        }
+        successfulSetConfigs++;
+        capturedConfig = cfg;
+      }).toJS,
+    );
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    // the first apply threw, so a retry is pending; a mask widget mounting
+    // now must join that chain instead of starting a second one
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(successfulSetConfigs, 0);
+
+    failing = false;
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(successfulSetConfigs, 1);
+
+    // an orphaned first-chain timer would fire here and apply a second time
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(successfulSetConfigs, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets(
+      'a mask widget outside the tracked PostHogWidget tree does not opt in',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Column(
+          children: [
+            Expanded(child: PostHogWidget(child: Container())),
+            const PostHogMaskWidget(child: SizedBox.shrink()),
+          ],
+        ),
+      ),
+    );
+
+    expect(setConfigCalls, 0);
+    expect(stopRecordingCalls, 0);
+    expect(startRecordingCalls, 0);
+  });
+
+  testWidgets('a mask widget inside the tracked PostHogWidget tree opts in',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    await tester.pumpWidget(
+      PostHogWidget(child: PostHogMaskWidget(child: const SizedBox.shrink())),
+    );
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
   test('registers the mask provider via set_config', () {
     installPosthogStub();
 
