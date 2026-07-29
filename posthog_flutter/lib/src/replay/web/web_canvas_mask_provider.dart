@@ -179,16 +179,17 @@ class WebCanvasMaskProvider {
     _retryTimer?.cancel();
     _polling = true;
     _retryTimer = Timer(delay, () {
-      var next = delay;
+      // ramped up front so a throwing apply backs off like the
+      // posthog-not-ready path instead of retrying at a fixed 250ms forever
+      final doubled = delay * 2;
+      final next = doubled > const Duration(seconds: 4)
+          ? const Duration(seconds: 4)
+          : doubled;
       try {
         if (_apply() != _ApplyResult.posthogNotReady) {
           _polling = false;
           return;
         }
-        final doubled = delay * 2;
-        next = doubled > const Duration(seconds: 4)
-            ? const Duration(seconds: 4)
-            : doubled;
       } catch (e) {
         printIfDebug('PostHog: web canvas masking retry failed: $e');
       }
