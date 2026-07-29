@@ -1,5 +1,11 @@
 ## Next
 
+## 5.33.4
+
+### Patch Changes
+
+- 69c8859: Clean up Android build warnings.
+
 ## 5.33.3
 
 ### Patch Changes
