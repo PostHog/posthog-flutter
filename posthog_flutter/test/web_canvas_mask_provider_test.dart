@@ -567,6 +567,26 @@ void main() {
     expect(capturedConfig, isNotNull);
   });
 
+  test('backs off when the apply keeps throwing', () async {
+    final stub = installPosthogStub();
+    var attempts = 0;
+    void failingSetConfig(JSObject cfg) {
+      attempts++;
+      throw StateError('stub failure');
+    }
+
+    stub.setProperty('set_config'.toJS, failingSetConfig.toJS);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    await Future<void>.delayed(const Duration(milliseconds: 2200));
+
+    // the doubling chain (250, 500, 1000, 2000ms) allows ~4 attempts in this
+    // window; fixed-250ms retries would reach ~9
+    expect(attempts, greaterThanOrEqualTo(3));
+    expect(attempts, lessThanOrEqualTo(5));
+  });
+
   test('finishes the restart when stop succeeds but start throws', () async {
     final stub = installPosthogStub(recordingStarted: true);
     var startAttempts = 0;
