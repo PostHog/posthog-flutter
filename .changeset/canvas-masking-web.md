@@ -4,12 +4,12 @@
 
 **Session replay masking now works on Flutter web** ([#496](https://github.com/PostHog/posthog-flutter/issues/496)).
 
-On Flutter web your app is painted into a single `<canvas>`, so PostHog's DOM-based
-masking could not see any of your text — session recordings captured it in the clear
-even if you had masking configured. Masking now applies inside the canvas.
+On Flutter web the app is painted into a single `<canvas>`, so DOM-based masking
+could not see any of your text. Masking now applies inside the canvas:
+`maskAllTexts`, `maskAllImages`, `PostHogMaskWidget` and obscured text fields all
+mask canvas content, and Flutter's accessibility DOM is excluded from capture.
 
-To enable it, add `maskRegionsFn` to the `posthog.init` call in your
-`web/index.html`:
+To enable it, add `maskRegionsFn` to `posthog.init` in your `web/index.html`:
 
 ```js
 posthog.init('<your-token>', {
@@ -26,45 +26,25 @@ posthog.init('<your-token>', {
 })
 ```
 
-Once enabled, `sessionReplayConfig.maskAllTexts`, `maskAllImages`,
-`PostHogMaskWidget` and obscured text fields all mask canvas content, and Flutter's
-accessibility tree is excluded from DOM capture so your text is not recorded through
-it either.
+The contract is fail-closed:
 
-Notes:
+- Without `maskRegionsFn` the plugin changes nothing — including
+  `PostHogMaskWidget`, which has no effect on web unless you opt in (iOS and
+  Android need no setup).
+- Your app must be wrapped in `PostHogWidget`; if the widget tree can't be
+  walked, canvas frames are skipped instead of recorded unmasked, and a console
+  warning explains the fix.
+- Full DOM snapshots skip canvas pixel serialization while `maskRegionsFn` is
+  configured, so they can't embed an unmasked screenshot of the app.
+- On a posthog-js without `canvasCapture.maskRegionsFn` support (minimum version
+  pinned at release) canvas frames are NOT masked — a console warning tells you
+  to upgrade.
 
-- If you leave `maskRegionsFn` out, the plugin changes nothing and recording
-  behaves exactly as posthog-js is configured — as it did before this release.
-  **This includes `PostHogMaskWidget`**: on web it has no effect unless
-  `maskRegionsFn` is declared, because the canvas is masked by posthog-js and
-  the plugin only supplies rectangles to it once you have opted in. On iOS and
-  Android `PostHogMaskWidget` continues to work with no extra setup.
-  If canvas recording is enabled in your project settings rather than in
-  `posthog.init`, the plugin cannot detect it and will not warn.
-- Web replay is configured entirely in `posthog.init`. The `config.sessionReplay`
-  Dart flag drives iOS/Android screenshot capture only and does not affect what
-  is recorded on web.
-- When you opt in, the plugin adds `flt-semantics-host` to
-  `session_recording.blockSelector` so Flutter's accessibility tree is not recorded
-  as plaintext. A client-side `blockSelector` takes precedence over the one in your
-  project's Privacy and masking settings, so if you rely on a project-level selector,
-  list it in `posthog.init` as well — the plugin merges with what is there and cannot
-  see the project-level value. posthog-js may also log a notice about `blockSelector`
-  in `posthog.init` for this reason.
-- rrweb's DOM full snapshot serializes canvas pixels on a separate path
-  (`rr_dataURL`) that mask regions do not touch, and on current Flutter the
-  CanvasKit canvas is readable through it — a full snapshot can embed an
-  unmasked screenshot of your whole app. posthog-js therefore skips canvas
-  pixel serialization in full snapshots whenever `maskRegionsFn` is configured.
-  Declaring it in `posthog.init` covers this from the moment recording starts,
-  and the plugin's registration restart carries it through every later snapshot.
-- Widgets rendered as DOM rather than canvas pixels — `HtmlElementView`-based platform
-  views such as maps, webviews and iframes — are recorded as DOM and masked by
-  posthog-js's DOM rules, not by canvas mask regions. `PostHogMaskWidget` around a
-  platform view does not mask it on web.
-- Your app must be wrapped in `PostHogWidget`. If it is not, canvas frames are
-  skipped instead of recorded unmasked, and a console warning explains the fix.
-- Requires a posthog-js version that supports `canvasCapture.maskRegionsFn`
-  (minimum version pinned at release). On an older posthog-js the plugin still
-  registers — the accessibility-tree exclusion works there — but canvas frames
-  are NOT masked, and a console warning tells you to upgrade.
+Caveats: web replay is configured in `posthog.init` (the Dart `sessionReplay`
+flag drives iOS/Android only); list any project-level `blockSelector` in
+`posthog.init` too, as the client-side selector takes precedence; DOM-rendered
+platform views (`HtmlElementView`) follow posthog-js's DOM masking rules, not
+canvas mask regions.
+
+Also fixes `maskAllTexts: false` still masking `Text` widgets when
+`maskAllImages` is on — this applies to iOS/Android screenshot masking too.
