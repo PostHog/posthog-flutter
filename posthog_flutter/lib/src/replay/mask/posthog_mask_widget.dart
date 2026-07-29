@@ -38,7 +38,7 @@ class PostHogMaskWidgetState extends State<PostHogMaskWidget> {
   @override
   void initState() {
     super.initState();
-    notifyMaskWidgetMounted();
+    notifyMaskWidgetMounted(context);
   }
 
   @override

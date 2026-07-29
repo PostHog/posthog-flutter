@@ -25,5 +25,8 @@ Things to know:
   `PostHogMaskWidget` mounts.
 - Your app must be wrapped in `PostHogWidget`. If it is not, canvas frames are
   skipped instead of recorded unmasked, and a console warning explains the fix.
+- A `PostHogMaskWidget` mounted outside the `PostHogWidget` tree does not opt the
+  app in: masking could never cover it, so opting in would expose it instead of
+  failing closed. A debug log explains the misplacement.
 
 Apps that declare neither are untouched, exactly as before.
