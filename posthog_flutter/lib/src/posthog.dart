@@ -12,6 +12,7 @@ import 'posthog_config.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
+import 'replay/mask/posthog_mask_controller.dart';
 import 'utils/before_send.dart';
 
 /// Entry point for the PostHog Flutter SDK.
@@ -66,6 +67,11 @@ class Posthog {
     }
 
     _config = config; // Store the config
+
+    // The mask controller singleton may predate this setup() (or a previous
+    // setup() built it with different masking flags); without a refresh the
+    // stale parser map would keep deciding what replay masks on every platform.
+    PostHogMaskController.instance.refreshParsers(config.sessionReplayConfig);
 
     if (config.sessionReplay) {
       PostHogInternalEvents.sessionRecordingActive.value = true;

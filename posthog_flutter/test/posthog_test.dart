@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -37,6 +38,24 @@ void main() {
           fakePlatformInterface.registeredOnFeatureFlagsCallback,
           equals(testCallback),
         );
+      },
+    );
+
+    test(
+      'a second setup with different masking flags rebuilds the parser map',
+      () async {
+        final controller = PostHogMaskController.instance;
+        addTearDown(() => controller.refreshParsers(null));
+
+        final imagesMasked = PostHogConfig('test_project_token');
+        await Posthog().setup(imagesMasked);
+        expect(controller.parsers.keys, contains('RenderImage'));
+
+        final imagesUnmasked = PostHogConfig('test_project_token')
+          ..sessionReplayConfig.maskAllImages = false;
+        await Posthog().setup(imagesUnmasked);
+        expect(controller.parsers.keys, isNot(contains('RenderImage')));
+        expect(controller.parsers.keys, contains('RenderParagraph'));
       },
     );
 
