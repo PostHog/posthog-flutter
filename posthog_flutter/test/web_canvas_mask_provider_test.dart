@@ -621,6 +621,98 @@ void main() {
     expect(regions.toDart, isEmpty);
   });
 
+  group('app-provided maskRegionsFn delegation', () {
+    JSObject sessionRecordingWithAppFn(JSFunction appFn) {
+      final canvasCapture = JSObject()
+        ..setProperty('maskRegionsFn'.toJS, appFn);
+      return JSObject()..setProperty('canvasCapture'.toJS, canvasCapture);
+    }
+
+    JSFunction installedRegionsFn() => capturedSessionRecording()
+        .getProperty<JSObject>('canvasCapture'.toJS)
+        .getProperty<JSFunction>('maskRegionsFn'.toJS);
+
+    test('a canvas outside every flutter view gets the app callback answer',
+        () {
+      var appFnCalls = 0;
+      final appFn = ((web.HTMLCanvasElement c) {
+        appFnCalls++;
+        return [JSObject()..setProperty('x'.toJS, 42.toJS)].toJS;
+      }).toJS;
+      installPosthogStub(
+        declaresMaskProvider: false,
+        sessionRecording: sessionRecordingWithAppFn(appFn),
+      );
+      WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+      final canvas = web.document.createElement('canvas');
+      final result = installedRegionsFn().callAsFunction(null, canvas);
+
+      expect(appFnCalls, 1);
+      final regions = (result as JSArray<JSObject>).toDart;
+      expect(regions, hasLength(1));
+      expect(regions.single.getProperty<JSNumber>('x'.toJS).toDartInt, 42);
+    });
+
+    test('an app callback answering null keeps its fail-closed meaning', () {
+      JSAny? nullAppFn(web.HTMLCanvasElement c) => null;
+      final appFn = nullAppFn.toJS;
+      installPosthogStub(
+        declaresMaskProvider: false,
+        sessionRecording: sessionRecordingWithAppFn(appFn),
+      );
+      WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+      final canvas = web.document.createElement('canvas');
+      expect(installedRegionsFn().callAsFunction(null, canvas), isNull);
+    });
+
+    test('a throwing app callback fails closed', () {
+      JSAny? throwingAppFn(web.HTMLCanvasElement c) {
+        throw StateError('app fn exploded');
+      }
+
+      final appFn = throwingAppFn.toJS;
+      installPosthogStub(
+        declaresMaskProvider: false,
+        sessionRecording: sessionRecordingWithAppFn(appFn),
+      );
+      WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+      final canvas = web.document.createElement('canvas');
+      expect(installedRegionsFn().callAsFunction(null, canvas), isNull);
+    });
+
+    test(
+        'a second setup does not mistake the installed callback for the app '
+        'fn', () {
+      var appFnCalls = 0;
+      final appFn = ((web.HTMLCanvasElement c) {
+        appFnCalls++;
+        return JSArray<JSObject>();
+      }).toJS;
+      installPosthogStub(
+        declaresMaskProvider: false,
+        sessionRecording: sessionRecordingWithAppFn(appFn),
+      );
+      WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+      // posthog-js merges set_config into its live config, so a second
+      // setup()'s apply reads back the provider's own installed callback
+      final firstApply = capturedSessionRecording();
+      installPosthogStub(
+        declaresMaskProvider: false,
+        sessionRecording: firstApply,
+      );
+      WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+      final canvas = web.document.createElement('canvas');
+      installedRegionsFn().callAsFunction(null, canvas);
+
+      expect(appFnCalls, 1);
+    });
+  });
+
   test(
       'fails closed for a flutter-view canvas when no PostHogWidget is '
       'mounted', () {
