@@ -18,8 +18,10 @@ import 'canvas_mask_registration_io.dart'
 /// `session_recording: { canvasCapture: { maskRegionsFn: () => null } }`
 /// in your `posthog.init` call — until this plugin takes over, those frames are
 /// skipped instead of recorded. Your app must be wrapped in `PostHogWidget`,
-/// or canvas frames are skipped instead of recorded unmasked. iOS and Android
-/// need no setup either way.
+/// and every [PostHogMaskWidget] must sit inside it — otherwise canvas frames
+/// are skipped instead of recorded unmasked, until the mask widget is moved
+/// inside `PostHogWidget` or removed. iOS and Android need no setup either
+/// way.
 class PostHogMaskWidget extends StatefulWidget {
   /// The widget subtree to mask in session replay snapshots.
   final Widget child;
@@ -43,6 +45,7 @@ class PostHogMaskWidgetState extends State<PostHogMaskWidget> {
 
   @override
   void dispose() {
+    notifyMaskWidgetUnmounted(context);
     super.dispose();
   }
 

@@ -304,7 +304,8 @@ void main() {
 
   testWidgets(
       'a mask widget that mounts before any PostHogWidget opts in '
-      '(no-PostHogWidget shape)', (tester) async {
+      '(no-PostHogWidget shape), but a later PostHogWidget that excludes it '
+      'makes frames fail closed', (tester) async {
     installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
 
@@ -327,6 +328,110 @@ void main() {
     expect(setConfigCalls, 1);
     expect(stopRecordingCalls, 1);
     expect(startRecordingCalls, 1);
+
+    // the latched opt-in must not ship the sibling tree's rects while this
+    // mask widget sits outside it
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      expect(regionsFn.callAsFunction(null, canvas), isNull);
+    } finally {
+      flutterView.remove();
+    }
+  });
+
+  testWidgets(
+      'a mask widget that mounts before a PostHogWidget that later contains '
+      'it keeps producing regions', (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+    WebCanvasMaskProvider(config).register();
+
+    final maskKey = GlobalKey();
+    Widget mask() => Align(
+          alignment: Alignment.topLeft,
+          child: PostHogMaskWidget(
+            key: maskKey,
+            child: const SizedBox(width: 30, height: 40),
+          ),
+        );
+
+    await tester.pumpWidget(mask());
+    expect(setConfigCalls, 1);
+
+    await tester.pumpWidget(PostHogWidget(child: mask()));
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      final regions =
+          regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>;
+
+      expect(regions.toDart, hasLength(1));
+      final region = regions.toDart.first;
+      expect(
+        region.getProperty<JSNumber>('width'.toJS).toDartDouble,
+        greaterThanOrEqualTo(30),
+      );
+      expect(
+        region.getProperty<JSNumber>('height'.toJS).toDartDouble,
+        greaterThanOrEqualTo(40),
+      );
+    } finally {
+      flutterView.remove();
+    }
+  });
+
+  testWidgets(
+      'frames recover once the mask widget outside the tracked tree is '
+      'removed', (tester) async {
+    installPosthogStub(recordingStarted: true);
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+    WebCanvasMaskProvider(config).register();
+
+    Widget layout({required bool withOutsideMask}) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              Expanded(child: PostHogWidget(child: Container())),
+              if (withOutsideMask)
+                const PostHogMaskWidget(child: SizedBox.shrink()),
+            ],
+          ),
+        );
+
+    await tester.pumpWidget(layout(withOutsideMask: true));
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      expect(regionsFn.callAsFunction(null, canvas), isNull);
+
+      await tester.pumpWidget(layout(withOutsideMask: false));
+
+      expect(regionsFn.callAsFunction(null, canvas), isNotNull);
+    } finally {
+      flutterView.remove();
+    }
   });
 
   testWidgets('a mask widget inside the tracked PostHogWidget tree opts in',

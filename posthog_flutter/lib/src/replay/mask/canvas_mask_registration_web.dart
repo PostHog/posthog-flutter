@@ -13,6 +13,7 @@ import 'posthog_mask_controller.dart';
 /// build phase: registering calls straight into posthog-js and restarts an
 /// in-flight recording.
 void notifyMaskWidgetMounted(BuildContext context) {
+  WebCanvasMaskProvider.registerMaskWidgetContext(context);
   SchedulerBinding.instance.addPostFrameCallback((_) {
     if (!_isInTrackedTree(context)) {
       printIfDebug(
@@ -26,6 +27,10 @@ void notifyMaskWidgetMounted(BuildContext context) {
   });
 }
 
+void notifyMaskWidgetUnmounted(BuildContext context) {
+  WebCanvasMaskProvider.unregisterMaskWidgetContext(context);
+}
+
 /// The masking walk only sees PostHogWidget's subtree, so a mask widget
 /// outside it would opt masking in while its own rects are never produced —
 /// the walk would succeed and ship rects that do not cover the widget. With
@@ -35,8 +40,11 @@ void notifyMaskWidgetMounted(BuildContext context) {
 ///
 /// The check runs once, in the mount's post-frame callback: a null tracked
 /// context at that moment is treated as the no-PostHogWidget shape and
-/// allowed, even if a PostHogWidget later mounts without containing this
-/// widget.
+/// allowed. That one-shot allowance is backstopped by
+/// [WebCanvasMaskProvider], which revalidates every mounted mask widget when
+/// regions are computed — if a PostHogWidget later mounts without containing
+/// this widget, frames are skipped (fail closed) rather than recorded
+/// unmasked.
 bool _isInTrackedTree(BuildContext context) {
   final trackedContext =
       PostHogMaskController.instance.containerKey.currentContext;

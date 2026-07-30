@@ -6,7 +6,7 @@ import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart' show View;
+import 'package:flutter/widgets.dart' show BuildContext, View;
 import 'package:web/web.dart' as web;
 
 import '../../posthog_config.dart';
@@ -61,6 +61,7 @@ class WebCanvasMaskProvider {
   static WebCanvasMaskProvider? _active;
   static bool _maskWidgetSeen = false;
   static bool _warnedOldPosthogJs = false;
+  static final Set<BuildContext> _mountedMaskWidgets = {};
 
   @visibleForTesting
   static String? debugMinPosthogJsVersionOverride;
@@ -87,11 +88,20 @@ class WebCanvasMaskProvider {
     }
   }
 
+  static void registerMaskWidgetContext(BuildContext context) {
+    _mountedMaskWidgets.add(context);
+  }
+
+  static void unregisterMaskWidgetContext(BuildContext context) {
+    _mountedMaskWidgets.remove(context);
+  }
+
   @visibleForTesting
   static void resetForTesting() {
     _active?._retryTimer?.cancel();
     _active = null;
     _maskWidgetSeen = false;
+    _mountedMaskWidgets.clear();
     _warnedOldPosthogJs = false;
     debugMinPosthogJsVersionOverride = null;
     debugOwnViewHostOverride = null;
@@ -104,6 +114,7 @@ class WebCanvasMaskProvider {
   int _cachedAtFrame = -1;
   int _consecutiveWalkFailures = 0;
   bool _warnedWalkFailure = false;
+  bool _warnedMaskWidgetOutsideTree = false;
   bool _applied = false;
   bool _maskWidgetMounted = false;
   bool _polling = false;
@@ -411,6 +422,18 @@ class WebCanvasMaskProvider {
     }
     _consecutiveWalkFailures = 0;
 
+    if (!_maskWidgetsInsideTrackedTree()) {
+      if (!_warnedMaskWidgetOutsideTree) {
+        _warnedMaskWidgetOutsideTree = true;
+        printIfDebug(
+          'PostHog: a PostHogMaskWidget is mounted outside the PostHogWidget '
+          'tree, so masking could never cover it — canvas frames are skipped '
+          'until it is moved inside PostHogWidget or removed.',
+        );
+      }
+      return null;
+    }
+
     // our rects always describe PostHogWidget's tree — shipping them with a
     // different flutter-view's canvas would record that view unmasked
     if (!_isOwnViewCanvas(host)) {
@@ -486,6 +509,40 @@ class WebCanvasMaskProvider {
       printIfDebug('PostHog: could not resolve the Flutter view host: $e');
     }
     return null;
+  }
+
+  // Re-checked on every frame, not only at mount: a mask widget that mounted
+  // before any PostHogWidget latches the opt-in, and a PostHogWidget mounting
+  // later without containing it would otherwise ship rects that never cover
+  // the widget. Deliberately outside the per-frame rects cache, so a cached
+  // value cannot outlive a tree change.
+  bool _maskWidgetsInsideTrackedTree() {
+    if (_mountedMaskWidgets.isEmpty) {
+      return true;
+    }
+    final tracked = PostHogMaskController.instance.containerKey.currentContext
+        ?.findRenderObject();
+    if (tracked == null) {
+      return false;
+    }
+    for (final context in _mountedMaskWidgets) {
+      if (!context.mounted) {
+        continue;
+      }
+      var inside = false;
+      RenderObject? node = context.findRenderObject();
+      while (node != null) {
+        if (identical(node, tracked)) {
+          inside = true;
+          break;
+        }
+        node = node.parent;
+      }
+      if (!inside) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // rects only change when Flutter paints a frame, so cache per frame instead
