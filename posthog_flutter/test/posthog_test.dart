@@ -6,6 +6,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -56,6 +57,21 @@ void main() {
         await Posthog().setup(imagesUnmasked);
         expect(controller.parsers.keys, isNot(contains('RenderImage')));
         expect(controller.parsers.keys, contains('RenderParagraph'));
+      },
+    );
+
+    test(
+      'screenshot capturer resolves the live config after a second setup',
+      () async {
+        final first = PostHogConfig('test_project_token')
+          ..sessionReplayConfig.maskAllImages = false;
+        await Posthog().setup(first);
+        final capturer = ScreenshotCapturer(first);
+        expect(capturer.effectiveConfig, same(first));
+
+        final second = PostHogConfig('test_project_token');
+        await Posthog().setup(second);
+        expect(capturer.effectiveConfig, same(second));
       },
     );
 
