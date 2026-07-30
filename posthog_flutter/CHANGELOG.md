@@ -1,5 +1,11 @@
 ## Next
 
+## 5.34.2
+
+### Patch Changes
+
+- 1cb3a7c: Fix session replay masking on iOS and Android ignoring changed `maskAllTexts`/`maskAllImages` flags when `setup()` is called again
+
 ## 5.34.1
 
 ### Patch Changes
