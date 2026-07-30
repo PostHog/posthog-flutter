@@ -335,6 +335,7 @@ void main() {
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
     web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
     try {
       final regionsFn = capturedSessionRecording()
           .getProperty<JSObject>('canvasCapture'.toJS)
@@ -372,6 +373,7 @@ void main() {
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
     web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
     try {
       final regionsFn = capturedSessionRecording()
           .getProperty<JSObject>('canvasCapture'.toJS)
@@ -420,6 +422,7 @@ void main() {
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
     web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
     try {
       final regionsFn = capturedSessionRecording()
           .getProperty<JSObject>('canvasCapture'.toJS)
@@ -573,6 +576,7 @@ void main() {
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
     web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
     try {
       expect(regionsFn.callAsFunction(null, canvas), isNull);
     } finally {
@@ -598,6 +602,7 @@ void main() {
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
     web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
     try {
       final regionsFn = capturedSessionRecording()
           .getProperty<JSObject>('canvasCapture'.toJS)
