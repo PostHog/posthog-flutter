@@ -1,5 +1,23 @@
 ## Next
 
+## 5.33.4
+
+### Patch Changes
+
+- 69c8859: Clean up Android build warnings.
+
+## 5.33.3
+
+### Patch Changes
+
+- e835d19: Flutter web (WebAssembly): enabling `captureIsolateErrors` no longer crashes the app at startup. The isolate error handler was selected with a `dart.library.html` conditional import, which is false under dart2wasm, so wasm builds compiled the `dart:isolate` implementation and threw `Unsupported operation: RawReceivePort` before `runApp` — a white screen. The import now keys on `dart.library.js_interop` (true for both JS and wasm web builds), and the setup guard also skips isolate wiring on web explicitly. JS web builds and mobile/desktop are unaffected.
+
+## 5.33.2
+
+### Patch Changes
+
+- 771e558: Flutter web: `PostHogWidget` no longer runs the mobile session replay screenshot pipeline. On web, session replay is recorded by posthog-js, and every snapshot this pipeline produced was discarded — but it still walked the whole render tree twice per second (once for `PostHogMaskWidget` wrappers, once more when `maskAllTexts` or `maskAllImages` is on) for as long as the app was open. Web apps that enable `sessionReplay` and mount `PostHogWidget` no longer pay for that. Replay on web is unaffected, and `PostHogWidget` still mounts as before, so it remains safe to keep in a shared widget tree across web and mobile.
+
 ## 5.33.1
 
 ### Patch Changes
