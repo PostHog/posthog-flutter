@@ -81,6 +81,12 @@ class ScreenshotCapturer {
 
   ScreenshotCapturer(this._config);
 
+  /// A second `setup()` replaces the SDK config object, but the capturer is
+  /// built once per widget lifecycle — resolving the live config at capture
+  /// time keeps masking flags from freezing at their first-setup values.
+  @visibleForTesting
+  PostHogConfig get effectiveConfig => Posthog().config ?? _config;
+
   void cancel() {
     _cancelled = true;
   }
@@ -448,7 +454,7 @@ class ScreenshotCapturer {
         srcHeight: srcHeight,
       );
 
-      final replayConfig = _config.sessionReplayConfig;
+      final replayConfig = effectiveConfig.sessionReplayConfig;
 
       final postHogWidgetWrapperElements =
           PostHogMaskController.instance.getPostHogWidgetWrapperElements();

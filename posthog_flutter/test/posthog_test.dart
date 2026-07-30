@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -37,6 +39,44 @@ void main() {
           fakePlatformInterface.registeredOnFeatureFlagsCallback,
           equals(testCallback),
         );
+      },
+    );
+
+    test(
+      'setup after close with different masking flags rebuilds the parser map',
+      () async {
+        final controller = PostHogMaskController.instance;
+        addTearDown(() => controller.refreshParsers(null));
+
+        final imagesMasked = PostHogConfig('test_project_token');
+        await Posthog().setup(imagesMasked);
+        expect(controller.parsers.keys, contains('RenderImage'));
+
+        await Posthog().close();
+        final imagesUnmasked = PostHogConfig('test_project_token')
+          ..sessionReplayConfig.maskAllImages = false;
+        await Posthog().setup(imagesUnmasked);
+        expect(controller.parsers.keys, isNot(contains('RenderImage')));
+        expect(controller.parsers.keys, contains('RenderParagraph'));
+      },
+    );
+
+    test(
+      'screenshot capturer resolves the live config after close and re-setup',
+      () async {
+        final first = PostHogConfig('test_project_token')
+          ..sessionReplayConfig.maskAllImages = false;
+        await Posthog().setup(first);
+        // PostHogWidget builds its capturer once and keeps it across a
+        // close()/setup() reconfigure, so the capturer must follow the live
+        // config rather than the one it was constructed with.
+        final capturer = ScreenshotCapturer(first);
+        expect(capturer.effectiveConfig, same(first));
+
+        await Posthog().close();
+        final second = PostHogConfig('test_project_token');
+        await Posthog().setup(second);
+        expect(capturer.effectiveConfig, same(second));
       },
     );
 
