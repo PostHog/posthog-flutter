@@ -641,6 +641,9 @@ void main() {
 
     installPosthogStub();
     try {
+      // the harness's own flutter-view plus this fake one make the real
+      // <body> host ambiguous, which now fails closed
+      WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
       WebCanvasMaskProvider(config).register();
 
       final regionsFn = capturedSessionRecording()
@@ -690,6 +693,7 @@ void main() {
 
     installPosthogStub();
     try {
+      WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
       WebCanvasMaskProvider(config).register();
 
       final regionsFn = capturedSessionRecording()
@@ -759,6 +763,55 @@ void main() {
     } finally {
       ownHost.remove();
       foreignHost.remove();
+    }
+  });
+
+  testWidgets(
+      'fails closed for every canvas when the host contains more than one '
+      'flutter-view', (tester) async {
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+
+    await tester.pumpWidget(
+      PostHogWidget(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: PostHogMaskWidget(
+            child: const SizedBox(width: 30, height: 40),
+          ),
+        ),
+      ),
+    );
+
+    web.Element embeddedView(web.Element host) {
+      final view = web.document.createElement('flutter-view');
+      final canvas = web.document.createElement('canvas');
+      view.appendChild(canvas);
+      host.appendChild(view);
+      return canvas;
+    }
+
+    // full-page mode: getHostElement resolves to <body>, which hosts both
+    // our view and the foreign one
+    final sharedHost = web.document.createElement('div');
+    final ownCanvas = embeddedView(sharedHost);
+    final foreignCanvas = embeddedView(sharedHost);
+    web.document.body!.appendChild(sharedHost);
+
+    installPosthogStub();
+    try {
+      WebCanvasMaskProvider.debugOwnViewHostOverride = sharedHost;
+      WebCanvasMaskProvider(config).register();
+
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+
+      expect(regionsFn.callAsFunction(null, ownCanvas), isNull);
+      expect(regionsFn.callAsFunction(null, foreignCanvas), isNull);
+    } finally {
+      sharedHost.remove();
     }
   });
 

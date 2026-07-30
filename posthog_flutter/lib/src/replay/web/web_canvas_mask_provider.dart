@@ -115,6 +115,7 @@ class WebCanvasMaskProvider {
   int _consecutiveWalkFailures = 0;
   bool _warnedWalkFailure = false;
   bool _warnedMaskWidgetOutsideTree = false;
+  bool _warnedAmbiguousHost = false;
   bool _applied = false;
   bool _maskWidgetMounted = false;
   bool _polling = false;
@@ -479,11 +480,22 @@ class WebCanvasMaskProvider {
   }
 
   // In full-page mode the embedder host is <body>, which contains every
-  // flutter-view on the page, so only a view embedded in a dedicated host
-  // element (multi-view) can be told apart from ours.
+  // flutter-view on the page — containment only proves ownership when the
+  // host holds a single flutter-view. With more, our rects could be paired
+  // with a foreign view's canvas and record it unmasked, so fail closed.
   bool _isOwnViewCanvas(web.Element canvasViewHost) {
     final ownHost = debugOwnViewHostOverride ?? _resolveOwnViewHost();
     if (ownHost != null) {
+      if (ownHost.querySelectorAll('flutter-view').length > 1) {
+        if (!_warnedAmbiguousHost) {
+          _warnedAmbiguousHost = true;
+          printIfDebug(
+            'PostHog: multiple Flutter views share one host element, so '
+            'canvas frames are skipped — masks cannot be matched to a view.',
+          );
+        }
+        return false;
+      }
       return ownHost.contains(canvasViewHost);
     }
     // unresolvable: with a single flutter-view it can only be ours
