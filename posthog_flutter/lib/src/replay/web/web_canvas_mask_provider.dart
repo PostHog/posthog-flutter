@@ -6,7 +6,8 @@ import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart' show BuildContext, View;
+import 'package:flutter/widgets.dart'
+    show BuildContext, ModalRoute, Navigator, View;
 import 'package:web/web.dart' as web;
 
 import '../../posthog_config.dart';
@@ -90,6 +91,25 @@ class WebCanvasMaskProvider {
 
   static void registerMaskWidgetContext(BuildContext context) {
     _mountedMaskWidgets.add(context);
+  }
+
+  /// The render object rooting the tree the masking walk actually covers,
+  /// mirroring `RootElementProvider`: when the tracked context sits under an
+  /// active route the walk roots at the root navigator (so it covers dialogs
+  /// and other routes), otherwise at the tracked context itself. Every
+  /// tracked-tree membership check must use this same root, or a mask widget
+  /// in a dialog the walk covers would be treated as untracked.
+  static RenderObject? trackedTreeRoot(BuildContext trackedContext) {
+    try {
+      if (ModalRoute.of(trackedContext)?.isActive ?? false) {
+        return Navigator.of(trackedContext, rootNavigator: true)
+            .context
+            .findRenderObject();
+      }
+    } catch (e) {
+      printIfDebug('PostHog: could not resolve the tracked-tree root: $e');
+    }
+    return trackedContext.findRenderObject();
   }
 
   static void unregisterMaskWidgetContext(BuildContext context) {
@@ -527,13 +547,18 @@ class WebCanvasMaskProvider {
   // before any PostHogWidget latches the opt-in, and a PostHogWidget mounting
   // later without containing it would otherwise ship rects that never cover
   // the widget. Deliberately outside the per-frame rects cache, so a cached
-  // value cannot outlive a tree change.
+  // value cannot outlive a tree change. The boundary is [trackedTreeRoot],
+  // the walk's own route-dependent root — not PostHogWidget's subtree.
   bool _maskWidgetsInsideTrackedTree() {
     if (_mountedMaskWidgets.isEmpty) {
       return true;
     }
-    final tracked = PostHogMaskController.instance.containerKey.currentContext
-        ?.findRenderObject();
+    final trackedContext =
+        PostHogMaskController.instance.containerKey.currentContext;
+    if (trackedContext == null) {
+      return false;
+    }
+    final tracked = trackedTreeRoot(trackedContext);
     if (tracked == null) {
       return false;
     }

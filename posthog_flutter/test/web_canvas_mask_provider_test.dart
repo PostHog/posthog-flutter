@@ -451,6 +451,64 @@ void main() {
     expect(startRecordingCalls, 1);
   });
 
+  testWidgets(
+      'a mask widget in a dialog above PostHogWidget opts in and produces '
+      'regions', (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+    WebCanvasMaskProvider(config).register();
+    expect(setConfigCalls, 0);
+
+    // PostHogWidget sits UNDER the home route, so the walk roots at the root
+    // navigator and covers the dialog — the tracked-tree boundary must too
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PostHogWidget(
+          child: Builder(
+            builder: (context) => TextButton(
+              onPressed: () {
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => Align(
+                    alignment: Alignment.topLeft,
+                    child: PostHogMaskWidget(
+                      child: const SizedBox(width: 30, height: 40),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(setConfigCalls, 0);
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(setConfigCalls, 1);
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      final regions = regionsFn.callAsFunction(null, canvas);
+      expect(regions, isNotNull);
+      expect((regions as JSArray<JSObject>).toDart, isNotEmpty);
+    } finally {
+      flutterView.remove();
+    }
+  });
+
   test('registers the mask provider via set_config', () {
     installPosthogStub();
 

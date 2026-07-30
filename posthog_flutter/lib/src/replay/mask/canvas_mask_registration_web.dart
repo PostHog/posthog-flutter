@@ -15,15 +15,19 @@ import 'posthog_mask_controller.dart';
 void notifyMaskWidgetMounted(BuildContext context) {
   WebCanvasMaskProvider.registerMaskWidgetContext(context);
   SchedulerBinding.instance.addPostFrameCallback((_) {
-    if (!_isInTrackedTree(context)) {
-      printIfDebug(
-        'PostHog: this PostHogMaskWidget is outside the PostHogWidget tree '
-        'PostHog tracks, so masking could never cover it — it does not '
-        'enable web canvas masking.',
-      );
-      return;
+    try {
+      if (!_isInTrackedTree(context)) {
+        printIfDebug(
+          'PostHog: this PostHogMaskWidget is outside the PostHogWidget tree '
+          'PostHog tracks, so masking could never cover it — it does not '
+          'enable web canvas masking.',
+        );
+        return;
+      }
+      WebCanvasMaskProvider.notifyMaskWidgetMounted();
+    } catch (e) {
+      printIfDebug('PostHog: error enabling web canvas masking: $e');
     }
-    WebCanvasMaskProvider.notifyMaskWidgetMounted();
   });
 }
 
@@ -31,9 +35,11 @@ void notifyMaskWidgetUnmounted(BuildContext context) {
   WebCanvasMaskProvider.unregisterMaskWidgetContext(context);
 }
 
-/// The masking walk only sees PostHogWidget's subtree, so a mask widget
-/// outside it would opt masking in while its own rects are never produced —
-/// the walk would succeed and ship rects that do not cover the widget. With
+/// The masking walk only sees the tracked tree (whose route-dependent root is
+/// [WebCanvasMaskProvider.trackedTreeRoot], the boundary this check walks
+/// against), so a mask widget outside it would opt masking in while its own
+/// rects are never produced — the walk would succeed and ship rects that do
+/// not cover the widget. With
 /// no tracked tree at all the opt-in stays allowed: every walk then fails and
 /// frames are skipped (fail closed), which is the documented behavior for an
 /// app missing PostHogWidget.
@@ -51,7 +57,7 @@ bool _isInTrackedTree(BuildContext context) {
   if (trackedContext == null) {
     return true;
   }
-  final tracked = trackedContext.findRenderObject();
+  final tracked = WebCanvasMaskProvider.trackedTreeRoot(trackedContext);
   if (tracked == null) {
     // cannot prove the mask widget is outside the tracked tree
     return true;
