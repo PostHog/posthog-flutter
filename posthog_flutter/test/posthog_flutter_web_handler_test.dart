@@ -156,6 +156,37 @@ void main() {
     });
   });
 
+  // Guards the web wiring: PosthogFlutterWeb must override displaySurvey so
+  // the call actually reaches posthog-js. Without the override it falls through
+  // to the platform interface and throws UnimplementedError on web.
+  group('PosthogFlutterWeb displaySurvey', () {
+    String? capturedSurveyId;
+    JSAny? capturedOptions;
+
+    setUp(() {
+      capturedSurveyId = null;
+      capturedOptions = null;
+
+      final fake = JSObject();
+      fake.setProperty(
+        'displaySurvey'.toJS,
+        ((JSString surveyId, JSAny? options) {
+          capturedSurveyId = surveyId.toDart;
+          capturedOptions = options;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('override forwards the survey ID and popover options to posthog-js',
+        () async {
+      await PosthogFlutterWeb().displaySurvey('survey-123');
+
+      expect(capturedSurveyId, 'survey-123');
+      expect(capturedOptions.dartify(), {'displayType': 'popover'});
+    });
+  });
+
   // captureException must route through posthog-js's captureException (not the
   // generic capture) so it attaches required metadata and any buffered
   // $exception_steps. The Dart-built payload is passed as additionalProperties,

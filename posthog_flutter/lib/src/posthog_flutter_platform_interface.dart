@@ -165,6 +165,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('showSurvey() has not been implemented.');
   }
 
+  Future<void> displaySurvey(String surveyId) {
+    throw UnimplementedError('displaySurvey() has not been implemented.');
+  }
+
   Future<void> group({
     required String groupType,
     required String groupKey,

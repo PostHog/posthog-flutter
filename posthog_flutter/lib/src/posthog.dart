@@ -765,5 +765,23 @@ class Posthog {
   /// current platform.
   Future<bool> isSessionReplayActive() => _posthog.isSessionReplayActive();
 
+  /// Displays the survey with the given ID on demand, regardless of its
+  /// display conditions.
+  ///
+  /// The survey must be running and part of your project's surveys. Display
+  /// conditions (targeting flags, event triggers, and the seen/wait-period
+  /// checks) are bypassed, so this also works for API-type surveys, which are
+  /// never displayed automatically. If another survey is already being
+  /// displayed, this call is ignored.
+  ///
+  /// Surveys must be enabled via `PostHogConfig.surveys` (mobile) or in your
+  /// web snippet configuration. On Android and iOS the survey is rendered by
+  /// the native SDK through the regular Flutter survey UI; on Web it is
+  /// rendered by the JS SDK as a popover.
+  ///
+  /// Returns a [Future] that completes when the display request has been sent.
+  Future<void> displaySurvey(String surveyId) =>
+      _posthog.displaySurvey(surveyId);
+
   Posthog._internal();
 }

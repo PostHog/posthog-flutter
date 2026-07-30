@@ -422,6 +422,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 // surveys only supported on iOS
                 result(nil)
             #endif
+        case "displaySurvey":
+            #if os(iOS)
+                displaySurvey(call, result: result)
+            #else
+                // surveys only supported on iOS
+                result(nil)
+            #endif
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -459,6 +466,18 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
             // Notify Flutter side that surveys have been cleaned up
             invokeFlutterMethod("hideSurveys", arguments: nil)
+        }
+
+        private func displaySurvey(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+            guard let args = call.arguments as? [String: Any],
+                  let surveyId = args["surveyId"] as? String
+            else {
+                result(FlutterError(code: "InvalidArguments", message: "Missing surveyId", details: nil))
+                return
+            }
+
+            PostHogSDK.shared.displaySurvey(surveyId)
+            result(nil)
         }
 
         private func handleSurveyAction(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
