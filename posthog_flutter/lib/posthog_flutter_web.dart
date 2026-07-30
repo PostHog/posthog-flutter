@@ -69,6 +69,22 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final ph = posthog;
     _config = config;
 
+    // posthog-js is initialized by the host app, so a few config options never
+    // reach it. Warn instead of silently ignoring them.
+    if (!config.preloadFeatureFlags) {
+      printIfDebug(
+        'Warning: PostHogConfig.preloadFeatureFlags is not applied on Flutter web. '
+        'posthog-js is initialized by your app, so set '
+        'advanced_disable_feature_flags_on_first_load in your posthog.init({...}) call instead.',
+      );
+    }
+    if (config.bootstrap != null) {
+      printIfDebug(
+        'Warning: PostHogConfig.bootstrap is not applied on Flutter web. '
+        'Configure bootstrap in your posthog.init({...}) call instead.',
+      );
+    }
+
     WebCanvasMaskProvider(config).register();
 
     if (config.onFeatureFlags != null && ph != null) {

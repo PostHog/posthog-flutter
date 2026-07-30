@@ -117,6 +117,9 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when the identify call has been queued.
   ///
+  /// Note that identifying a user reloads feature flags, which issues a
+  /// `/flags` request even when [PostHogConfig.preloadFeatureFlags] is `false`.
+  ///
   /// **Example:**
   /// ```dart
   /// await Posthog().identify(
@@ -543,6 +546,9 @@ class Posthog {
   /// The optional [groupProperties] are group properties set with `$group_set`.
   ///
   /// Returns a [Future] that completes when the group call has been queued.
+  ///
+  /// Note that setting a group reloads feature flags, which issues a `/flags`
+  /// request even when [PostHogConfig.preloadFeatureFlags] is `false`.
   ///
   /// **Example:**
   /// ```dart
