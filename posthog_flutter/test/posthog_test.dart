@@ -43,7 +43,7 @@ void main() {
     );
 
     test(
-      'a second setup with different masking flags rebuilds the parser map',
+      'setup after close with different masking flags rebuilds the parser map',
       () async {
         final controller = PostHogMaskController.instance;
         addTearDown(() => controller.refreshParsers(null));
@@ -52,6 +52,7 @@ void main() {
         await Posthog().setup(imagesMasked);
         expect(controller.parsers.keys, contains('RenderImage'));
 
+        await Posthog().close();
         final imagesUnmasked = PostHogConfig('test_project_token')
           ..sessionReplayConfig.maskAllImages = false;
         await Posthog().setup(imagesUnmasked);
@@ -61,14 +62,18 @@ void main() {
     );
 
     test(
-      'screenshot capturer resolves the live config after a second setup',
+      'screenshot capturer resolves the live config after close and re-setup',
       () async {
         final first = PostHogConfig('test_project_token')
           ..sessionReplayConfig.maskAllImages = false;
         await Posthog().setup(first);
+        // PostHogWidget builds its capturer once and keeps it across a
+        // close()/setup() reconfigure, so the capturer must follow the live
+        // config rather than the one it was constructed with.
         final capturer = ScreenshotCapturer(first);
         expect(capturer.effectiveConfig, same(first));
 
+        await Posthog().close();
         final second = PostHogConfig('test_project_token');
         await Posthog().setup(second);
         expect(capturer.effectiveConfig, same(second));
