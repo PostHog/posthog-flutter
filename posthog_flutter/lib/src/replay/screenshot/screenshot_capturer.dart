@@ -81,9 +81,10 @@ class ScreenshotCapturer {
 
   ScreenshotCapturer(this._config);
 
-  /// A second `setup()` replaces the SDK config object, but the capturer is
-  /// built once per widget lifecycle — resolving the live config at capture
-  /// time keeps masking flags from freezing at their first-setup values.
+  /// A close()/setup() reconfigure rebuilds the capturer, but a capture that
+  /// started before the rebuild lands still runs on the old instance —
+  /// resolving the live config at capture time keeps its masking flags from
+  /// trailing the reconfigure.
   @visibleForTesting
   PostHogConfig get effectiveConfig => Posthog().config ?? _config;
 

@@ -43,6 +43,25 @@ void main() {
     );
 
     test(
+      'setup is a no-op while the SDK is already set up',
+      () async {
+        final first = PostHogConfig('test_project_token');
+        await Posthog().setup(first);
+
+        final second = PostHogConfig('other_project_token');
+        await Posthog().setup(second);
+
+        expect(fakePlatformInterface.receivedConfig, same(first));
+        expect(Posthog().config, same(first));
+
+        await Posthog().close();
+        await Posthog().setup(second);
+        expect(fakePlatformInterface.receivedConfig, same(second));
+        expect(Posthog().config, same(second));
+      },
+    );
+
+    test(
       'setup after close with different masking flags rebuilds the parser map',
       () async {
         final controller = PostHogMaskController.instance;
@@ -67,9 +86,10 @@ void main() {
         final first = PostHogConfig('test_project_token')
           ..sessionReplayConfig.maskAllImages = false;
         await Posthog().setup(first);
-        // PostHogWidget builds its capturer once and keeps it across a
-        // close()/setup() reconfigure, so the capturer must follow the live
-        // config rather than the one it was constructed with.
+        // A close()/setup() reconfigure rebuilds the capturer, but a capture
+        // already in flight still runs on the old instance, so the capturer
+        // must follow the live config rather than the one it was constructed
+        // with.
         final capturer = ScreenshotCapturer(first);
         expect(capturer.effectiveConfig, same(first));
 

@@ -31,6 +31,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
   ChangeDetector? _changeDetector;
   ScreenshotCapturer? _screenshotCapturer;
   NativeCommunicator? _nativeCommunicator;
+  PostHogConfig? _componentsConfig;
+
+  @visibleForTesting
+  ChangeDetector? get debugChangeDetector => _changeDetector;
+
+  @visibleForTesting
+  ScreenshotCapturer? get debugScreenshotCapturer => _screenshotCapturer;
 
   bool _isCapturing = false;
   bool _disposed = false;
@@ -140,12 +147,27 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
   void _initComponents(PostHogConfig config) {
     final throttleDelay = config.sessionReplayConfig.throttleDelay;
-    _screenshotCapturer = ScreenshotCapturer(config);
+    // Carried across a rebuild: the flag is only refreshed after a completed
+    // capture, which on a static captured-view screen needs the forced frame
+    // this very flag gates — starting at false would stall capture forever.
+    // Seed the capturer too: the post-capture refresh copies capturer to
+    // detector, so a fresh-false capturer would erase the carry on the first
+    // bailed attempt. The capturer leads (the detector lags by one refresh).
+    final hadCapturedPlatformViews =
+        _screenshotCapturer?.hasCapturedPlatformViews ??
+            _changeDetector?.hasCapturedPlatformViews ??
+            false;
+    _componentsConfig = config;
+    _screenshotCapturer = ScreenshotCapturer(config)
+      ..hasCapturedPlatformViews = hadCapturedPlatformViews;
     _nativeCommunicator = NativeCommunicator();
     _changeDetector = ChangeDetector(
       _onChangeDetected,
       interval: throttleDelay,
     );
+    // A rebuilt detector must not resume forced frames mid-occlusion.
+    _changeDetector?.suppressForcedFrames = _suppressFlutterCapture;
+    _changeDetector?.hasCapturedPlatformViews = hadCapturedPlatformViews;
   }
 
   void _onSessionRecordingChanged() {
@@ -167,6 +189,16 @@ class PostHogWidgetState extends State<PostHogWidget> {
     }
 
     if (_changeDetector == null) {
+      _initComponents(config);
+    } else if (!identical(_componentsConfig, config) ||
+        _changeDetector!.interval != config.sessionReplayConfig.throttleDelay) {
+      // A close()/setup() reconfigure changed the config; components capture
+      // config-derived state (capture throttle, masking flags) at
+      // construction, so they must be rebuilt against the new one. The
+      // interval is value-compared because the same config object may be
+      // reused with throttleDelay mutated in place.
+      _changeDetector?.stop();
+      _screenshotCapturer?.cancel();
       _initComponents(config);
     }
 

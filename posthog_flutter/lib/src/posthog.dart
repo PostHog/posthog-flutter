@@ -45,6 +45,9 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when platform setup has finished.
   ///
+  /// Calling [setup] while the SDK is already set up is ignored, matching the
+  /// Android and iOS SDKs — call [close] first to reconfigure.
+  ///
   /// **Example:**
   /// ```dart
   /// final config = PostHogConfig('YOUR_PROJECT_TOKEN');
@@ -59,6 +62,16 @@ class Posthog {
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
   Future<void> setup(PostHogConfig config) {
+    // Mirrors the Android and iOS SDKs, which ignore a second setup; without
+    // this guard the Dart layer would half-apply the new config while native
+    // keeps the old one.
+    if (_config != null) {
+      debugPrint(
+        '[PostHog] setup() called, but the SDK is already set up. '
+        'Call close() first to reconfigure. Setup skipped.',
+      );
+      return Future<void>.value();
+    }
     if (config.projectToken.isEmpty) {
       debugPrint(
         '[PostHog] projectToken must not be blank. Setup skipped.',
