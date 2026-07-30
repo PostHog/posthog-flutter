@@ -1,5 +1,15 @@
 ## Next
 
+## 5.34.0
+
+### Minor Changes
+
+- 0d8b279: Add session replay canvas masking on Flutter web: `maskAllTexts`, `maskAllImages`, `PostHogMaskWidget`, and obscured text fields now apply to the CanvasKit canvas — enable by declaring `session_recording.canvasCapture.maskRegionsFn` in `posthog.init`, or just by mounting a `PostHogMaskWidget` (requires posthog-js 1.408.0+)
+
+### Patch Changes
+
+- 0d8b279: Fix `maskAllTexts: false` still masking `Text` widgets when `maskAllImages` is enabled
+
 ## 5.33.4
 
 ### Patch Changes
