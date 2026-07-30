@@ -1,5 +1,11 @@
 ## Next
 
+## 5.34.1
+
+### Patch Changes
+
+- 3baf48d: Fix web canvas masking discarding an app-provided `maskRegionsFn` — canvases outside the Flutter view now get the app's original callback instead of recording unmasked
+
 ## 5.34.0
 
 ### Minor Changes
