@@ -4,7 +4,7 @@ library;
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/web/web_canvas_mask_provider.dart';
@@ -14,6 +14,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   JSObject? capturedConfig;
+  var setConfigCalls = 0;
   var stopRecordingCalls = 0;
   var startRecordingCalls = 0;
 
@@ -26,6 +27,7 @@ void main() {
     String? version,
   }) {
     capturedConfig = null;
+    setConfigCalls = 0;
     stopRecordingCalls = 0;
     startRecordingCalls = 0;
     final stub = JSObject();
@@ -52,6 +54,7 @@ void main() {
       'set_config'.toJS,
       ((JSObject cfg) {
         capturedConfig = cfg;
+        setConfigCalls++;
       }).toJS,
     );
     var recordingState = recordingStarted;
@@ -121,6 +124,389 @@ void main() {
     expect(capturedConfig, isNull);
     expect(stopRecordingCalls, 0);
     expect(startRecordingCalls, 0);
+  });
+
+  testWidgets('opts in when a PostHogMaskWidget mounted before register()',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(setConfigCalls, 0);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets('a mounted PostHogMaskWidget opts the app in on its own',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(capturedConfig, isNull);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+
+    final sessionRecording = capturedSessionRecording();
+    expect(
+      sessionRecording
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSAny?>('maskRegionsFn'.toJS)
+          .isA<JSFunction>(),
+      isTrue,
+    );
+    expect(
+      sessionRecording.getProperty<JSAny?>('blockSelector'.toJS).dartify(),
+      'flt-semantics-host',
+    );
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets('registers once however many PostHogMaskWidgets mount',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    Widget maskWidgets(int count) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: List.generate(
+              count,
+              (_) => const PostHogMaskWidget(child: SizedBox.shrink()),
+            ),
+          ),
+        );
+    await tester.pumpWidget(maskWidgets(3));
+    await tester.pumpWidget(maskWidgets(5));
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets(
+      'a PostHogMaskWidget mount is a no-op when posthog.init already '
+      'opted in', (tester) async {
+    installPosthogStub(recordingStarted: true);
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(setConfigCalls, 1);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets(
+      'an exception during the mount-triggered apply does not consume the '
+      'opt-in', (tester) async {
+    final stub = installPosthogStub(declaresMaskProvider: false);
+    var calls = 0;
+    stub.setProperty(
+      'set_config'.toJS,
+      ((JSObject cfg) {
+        calls++;
+        if (calls == 1) {
+          throw StateError('stub failure');
+        }
+        capturedConfig = cfg;
+      }).toJS,
+    );
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(capturedConfig, isNull);
+
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(calls, 2);
+    expect(capturedConfig, isNotNull);
+  });
+
+  testWidgets('opts in once posthog-js arrives after the widget mounted',
+      (tester) async {
+    web.window.setProperty('posthog'.toJS, null);
+    capturedConfig = null;
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(capturedConfig, isNull);
+
+    installPosthogStub(declaresMaskProvider: false);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(setConfigCalls, 1);
+  });
+
+  testWidgets(
+      'a retry chain from a throw-path apply cannot outlive a second '
+      'register()', (tester) async {
+    final stub = installPosthogStub(recordingStarted: true);
+    var successfulSetConfigs = 0;
+    var failing = true;
+    stub.setProperty(
+      'set_config'.toJS,
+      ((JSObject cfg) {
+        if (failing) {
+          throw StateError('stub failure');
+        }
+        successfulSetConfigs++;
+        capturedConfig = cfg;
+      }).toJS,
+    );
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    // the first apply threw, so a retry is pending; a mask widget mounting
+    // now must join that chain instead of starting a second one
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+    expect(successfulSetConfigs, 0);
+
+    failing = false;
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(successfulSetConfigs, 1);
+
+    // an orphaned first-chain timer would fire here and apply a second time
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(successfulSetConfigs, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets(
+      'a mask widget outside the tracked PostHogWidget tree does not opt in',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Column(
+          children: [
+            Expanded(child: PostHogWidget(child: Container())),
+            const PostHogMaskWidget(child: SizedBox.shrink()),
+          ],
+        ),
+      ),
+    );
+
+    expect(setConfigCalls, 0);
+    expect(stopRecordingCalls, 0);
+    expect(startRecordingCalls, 0);
+  });
+
+  testWidgets(
+      'a mask widget that mounts before any PostHogWidget opts in '
+      '(no-PostHogWidget shape), but a later PostHogWidget that excludes it '
+      'makes frames fail closed', (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    Widget layout({required bool withPostHogWidget}) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              if (withPostHogWidget)
+                Expanded(child: PostHogWidget(child: Container())),
+              const PostHogMaskWidget(child: SizedBox.shrink()),
+            ],
+          ),
+        );
+
+    await tester.pumpWidget(layout(withPostHogWidget: false));
+    expect(setConfigCalls, 1);
+
+    await tester.pumpWidget(layout(withPostHogWidget: true));
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+
+    // the latched opt-in must not ship the sibling tree's rects while this
+    // mask widget sits outside it
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      expect(regionsFn.callAsFunction(null, canvas), isNull);
+    } finally {
+      flutterView.remove();
+    }
+  });
+
+  testWidgets(
+      'a mask widget that mounts before a PostHogWidget that later contains '
+      'it keeps producing regions', (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+    WebCanvasMaskProvider(config).register();
+
+    final maskKey = GlobalKey();
+    Widget mask() => Align(
+          alignment: Alignment.topLeft,
+          child: PostHogMaskWidget(
+            key: maskKey,
+            child: const SizedBox(width: 30, height: 40),
+          ),
+        );
+
+    await tester.pumpWidget(mask());
+    expect(setConfigCalls, 1);
+
+    await tester.pumpWidget(PostHogWidget(child: mask()));
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      final regions =
+          regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>;
+
+      expect(regions.toDart, hasLength(1));
+      final region = regions.toDart.first;
+      expect(
+        region.getProperty<JSNumber>('width'.toJS).toDartDouble,
+        greaterThanOrEqualTo(30),
+      );
+      expect(
+        region.getProperty<JSNumber>('height'.toJS).toDartDouble,
+        greaterThanOrEqualTo(40),
+      );
+    } finally {
+      flutterView.remove();
+    }
+  });
+
+  testWidgets(
+      'frames recover once the mask widget outside the tracked tree is '
+      'removed', (tester) async {
+    installPosthogStub(recordingStarted: true);
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+    WebCanvasMaskProvider(config).register();
+
+    Widget layout({required bool withOutsideMask}) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              Expanded(child: PostHogWidget(child: Container())),
+              if (withOutsideMask)
+                const PostHogMaskWidget(child: SizedBox.shrink()),
+            ],
+          ),
+        );
+
+    await tester.pumpWidget(layout(withOutsideMask: true));
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      expect(regionsFn.callAsFunction(null, canvas), isNull);
+
+      await tester.pumpWidget(layout(withOutsideMask: false));
+
+      expect(regionsFn.callAsFunction(null, canvas), isNotNull);
+    } finally {
+      flutterView.remove();
+    }
+  });
+
+  testWidgets('a mask widget inside the tracked PostHogWidget tree opts in',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+
+    await tester.pumpWidget(
+      PostHogWidget(child: PostHogMaskWidget(child: const SizedBox.shrink())),
+    );
+
+    expect(setConfigCalls, 1);
+    expect(stopRecordingCalls, 1);
+    expect(startRecordingCalls, 1);
+  });
+
+  testWidgets(
+      'a mask widget in a dialog above PostHogWidget opts in and produces '
+      'regions', (tester) async {
+    installPosthogStub(declaresMaskProvider: false, recordingStarted: true);
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+    WebCanvasMaskProvider(config).register();
+    expect(setConfigCalls, 0);
+
+    // PostHogWidget sits UNDER the home route, so the walk roots at the root
+    // navigator and covers the dialog — the tracked-tree boundary must too
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PostHogWidget(
+          child: Builder(
+            builder: (context) => TextButton(
+              onPressed: () {
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => Align(
+                    alignment: Alignment.topLeft,
+                    child: PostHogMaskWidget(
+                      child: const SizedBox(width: 30, height: 40),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(setConfigCalls, 0);
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(setConfigCalls, 1);
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      final regions = regionsFn.callAsFunction(null, canvas);
+      expect(regions, isNotNull);
+      expect((regions as JSArray<JSObject>).toDart, isNotEmpty);
+    } finally {
+      flutterView.remove();
+    }
   });
 
   test('registers the mask provider via set_config', () {
@@ -248,6 +634,7 @@ void main() {
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
     web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
     try {
       expect(regionsFn.callAsFunction(null, canvas), isNull);
     } finally {
@@ -273,6 +660,7 @@ void main() {
     final canvas = web.document.createElement('canvas');
     flutterView.appendChild(canvas);
     web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
     try {
       final regionsFn = capturedSessionRecording()
           .getProperty<JSObject>('canvasCapture'.toJS)
@@ -737,5 +1125,20 @@ void main() {
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
 
     expect(warns(), 1);
+  });
+
+  testWidgets('warns about an old posthog-js on the mount-triggered apply',
+      (tester) async {
+    installPosthogStub(declaresMaskProvider: false, version: '1.399.2');
+    WebCanvasMaskProvider.debugMinPosthogJsVersionOverride = '1.407.0';
+    final warns = interceptWarns();
+
+    WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+    expect(warns(), 0);
+
+    await tester.pumpWidget(const PostHogMaskWidget(child: SizedBox.shrink()));
+
+    expect(warns(), 1);
+    expect(capturedConfig, isNotNull);
   });
 }

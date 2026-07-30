@@ -256,7 +256,7 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
               // The amber box matches no masking rule on its own, so it is
               // covered only if the wrapper contributes its own rect.
               _buildTestSection(
-                'Test 15: PostHogMaskWidget with multiple children (needs maskAllTexts or maskAllImages)',
+                'Test 15: PostHogMaskWidget with multiple children',
                 PostHogMaskWidget(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
