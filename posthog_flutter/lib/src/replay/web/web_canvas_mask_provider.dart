@@ -436,12 +436,13 @@ class WebCanvasMaskProvider {
       return JSArray<JSObject>();
     }
 
-    final containerRects = _currentContainerRects();
-    if (containerRects == null) {
-      _noteWalkFailure();
+    // our rects always describe PostHogWidget's tree — shipping them with a
+    // different flutter-view's canvas would record that view unmasked; checked
+    // before the walk so foreign canvases neither cost a walk nor advance the
+    // walk-failure counter
+    if (!_isOwnViewCanvas(host)) {
       return null;
     }
-    _consecutiveWalkFailures = 0;
 
     if (!_maskWidgetsInsideTrackedTree()) {
       if (!_warnedMaskWidgetOutsideTree) {
@@ -455,11 +456,12 @@ class WebCanvasMaskProvider {
       return null;
     }
 
-    // our rects always describe PostHogWidget's tree — shipping them with a
-    // different flutter-view's canvas would record that view unmasked
-    if (!_isOwnViewCanvas(host)) {
+    final containerRects = _currentContainerRects();
+    if (containerRects == null) {
+      _noteWalkFailure();
       return null;
     }
+    _consecutiveWalkFailures = 0;
     if (containerRects.isEmpty) {
       return JSArray<JSObject>();
     }
@@ -489,6 +491,12 @@ class WebCanvasMaskProvider {
           ? rect
           : MatrixUtils.transformRect(containerTransform, rect);
       final shifted = globalRect.shift(offset);
+      // a singular/perspective ancestor transform yields non-finite
+      // components, and posthog-js fillRect silently no-ops on those — the
+      // frame would ship unmasked, so skip it instead
+      if (!shifted.isFinite) {
+        return null;
+      }
       regions.add(_JSMaskRegion(
         x: shifted.left,
         y: shifted.top,
@@ -518,8 +526,12 @@ class WebCanvasMaskProvider {
       }
       return ownHost.contains(canvasViewHost);
     }
-    // unresolvable: with a single flutter-view it can only be ours
-    return web.document.querySelectorAll('flutter-view').length <= 1;
+    // unresolvable: claim ownership only when the lone light-DOM flutter-view
+    // is the canvas's own — a count of 0 with a flutter-view canvas in hand
+    // means the views sit in shadow roots querySelectorAll cannot see, which
+    // is ambiguous
+    final views = web.document.querySelectorAll('flutter-view');
+    return views.length == 1 && views.item(0)!.contains(canvasViewHost);
   }
 
   web.Element? _resolveOwnViewHost() {

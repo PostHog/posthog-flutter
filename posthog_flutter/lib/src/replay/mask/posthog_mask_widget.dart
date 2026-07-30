@@ -12,10 +12,13 @@ import 'canvas_mask_registration_io.dart'
 /// plugin, so the first [PostHogMaskWidget] to mount turns canvas masking on —
 /// which restarts an in-flight recording once, because masking also excludes
 /// the Flutter semantics DOM tree via `blockSelector`, and posthog-js only
-/// reads that when recording starts. Frames captured before that first
-/// mount are recorded unmasked; to cover the window between `posthog.init` and
-/// Flutter booting, declare
-/// `session_recording: { canvasCapture: { maskRegionsFn: () => null } }`
+/// reads that when recording starts. Canvas recording itself must be enabled
+/// separately — either with `captureCanvas: { recordCanvas: true }` as shown
+/// below, or with the canvas capture toggle in your project's session replay
+/// settings. Frames captured before that first mount are recorded unmasked;
+/// to cover the window between `posthog.init` and Flutter booting, declare
+/// `session_recording: { captureCanvas: { recordCanvas: true },
+/// canvasCapture: { maskRegionsFn: () => null } }`
 /// in your `posthog.init` call — until this plugin takes over, those frames are
 /// skipped instead of recorded. Your app must be wrapped in `PostHogWidget`,
 /// and every [PostHogMaskWidget] must sit inside it — otherwise canvas frames

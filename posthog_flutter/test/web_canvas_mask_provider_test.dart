@@ -777,6 +777,46 @@ void main() {
     }
   });
 
+  testWidgets('fails closed when an ancestor transform is singular',
+      (tester) async {
+    final config = PostHogConfig('phc_test')
+      ..sessionReplayConfig.maskAllTexts = false
+      ..sessionReplayConfig.maskAllImages = false;
+
+    await tester.pumpWidget(
+      Transform(
+        transform: Matrix4.identity()..setEntry(3, 3, 0),
+        child: PostHogWidget(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: PostHogMaskWidget(
+              child: const SizedBox(width: 30, height: 40),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+
+    installPosthogStub();
+    try {
+      WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+      WebCanvasMaskProvider(config).register();
+
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+
+      expect(regionsFn.callAsFunction(null, canvas), isNull);
+    } finally {
+      flutterView.remove();
+    }
+  });
+
   testWidgets(
       'fails closed for a canvas in a foreign flutter-view on a multi-view '
       'page', (tester) async {

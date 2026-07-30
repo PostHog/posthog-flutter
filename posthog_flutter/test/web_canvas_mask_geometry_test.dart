@@ -47,9 +47,11 @@ void main() {
     expect(rect.contains(const Offset(0, 0)), isTrue);
   });
 
-  test('drops empty and non-finite rects', () {
+  test('drops empty and non-finite rects before outsetting', () {
     final rects = containerMaskRects([
       element(Rect.zero.deflate(2)),
+      element(Rect.zero),
+      element(const Rect.fromLTWH(3, 4, 0, 10)),
       element(const Rect.fromLTWH(0, 0, double.infinity, 10)),
       element(const Rect.fromLTWH(0, 0, 5, 5)),
     ]);
