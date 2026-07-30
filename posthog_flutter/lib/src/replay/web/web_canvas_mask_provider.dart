@@ -56,6 +56,11 @@ enum _ApplyResult {
 ///
 /// Fails closed: a failed widget-tree walk returns null, which makes
 /// posthog-js skip the frame instead of shipping it unmasked.
+///
+/// An app-declared `maskRegionsFn` is not discarded by the takeover: the
+/// provider answers only for canvases inside a flutter-view and hands any
+/// other canvas back to the app's original callback, so a hybrid page keeps
+/// the masking it configured for its own canvases.
 class WebCanvasMaskProvider {
   WebCanvasMaskProvider(this._config);
 
@@ -63,6 +68,13 @@ class WebCanvasMaskProvider {
   static bool _maskWidgetSeen = false;
   static bool _warnedOldPosthogJs = false;
   static final Set<BuildContext> _mountedMaskWidgets = {};
+
+  // The app's own maskRegionsFn, read once before the first apply replaces it
+  // in posthog-js config — every later read would see this provider's own
+  // installed callback. Static so a second setup()'s provider cannot mistake
+  // the first provider's callback for the app's.
+  static JSFunction? _appMaskRegionsFn;
+  static bool _appMaskRegionsFnCaptured = false;
 
   @visibleForTesting
   static String? debugMinPosthogJsVersionOverride;
@@ -123,6 +135,8 @@ class WebCanvasMaskProvider {
     _maskWidgetSeen = false;
     _mountedMaskWidgets.clear();
     _warnedOldPosthogJs = false;
+    _appMaskRegionsFn = null;
+    _appMaskRegionsFnCaptured = false;
     debugMinPosthogJsVersionOverride = null;
     debugOwnViewHostOverride = null;
   }
@@ -283,6 +297,13 @@ class WebCanvasMaskProvider {
     }
     _warnIfPosthogJsTooOld(ph);
     _ensureFrameCounter();
+    if (!_appMaskRegionsFnCaptured) {
+      _appMaskRegionsFnCaptured = true;
+      final declared = canvasCapture.getProperty<JSAny?>('maskRegionsFn'.toJS);
+      if (declared.isA<JSFunction>()) {
+        _appMaskRegionsFn = declared as JSFunction;
+      }
+    }
     canvasCapture.setProperty(
       'maskRegionsFn'.toJS,
       _computeMaskRegions.toJS,
@@ -421,7 +442,7 @@ class WebCanvasMaskProvider {
   }
 
   // null tells posthog-js to skip the frame rather than ship it unmasked
-  JSArray<JSObject>? _computeMaskRegions(web.HTMLCanvasElement canvas) {
+  JSAny? _computeMaskRegions(web.HTMLCanvasElement canvas) {
     try {
       return _unsafeComputeMaskRegions(canvas);
     } catch (e) {
@@ -430,10 +451,30 @@ class WebCanvasMaskProvider {
     }
   }
 
-  JSArray<JSObject>? _unsafeComputeMaskRegions(web.HTMLCanvasElement canvas) {
+  // A canvas outside every flutter-view is one this provider cannot describe;
+  // answering `[]` for it would record hybrid-page canvases unmasked even when
+  // the app's own maskRegionsFn had masked them, so those canvases keep the
+  // app's callback. posthog-js reads `undefined` as record-unmasked and `null`
+  // as mask-fully, but js_interop conflates the two on the way back through
+  // Dart — an app answer of `undefined` therefore comes out as the fail-closed
+  // `null`.
+  JSAny? _delegateToAppMaskRegionsFn(web.HTMLCanvasElement canvas) {
+    final appFn = _appMaskRegionsFn;
+    if (appFn == null) {
+      return JSArray<JSObject>();
+    }
+    try {
+      return appFn.callAsFunction(null, canvas);
+    } catch (e) {
+      printIfDebug('PostHog: app-provided maskRegionsFn threw: $e');
+      return null;
+    }
+  }
+
+  JSAny? _unsafeComputeMaskRegions(web.HTMLCanvasElement canvas) {
     final host = _flutterViewHost(canvas);
     if (host == null) {
-      return JSArray<JSObject>();
+      return _delegateToAppMaskRegionsFn(canvas);
     }
 
     // our rects always describe PostHogWidget's tree — shipping them with a
