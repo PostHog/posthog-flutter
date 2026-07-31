@@ -299,6 +299,32 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             config.bootstrap = bootstrapConfig
         }
 
+        #if os(iOS) || os(macOS)
+            if let capturePushNotificationSubscriptions = posthogConfig["capturePushNotificationSubscriptions"] as? Bool {
+                config.capturePushNotificationSubscriptions = capturePushNotificationSubscriptions
+            }
+            if let capturePushNotificationOpened = posthogConfig["capturePushNotificationOpened"] as? Bool {
+                config.capturePushNotificationOpened = capturePushNotificationOpened
+            }
+        #endif
+
+        if posthogConfig["pushIdentityProviderEnabled"] as? Bool == true {
+            config.pushIdentityProvider = { [weak instance] distinctId, appId, completion in
+                DispatchQueue.main.async {
+                    guard let channel = instance?.channel else {
+                        completion(nil)
+                        return
+                    }
+                    channel.invokeMethod(
+                        "pushIdentityProvider",
+                        arguments: ["distinctId": distinctId, "appId": appId]
+                    ) { res in
+                        completion(res as? String)
+                    }
+                }
+            }
+        }
+
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
         postHogVersion = postHogFlutterVersion
@@ -422,6 +448,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 // surveys only supported on iOS
                 result(nil)
             #endif
+        case "registerPushNotificationToken":
+            registerPushNotificationToken(call, result: result)
+        case "unregisterPushNotificationToken":
+            unregisterPushNotificationToken(result)
+        case "capturePushNotificationOpened":
+            capturePushNotificationOpened(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -1444,6 +1476,52 @@ extension PosthogFlutterPlugin {
     private func flush(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.flush()
         result(nil)
+    }
+
+    private func registerPushNotificationToken(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        #if os(iOS)
+            if let args = call.arguments as? [String: Any],
+               let deviceToken = args["deviceToken"] as? String
+            {
+                PostHogSDK.shared.registerPushNotificationToken(deviceToken, appId: args["appId"] as? String)
+                result(nil)
+            } else {
+                _badArgumentError(result)
+            }
+        #else
+            result(nil)
+        #endif
+    }
+
+    private func unregisterPushNotificationToken(_ result: @escaping FlutterResult) {
+        #if os(iOS)
+            PostHogSDK.shared.unregisterPushNotificationToken()
+            result(nil)
+        #else
+            result(nil)
+        #endif
+    }
+
+    private func capturePushNotificationOpened(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        #if os(iOS) || os(macOS)
+            let args = call.arguments as? [String: Any] ?? [:]
+            PostHogSDK.shared.capturePushNotificationOpened(
+                title: args["title"] as? String,
+                subtitle: args["subtitle"] as? String,
+                body: args["body"] as? String,
+                payload: args["payload"] as? [String: Any],
+                action: args["action"] as? String
+            )
+            result(nil)
+        #else
+            result(nil)
+        #endif
     }
 
     private func captureException(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
