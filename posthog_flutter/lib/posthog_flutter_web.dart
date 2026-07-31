@@ -368,6 +368,30 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> registerPushNotificationToken(
+    String deviceToken, {
+    String? appId,
+  }) async {
+    // Not supported on web - posthog-js has no push subscription API
+  }
+
+  @override
+  Future<void> unregisterPushNotificationToken() async {
+    // Not supported on web - posthog-js has no push subscription API
+  }
+
+  @override
+  Future<void> capturePushNotificationOpened({
+    String? title,
+    String? subtitle,
+    String? body,
+    Map<String, Object?>? payload,
+    String? action,
+  }) async {
+    // Not supported on web - posthog-js has no push subscription API
+  }
+
+  @override
   Future<void> captureException({
     required Object error,
     StackTrace? stackTrace,

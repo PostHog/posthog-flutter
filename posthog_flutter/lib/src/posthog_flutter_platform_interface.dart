@@ -90,6 +90,33 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('openUrl() has not been implemented.');
   }
 
+  Future<void> registerPushNotificationToken(
+    String deviceToken, {
+    String? appId,
+  }) {
+    throw UnimplementedError(
+      'registerPushNotificationToken() has not been implemented.',
+    );
+  }
+
+  Future<void> unregisterPushNotificationToken() {
+    throw UnimplementedError(
+      'unregisterPushNotificationToken() has not been implemented.',
+    );
+  }
+
+  Future<void> capturePushNotificationOpened({
+    String? title,
+    String? subtitle,
+    String? body,
+    Map<String, Object?>? payload,
+    String? action,
+  }) {
+    throw UnimplementedError(
+      'capturePushNotificationOpened() has not been implemented.',
+    );
+  }
+
   Future<void> alias({required String alias}) {
     throw UnimplementedError('alias() has not been implemented.');
   }

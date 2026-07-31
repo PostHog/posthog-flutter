@@ -1036,4 +1036,136 @@ void main() {
       expect(PostHogInternalEvents.nativeOcclusionEvent.value, 2);
     });
   });
+
+  group('PosthogFlutterIO push notifications', () {
+    Map<String, dynamic> argsOf(String method) => Map<String, dynamic>.from(
+          log.firstWhere((c) => c.method == method).arguments as Map,
+        );
+
+    test('registerPushNotificationToken sends deviceToken and appId', () async {
+      await posthogFlutterIO.registerPushNotificationToken(
+        'token-abc',
+        appId: 'com.example.app',
+      );
+
+      expect(argsOf('registerPushNotificationToken'), {
+        'deviceToken': 'token-abc',
+        'appId': 'com.example.app',
+      });
+    });
+
+    test('registerPushNotificationToken omits appId when null', () async {
+      await posthogFlutterIO.registerPushNotificationToken('token-abc');
+
+      // Each native side derives its own app id, so the key must be absent
+      // rather than present-and-null.
+      expect(
+        argsOf('registerPushNotificationToken'),
+        {'deviceToken': 'token-abc'},
+      );
+    });
+
+    test('unregisterPushNotificationToken sends no arguments', () async {
+      await posthogFlutterIO.unregisterPushNotificationToken();
+
+      final call =
+          log.firstWhere((c) => c.method == 'unregisterPushNotificationToken');
+      expect(call.arguments, isNull);
+    });
+
+    test('capturePushNotificationOpened forwards every field', () async {
+      await posthogFlutterIO.capturePushNotificationOpened(
+        title: 'Title',
+        subtitle: 'Subtitle',
+        body: 'Body',
+        payload: {'posthog': '{"campaign_id":"x"}'},
+        action: 'reply',
+      );
+
+      expect(argsOf('capturePushNotificationOpened'), {
+        'title': 'Title',
+        'subtitle': 'Subtitle',
+        'body': 'Body',
+        'payload': {'posthog': '{"campaign_id":"x"}'},
+        'action': 'reply',
+      });
+    });
+
+    test('capturePushNotificationOpened omits null fields', () async {
+      await posthogFlutterIO.capturePushNotificationOpened(body: 'Body');
+
+      expect(argsOf('capturePushNotificationOpened'), {'body': 'Body'});
+    });
+
+    test('capturePushNotificationOpened preserves empty strings', () async {
+      // The native SDKs decide what to drop; the bridge must not pre-filter or
+      // an empty title would look like an absent one.
+      await posthogFlutterIO.capturePushNotificationOpened(title: '');
+
+      expect(argsOf('capturePushNotificationOpened'), {'title': ''});
+    });
+
+    Future<Object?> mintIdentityToken() async {
+      Object? reply;
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(
+          const MethodCall('pushIdentityProvider', {
+            'distinctId': 'user-1',
+            'appId': 'com.example.app',
+          }),
+        ),
+        (ByteData? data) {
+          reply = data == null ? null : channel.codec.decodeEnvelope(data);
+        },
+      );
+      return reply;
+    }
+
+    test('pushIdentityProvider replies with the minted token', () async {
+      String? seenDistinctId;
+      String? seenAppId;
+
+      testConfig = PostHogConfig('test_project_token')
+        ..pushIdentityProvider = (distinctId, appId) async {
+          seenDistinctId = distinctId;
+          seenAppId = appId;
+          return 'minted-token';
+        };
+      await posthogFlutterIO.setup(testConfig);
+
+      expect(await mintIdentityToken(), 'minted-token');
+      expect(seenDistinctId, 'user-1');
+      expect(seenAppId, 'com.example.app');
+    });
+
+    test('setup flags whether a provider is installed', () async {
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+      expect(argsOf('setup')['pushIdentityProviderEnabled'], isFalse);
+
+      log.clear();
+      await posthogFlutterIO.setup(
+        PostHogConfig('test_project_token')
+          ..pushIdentityProvider = (_, __) async => 'tok',
+      );
+      expect(argsOf('setup')['pushIdentityProviderEnabled'], isTrue);
+    });
+
+    test('a throwing provider degrades to a null token', () async {
+      testConfig = PostHogConfig('test_project_token')
+        ..pushIdentityProvider = (_, __) async => throw StateError('backend');
+      await posthogFlutterIO.setup(testConfig);
+
+      // Native falls back to an unauthenticated request; it must never see the
+      // exception.
+      expect(await mintIdentityToken(), isNull);
+    });
+
+    test('no provider configured replies null', () async {
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+
+      expect(await mintIdentityToken(), isNull);
+    });
+  });
 }

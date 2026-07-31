@@ -31,6 +31,15 @@ typedef BeforeSendLogCallback = FutureOr<PostHogLogRecord?> Function(
   PostHogLogRecord record,
 );
 
+/// Mints a signed identity-verification token for a push subscription request.
+///
+/// Called by the native SDK with the current [distinctId] and [appId]. Return
+/// `null` to send the request without an identity token.
+typedef PushIdentityProvider = Future<String?> Function(
+  String distinctId,
+  String appId,
+);
+
 /// Controls whether events create or update PostHog person profiles.
 enum PostHogPersonProfiles {
   /// Never create person profiles from captured events.
@@ -200,6 +209,48 @@ class PostHogConfig {
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
 
+  /// Whether to automatically register this device's push token with PostHog.
+  ///
+  /// On iOS the native SDK swizzles the app delegate's remote-notification
+  /// registration callback; on Android it fetches the FCM token at startup when
+  /// `firebase-messaging` is on the classpath. Either way the host app is still
+  /// responsible for requesting notification permission and calling
+  /// `registerForRemoteNotifications()` (iOS) — this only observes the result.
+  ///
+  /// The startup fetch does not see later token refreshes; wire those to
+  /// [Posthog.registerPushNotificationToken] yourself.
+  ///
+  /// **Flutter web:** not supported. Defaults to `true`.
+  bool capturePushNotificationSubscriptions = true;
+
+  /// Whether to automatically capture `$push_notification_opened` when a user
+  /// taps a PostHog-delivered notification.
+  ///
+  /// Auto-detection only covers cold starts (iOS: the notification-response
+  /// delegate callback; Android: the launch intent). Foreground messages and
+  /// warm-start taps are invisible to it — call
+  /// [Posthog.capturePushNotificationOpened] for those.
+  ///
+  /// **Flutter web:** not supported. Defaults to `true`.
+  bool capturePushNotificationOpened = true;
+
+  /// Mints a signed identity-verification token for push subscription requests.
+  ///
+  /// Only needed when your PostHog project requires identity verification for
+  /// push. The native SDK calls this with the current `distinctId` and `appId`
+  /// and attaches the returned token to the subscription request; return `null`
+  /// to send without one.
+  ///
+  /// The token is minted by your backend (HS256, with `sub` = distinctId,
+  /// `app_id`, and `aud` = `posthog:push_identity`), never in the app.
+  ///
+  /// The native SDKs cache the result per `(distinctId, appId)` and give this
+  /// callback 10 seconds before falling back to an unauthenticated request, so
+  /// a slow or throwing implementation degrades rather than blocking delivery.
+  ///
+  /// **Flutter web:** not supported. Defaults to `null`.
+  PushIdentityProvider? pushIdentityProvider;
+
   /// Callbacks to intercept and modify events before they are sent to PostHog.
   ///
   /// Callbacks are invoked in order for events captured via Dart APIs:
@@ -322,6 +373,13 @@ class PostHogConfig {
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
       'logs': logsConfig.toMap(),
+      'capturePushNotificationSubscriptions':
+          capturePushNotificationSubscriptions,
+      'capturePushNotificationOpened': capturePushNotificationOpened,
+      // A closure can't cross the channel. This tells native whether to install
+      // a bridging provider at all — installing one the host didn't ask for
+      // would change how the native SDK handles a 401 on the subscription call.
+      'pushIdentityProviderEnabled': pushIdentityProvider != null,
       if (bootstrap != null) 'bootstrap': bootstrap!.toMap(),
     };
   }
