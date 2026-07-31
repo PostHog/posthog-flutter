@@ -4679,6 +4679,18 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "debugTriggerOnChange",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "returnTypeName": "void",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "new",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_widget.dart",
@@ -4688,6 +4700,72 @@
                     }
                 ],
                 "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "debugChangeDetectorIdentity",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "Object?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "debugChangeDetectorInterval",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "Duration?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "debugChangeDetectorIsRunning",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "bool?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "debugDetectorHasCapturedPlatformViews",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "bool?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": false,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "debugCapturerHasCapturedPlatformViews",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "debugCapturerEffectiveConfig",
+                        "relativePath": "lib/src/posthog_widget.dart",
+                        "typeName": "PostHogConfig?"
+                    },
                     {
                         "entryPoints": [],
                         "isDeprecated": false,

@@ -33,11 +33,38 @@ class PostHogWidgetState extends State<PostHogWidget> {
   NativeCommunicator? _nativeCommunicator;
   PostHogConfig? _componentsConfig;
 
+  // Typed as primitives/Object so the internal component classes stay out of
+  // the public API snapshot (PostHogWidgetState is exported).
   @visibleForTesting
-  ChangeDetector? get debugChangeDetector => _changeDetector;
+  Object? get debugChangeDetectorIdentity => _changeDetector;
 
   @visibleForTesting
-  ScreenshotCapturer? get debugScreenshotCapturer => _screenshotCapturer;
+  Duration? get debugChangeDetectorInterval => _changeDetector?.interval;
+
+  @visibleForTesting
+  bool? get debugChangeDetectorIsRunning => _changeDetector?.isRunning;
+
+  @visibleForTesting
+  bool? get debugDetectorHasCapturedPlatformViews =>
+      _changeDetector?.hasCapturedPlatformViews;
+
+  @visibleForTesting
+  set debugDetectorHasCapturedPlatformViews(bool? value) {
+    if (value != null) _changeDetector?.hasCapturedPlatformViews = value;
+  }
+
+  @visibleForTesting
+  set debugCapturerHasCapturedPlatformViews(bool value) {
+    _screenshotCapturer?.hasCapturedPlatformViews = value;
+  }
+
+  @visibleForTesting
+  PostHogConfig? get debugCapturerEffectiveConfig =>
+      // ignore: invalid_use_of_visible_for_testing_member
+      _screenshotCapturer?.effectiveConfig;
+
+  @visibleForTesting
+  void debugTriggerOnChange() => _changeDetector?.onChange();
 
   bool _isCapturing = false;
   bool _disposed = false;

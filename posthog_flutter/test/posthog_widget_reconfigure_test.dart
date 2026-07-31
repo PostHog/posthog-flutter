@@ -51,8 +51,8 @@ void main() {
     final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
 
     expect(
-        state.debugChangeDetector?.interval, const Duration(milliseconds: 500));
-    expect(state.debugScreenshotCapturer?.effectiveConfig, same(first));
+        state.debugChangeDetectorInterval, const Duration(milliseconds: 500));
+    expect(state.debugCapturerEffectiveConfig, same(first));
 
     await Posthog().close();
     final second = replayConfig(const Duration(milliseconds: 250));
@@ -61,9 +61,9 @@ void main() {
     await tester.pump(Duration.zero);
 
     expect(
-        state.debugChangeDetector?.interval, const Duration(milliseconds: 250));
-    expect(state.debugChangeDetector?.isRunning, isTrue);
-    expect(state.debugScreenshotCapturer?.effectiveConfig, same(second));
+        state.debugChangeDetectorInterval, const Duration(milliseconds: 250));
+    expect(state.debugChangeDetectorIsRunning, isTrue);
+    expect(state.debugCapturerEffectiveConfig, same(second));
 
     // stops the detector's periodic timer before the test framework's
     // pending-timer check, then drains the last capture future
@@ -74,7 +74,7 @@ void main() {
     // With the live config nulled by close(), effectiveConfig only returns
     // `second` from a rebuilt capturer's constructor config — pre-close the
     // live-config fallback would mask a capturer that was never rebuilt.
-    expect(state.debugScreenshotCapturer?.effectiveConfig, same(second));
+    expect(state.debugCapturerEffectiveConfig, same(second));
   });
 
   testWidgets(
@@ -88,8 +88,8 @@ void main() {
     await tester.pump(Duration.zero);
     final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
 
-    state.debugScreenshotCapturer?.hasCapturedPlatformViews = true;
-    state.debugChangeDetector?.hasCapturedPlatformViews = true;
+    state.debugCapturerHasCapturedPlatformViews = true;
+    state.debugDetectorHasCapturedPlatformViews = true;
 
     await Posthog().close();
     final second = replayConfig(const Duration(milliseconds: 250));
@@ -98,15 +98,15 @@ void main() {
     // On a static screen with revealed platform views, only the forced frame
     // this flag gates ever re-runs a capture — so the rebuilt detector must
     // inherit it or capture stalls until the Flutter tree next repaints.
-    expect(state.debugChangeDetector?.hasCapturedPlatformViews, isTrue);
+    expect(state.debugDetectorHasCapturedPlatformViews, isTrue);
 
     // A bailed capture attempt refreshes the detector from the capturer, so
     // the carry must survive it — a fresh-false capturer would erase it here.
-    state.debugChangeDetector?.onChange();
+    state.debugTriggerOnChange();
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 
-    expect(state.debugChangeDetector?.hasCapturedPlatformViews, isTrue);
+    expect(state.debugDetectorHasCapturedPlatformViews, isTrue);
 
     await Posthog().close();
     await tester.pump(Duration.zero);
@@ -125,7 +125,7 @@ void main() {
     final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
 
     expect(
-        state.debugChangeDetector?.interval, const Duration(milliseconds: 500));
+        state.debugChangeDetectorInterval, const Duration(milliseconds: 500));
 
     await Posthog().close();
     config.sessionReplayConfig.throttleDelay =
@@ -135,8 +135,8 @@ void main() {
     await tester.pump(Duration.zero);
 
     expect(
-        state.debugChangeDetector?.interval, const Duration(milliseconds: 250));
-    expect(state.debugChangeDetector?.isRunning, isTrue);
+        state.debugChangeDetectorInterval, const Duration(milliseconds: 250));
+    expect(state.debugChangeDetectorIsRunning, isTrue);
 
     await Posthog().close();
     await tester.pump(Duration.zero);
@@ -152,13 +152,13 @@ void main() {
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
     final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
-    final detector = state.debugChangeDetector;
+    final detector = state.debugChangeDetectorIdentity;
 
     PostHogInternalEvents.sessionRecordingActive.value = false;
     PostHogInternalEvents.sessionRecordingActive.value = true;
 
-    expect(state.debugChangeDetector, same(detector));
-    expect(state.debugChangeDetector?.isRunning, isTrue);
+    expect(state.debugChangeDetectorIdentity, same(detector));
+    expect(state.debugChangeDetectorIsRunning, isTrue);
 
     await Posthog().close();
     await tester.pump(Duration.zero);
