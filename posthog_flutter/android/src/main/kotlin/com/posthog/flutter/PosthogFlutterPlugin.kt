@@ -148,6 +148,7 @@ class PosthogFlutterPlugin :
             snapshotSendExecutor = Executors.newSingleThreadExecutor()
         }
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
+        activeChannel = channel
 
         this.applicationContext = flutterPluginBinding.applicationContext
         initPlugin()
@@ -682,24 +683,32 @@ class PosthogFlutterPlugin :
                 }
                 posthogConfig.getIfNotNull<Boolean>("pushIdentityProviderEnabled") { enabled ->
                     if (enabled) {
-                        // If no reply ever arrives (channel torn down), the native SDK's
-                        // 10s mint watchdog sends the request without a token.
                         pushIdentityProvider = { distinctId, appId, completion ->
-                            invokeFlutterMethod(
-                                "pushIdentityProvider",
-                                mapOf("distinctId" to distinctId, "appId" to appId),
-                                object : MethodChannel.Result {
-                                    override fun success(res: Any?) = completion(res as? String)
+                            val target = activeChannel
+                            if (target == null) {
+                                // No engine attached: decline now rather than let the
+                                // native 10s mint watchdog time out on a reply that
+                                // can never arrive.
+                                completion(null)
+                            } else {
+                                runOnMainThread {
+                                    target.invokeMethod(
+                                        "pushIdentityProvider",
+                                        mapOf("distinctId" to distinctId, "appId" to appId),
+                                        object : MethodChannel.Result {
+                                            override fun success(res: Any?) = completion(res as? String)
 
-                                    override fun error(
-                                        errorCode: String,
-                                        errorMessage: String?,
-                                        errorDetails: Any?,
-                                    ) = completion(null)
+                                            override fun error(
+                                                errorCode: String,
+                                                errorMessage: String?,
+                                                errorDetails: Any?,
+                                            ) = completion(null)
 
-                                    override fun notImplemented() = completion(null)
-                                },
-                            )
+                                            override fun notImplemented() = completion(null)
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -770,6 +779,9 @@ class PosthogFlutterPlugin :
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopOcclusionDetector()
         channel.setMethodCallHandler(null)
+        if (activeChannel === channel) {
+            activeChannel = null
+        }
         bitmapExportExecutor.shutdown()
         snapshotSendExecutor.shutdown()
     }
@@ -1970,24 +1982,6 @@ class PosthogFlutterPlugin :
         runOnMainThread { channel.invokeMethod(method, arguments) }
     }
 
-    // Sibling overload that carries a Result callback back to the caller (e.g. the
-    // native pushIdentityProvider bridge), reusing the same main-thread hop.
-    private fun invokeFlutterMethod(
-        method: String,
-        arguments: Any?,
-        result: Result,
-    ) {
-        runOnMainThread { channel.invokeMethod(method, arguments, result) }
-    }
-
-    private fun runOnMainThread(action: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            action()
-        } else {
-            Handler(Looper.getMainLooper()).post(action)
-        }
-    }
-
     // MARK: - Survey Action Handling
 
     private fun handleSurveyAction(
@@ -2010,6 +2004,25 @@ class PosthogFlutterPlugin :
         }
 
         flutterSurveysDelegate?.handleSurveyAction(type, args, result)
+    }
+
+    companion object {
+        // The native SDK holds the pushIdentityProvider closure for the life of the
+        // process, outliving any single engine attachment. Resolving the channel here
+        // at call time keeps a re-attached engine mintable and lets a detached one
+        // decline immediately instead of stalling the native 10s mint watchdog.
+        @Volatile
+        private var activeChannel: MethodChannel? = null
+
+        // On the companion, not the instance: the pushIdentityProvider closure would
+        // otherwise capture the plugin that happened to be attached at setup time.
+        private fun runOnMainThread(action: () -> Unit) {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                action()
+            } else {
+                Handler(Looper.getMainLooper()).post(action)
+            }
+        }
     }
 }
 

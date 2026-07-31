@@ -579,7 +579,11 @@ class Posthog {
   ///
   /// [appId] identifies the app the token belongs to: the Firebase
   /// `project_id` on Android, the APNs bundle id on iOS. Leave it `null` and
-  /// each platform derives its own.
+  /// each platform derives its own — but the Android side derives it from the
+  /// default `FirebaseApp`, so pass [appId] explicitly if your app does not use
+  /// Firebase, or registers tokens for a non-default Firebase project.
+  /// Otherwise the call is skipped on Android and the token is never
+  /// registered.
   ///
   /// **The token differs per platform.** iOS registers the raw APNs device
   /// token; Android registers the FCM token. `firebase_messaging`'s
@@ -616,20 +620,27 @@ class Posthog {
   /// Captures `$push_notification_opened` when a user opens a push
   /// notification.
   ///
-  /// Cold-start taps on PostHog-delivered notifications are captured
-  /// automatically when [PostHogConfig.capturePushNotificationOpened] is
-  /// enabled. Call this for the paths auto-detection cannot observe —
-  /// foreground messages and warm-start taps:
+  /// What [PostHogConfig.capturePushNotificationOpened] already captures
+  /// differs per platform: iOS sees every tap on a remote notification through
+  /// the notification-response delegate, while Android only sees the launch
+  /// intent of a cold start. So call this for Android's warm-start and
+  /// foreground taps, and guard it — calling it on iOS double-counts the tap
+  /// the native SDK already captured:
   ///
   /// ```dart
-  /// FirebaseMessaging.onMessageOpenedApp.listen((m) {
-  ///   Posthog().capturePushNotificationOpened(
-  ///     title: m.notification?.title,
-  ///     body: m.notification?.body,
-  ///     payload: m.data,
-  ///   );
-  /// });
+  /// if (Platform.isAndroid) {
+  ///   FirebaseMessaging.onMessageOpenedApp.listen((m) {
+  ///     Posthog().capturePushNotificationOpened(
+  ///       title: m.notification?.title,
+  ///       body: m.notification?.body,
+  ///       payload: m.data,
+  ///     );
+  ///   });
+  /// }
   /// ```
+  ///
+  /// The event is built natively, so [PostHogConfig.beforeSend] callbacks do
+  /// not run on it — redact anything sensitive before passing it here.
   ///
   /// Keys of [payload]'s `posthog` entry become `$notification_<key>`
   /// properties; it is decoded natively whether it arrives as a map or as a

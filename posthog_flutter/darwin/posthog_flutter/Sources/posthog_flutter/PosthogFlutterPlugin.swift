@@ -309,9 +309,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         #endif
 
         if posthogConfig["pushIdentityProviderEnabled"] as? Bool == true {
-            config.pushIdentityProvider = { [weak instance] distinctId, appId, completion in
+            // Resolved at call time, not captured: the native SDK holds this closure
+            // for the life of the process and no-ops a second setup(), so a closure
+            // bound to the setup-time instance would go permanently dead once a new
+            // Flutter engine attaches.
+            config.pushIdentityProvider = { distinctId, appId, completion in
                 DispatchQueue.main.async {
-                    guard let channel = instance?.channel else {
+                    guard let channel = PosthogFlutterPlugin.instance?.channel else {
                         completion(nil)
                         return
                     }
@@ -1510,7 +1514,10 @@ extension PosthogFlutterPlugin {
         result: @escaping FlutterResult
     ) {
         #if os(iOS) || os(macOS)
-            let args = call.arguments as? [String: Any] ?? [:]
+            guard let args = call.arguments as? [String: Any] else {
+                _badArgumentError(result)
+                return
+            }
             PostHogSDK.shared.capturePushNotificationOpened(
                 title: args["title"] as? String,
                 subtitle: args["subtitle"] as? String,
