@@ -333,6 +333,18 @@ class PosthogFlutterPlugin :
                 close(result)
             }
 
+            "registerPushNotificationToken" -> {
+                registerPushNotificationToken(call, result)
+            }
+
+            "unregisterPushNotificationToken" -> {
+                unregisterPushNotificationToken(result)
+            }
+
+            "capturePushNotificationOpened" -> {
+                capturePushNotificationOpened(call, result)
+            }
+
             "sendMetaEvent" -> {
                 handleMetaEvent(call, result)
             }
@@ -351,8 +363,10 @@ class PosthogFlutterPlugin :
                     // for an episode Dart never handed off.
                     val episode = call.argument<Int>("episode")
                     val accepted =
-                        isOccluded && episode == occlusionEpisode &&
-                            replayIntegration() != null && isSessionReplayActive()
+                        isOccluded &&
+                            episode == occlusionEpisode &&
+                            replayIntegration() != null &&
+                            isSessionReplayActive()
                     if (accepted) {
                         bridgeEnabled = true
                         nudgeOcclusionDetector()
@@ -657,6 +671,37 @@ class PosthogFlutterPlugin :
                 // Bootstrap precedence and flag layering live in the native SDK; forward values only.
                 posthogConfig.getIfNotNull<Map<String, Any>>("bootstrap") {
                     this.bootstrap = bootstrapConfigFromMap(it)
+                }
+
+                // Configure push notifications
+                posthogConfig.getIfNotNull<Boolean>("capturePushNotificationSubscriptions") {
+                    capturePushNotificationSubscriptions = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("capturePushNotificationOpened") {
+                    capturePushNotificationOpened = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("pushIdentityProviderEnabled") { enabled ->
+                    if (enabled) {
+                        // If no reply ever arrives (channel torn down), the native SDK's
+                        // 10s mint watchdog sends the request without a token.
+                        pushIdentityProvider = { distinctId, appId, completion ->
+                            invokeFlutterMethod(
+                                "pushIdentityProvider",
+                                mapOf("distinctId" to distinctId, "appId" to appId),
+                                object : MethodChannel.Result {
+                                    override fun success(res: Any?) = completion(res as? String)
+
+                                    override fun error(
+                                        errorCode: String,
+                                        errorMessage: String?,
+                                        errorDetails: Any?,
+                                    ) = completion(null)
+
+                                    override fun notImplemented() = completion(null)
+                                },
+                            )
+                        }
+                    }
                 }
 
                 sdkName = "posthog-flutter"
@@ -1732,6 +1777,74 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun registerPushNotificationToken(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val deviceToken = call.argument<String>("deviceToken")
+            if (deviceToken == null) {
+                result.error("PosthogFlutterException", "Missing argument: deviceToken", null)
+                return
+            }
+            val appId =
+                call.argument<String>("appId")?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: firebaseProjectId()
+            if (appId.isNullOrEmpty()) {
+                // Native no-ops on a blank appId anyway; skip the call so we don't
+                // rely on that silently. Logged, not thrown: apps without Firebase
+                // shouldn't crash over this.
+                Log.w("PostHog", "registerPushNotificationToken: no appId provided and no Firebase project id could be resolved, skipping")
+                result.success(null)
+                return
+            }
+            PostHog.registerPushNotificationToken(deviceToken, appId)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun unregisterPushNotificationToken(result: Result) {
+        try {
+            PostHog.unregisterPushNotificationToken()
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun capturePushNotificationOpened(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val title = call.argument<String>("title")
+            val body = call.argument<String>("body")
+            // subtitle is iOS-only; posthog-android's capturePushNotificationOpened
+            // has no subtitle parameter, so Dart's value is dropped here.
+            val payload = call.argument<Map<String, Any?>>("payload")
+            val action = call.argument<String>("action")
+            PostHog.capturePushNotificationOpened(title, body, payload, action)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    // Mirrors posthog-android's own PostHogPushSubscriptionIntegration: this plugin
+    // has no Firebase dependency, so the project id is looked up reflectively and
+    // any failure (class missing, Firebase not initialized, etc.) is swallowed.
+    private fun firebaseProjectId(): String? =
+        try {
+            val firebaseAppClass = Class.forName("com.google.firebase.FirebaseApp")
+            val firebaseApp = firebaseAppClass.getMethod("getInstance").invoke(null)
+            val options = firebaseAppClass.getMethod("getOptions").invoke(firebaseApp)
+            options?.javaClass?.getMethod("getProjectId")?.invoke(options) as? String
+        } catch (e: Throwable) {
+            null
+        }
+
     private fun captureException(
         call: MethodCall,
         result: Result,
@@ -1854,12 +1967,24 @@ class PosthogFlutterPlugin :
         method: String,
         arguments: Any? = null,
     ) {
+        runOnMainThread { channel.invokeMethod(method, arguments) }
+    }
+
+    // Sibling overload that carries a Result callback back to the caller (e.g. the
+    // native pushIdentityProvider bridge), reusing the same main-thread hop.
+    private fun invokeFlutterMethod(
+        method: String,
+        arguments: Any?,
+        result: Result,
+    ) {
+        runOnMainThread { channel.invokeMethod(method, arguments, result) }
+    }
+
+    private fun runOnMainThread(action: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            channel.invokeMethod(method, arguments)
+            action()
         } else {
-            Handler(Looper.getMainLooper()).post {
-                channel.invokeMethod(method, arguments)
-            }
+            Handler(Looper.getMainLooper()).post(action)
         }
     }
 

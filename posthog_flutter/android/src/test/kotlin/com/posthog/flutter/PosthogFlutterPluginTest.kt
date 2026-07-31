@@ -240,4 +240,97 @@ internal class PosthogFlutterPluginTest {
         assertNull(config.featureFlags)
         assertNull(config.featureFlagPayloads)
     }
+
+    @Test
+    fun onMethodCall_registerPushNotificationToken_withAppId_returnsSuccess() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call =
+            MethodCall(
+                "registerPushNotificationToken",
+                mapOf("deviceToken" to "token-abc", "appId" to "my-firebase-project"),
+            )
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
+    fun onMethodCall_registerPushNotificationToken_missingDeviceToken_returnsError() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("registerPushNotificationToken", mapOf<String, Any>())
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).error(
+            Mockito.eq("PosthogFlutterException"),
+            Mockito.eq("Missing argument: deviceToken"),
+            Mockito.isNull(),
+        )
+    }
+
+    @Test
+    fun onMethodCall_registerPushNotificationToken_noAppIdAndNoFirebase_skipsWithoutError() {
+        val plugin = PosthogFlutterPlugin()
+
+        // Firebase isn't on the unit-test classpath, so the reflective project-id
+        // fallback finds nothing. Apps that don't use Firebase must not crash.
+        val call = MethodCall("registerPushNotificationToken", mapOf("deviceToken" to "token-abc"))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
+        Mockito.verify(mockResult, Mockito.never()).error(
+            Mockito.anyString(),
+            Mockito.anyString(),
+            Mockito.any(),
+        )
+    }
+
+    @Test
+    fun onMethodCall_unregisterPushNotificationToken_returnsSuccess() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("unregisterPushNotificationToken", null)
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
+    fun onMethodCall_capturePushNotificationOpened_dropsIosOnlySubtitle() {
+        val plugin = PosthogFlutterPlugin()
+
+        // subtitle has no Android counterpart; it must be ignored rather than
+        // rejected, so iOS-shaped calls from shared Dart code still succeed.
+        val call =
+            MethodCall(
+                "capturePushNotificationOpened",
+                mapOf(
+                    "title" to "Title",
+                    "subtitle" to "Subtitle",
+                    "body" to "Body",
+                    "payload" to mapOf("posthog" to """{"campaign_id":"x"}"""),
+                    "action" to "reply",
+                ),
+            )
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
+    fun onMethodCall_capturePushNotificationOpened_noArguments_returnsSuccess() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("capturePushNotificationOpened", mapOf<String, Any>())
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).success(null)
+    }
 }
