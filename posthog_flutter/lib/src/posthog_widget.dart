@@ -76,11 +76,11 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   /// A session change Dart knows about before the capture path could observe it:
-  /// `reset()` (both platforms rotate), and a start that does not resume — which
-  /// rotates on iOS but on Android may not rotate at all, since
-  /// `PostHog.startSessionReplay` returns early while recording is already
-  /// active. The drop is requested directly rather than waiting for a tick to
-  /// read the new id.
+  /// `reset()` and `close()` (both platforms end the session), and a start that
+  /// does not resume — which rotates on iOS but on Android may not rotate at
+  /// all, since `PostHog.startSessionReplay` returns early while recording is
+  /// already active. The drop is requested directly rather than waiting for a
+  /// tick to read the new id.
   void _forceReplaySessionReset() {
     _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
   }

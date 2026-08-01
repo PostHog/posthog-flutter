@@ -65,24 +65,15 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   final List<Map<String, dynamic>> setGroupPropertiesForFlagsCalls = [];
   final List<String?> resetGroupPropertiesForFlagsCalls = [];
 
-  final List<bool> startSessionRecordingCalls = [];
-  int stopSessionRecordingCount = 0;
-  int resetCount = 0;
+  // Overridden because the base implementations throw UnimplementedError.
+  @override
+  Future<void> reset() async {}
 
   @override
-  Future<void> reset() async {
-    resetCount++;
-  }
+  Future<void> startSessionRecording({bool resumeCurrent = true}) async {}
 
   @override
-  Future<void> startSessionRecording({bool resumeCurrent = true}) async {
-    startSessionRecordingCalls.add(resumeCurrent);
-  }
-
-  @override
-  Future<void> stopSessionRecording() async {
-    stopSessionRecordingCount++;
-  }
+  Future<void> stopSessionRecording() async {}
 
   @override
   Future<void> reloadFeatureFlags() async {

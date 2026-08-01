@@ -877,5 +877,48 @@ void main() {
 
       await unmountAndFlush(tester);
     });
+
+    testWidgets('a capture crossing the reconfigure is dropped, not sent bare',
+        (tester) async {
+      // Same ordering regression as the rotation case, reached without any
+      // replay-specific API: close() ends the session while a frame captured
+      // under it is mid-send, so that frame would arrive as a full snapshot at
+      // the head of the session the following setup() starts.
+      sessionReplayActive = true;
+      var reconfigured = false;
+      onSendMetaEvent = () {
+        if (reconfigured) return;
+        reconfigured = true;
+        // Unawaited on purpose: both calls do their Dart-side work
+        // synchronously, which is what has to land inside this send.
+        Posthog().close();
+        sessionId = 'session-b';
+        Posthog().setup(replayConfig(captureNativeScreens: false));
+      };
+
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+
+      final sends = recordedCalls
+          .map((c) => c.method)
+          .where((m) => m == 'sendMetaEvent' || m == 'sendFullSnapshot')
+          .toList();
+
+      expect(sends.first, 'sendMetaEvent',
+          reason: 'the capture in flight when close() ran had already sent the '
+              "closed session's meta");
+      expect(sends, contains('sendFullSnapshot'),
+          reason: 'the session setup() started still records');
+      expect(
+        sends.indexOf('sendFullSnapshot'),
+        greaterThan(sends.lastIndexOf('sendMetaEvent')),
+        reason:
+            'the frame captured before close() must be dropped, not shipped '
+            "ahead of the new session's meta",
+      );
+
+      await unmountAndFlush(tester);
+    });
   });
 }

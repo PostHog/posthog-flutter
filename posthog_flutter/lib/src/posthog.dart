@@ -375,12 +375,20 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when the reset request has been queued.
   Future<void> reset() async {
-    await _posthog.reset();
     // Both platforms rotate the session here. Dropping the replay's per-session
     // state now, rather than leaving it to the tick that observes the new id,
     // also invalidates a Flutter frame still mid-send — which would otherwise
     // land in the post-logout session with no meta event ahead of it.
+    //
+    // Bumped before the platform call because native rotates inside that round
+    // trip. That narrows the window rather than closing it: a capture tick that
+    // starts inside the round trip reads — and re-adopts — the pre-rotation id.
+    // Closing it fully needs native to push the session change back to Dart.
+    // The cost of bumping early is at most one redundant meta + full snapshot at
+    // the tail of the old recording, which beats a full snapshot with no meta at
+    // the head of the new one.
     PostHogInternalEvents.forceReplaySessionReset.value++;
+    await _posthog.reset();
   }
 
   /// Disables data collection for the current user.
@@ -739,6 +747,13 @@ class Posthog {
 
   /// Closes the PostHog SDK and cleans up resources.
   ///
+  /// This is also the entry point for reconfiguring: [setup] is ignored while
+  /// the SDK is already set up, so call [close] first and then [setup] again
+  /// with the new configuration.
+  ///
+  /// The current session ends here, so session replay drops the state it keeps
+  /// per session — whatever is recorded next belongs to a new session.
+  ///
   /// Returns a [Future] that completes when platform resources have been closed.
   ///
   /// **Note:** After calling `close()`, surveys will not be rendered until the
@@ -747,6 +762,11 @@ class Posthog {
     _config = null;
     _currentScreen = null;
     PostHogInternalEvents.sessionRecordingActive.value = false;
+    // After the line above stopped the capture path: both platforms end the
+    // session here, so the replay's per-session state (meta latch, dedup
+    // hashes, tracked session id) must not survive into whatever a later
+    // setup() starts, and a frame still mid-send belongs to the closed session.
+    PostHogInternalEvents.forceReplaySessionReset.value++;
     PosthogObserver.clearCurrentContext();
 
     // Uninstall Flutter integrations
@@ -767,20 +787,26 @@ class Posthog {
   /// replay is disabled in your project settings.
   ///
   /// Set [resumeCurrent] to `true` (the default) to resume recording the current
-  /// session. Set it to `false` to start a new session and begin recording.
+  /// session. Set it to `false` to start a new session and begin recording; on
+  /// Android the session only rotates when recording is not already active, so
+  /// call [stopSessionRecording] first if you need a new session there. Either
+  /// way, `false` restarts the replay recording — a fresh meta event and full
+  /// snapshot — even when the platform keeps the current session id.
   ///
   /// Returns a [Future] that completes when the start request has been sent.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
-    await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
     if (!resumeCurrent) {
       // Mirrors the `force` flag the native replay integrations pass when a
-      // start does not resume. It is iOS that needs it: there the platform
-      // rotates the session on this call, so Dart learns of the rotation before
-      // a capture tick observes the new id. (On Android
-      // `PostHog.startSessionReplay` returns early while recording is already
-      // active, so nothing rotates and this is a cheap no-op.)
+      // start does not resume: the recording that follows must send its own meta
+      // event instead of inheriting the previous session's latch. iOS rotates
+      // the session on this call; Android rotates only when recording is not
+      // already active, since `PostHog.startSessionReplay` returns early when it
+      // is. Bumped before the platform call because native rotates inside that
+      // round trip — see reset() for why that narrows the window without
+      // closing it.
       PostHogInternalEvents.forceReplaySessionReset.value++;
     }
+    await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
     PostHogInternalEvents.sessionRecordingActive.value = true;
   }
 

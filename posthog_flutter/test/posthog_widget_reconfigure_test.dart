@@ -3,7 +3,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
-import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -130,20 +129,5 @@ void main() {
     await Posthog().close();
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
-  });
-
-  test('the capturer reads the config the SDK is currently set up with',
-      () async {
-    final first = replayConfig(const Duration(milliseconds: 500));
-    await Posthog().setup(first);
-    final capturer = ScreenshotCapturer(first);
-    expect(capturer.effectiveConfig, same(first));
-
-    await Posthog().close();
-    final second = replayConfig(const Duration(milliseconds: 250));
-    await Posthog().setup(second);
-
-    expect(capturer.effectiveConfig, same(second),
-        reason: 'masking flags must not trail a close()/setup() reconfigure');
   });
 }

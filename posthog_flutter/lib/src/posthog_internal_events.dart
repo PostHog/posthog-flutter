@@ -10,9 +10,9 @@ class PostHogInternalEvents {
 
   /// Drops the replay capture's per-session state right now, without waiting
   /// for the capture path to observe a new session id. Bumped for the session
-  /// changes Dart learns about first: `reset()`, and a start that does not
-  /// resume the current session — which must not inherit the previous session's
-  /// meta latch even on a platform that kept the same session id.
+  /// changes Dart learns about first: `reset()`, `close()`, and a start that
+  /// does not resume the current session — which must not inherit the previous
+  /// session's meta latch even on a platform that kept the same session id.
   static final forceReplaySessionReset = ValueNotifier<int>(0);
 
   /// Occlusion episode protocol, pushed by the native side. A monotonic

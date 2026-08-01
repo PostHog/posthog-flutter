@@ -2,4 +2,4 @@
 "posthog_flutter": minor
 ---
 
-Change `setup()` to ignore repeated calls until `close()` runs, matching the Android and iOS SDKs, and re-apply all session replay settings (including `throttleDelay`) on a `close()`/`setup()` reconfigure
+**Breaking:** ignore repeated `setup()` calls until `close()` runs, matching the Android and iOS SDKs — changing session replay settings such as `maskAllTexts`, `maskAllImages` or `throttleDelay` through a second `setup()` now requires calling `close()` first
