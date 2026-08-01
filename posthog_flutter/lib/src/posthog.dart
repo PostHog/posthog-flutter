@@ -374,7 +374,14 @@ class Posthog {
   /// The SDK will behave as if it has been [setup] for the first time.
   ///
   /// Returns a [Future] that completes when the reset request has been queued.
-  Future<void> reset() => _posthog.reset();
+  Future<void> reset() async {
+    await _posthog.reset();
+    // Both platforms rotate the session here. Dropping the replay's per-session
+    // state now, rather than leaving it to the tick that observes the new id,
+    // also invalidates a Flutter frame still mid-send — which would otherwise
+    // land in the post-logout session with no meta event ahead of it.
+    PostHogInternalEvents.forceReplaySessionReset.value++;
+  }
 
   /// Disables data collection for the current user.
   ///
@@ -767,10 +774,12 @@ class Posthog {
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
     if (!resumeCurrent) {
       // Mirrors the `force` flag the native replay integrations pass when a
-      // start does not resume: the request itself is the signal, since the
-      // platform may keep the same session id (Android returns early when
-      // recording is already active) and the id check alone would miss it.
-      PostHogInternalEvents.forceReplaySessionReset?.call();
+      // start does not resume. It is iOS that needs it: there the platform
+      // rotates the session on this call, so Dart learns of the rotation before
+      // a capture tick observes the new id. (On Android
+      // `PostHog.startSessionReplay` returns early while recording is already
+      // active, so nothing rotates and this is a cheap no-op.)
+      PostHogInternalEvents.forceReplaySessionReset.value++;
     }
     PostHogInternalEvents.sessionRecordingActive.value = true;
   }

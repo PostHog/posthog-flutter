@@ -131,8 +131,14 @@ class ScreenshotCapturer {
 
   /// Whether a frame captured under [sessionId] still belongs to the session the
   /// capturer is tracking — the session-level counterpart of the occlusion
-  /// episode check. A frame that crosses a rotation would ship into the new
-  /// session ahead of the meta event that session has not sent yet.
+  /// episode check, since a frame outliving its session would ship into the new
+  /// one ahead of the meta event that session has not sent yet.
+  ///
+  /// It catches a forced reset landing mid-send, and a rotation the occlusion
+  /// placeholder path observes concurrently. It does not catch a rotation the
+  /// capture tick observes: that tick is the only other writer of the tracked id
+  /// and is serialized against captures by the widget, so the id cannot move
+  /// under a capture in flight.
   bool sessionStillCurrent(String? sessionId) => _replaySessionId == sessionId;
 
   /// Called when an occlusion episode ends: invalidates the dedup hashes (else
@@ -483,7 +489,8 @@ class ScreenshotCapturer {
   /// Captures one Flutter frame, or null when there is nothing to send. Never
   /// throws.
   Future<ImageInfo?> captureScreenshot() async {
-    // A prior stop's cancel() must not veto this fresh capture.
+    // Also cleared in [_resolveCaptureTarget] (see there), but that runs only
+    // after the native round trip below, which must not be vetoed either.
     _cancelled = false;
     final state = await _nativeCommunicator.getSessionReplayState();
     if (_cancelled) {
@@ -500,7 +507,8 @@ class ScreenshotCapturer {
   }
 
   /// [sessionId] is the session this capture started in, tagged onto the frame
-  /// so the sender can drop it if the session rotates while it is being built.
+  /// so the sender can drop it if the tracked session is reset while it is
+  /// being built.
   Future<ImageInfo?> _captureScreenshot(String? sessionId) {
     final target = _resolveCaptureTarget();
     if (target == null) {

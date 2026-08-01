@@ -739,6 +739,30 @@ void main() {
       await unmountAndFlush(tester);
     });
 
+    testWidgets('reset() drops the meta latch for the post-logout session',
+        (tester) async {
+      // reset() rotates the session on both platforms. The mock keeps reporting
+      // the same id so this pins the Dart-side drop specifically, rather than
+      // the id-observation path a rotation would also trigger.
+      await deliverFirstFrame(tester);
+
+      await Posthog().reset();
+      await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason: 'the post-logout session must not inherit the previous '
+              "session's meta latch");
+      expect(methods, contains('sendFullSnapshot'));
+      expect(
+        methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: 'meta must precede the frame it describes',
+      );
+
+      await unmountAndFlush(tester);
+    });
+
     testWidgets('a repeated tick in the same session does not re-send meta',
         (tester) async {
       await deliverFirstFrame(tester);
@@ -767,7 +791,7 @@ void main() {
         // What Posthog().startSessionRecording(resumeCurrent: false) triggers,
         // landing while this very capture is mid-send.
         sessionId = 'session-b';
-        PostHogInternalEvents.forceReplaySessionReset?.call();
+        PostHogInternalEvents.forceReplaySessionReset.value++;
       };
 
       await setupPosthog(replayConfig(captureNativeScreens: false));

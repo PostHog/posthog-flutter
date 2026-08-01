@@ -67,6 +67,12 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
   final List<bool> startSessionRecordingCalls = [];
   int stopSessionRecordingCount = 0;
+  int resetCount = 0;
+
+  @override
+  Future<void> reset() async {
+    resetCount++;
+  }
 
   @override
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {

@@ -70,13 +70,17 @@ class PostHogWidgetState extends State<PostHogWidget> {
     PostHogInternalEvents.nativeOcclusionEvent.addListener(
       _onNativeOcclusionChanged,
     );
-    PostHogInternalEvents.forceReplaySessionReset = _forceReplaySessionReset;
+    PostHogInternalEvents.forceReplaySessionReset.addListener(
+      _forceReplaySessionReset,
+    );
   }
 
-  /// An explicit new-session start: the capture path has not read the new
-  /// session id yet (and on Android it may not even change), so the drop is
-  /// requested directly. Leaving the tracked id null also invalidates any
-  /// capture still in flight from the previous session.
+  /// A session change Dart knows about before the capture path could observe it:
+  /// `reset()` (both platforms rotate), and a start that does not resume — which
+  /// rotates on iOS but on Android may not rotate at all, since
+  /// `PostHog.startSessionReplay` returns early while recording is already
+  /// active. The drop is requested directly rather than waiting for a tick to
+  /// read the new id.
   void _forceReplaySessionReset() {
     _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
   }
@@ -142,9 +146,14 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   /// A frame may only ship while the world it was captured in is still current:
-  /// the same occlusion episode and the same replay session. A frame that
-  /// crosses a session rotation would land in the new session ahead of the meta
-  /// event that session has not sent yet.
+  /// the same occlusion episode and the same replay session — otherwise it lands
+  /// in the new session ahead of the meta event that session has not sent yet.
+  ///
+  /// The session half catches a forced reset (see [_forceReplaySessionReset])
+  /// landing mid-send, and a rotation observed by a concurrent occlusion
+  /// placeholder. It cannot catch a rotation observed by the capture tick: the
+  /// tick is the only other writer of the tracked id and runs serialized behind
+  /// `_isCapturing`, so the id cannot move under a capture in flight.
   bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
     return PostHogInternalEvents.episodeStillCurrent(episode,
             occluded: occluded) &&
@@ -234,7 +243,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       }
 
       // Only valid while the world it was captured in is still current — an
-      // episode or a session starting mid-pipeline makes it stale.
+      // episode or a forced session reset mid-pipeline makes it stale.
       await _sendSnapshot(
         imageInfo,
         isStillValid: () => _stillValid(imageInfo, episode, occluded: occluded),
@@ -304,12 +313,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
     PostHogInternalEvents.nativeOcclusionEvent.removeListener(
       _onNativeOcclusionChanged,
     );
-    // Guarded so a replacement widget's hook, registered before this dispose,
-    // survives.
-    if (PostHogInternalEvents.forceReplaySessionReset ==
-        _forceReplaySessionReset) {
-      PostHogInternalEvents.forceReplaySessionReset = null;
-    }
+    PostHogInternalEvents.forceReplaySessionReset.removeListener(
+      _forceReplaySessionReset,
+    );
 
     _changeDetector?.stop();
     _changeDetector = null;
