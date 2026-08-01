@@ -75,6 +75,12 @@ class ChangeDetector {
   /// Samples once before the next poll tick, forcing a frame so a static screen
   /// still gets sampled: nothing else schedules one there, and without a
   /// rendered frame the post-frame callback (and so the capture) never runs.
+  ///
+  /// No-ops while the detector is stopped, and forces no frame while
+  /// [suppressForcedFrames] is set — so a caller that ends a suppressed episode
+  /// must clear the flag before calling. The other order leaves a static screen
+  /// unsampled, freezing the replay on the episode's last frame until the app
+  /// happens to render again.
   void requestImmediateSample() {
     _scheduleFrameCallback(forceFrame: true);
   }

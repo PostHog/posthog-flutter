@@ -111,9 +111,10 @@ class ScreenshotCapturer {
   /// the Dart API can predict.
   ///
   /// [force] resets even when the id is unchanged — the counterpart of the same
-  /// flag in the native replay integrations, for an explicit start that does not
-  /// resume the current session. The new id is unknown at that point, so it is
-  /// left null until the next tick reads it.
+  /// flag in Android's PostHogReplayIntegration (iOS has none and rotates the
+  /// session instead), for an explicit start that does not resume the current
+  /// session. The new id is unknown at that point, so it is left null until the
+  /// next tick reads it.
   void resetSessionStateIfNeeded(
     String? currentSessionId, {
     bool force = false,
@@ -490,7 +491,8 @@ class ScreenshotCapturer {
   /// throws.
   Future<ImageInfo?> captureScreenshot() async {
     // Also cleared in [_resolveCaptureTarget] (see there), but that runs only
-    // after the native round trip below, which must not be vetoed either.
+    // after the native round trip below, whose post-await `_cancelled` check
+    // would otherwise veto this capture on a prior stop's flag.
     _cancelled = false;
     final state = await _nativeCommunicator.getSessionReplayState();
     if (_cancelled) {

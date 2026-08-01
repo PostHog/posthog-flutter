@@ -65,12 +65,21 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   final List<Map<String, dynamic>> setGroupPropertiesForFlagsCalls = [];
   final List<String?> resetGroupPropertiesForFlagsCalls = [];
 
+  /// Runs inside the platform round trip of the calls that cross a session
+  /// boundary, standing in for the work native does there — notably rotating
+  /// the session id, which happens while the call is still in flight.
+  Future<void> Function()? onSessionBoundaryCall;
+
   // Overridden because the base implementations throw UnimplementedError.
   @override
-  Future<void> reset() async {}
+  Future<void> reset() async {
+    await onSessionBoundaryCall?.call();
+  }
 
   @override
-  Future<void> startSessionRecording({bool resumeCurrent = true}) async {}
+  Future<void> startSessionRecording({bool resumeCurrent = true}) async {
+    await onSessionBoundaryCall?.call();
+  }
 
   @override
   Future<void> stopSessionRecording() async {}
@@ -184,7 +193,9 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> enable() async {}
 
   @override
-  Future<void> close() async {}
+  Future<void> close() async {
+    await onSessionBoundaryCall?.call();
+  }
 
   @override
   Future<void> setPersonProperties({

@@ -387,7 +387,7 @@ class Posthog {
     // The cost of bumping early is at most one redundant meta + full snapshot at
     // the tail of the old recording, which beats a full snapshot with no meta at
     // the head of the new one.
-    PostHogInternalEvents.forceReplaySessionReset.value++;
+    PostHogInternalEvents.requestReplaySessionReset();
     await _posthog.reset();
   }
 
@@ -766,7 +766,7 @@ class Posthog {
     // session here, so the replay's per-session state (meta latch, dedup
     // hashes, tracked session id) must not survive into whatever a later
     // setup() starts, and a frame still mid-send belongs to the closed session.
-    PostHogInternalEvents.forceReplaySessionReset.value++;
+    PostHogInternalEvents.requestReplaySessionReset();
     PosthogObserver.clearCurrentContext();
 
     // Uninstall Flutter integrations
@@ -796,15 +796,15 @@ class Posthog {
   /// Returns a [Future] that completes when the start request has been sent.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     if (!resumeCurrent) {
-      // Mirrors the `force` flag the native replay integrations pass when a
-      // start does not resume: the recording that follows must send its own meta
-      // event instead of inheriting the previous session's latch. iOS rotates
-      // the session on this call; Android rotates only when recording is not
-      // already active, since `PostHog.startSessionReplay` returns early when it
-      // is. Bumped before the platform call because native rotates inside that
-      // round trip — see reset() for why that narrows the window without
-      // closing it.
-      PostHogInternalEvents.forceReplaySessionReset.value++;
+      // Mirrors the `force` flag Android's PostHogReplayIntegration passes when
+      // a start does not resume: the recording that follows must send its own
+      // meta event instead of inheriting the previous session's latch. iOS has
+      // no such flag and gets there by rotating the session on this call;
+      // Android rotates only when recording is not already active, since
+      // `PostHog.startSessionReplay` returns early when it is. Bumped before the
+      // platform call because native rotates inside that round trip — see
+      // reset() for why that narrows the window without closing it.
+      PostHogInternalEvents.requestReplaySessionReset();
     }
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
     PostHogInternalEvents.sessionRecordingActive.value = true;

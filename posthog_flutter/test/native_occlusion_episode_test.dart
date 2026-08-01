@@ -63,9 +63,11 @@ void main() {
     PostHogInternalEvents.nativeBridgeFailed = false;
   }
 
-  Future<void> setupPosthog(PostHogConfig config) async {
-    PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
+  Future<PosthogFlutterPlatformFake> setupPosthog(PostHogConfig config) async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
     await Posthog().setup(config);
+    return fake;
   }
 
   PostHogConfig replayConfig({required bool captureNativeScreens}) {
@@ -104,6 +106,11 @@ void main() {
   /// Drives a full periodic capture to completion: it interleaves fake-async
   /// work (channel round-trips, the detector's timer) with real async
   /// (rasterization), so neither pumping nor [runAsync] alone gets there.
+  ///
+  /// The round count is comfortably above the number of awaits in the capture
+  /// pipeline; raise it if a capture gains awaits, otherwise the negative
+  /// assertions built on this helper (`isNot(contains(...))`) pass for the
+  /// wrong reason — the capture simply never finished.
   Future<void> settleCapture(WidgetTester tester) async {
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 1));
@@ -721,7 +728,8 @@ void main() {
         'platform keeps the session id', (tester) async {
       // Android returns early from startSessionReplay while recording is
       // already active, so the session id does not change there. The explicit
-      // request is the signal, exactly like the native integrations' `force`.
+      // request is the signal, exactly like the `force` flag Android's
+      // PostHogReplayIntegration passes on a non-resuming start.
       await deliverFirstFrame(tester);
 
       await Posthog().startSessionRecording(resumeCurrent: false);
@@ -816,6 +824,57 @@ void main() {
 
       await unmountAndFlush(tester);
     });
+
+    // Every API that crosses a session boundary must drop the replay state
+    // *before* the platform round trip, because native rotates the session
+    // inside it. Moving a bump after its `await` fails these.
+    final sessionBoundaryCalls = <String, Future<void> Function()>{
+      'reset()': () => Posthog().reset(),
+      'close()': () => Posthog().close(),
+      'startSessionRecording(resumeCurrent: false)': () =>
+          Posthog().startSessionRecording(resumeCurrent: false),
+    };
+
+    for (final entry in sessionBoundaryCalls.entries) {
+      testWidgets(
+          '${entry.key} drops the in-flight frame before the platform '
+          'round trip returns', (tester) async {
+        sessionReplayActive = true;
+        final fake = await setupPosthog(replayConfig(
+          captureNativeScreens: false,
+        ));
+        var called = false;
+        fake.onSessionBoundaryCall = () async {
+          // Stands in for the rotation native performs inside the round trip.
+          // The delay is what makes the ordering observable: a bump placed
+          // after the `await` would land only after the frame already mid-send
+          // has passed its last validity check.
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+          sessionId = 'session-b';
+        };
+        onSendMetaEvent = () {
+          if (called) return;
+          called = true;
+          // Unawaited on purpose: only the Dart-side work that happens before
+          // the platform call has to land inside this send.
+          entry.value();
+        };
+
+        await pumpReplayWidget(tester);
+        await settleCapture(tester);
+
+        final methods = recordedCalls.map((c) => c.method).toList();
+        expect(called, isTrue, reason: 'the call must land mid-send');
+        expect(methods, contains('sendMetaEvent'));
+        expect(methods, isNot(contains('sendFullSnapshot')),
+            reason: 'the frame belongs to the session that ended, so it must '
+                'be dropped rather than ship into the session native rotates '
+                'to inside the round trip');
+
+        fake.onSessionBoundaryCall = null;
+        await unmountAndFlush(tester);
+      });
+    }
 
     testWidgets('a same-session pause/resume does not re-send meta',
         (tester) async {

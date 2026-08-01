@@ -71,7 +71,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       _onNativeOcclusionChanged,
     );
     PostHogInternalEvents.forceReplaySessionReset.addListener(
-      _forceReplaySessionReset,
+      _onForcedReplaySessionReset,
     );
   }
 
@@ -81,7 +81,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   /// all, since `PostHog.startSessionReplay` returns early while recording is
   /// already active. The drop is requested directly rather than waiting for a
   /// tick to read the new id.
-  void _forceReplaySessionReset() {
+  void _onForcedReplaySessionReset() {
     _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
   }
 
@@ -149,7 +149,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   /// the same occlusion episode and the same replay session — otherwise it lands
   /// in the new session ahead of the meta event that session has not sent yet.
   ///
-  /// The session half catches a forced reset (see [_forceReplaySessionReset])
+  /// The session half catches a forced reset (see [_onForcedReplaySessionReset])
   /// landing mid-send, and a rotation observed by a concurrent occlusion
   /// placeholder. It cannot catch a rotation observed by the capture tick: the
   /// tick is the only other writer of the tracked id and runs serialized behind
@@ -170,8 +170,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // same config instance) takes effect on the restart it triggers, without
       // rebuilding the detector.
       intervalOf: () => Posthog().config?.sessionReplayConfig.throttleDelay,
-    );
-    _changeDetector?.suppressForcedFrames = _suppressFlutterCapture;
+    )..suppressForcedFrames = _suppressFlutterCapture;
   }
 
   void _onSessionRecordingChanged() {
@@ -314,7 +313,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       _onNativeOcclusionChanged,
     );
     PostHogInternalEvents.forceReplaySessionReset.removeListener(
-      _forceReplaySessionReset,
+      _onForcedReplaySessionReset,
     );
 
     _changeDetector?.stop();
