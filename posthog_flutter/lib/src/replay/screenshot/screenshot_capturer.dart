@@ -81,15 +81,26 @@ class ScreenshotCapturer {
 
   ScreenshotCapturer(this._config);
 
-  /// A close()/setup() reconfigure rebuilds the capturer, but a capture that
-  /// started before the rebuild lands still runs on the old instance —
-  /// resolving the live config at capture time keeps its masking flags from
-  /// trailing the reconfigure.
+  /// Resolves the live config at read time so masking flags never trail a
+  /// close()/setup() reconfigure.
   @visibleForTesting
   PostHogConfig get effectiveConfig => Posthog().config ?? _config;
 
   void cancel() {
     _cancelled = true;
+  }
+
+  /// Drops all per-session snapshot state so a new recording session starts
+  /// clean: it is a new session id, so it needs its own meta event and must not
+  /// have its first frame deduped against the previous session's pixels.
+  /// Also runs on a pause/resume, where the worst case is a re-sent meta plus
+  /// one non-deduped frame — both harmless, a missing meta is not.
+  void resetForNewSession() {
+    _snapshotManager.clear();
+    _lastTargetViewId = null;
+    _lastTargetStatus = null;
+    _pendingImageBytesHash = null;
+    _pendingCompositedBytesHash = null;
   }
 
   /// Called when an occlusion episode ends: invalidates the dedup hashes (else

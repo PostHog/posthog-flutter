@@ -8,6 +8,12 @@ class PostHogInternalEvents {
 
   static final sessionRecordingActive = ValueNotifier<bool>(false);
 
+  /// Bumped whenever a NEW replay session id starts (setup(), or an explicit
+  /// start that does not resume the current session). A monotonic counter, not
+  /// a bool: recording is usually already active when a session rotates, and a
+  /// bool would dedupe that away. Listeners drop their per-session state.
+  static final replaySessionStarted = ValueNotifier<int>(0);
+
   /// Occlusion episode protocol, pushed by the native side. A monotonic
   /// counter (not a bool, which would dedupe repeated states and swallow e.g. a
   /// bridge-failure re-push). Current state is in [nativeOcclusionActive] /

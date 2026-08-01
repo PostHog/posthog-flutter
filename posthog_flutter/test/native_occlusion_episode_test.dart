@@ -17,6 +17,7 @@ void main() {
 
   final recordedCalls = <MethodCall>[];
   var enableNativeBridgeResult = false;
+  var sessionReplayActive = false;
   // Optional side effect run inside the sendMetaEvent handler, used to
   // simulate the world changing mid-send (between meta and full snapshot).
   void Function()? onSendMetaEvent;
@@ -25,10 +26,11 @@ void main() {
     messenger.setMockMethodCallHandler(channel, (call) async {
       recordedCalls.add(call);
       switch (call.method) {
-        // false so the ChangeDetector's periodic captures self-drop before
-        // sending anything: these tests drive the occlusion paths only.
+        // Defaults to false so the ChangeDetector's periodic captures self-drop
+        // before sending anything: most tests here drive the occlusion paths
+        // only.
         case 'isSessionReplayActive':
-          return false;
+          return sessionReplayActive;
         case 'enableNativeBridge':
           return enableNativeBridgeResult;
         case 'sendMetaEvent':
@@ -96,9 +98,22 @@ void main() {
     await tester.pump();
   }
 
+  /// Drives a full periodic capture to completion: it interleaves fake-async
+  /// work (channel round-trips, the detector's timer) with real async
+  /// (rasterization), so neither pumping nor [runAsync] alone gets there.
+  Future<void> settleCapture(WidgetTester tester) async {
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+    }
+  }
+
   setUp(() {
     recordedCalls.clear();
     enableNativeBridgeResult = false;
+    sessionReplayActive = false;
     onSendMetaEvent = null;
     resetOcclusionState();
     mockChannel();
@@ -219,9 +234,8 @@ void main() {
       recordedCalls.clear();
 
       PostHogInternalEvents.sessionRecordingActive.value = true;
-      // A restarted detector only arms a post-frame callback, so something has
-      // to render a frame for it to fire.
-      tester.binding.scheduleFrame();
+      // start() forces the frame itself, so the restart's post-frame capture
+      // fires without the test scheduling one.
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1));
 
@@ -560,6 +574,42 @@ void main() {
       await unmountAndFlush(tester);
     });
 
+    testWidgets(
+        'resetForNewSession clears every tracked view, not just the '
+        'held one', (tester) async {
+      final config = replayConfig(captureNativeScreens: true);
+      await setupPosthog(config);
+      await pumpReplayWidget(tester);
+
+      final capturer = ScreenshotCapturer(config);
+      final imageInfo = await tester.runAsync(
+        () => capturer.buildOcclusionPlaceholder(),
+      );
+      final status = capturer.debugLastTargetStatus!;
+      capturer.confirmDelivered(imageInfo!.id, metaSent: true);
+      status.imageBytesHash = 12345;
+
+      capturer.resetForNewSession();
+
+      expect(capturer.debugLastTargetStatus, isNull,
+          reason: 'a stale delivery must not commit into the new session');
+      capturer.confirmDelivered(imageInfo.id, metaSent: true);
+      expect(status.sentMetaEvent, isTrue,
+          reason: 'the dropped status is no longer written to');
+
+      final next = await tester.runAsync(
+        () => capturer.buildOcclusionPlaceholder(),
+      );
+      final nextStatus = capturer.debugLastTargetStatus!;
+      expect(next, isNotNull);
+      expect(nextStatus.sentMetaEvent, isFalse);
+      expect(nextStatus.imageBytesHash, isNull,
+          reason: 'the same RepaintBoundary gets a fresh status, so the new '
+              'session is not deduped against the previous one');
+
+      await unmountAndFlush(tester);
+    });
+
     testWidgets('onOcclusionEnded re-arms via the held status reference',
         (tester) async {
       final config = replayConfig(captureNativeScreens: true);
@@ -584,6 +634,105 @@ void main() {
       expect(status.compositedBytesHash, isNull,
           reason: 'dedup hashes cleared so the first post-occlusion frame '
               'is never deduped away');
+
+      await unmountAndFlush(tester);
+    });
+  });
+
+  group('new replay session', () {
+    /// Drives one poll tick and renders [child], so the frame callback the
+    /// tick armed actually fires: on a static screen nothing schedules a frame
+    /// and the tick's callback would never run.
+    Future<void> tickWithRepaint(WidgetTester tester, Widget child) async {
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(PostHogWidget(child: child));
+      await settleCapture(tester);
+    }
+
+    testWidgets('startSessionRecording(resumeCurrent: false) ships meta',
+        (tester) async {
+      // A new session id, but recording was already active, so nothing about
+      // the recording flag changes — the new session still needs its own meta.
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'the first session must deliver, else there is no latched '
+              'meta to carry over');
+
+      recordedCalls.clear();
+      await Posthog().startSessionRecording(resumeCurrent: false);
+      await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason: 'the new session has no meta of its own yet');
+      expect(methods, contains('sendFullSnapshot'));
+      expect(
+        methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: 'meta must precede the frame it describes',
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('a same-session pause/resume does not re-send meta',
+        (tester) async {
+      // resumeCurrent keeps the session id, so its meta and dedup hashes are
+      // still valid: resending them would cost a redundant full-screen frame.
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'));
+
+      recordedCalls.clear();
+      await Posthog().stopSessionRecording();
+      await Posthog().startSessionRecording();
+      await settleCapture(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, isNot(contains('sendMetaEvent')));
+      expect(methods, isNot(contains('sendFullSnapshot')),
+          reason: 'the unchanged screen is still deduped against the frame '
+              'this very session already sent');
+
+      await unmountAndFlush(tester);
+    });
+  });
+
+  group('close()/setup() reconfigure', () {
+    // close() ends the native session, so what setup() starts is a new session
+    // id: it needs its own meta event, and its first frame must not be deduped
+    // against the pixels the previous session already sent.
+    testWidgets('the new session ships meta and a full snapshot',
+        (tester) async {
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'the first session must deliver, else there is no latched '
+              'meta or dedup hash to carry over');
+
+      recordedCalls.clear();
+      await Posthog().close();
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await settleCapture(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason: 'the new session has no meta of its own yet');
+      expect(methods, contains('sendFullSnapshot'),
+          reason: "the unchanged screen must still be sampled: the previous "
+              "session's dedup hash may not survive into this one");
+      expect(
+        methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: 'meta must precede the frame it describes',
+      );
 
       await unmountAndFlush(tester);
     });

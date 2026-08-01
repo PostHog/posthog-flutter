@@ -31,40 +31,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
   ChangeDetector? _changeDetector;
   ScreenshotCapturer? _screenshotCapturer;
   NativeCommunicator? _nativeCommunicator;
-  PostHogConfig? _componentsConfig;
-
-  // Typed as primitives/Object so the internal component classes stay out of
-  // the public API snapshot (PostHogWidgetState is exported).
-  @visibleForTesting
-  Object? get debugChangeDetectorIdentity => _changeDetector;
-
-  @visibleForTesting
-  Duration? get debugChangeDetectorInterval => _changeDetector?.interval;
-
-  @visibleForTesting
-  bool? get debugChangeDetectorIsRunning => _changeDetector?.isRunning;
-
-  @visibleForTesting
-  bool? get debugDetectorHasCapturedPlatformViews =>
-      _changeDetector?.hasCapturedPlatformViews;
-
-  @visibleForTesting
-  set debugDetectorHasCapturedPlatformViews(bool? value) {
-    if (value != null) _changeDetector?.hasCapturedPlatformViews = value;
-  }
-
-  @visibleForTesting
-  set debugCapturerHasCapturedPlatformViews(bool value) {
-    _screenshotCapturer?.hasCapturedPlatformViews = value;
-  }
-
-  @visibleForTesting
-  PostHogConfig? get debugCapturerEffectiveConfig =>
-      // ignore: invalid_use_of_visible_for_testing_member
-      _screenshotCapturer?.effectiveConfig;
-
-  @visibleForTesting
-  void debugTriggerOnChange() => _changeDetector?.onChange();
 
   bool _isCapturing = false;
   bool _disposed = false;
@@ -104,6 +70,15 @@ class PostHogWidgetState extends State<PostHogWidget> {
     PostHogInternalEvents.nativeOcclusionEvent.addListener(
       _onNativeOcclusionChanged,
     );
+    PostHogInternalEvents.replaySessionStarted.addListener(
+      _onReplaySessionStarted,
+    );
+  }
+
+  /// A new session id started, so the previous session's meta latch and dedup
+  /// hashes must not carry into it.
+  void _onReplaySessionStarted() {
+    _screenshotCapturer?.resetForNewSession();
   }
 
   /// A native screen started/stopped covering Flutter (pushed by the native
@@ -173,28 +148,16 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   void _initComponents(PostHogConfig config) {
-    final throttleDelay = config.sessionReplayConfig.throttleDelay;
-    // Carried across a rebuild: the flag is only refreshed after a completed
-    // capture, which on a static captured-view screen needs the forced frame
-    // this very flag gates — starting at false would stall capture forever.
-    // Seed the capturer too: the post-capture refresh copies capturer to
-    // detector, so a fresh-false capturer would erase the carry on the first
-    // bailed attempt. The capturer leads (the detector lags by one refresh).
-    final hadCapturedPlatformViews =
-        _screenshotCapturer?.hasCapturedPlatformViews ??
-            _changeDetector?.hasCapturedPlatformViews ??
-            false;
-    _componentsConfig = config;
-    _screenshotCapturer = ScreenshotCapturer(config)
-      ..hasCapturedPlatformViews = hadCapturedPlatformViews;
+    _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
     _changeDetector = ChangeDetector(
       _onChangeDetected,
-      interval: throttleDelay,
+      // Read live so a close()/setup() reconfigure (even one mutating the
+      // same config instance) takes effect without rebuilding the detector.
+      intervalOf: () =>
+          (Posthog().config ?? config).sessionReplayConfig.throttleDelay,
     );
-    // A rebuilt detector must not resume forced frames mid-occlusion.
     _changeDetector?.suppressForcedFrames = _suppressFlutterCapture;
-    _changeDetector?.hasCapturedPlatformViews = hadCapturedPlatformViews;
   }
 
   void _onSessionRecordingChanged() {
@@ -216,16 +179,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
     }
 
     if (_changeDetector == null) {
-      _initComponents(config);
-    } else if (!identical(_componentsConfig, config) ||
-        _changeDetector!.interval != config.sessionReplayConfig.throttleDelay) {
-      // A close()/setup() reconfigure changed the config; components capture
-      // config-derived state (capture throttle, masking flags) at
-      // construction, so they must be rebuilt against the new one. The
-      // interval is value-compared because the same config object may be
-      // reused with throttleDelay mutated in place.
-      _changeDetector?.stop();
-      _screenshotCapturer?.cancel();
       _initComponents(config);
     }
 
@@ -346,6 +299,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
     );
     PostHogInternalEvents.nativeOcclusionEvent.removeListener(
       _onNativeOcclusionChanged,
+    );
+    PostHogInternalEvents.replaySessionStarted.removeListener(
+      _onReplaySessionStarted,
     );
 
     _changeDetector?.stop();

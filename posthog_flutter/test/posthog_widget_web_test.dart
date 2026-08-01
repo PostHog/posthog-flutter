@@ -52,9 +52,9 @@ void main() {
 
       PostHogInternalEvents.sessionRecordingActive.value = false;
       PostHogInternalEvents.sessionRecordingActive.value = true;
-      // A restarted detector only arms a post-frame callback, and pump() is a
-      // no-op with no frame scheduled — without this the capture never runs
-      // and the test passes even when _startRecording is unguarded.
+      // Web builds no detector, so nothing forces a frame and pump() is a
+      // no-op — without this the capture never runs and the test passes even
+      // when _startRecording is unguarded.
       tester.binding.scheduleFrame();
       await tester.pump();
     });

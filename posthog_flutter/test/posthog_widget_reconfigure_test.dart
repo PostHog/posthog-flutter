@@ -3,9 +3,29 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
-import 'package:posthog_flutter/src/posthog_internal_events.dart';
+import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
+
+/// Stands in for an app that keeps rendering (an animation, a spinner). The
+/// detector samples from a post-frame callback, so without rendered frames a
+/// poll tick produces no capture at all and the cadence is unobservable.
+class _AlwaysRepainting extends StatefulWidget {
+  const _AlwaysRepainting();
+
+  @override
+  State<_AlwaysRepainting> createState() => _AlwaysRepaintingState();
+}
+
+class _AlwaysRepaintingState extends State<_AlwaysRepainting> {
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+    return const SizedBox.shrink();
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,11 +34,16 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
+  var captureAttempts = 0;
+
   setUp(() async {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
-    // false so the ChangeDetector's periodic captures self-drop
+    captureAttempts = 0;
     messenger.setMockMethodCallHandler(channel, (call) async {
       if (call.method == 'isSessionReplayActive') {
+        captureAttempts++;
+        // false so the capture self-drops before rasterizing; the call itself
+        // is the observable evidence that a poll tick reached capture.
         return false;
       }
       return null;
@@ -37,77 +62,43 @@ void main() {
       ..sessionReplayConfig.throttleDelay = throttleDelay;
   }
 
-  testWidgets(
-      'a close()/setup() reconfigure rebuilds the capture components '
-      'against the new config', (tester) async {
-    final first = replayConfig(const Duration(milliseconds: 500));
-    await Posthog().setup(first);
+  /// Renders frames for [window] and returns how many captures were attempted.
+  /// Each pump renders the frame that the previous poll tick's post-frame
+  /// callback is waiting on, so the count is the number of ticks in [window].
+  Future<int> captureAttemptsOver(WidgetTester tester, Duration window) async {
+    captureAttempts = 0;
+    const step = Duration(milliseconds: 25);
+    for (var elapsed = Duration.zero; elapsed < window; elapsed += step) {
+      await tester.pump(step);
+    }
+    // drains the last tick's capture future without advancing the clock
+    await tester.pump(Duration.zero);
+    await tester.pump(Duration.zero);
+    return captureAttempts;
+  }
 
-    await tester.pumpWidget(const PostHogWidget(child: SizedBox.shrink()));
+  testWidgets('a close()/setup() reconfigure changes the capture rate',
+      (tester) async {
+    await Posthog().setup(replayConfig(const Duration(milliseconds: 500)));
+
+    await tester.pumpWidget(const PostHogWidget(child: _AlwaysRepainting()));
     // extra pumps drain the zero-duration capture future the first frame
     // callback kicks off (the mocked isSessionReplayActive drops it)
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
-    final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
 
-    expect(
-        state.debugChangeDetectorInterval, const Duration(milliseconds: 500));
-    expect(state.debugCapturerEffectiveConfig, same(first));
+    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 2);
 
     await Posthog().close();
-    final second = replayConfig(const Duration(milliseconds: 250));
-    await Posthog().setup(second);
+    await Posthog().setup(replayConfig(const Duration(milliseconds: 250)));
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 
-    expect(
-        state.debugChangeDetectorInterval, const Duration(milliseconds: 250));
-    expect(state.debugChangeDetectorIsRunning, isTrue);
-    expect(state.debugCapturerEffectiveConfig, same(second));
+    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 4,
+        reason: 'the new throttleDelay must drive the real capture rate');
 
     // stops the detector's periodic timer before the test framework's
     // pending-timer check, then drains the last capture future
-    await Posthog().close();
-    await tester.pump(Duration.zero);
-    await tester.pump(Duration.zero);
-
-    // With the live config nulled by close(), effectiveConfig only returns
-    // `second` from a rebuilt capturer's constructor config — pre-close the
-    // live-config fallback would mask a capturer that was never rebuilt.
-    expect(state.debugCapturerEffectiveConfig, same(second));
-  });
-
-  testWidgets(
-      'a close()/setup() reconfigure keeps forcing frames when platform '
-      'views were captured', (tester) async {
-    final first = replayConfig(const Duration(milliseconds: 500));
-    await Posthog().setup(first);
-
-    await tester.pumpWidget(const PostHogWidget(child: SizedBox.shrink()));
-    await tester.pump(Duration.zero);
-    await tester.pump(Duration.zero);
-    final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
-
-    state.debugCapturerHasCapturedPlatformViews = true;
-    state.debugDetectorHasCapturedPlatformViews = true;
-
-    await Posthog().close();
-    final second = replayConfig(const Duration(milliseconds: 250));
-    await Posthog().setup(second);
-
-    // On a static screen with revealed platform views, only the forced frame
-    // this flag gates ever re-runs a capture — so the rebuilt detector must
-    // inherit it or capture stalls until the Flutter tree next repaints.
-    expect(state.debugDetectorHasCapturedPlatformViews, isTrue);
-
-    // A bailed capture attempt refreshes the detector from the capturer, so
-    // the carry must survive it — a fresh-false capturer would erase it here.
-    state.debugTriggerOnChange();
-    await tester.pump(Duration.zero);
-    await tester.pump(Duration.zero);
-
-    expect(state.debugDetectorHasCapturedPlatformViews, isTrue);
-
     await Posthog().close();
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
@@ -115,17 +106,16 @@ void main() {
 
   testWidgets(
       'a close()/setup() reconfigure reusing the same config instance with '
-      'throttleDelay mutated in place rebuilds the detector', (tester) async {
+      'throttleDelay mutated in place changes the capture rate',
+      (tester) async {
     final config = replayConfig(const Duration(milliseconds: 500));
     await Posthog().setup(config);
 
-    await tester.pumpWidget(const PostHogWidget(child: SizedBox.shrink()));
+    await tester.pumpWidget(const PostHogWidget(child: _AlwaysRepainting()));
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
-    final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
 
-    expect(
-        state.debugChangeDetectorInterval, const Duration(milliseconds: 500));
+    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 2);
 
     await Posthog().close();
     config.sessionReplayConfig.throttleDelay =
@@ -134,34 +124,26 @@ void main() {
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 
-    expect(
-        state.debugChangeDetectorInterval, const Duration(milliseconds: 250));
-    expect(state.debugChangeDetectorIsRunning, isTrue);
+    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 4,
+        reason: 'a config identical by identity still has to be re-read');
 
     await Posthog().close();
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
   });
 
-  testWidgets('recording restarts with the same config keep the components',
-      (tester) async {
-    final config = replayConfig(const Duration(milliseconds: 500));
-    await Posthog().setup(config);
-
-    await tester.pumpWidget(const PostHogWidget(child: SizedBox.shrink()));
-    await tester.pump(Duration.zero);
-    await tester.pump(Duration.zero);
-    final state = tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
-    final detector = state.debugChangeDetectorIdentity;
-
-    PostHogInternalEvents.sessionRecordingActive.value = false;
-    PostHogInternalEvents.sessionRecordingActive.value = true;
-
-    expect(state.debugChangeDetectorIdentity, same(detector));
-    expect(state.debugChangeDetectorIsRunning, isTrue);
+  test('the capturer reads the config the SDK is currently set up with',
+      () async {
+    final first = replayConfig(const Duration(milliseconds: 500));
+    await Posthog().setup(first);
+    final capturer = ScreenshotCapturer(first);
+    expect(capturer.effectiveConfig, same(first));
 
     await Posthog().close();
-    await tester.pump(Duration.zero);
-    await tester.pump(Duration.zero);
+    final second = replayConfig(const Duration(milliseconds: 250));
+    await Posthog().setup(second);
+
+    expect(capturer.effectiveConfig, same(second),
+        reason: 'masking flags must not trail a close()/setup() reconfigure');
   });
 }

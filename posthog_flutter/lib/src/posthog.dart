@@ -87,6 +87,9 @@ class Posthog {
     PostHogMaskController.instance.refreshParsers(config.sessionReplayConfig);
 
     if (config.sessionReplay) {
+      // Before flipping the recording flag, so per-session state is dropped
+      // before the restarted capture takes its first sample.
+      PostHogInternalEvents.replaySessionStarted.value++;
       PostHogInternalEvents.sessionRecordingActive.value = true;
     }
 
@@ -765,6 +768,9 @@ class Posthog {
   /// Returns a [Future] that completes when the start request has been sent.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
+    if (!resumeCurrent) {
+      PostHogInternalEvents.replaySessionStarted.value++;
+    }
     PostHogInternalEvents.sessionRecordingActive.value = true;
   }
 
