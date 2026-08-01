@@ -70,15 +70,15 @@ class PostHogWidgetState extends State<PostHogWidget> {
     PostHogInternalEvents.nativeOcclusionEvent.addListener(
       _onNativeOcclusionChanged,
     );
-    PostHogInternalEvents.replaySessionStarted.addListener(
-      _onReplaySessionStarted,
-    );
+    PostHogInternalEvents.forceReplaySessionReset = _forceReplaySessionReset;
   }
 
-  /// A new session id started, so the previous session's meta latch and dedup
-  /// hashes must not carry into it.
-  void _onReplaySessionStarted() {
-    _screenshotCapturer?.resetForNewSession();
+  /// An explicit new-session start: the capture path has not read the new
+  /// session id yet (and on Android it may not even change), so the drop is
+  /// requested directly. Leaving the tracked id null also invalidates any
+  /// capture still in flight from the previous session.
+  void _forceReplaySessionReset() {
+    _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
   }
 
   /// A native screen started/stopped covering Flutter (pushed by the native
@@ -101,14 +101,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
           'Native occlusion ended (episode $episode): resuming Flutter capture.');
       _setSuppressFlutterCapture(false);
       _screenshotCapturer?.onOcclusionEnded();
-      // A static screen renders no frame after the cover dismisses
-      // (addPostFrameCallback does not request one), so without forcing a
-      // frame here the replay would stay on the episode's last frame forever.
-      if (_changeDetector?.isRunning ?? false) {
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _onChangeDetected());
-        WidgetsBinding.instance.scheduleFrame();
-      }
+      // Without a sample here the replay would stay on the episode's last frame
+      // until the app happens to render again.
+      _changeDetector?.requestImmediateSample();
       return;
     }
     if (!replayConfig.captureNativeScreens) {
@@ -141,10 +136,20 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // A placeholder is only valid while its own episode is occluding.
       await _sendSnapshot(
         imageInfo,
-        isStillValid: () =>
-            PostHogInternalEvents.episodeStillCurrent(episode, occluded: true),
+        isStillValid: () => _stillValid(imageInfo, episode, occluded: true),
       );
     }
+  }
+
+  /// A frame may only ship while the world it was captured in is still current:
+  /// the same occlusion episode and the same replay session. A frame that
+  /// crosses a session rotation would land in the new session ahead of the meta
+  /// event that session has not sent yet.
+  bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
+    return PostHogInternalEvents.episodeStillCurrent(episode,
+            occluded: occluded) &&
+        (_screenshotCapturer?.sessionStillCurrent(imageInfo.sessionId) ??
+            false);
   }
 
   void _initComponents(PostHogConfig config) {
@@ -153,9 +158,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _changeDetector = ChangeDetector(
       _onChangeDetected,
       // Read live so a close()/setup() reconfigure (even one mutating the
-      // same config instance) takes effect without rebuilding the detector.
-      intervalOf: () =>
-          (Posthog().config ?? config).sessionReplayConfig.throttleDelay,
+      // same config instance) takes effect on the restart it triggers, without
+      // rebuilding the detector.
+      intervalOf: () => Posthog().config?.sessionReplayConfig.throttleDelay,
     );
     _changeDetector?.suppressForcedFrames = _suppressFlutterCapture;
   }
@@ -229,11 +234,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
       }
 
       // Only valid while the world it was captured in is still current — an
-      // episode starting mid-pipeline makes it stale.
+      // episode or a session starting mid-pipeline makes it stale.
       await _sendSnapshot(
         imageInfo,
-        isStillValid: () => PostHogInternalEvents.episodeStillCurrent(episode,
-            occluded: occluded),
+        isStillValid: () => _stillValid(imageInfo, episode, occluded: occluded),
       );
     } finally {
       _isCapturing = false;
@@ -300,9 +304,12 @@ class PostHogWidgetState extends State<PostHogWidget> {
     PostHogInternalEvents.nativeOcclusionEvent.removeListener(
       _onNativeOcclusionChanged,
     );
-    PostHogInternalEvents.replaySessionStarted.removeListener(
-      _onReplaySessionStarted,
-    );
+    // Guarded so a replacement widget's hook, registered before this dispose,
+    // survives.
+    if (PostHogInternalEvents.forceReplaySessionReset ==
+        _forceReplaySessionReset) {
+      PostHogInternalEvents.forceReplaySessionReset = null;
+    }
 
     _changeDetector?.stop();
     _changeDetector = null;

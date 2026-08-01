@@ -65,7 +65,9 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('re-arms each tick with the live interval', (tester) async {
+    testWidgets('resolves the interval once per start()', (tester) async {
+      // The detector is stopped and restarted around every reconfigure, so the
+      // cadence only has to follow a stop/start — not every tick.
       var interval = const Duration(seconds: 1);
       final detector = ChangeDetector(() {}, intervalOf: () => interval)
         ..hasCapturedPlatformViews = true;
@@ -74,56 +76,40 @@ void main() {
       await tester.pump();
 
       interval = const Duration(milliseconds: 250);
-      await tester.binding.delayed(const Duration(seconds: 1));
-      expect(tester.binding.hasScheduledFrame, isTrue,
-          reason: 'a tick armed before the change still fires at the old '
-              'interval');
+      await tester.binding.delayed(const Duration(milliseconds: 999));
+      expect(tester.binding.hasScheduledFrame, isFalse,
+          reason: 'a running detector keeps the interval it started with');
+      await tester.binding.delayed(const Duration(milliseconds: 1));
+      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pump();
+
+      detector.stop();
+      detector.start();
       await tester.pump();
 
       await tester.binding.delayed(const Duration(milliseconds: 249));
       expect(tester.binding.hasScheduledFrame, isFalse);
       await tester.binding.delayed(const Duration(milliseconds: 1));
       expect(tester.binding.hasScheduledFrame, isTrue,
-          reason: 'the next arm reads the new interval');
+          reason: 'the restart reads the new interval');
 
       detector.stop();
       await tester.pump();
     });
 
-    testWidgets('keeps polling when intervalOf throws', (tester) async {
-      // intervalOf reads the host app's config, so a broken one must fall back
-      // to the last interval rather than propagate out of the timer callback,
-      // which would leave _isRunning true with no timer pending: capture dead
-      // for good, and an uncaught async error in the host app's zone.
-      var resolves = 0;
+    testWidgets('does not start without an interval', (tester) async {
+      // No interval means the SDK is not set up, so there is nothing to poll.
       var ticks = 0;
-      final detector = ChangeDetector(
-        () => ticks++,
-        intervalOf: () {
-          resolves++;
-          if (resolves == 2) {
-            throw StateError('config blew up');
-          }
-          return const Duration(seconds: 1);
-        },
-      )..hasCapturedPlatformViews = true;
+      final detector = ChangeDetector(() => ticks++, intervalOf: () => null)
+        ..hasCapturedPlatformViews = true;
 
       detector.start();
+      expect(detector.isRunning, isFalse);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
       await tester.pump();
-      expect(ticks, 1);
-
-      for (var i = 0; i < 3; i++) {
-        await tester.binding.delayed(const Duration(seconds: 1));
-        await tester.pump();
-      }
-
-      expect(ticks, 4,
-          reason: 'the failed resolve falls back to the last interval and the '
-              'chain re-arms every tick');
-      expect(detector.isRunning, isTrue);
-
-      detector.stop();
-      await tester.pump();
+      await tester.binding.delayed(const Duration(seconds: 2));
+      expect(ticks, 0);
     });
 
     testWidgets('keeps polling when onChange throws', (tester) async {

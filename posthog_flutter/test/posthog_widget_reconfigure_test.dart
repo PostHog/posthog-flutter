@@ -40,11 +40,11 @@ void main() {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
     captureAttempts = 0;
     messenger.setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'isSessionReplayActive') {
+      if (call.method == 'getSessionReplayState') {
         captureAttempts++;
-        // false so the capture self-drops before rasterizing; the call itself
-        // is the observable evidence that a poll tick reached capture.
-        return false;
+        // inactive so the capture self-drops before rasterizing; the call
+        // itself is the observable evidence that a poll tick reached capture.
+        return {'isActive': false};
       }
       return null;
     });
@@ -83,7 +83,7 @@ void main() {
 
     await tester.pumpWidget(const PostHogWidget(child: _AlwaysRepainting()));
     // extra pumps drain the zero-duration capture future the first frame
-    // callback kicks off (the mocked isSessionReplayActive drops it)
+    // callback kicks off (the mocked inactive state drops it)
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 

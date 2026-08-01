@@ -87,9 +87,6 @@ class Posthog {
     PostHogMaskController.instance.refreshParsers(config.sessionReplayConfig);
 
     if (config.sessionReplay) {
-      // Before flipping the recording flag, so per-session state is dropped
-      // before the restarted capture takes its first sample.
-      PostHogInternalEvents.replaySessionStarted.value++;
       PostHogInternalEvents.sessionRecordingActive.value = true;
     }
 
@@ -769,7 +766,11 @@ class Posthog {
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
     if (!resumeCurrent) {
-      PostHogInternalEvents.replaySessionStarted.value++;
+      // Mirrors the `force` flag the native replay integrations pass when a
+      // start does not resume: the request itself is the signal, since the
+      // platform may keep the same session id (Android returns early when
+      // recording is already active) and the id check alone would miss it.
+      PostHogInternalEvents.forceReplaySessionReset?.call();
     }
     PostHogInternalEvents.sessionRecordingActive.value = true;
   }

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:posthog_flutter/src/util/logging.dart';
 
 /// A class that detects changes in the UI and executes a callback when changes occur.
 ///
@@ -24,14 +23,13 @@ import 'package:posthog_flutter/src/util/logging.dart';
 class ChangeDetector {
   final VoidCallback onChange;
 
-  /// Resolved before each poll is armed, so a config change (e.g. a
-  /// close()/setup() reconfigure with a new throttleDelay) takes effect on
-  /// the next tick without rebuilding the detector.
-  final Duration Function() intervalOf;
+  /// Resolved once per [start]. The detector is stopped and restarted around
+  /// every reconfigure, so reading it there is enough for a new throttleDelay
+  /// to take effect; null means there is no config to poll for.
+  final Duration? Function() intervalOf;
 
   bool _isRunning = false;
   Timer? _timer;
-  Duration _lastInterval = const Duration(seconds: 1);
 
   bool hasCapturedPlatformViews = false;
 
@@ -44,8 +42,7 @@ class ChangeDetector {
 
   /// Creates a [ChangeDetector] with the given [onChange] callback.
   ///
-  /// [intervalOf] is consulted before each poll and controls how often to
-  /// check for changes.
+  /// [intervalOf] controls how often to check for changes.
   ChangeDetector(this.onChange, {required this.intervalOf});
 
   /// Starts the change detection process.
@@ -56,13 +53,14 @@ class ChangeDetector {
     if (_isRunning) {
       return;
     }
+    final interval = intervalOf();
+    if (interval == null) {
+      return;
+    }
 
     _isRunning = true;
-    // Force the first frame: on a static screen nothing else schedules one,
-    // and without a rendered frame the post-frame callback (and so the first
-    // capture) would never run.
-    _scheduleFrameCallback(forceFrame: true);
-    _armTimer();
+    requestImmediateSample();
+    _timer = Timer.periodic(interval, (_) => _scheduleFrameCallback());
   }
 
   /// Stops the change detection process.
@@ -74,32 +72,11 @@ class ChangeDetector {
     _timer = null;
   }
 
-  void _armTimer() {
-    _timer = Timer(_resolveInterval(), () {
-      if (!_isRunning) {
-        return;
-      }
-      // Defensive: re-arm before doing anything that could throw. A throw here
-      // would otherwise leave the chain dead with _isRunning still true, which
-      // makes start() a no-op forever.
-      _armTimer();
-      try {
-        _scheduleFrameCallback();
-      } catch (error) {
-        printIfDebug('Error scheduling change detection frame: $error');
-      }
-    });
-  }
-
-  /// Never throws: [intervalOf] comes from the host app's config, and a broken
-  /// one must neither stop polling nor surface in the app's zone.
-  Duration _resolveInterval() {
-    try {
-      return _lastInterval = intervalOf();
-    } catch (error) {
-      printIfDebug('Error resolving the change detection interval: $error');
-      return _lastInterval;
-    }
+  /// Samples once before the next poll tick, forcing a frame so a static screen
+  /// still gets sampled: nothing else schedules one there, and without a
+  /// rendered frame the post-frame callback (and so the capture) never runs.
+  void requestImmediateSample() {
+    _scheduleFrameCallback(forceFrame: true);
   }
 
   /// Schedules a single post-frame callback to invoke [onChange].
