@@ -578,17 +578,19 @@ class Posthog {
   /// cannot see.
   ///
   /// [appId] identifies the app the token belongs to: the Firebase
-  /// `project_id` on Android, the APNs bundle id on iOS. Leave it `null` and
-  /// each platform derives its own — but the Android side derives it from the
-  /// default `FirebaseApp`, so pass [appId] explicitly if your app does not use
-  /// Firebase, or registers tokens for a non-default Firebase project.
-  /// Otherwise the call is skipped on Android and the token is never
-  /// registered.
+  /// `project_id` for an FCM token, the APNs bundle id for an APNs token. It is
+  /// what tells PostHog which provider to deliver through — the platform is
+  /// only recorded alongside it. Leave it `null` and iOS falls back to the
+  /// bundle id while Android falls back to the default `FirebaseApp`'s project
+  /// id, so pass it explicitly if your app does not use Firebase or registers
+  /// for a non-default Firebase project. Android cannot register without one
+  /// and reports the skip as a `PlatformException`, logged in debug builds.
   ///
-  /// **The token differs per platform.** iOS registers the raw APNs device
-  /// token; Android registers the FCM token. `firebase_messaging`'s
-  /// `onTokenRefresh` yields an FCM token on both, so guard it — passing an FCM
-  /// token on iOS overwrites the correct APNs token and breaks delivery:
+  /// **The default is APNs on iOS and FCM on Android**, matching what
+  /// [PostHogConfig.capturePushNotificationSubscriptions] registers on its own.
+  /// `firebase_messaging`'s `onTokenRefresh` yields an FCM token on both
+  /// platforms, so forwarding it unguarded pairs an FCM token with the iOS
+  /// bundle id and delivery fails:
   ///
   /// ```dart
   /// if (Platform.isAndroid) {
@@ -597,6 +599,19 @@ class Posthog {
   ///   );
   /// }
   /// ```
+  ///
+  /// **Using FCM on both platforms** is supported — pass the Firebase
+  /// `project_id` as [appId] on iOS too — but you must set
+  /// [PostHogConfig.capturePushNotificationSubscriptions] to `false` first.
+  /// PostHog stores one subscription per app id, so leaving automatic
+  /// registration on gives an iOS device two: an APNs one under the bundle id
+  /// and an FCM one under the project id. A Workflow configured with both
+  /// integrations then delivers to that device twice, and
+  /// [unregisterPushNotificationToken] only clears the most recently registered
+  /// of the two.
+  ///
+  /// Registration also fails server-side if your PostHog project has no
+  /// Firebase or APNs integration configured for [appId].
   ///
   /// Not supported on Flutter web or macOS.
   Future<void> registerPushNotificationToken(
@@ -620,12 +635,10 @@ class Posthog {
   /// Captures `$push_notification_opened` when a user opens a push
   /// notification.
   ///
-  /// What [PostHogConfig.capturePushNotificationOpened] already captures
-  /// differs per platform: iOS sees every tap on a remote notification through
-  /// the notification-response delegate, while Android only sees the launch
-  /// intent of a cold start. So call this for Android's warm-start and
-  /// foreground taps, and guard it — calling it on iOS double-counts the tap
-  /// the native SDK already captured:
+  /// Call this only for opens [PostHogConfig.capturePushNotificationOpened]
+  /// cannot see itself — local notifications on either platform, plus
+  /// warm-start and foreground taps on Android — or the tap is counted twice.
+  /// That doc has the full coverage matrix.
   ///
   /// ```dart
   /// if (Platform.isAndroid) {

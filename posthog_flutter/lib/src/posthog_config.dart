@@ -227,11 +227,12 @@ class PostHogConfig {
   /// taps a PostHog-delivered notification.
   ///
   /// Coverage differs per platform. iOS hooks the notification-response
-  /// delegate, so every tap on a remote notification is captured whatever the
-  /// app state. Android only reads the launch intent, so it sees cold starts
-  /// alone — call [Posthog.capturePushNotificationOpened] there for foreground
-  /// messages and warm-start taps, guarded to Android so iOS does not
-  /// double-count.
+  /// delegate, so every tap on a **remote** notification is captured whatever
+  /// the app state; locally-scheduled notifications are ignored. Android only
+  /// reads the launch intent, so it sees cold starts alone. Call
+  /// [Posthog.capturePushNotificationOpened] for the opens this misses —
+  /// local notifications on either platform, plus foreground messages and
+  /// warm-start taps on Android.
   ///
   /// **Flutter web:** not supported. Defaults to `true`.
   bool capturePushNotificationOpened = true;
