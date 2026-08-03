@@ -39,6 +39,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private static var instance: PosthogFlutterPlugin?
     private var channel: FlutterMethodChannel?
 
+    // The mint route for pushIdentityProvider, anchored to the engine whose
+    // setup() installed the provider: a secondary engine (e.g. firebase_messaging's
+    // background isolate, with no Dart-side handler) can neither steal the route
+    // nor, on detach, null it; a detached owner declines promptly instead of
+    // stalling the native 10s mint watchdog. Main-thread only.
+    private static var pushChannel: FlutterMethodChannel?
+
     public static func getInstance() -> PosthogFlutterPlugin? {
         instance
     }
@@ -317,13 +324,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         #endif
 
         if posthogConfig["pushIdentityProviderEnabled"] as? Bool == true {
+            PosthogFlutterPlugin.pushChannel = instance.channel
             // Resolved at call time, not captured: the native SDK holds this closure
             // for the life of the process and no-ops a second setup(), so a closure
             // bound to the setup-time instance would go permanently dead once a new
             // Flutter engine attaches.
             config.pushIdentityProvider = { distinctId, appId, completion in
                 DispatchQueue.main.async {
-                    guard let channel = PosthogFlutterPlugin.instance?.channel else {
+                    guard let channel = PosthogFlutterPlugin.pushChannel else {
                         declinePushIdentity(completion, "no Flutter engine attached")
                         return
                     }
@@ -742,6 +750,9 @@ extension PosthogFlutterPlugin {
     // The occlusion timer retains its closure until invalidated; without this
     // it would survive engine detach and push zombie occlusion events.
     public func detachFromEngine(for _: FlutterPluginRegistrar) {
+        if PosthogFlutterPlugin.pushChannel === channel {
+            PosthogFlutterPlugin.pushChannel = nil
+        }
         #if os(iOS)
             DispatchQueue.main.async { [weak self] in
                 self?.stopOcclusionDetector()

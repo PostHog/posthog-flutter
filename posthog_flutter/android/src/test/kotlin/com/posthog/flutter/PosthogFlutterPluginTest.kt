@@ -7,10 +7,14 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.StandardMethodCodec
+import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
+import java.nio.ByteBuffer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -52,10 +56,7 @@ internal class PosthogFlutterPluginTest {
     @Test
     fun onMethodCall_sendMetaEvent_repliesAfterWorkDropsOnDetachRecoversOnReattach() {
         val plugin = PosthogFlutterPlugin()
-        val binding = Mockito.mock(FlutterPlugin.FlutterPluginBinding::class.java)
-        Mockito.`when`(binding.applicationContext).thenReturn(Mockito.mock(Context::class.java))
-        Mockito.`when`(binding.binaryMessenger).thenReturn(Mockito.mock(BinaryMessenger::class.java))
-        plugin.onAttachedToEngine(binding)
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
 
         val call = MethodCall("sendMetaEvent", mapOf("width" to 10, "height" to 20, "screen" to "Home"))
 
@@ -333,5 +334,160 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, mockResult)
 
         Mockito.verify(mockResult).success(null)
+    }
+
+    // The stubbed test Looper makes runOnMainThread run inline (myLooper and
+    // getMainLooper both default to null), so mint round trips are synchronous here.
+
+    private fun attach(
+        plugin: PosthogFlutterPlugin,
+        messenger: BinaryMessenger,
+    ): FlutterPlugin.FlutterPluginBinding {
+        val binding = Mockito.mock(FlutterPlugin.FlutterPluginBinding::class.java)
+        Mockito.`when`(binding.applicationContext).thenReturn(Mockito.mock(Context::class.java))
+        Mockito.`when`(binding.binaryMessenger).thenReturn(messenger)
+        plugin.onAttachedToEngine(binding)
+        return binding
+    }
+
+    private fun setupWithIdentityProvider(plugin: PosthogFlutterPlugin): (String, String, (String?) -> Unit) -> Unit {
+        val call =
+            MethodCall(
+                "setup",
+                mapOf("projectToken" to "test-token", "pushIdentityProviderEnabled" to true),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        return assertNotNull(plugin.postHogConfig?.pushIdentityProvider)
+    }
+
+    private fun replyToMint(
+        messenger: BinaryMessenger,
+        response: ByteBuffer?,
+        invocation: Int = 1,
+    ): MethodCall {
+        val messageCaptor = ArgumentCaptor.forClass(ByteBuffer::class.java)
+        val replyCaptor = ArgumentCaptor.forClass(BinaryMessenger.BinaryReply::class.java)
+        Mockito
+            .verify(messenger, Mockito.times(invocation))
+            .send(Mockito.eq("posthog_flutter"), messageCaptor.capture(), replyCaptor.capture())
+        val message = messageCaptor.value.also { it.rewind() }
+        replyCaptor.value.reply(response)
+        return StandardMethodCodec.INSTANCE.decodeMethodCall(message)
+    }
+
+    private fun successEnvelope(value: Any?): ByteBuffer = StandardMethodCodec.INSTANCE.encodeSuccessEnvelope(value).also { it.rewind() }
+
+    private data class ProviderHarness(
+        val plugin: PosthogFlutterPlugin,
+        val messenger: BinaryMessenger,
+        val binding: FlutterPlugin.FlutterPluginBinding,
+        val provider: (String, String, (String?) -> Unit) -> Unit,
+    )
+
+    private fun pluginWithProvider(): ProviderHarness {
+        val plugin = PosthogFlutterPlugin()
+        val messenger = Mockito.mock(BinaryMessenger::class.java)
+        val binding = attach(plugin, messenger)
+        return ProviderHarness(plugin, messenger, binding, setupWithIdentityProvider(plugin))
+    }
+
+    @Test
+    fun pushIdentityProvider_mintsThroughEngineThatRanSetup() {
+        val owner = pluginWithProvider()
+
+        var minted: String? = null
+        owner.provider("user-1", "com.example.app") { minted = it }
+
+        val sent = replyToMint(owner.messenger, successEnvelope("minted-token"))
+        assertEquals("pushIdentityProvider", sent.method)
+        assertEquals(
+            mapOf("distinctId" to "user-1", "appId" to "com.example.app"),
+            sent.arguments,
+        )
+        assertEquals("minted-token", minted)
+    }
+
+    @Test
+    fun pushIdentityProvider_dartError_declinesWithNullToken() {
+        val owner = pluginWithProvider()
+
+        var minted: String? = "sentinel"
+        owner.provider("user-1", "com.example.app") { minted = it }
+        replyToMint(
+            owner.messenger,
+            StandardMethodCodec.INSTANCE
+                .encodeErrorEnvelope("MINT_FAILED", "backend down", null)
+                .also { it.rewind() },
+        )
+
+        assertNull(minted)
+    }
+
+    @Test
+    fun pushIdentityProvider_notImplemented_declinesWithNullToken() {
+        val owner = pluginWithProvider()
+
+        var minted: String? = "sentinel"
+        owner.provider("user-1", "com.example.app") { minted = it }
+        // A null binary reply is how the channel signals notImplemented.
+        replyToMint(owner.messenger, null)
+
+        assertNull(minted)
+    }
+
+    @Test
+    fun pushIdentityProvider_secondaryEngineNeitherStealsNorClearsRoute() {
+        val owner = pluginWithProvider()
+
+        // A secondary engine (firebase_messaging-style background isolate)
+        // attaches without running setup: it must not steal the mint route...
+        val background = PosthogFlutterPlugin()
+        val backgroundMessenger = Mockito.mock(BinaryMessenger::class.java)
+        val backgroundBinding = attach(background, backgroundMessenger)
+
+        var minted: String? = null
+        owner.provider("user-1", "app") { minted = it }
+        replyToMint(owner.messenger, successEnvelope("tok-1"))
+        assertEquals("tok-1", minted)
+        Mockito
+            .verify(backgroundMessenger, Mockito.never())
+            .send(Mockito.any(), Mockito.any(), Mockito.any())
+
+        // ...nor null it when it detaches.
+        background.onDetachedFromEngine(backgroundBinding)
+        owner.provider("user-1", "app") { minted = it }
+        replyToMint(owner.messenger, successEnvelope("tok-2"), invocation = 2)
+        assertEquals("tok-2", minted)
+    }
+
+    @Test
+    fun pushIdentityProvider_declinesPromptlyAfterOwnerDetach() {
+        val owner = pluginWithProvider()
+
+        // Declines synchronously instead of stalling the native 10s mint
+        // watchdog on a dead messenger.
+        owner.plugin.onDetachedFromEngine(owner.binding)
+        var declined = false
+        owner.provider("user-1", "app") { declined = it == null }
+
+        assertTrue(declined)
+        Mockito
+            .verify(owner.messenger, Mockito.never())
+            .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
+
+    @Test
+    fun pushIdentityProvider_reSetupAfterDetachRepointsRoute() {
+        val owner = pluginWithProvider()
+        owner.plugin.onDetachedFromEngine(owner.binding)
+
+        val reattachedMessenger = Mockito.mock(BinaryMessenger::class.java)
+        attach(owner.plugin, reattachedMessenger)
+        setupWithIdentityProvider(owner.plugin)
+
+        var minted: String? = null
+        owner.provider("user-1", "app") { minted = it }
+        replyToMint(reattachedMessenger, successEnvelope("tok-3"))
+        assertEquals("tok-3", minted)
     }
 }

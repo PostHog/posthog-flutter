@@ -63,7 +63,7 @@ class PosthogFlutterPlugin :
     private var activity: Activity? = null
     private var application: Application? = null
 
-    private var postHogConfig: PostHogAndroidConfig? = null
+    internal var postHogConfig: PostHogAndroidConfig? = null
 
     // Occluded = host activity STOPPED (not just paused — a translucent/dialog
     // activity pauses the host while Flutter stays visible) AND one of our own
@@ -148,7 +148,6 @@ class PosthogFlutterPlugin :
             snapshotSendExecutor = Executors.newSingleThreadExecutor()
         }
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
-        activeChannel = channel
 
         this.applicationContext = flutterPluginBinding.applicationContext
         initPlugin()
@@ -682,6 +681,7 @@ class PosthogFlutterPlugin :
                 }
                 posthogConfig.getIfNotNull<Boolean>("pushIdentityProviderEnabled") { enabled ->
                     if (enabled) {
+                        activeChannel = channel
                         pushIdentityProvider = { distinctId, appId, completion ->
                             val target = activeChannel
                             if (target == null) {
@@ -729,8 +729,10 @@ class PosthogFlutterPlugin :
                     }
             }
 
-        PostHogAndroid.setup(applicationContext, config)
+        // Stored before the SDK call: unit tests reach the built config (and the
+        // pushIdentityProvider installed on it) even when setup throws on a mock Context.
         postHogConfig = config
+        PostHogAndroid.setup(applicationContext, config)
         cachedReplayIntegration = null
     }
 
@@ -2016,9 +2018,12 @@ class PosthogFlutterPlugin :
     }
 
     companion object {
-        // The pushIdentityProvider closure outlives any single engine attachment, so the
-        // channel is resolved at call time: a re-attached engine stays mintable, and a
-        // detached one declines instead of stalling the native 10s mint watchdog.
+        // The mint route for the pushIdentityProvider closure, resolved at call time
+        // because the native SDK holds the closure for the process lifetime. Anchored to
+        // the engine whose setup() installed the provider: a secondary engine (e.g.
+        // firebase_messaging's background isolate, with no Dart-side handler) can neither
+        // steal the route nor, on detach, null it; a detached owner declines promptly
+        // instead of stalling the native 10s mint watchdog.
         @Volatile
         private var activeChannel: MethodChannel? = null
 
