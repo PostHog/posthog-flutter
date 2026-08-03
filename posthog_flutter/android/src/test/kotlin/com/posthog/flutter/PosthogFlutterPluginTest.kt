@@ -2,6 +2,7 @@ package com.posthog.flutter
 
 import android.app.Activity
 import android.content.Context
+import com.google.firebase.FirebaseApp
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
@@ -11,6 +12,7 @@ import io.flutter.plugin.common.StandardMethodCodec
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import java.nio.ByteBuffer
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -27,6 +29,11 @@ import kotlin.test.assertTrue
  */
 
 internal class PosthogFlutterPluginTest {
+    @BeforeTest
+    fun resetSharedRoute() {
+        PosthogFlutterPlugin.resetPushIdentityRouteForTesting()
+    }
+
     @Test
     fun onMethodCall_identify_returnsExpectedValue() {
         val plugin = PosthogFlutterPlugin()
@@ -276,9 +283,10 @@ internal class PosthogFlutterPluginTest {
     fun onMethodCall_registerPushNotificationToken_noAppIdAndNoFirebase_reportsSkip() {
         val plugin = PosthogFlutterPlugin()
 
-        // Firebase isn't on the unit-test classpath, so the reflective project-id
-        // fallback finds nothing. The token can't be registered, and reporting it as
-        // an error is what lets Dart log the skip instead of seeing a false success.
+        // The FirebaseApp stub isn't initialized, so the reflective project-id
+        // fallback finds nothing; the missing id is reported as an error so Dart
+        // logs the skip instead of seeing a false success.
+        FirebaseApp.projectId = null
         val call = MethodCall("registerPushNotificationToken", mapOf("deviceToken" to "token-abc"))
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
@@ -286,6 +294,41 @@ internal class PosthogFlutterPluginTest {
         Mockito.verify(mockResult).error(
             Mockito.eq("PosthogFlutterException"),
             Mockito.contains("no appId provided"),
+            Mockito.isNull(),
+        )
+        Mockito.verify(mockResult, Mockito.never()).success(Mockito.any())
+    }
+
+    @Test
+    fun onMethodCall_registerPushNotificationToken_noAppIdWithFirebase_resolvesProjectId() {
+        val plugin = PosthogFlutterPlugin()
+
+        // With the stub initialized, the reflective fallback resolves a project
+        // id and registration proceeds instead of erroring.
+        FirebaseApp.projectId = "stub-project"
+        try {
+            val call = MethodCall("registerPushNotificationToken", mapOf("deviceToken" to "token-abc"))
+            val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+            plugin.onMethodCall(call, mockResult)
+
+            Mockito.verify(mockResult).success(null)
+            Mockito.verify(mockResult, Mockito.never()).error(Mockito.any(), Mockito.any(), Mockito.any())
+        } finally {
+            FirebaseApp.projectId = null
+        }
+    }
+
+    @Test
+    fun onMethodCall_registerPushNotificationToken_blankDeviceToken_returnsError() {
+        val plugin = PosthogFlutterPlugin()
+
+        val call = MethodCall("registerPushNotificationToken", mapOf("deviceToken" to "  "))
+        val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(call, mockResult)
+
+        Mockito.verify(mockResult).error(
+            Mockito.eq("PosthogFlutterException"),
+            Mockito.eq("Missing argument: deviceToken"),
             Mockito.isNull(),
         )
         Mockito.verify(mockResult, Mockito.never()).success(Mockito.any())
@@ -357,7 +400,7 @@ internal class PosthogFlutterPluginTest {
                 mapOf("projectToken" to "test-token", "pushIdentityProviderEnabled" to true),
             )
         plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
-        return assertNotNull(plugin.postHogConfig?.pushIdentityProvider)
+        return assertNotNull(plugin.lastBuiltConfig?.pushIdentityProvider)
     }
 
     private fun replyToMint(
@@ -433,6 +476,33 @@ internal class PosthogFlutterPluginTest {
         replyToMint(owner.messenger, null)
 
         assertNull(minted)
+    }
+
+    @Test
+    fun pushIdentityProvider_secondarySetupNeitherStealsNorOrphansRoute() {
+        val owner = pluginWithProvider()
+
+        // A background isolate (firebase_messaging pattern) legitimately re-runs
+        // setup() with the same provider-enabled config. The native SDK no-ops
+        // the duplicate setup; the mint route must stay with the live owner...
+        val background = PosthogFlutterPlugin()
+        val backgroundMessenger = Mockito.mock(BinaryMessenger::class.java)
+        val backgroundBinding = attach(background, backgroundMessenger)
+        setupWithIdentityProvider(background)
+
+        var minted: String? = null
+        owner.provider("user-1", "app") { minted = it }
+        replyToMint(owner.messenger, successEnvelope("tok-1"))
+        assertEquals("tok-1", minted)
+        Mockito
+            .verify(backgroundMessenger, Mockito.never())
+            .send(Mockito.any(), Mockito.any(), Mockito.any())
+
+        // ...and its detach must not orphan the owner's route.
+        background.onDetachedFromEngine(backgroundBinding)
+        owner.provider("user-1", "app") { minted = it }
+        replyToMint(owner.messenger, successEnvelope("tok-2"), invocation = 2)
+        assertEquals("tok-2", minted)
     }
 
     @Test

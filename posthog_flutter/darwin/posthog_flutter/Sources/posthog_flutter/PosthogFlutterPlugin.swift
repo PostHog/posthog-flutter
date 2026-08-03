@@ -120,8 +120,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         ])
     }
 
-    private static func setupPostHog(_ posthogConfig: [String: Any]) {
-        guard let instance = PosthogFlutterPlugin.instance else {
+    // `anchor` is the engine that called setup(); the static `instance` is only the
+    // Info.plist auto-setup fallback. Resolving from `instance` would bind the mint
+    // route to whichever engine registered last.
+    private static func setupPostHog(_ posthogConfig: [String: Any], anchor: PosthogFlutterPlugin? = nil) {
+        guard let instance = anchor ?? PosthogFlutterPlugin.instance else {
             print("[PostHog] Plugin instance not found!")
             return
         }
@@ -324,7 +327,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         #endif
 
         if posthogConfig["pushIdentityProviderEnabled"] as? Bool == true {
-            PosthogFlutterPlugin.pushChannel = instance.channel
+            // Anchor only if unowned: a live owner is never displaced by a secondary
+            // engine's setup(), and detach nils the field so a later re-setup can re-anchor.
+            if PosthogFlutterPlugin.pushChannel == nil {
+                PosthogFlutterPlugin.pushChannel = instance.channel
+            }
             // Resolved at call time, not captured: the native SDK holds this closure
             // for the life of the process and no-ops a second setup(), so a closure
             // bound to the setup-time instance would go permanently dead once a new
@@ -1156,7 +1163,7 @@ extension PosthogFlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any] {
-            PosthogFlutterPlugin.setupPostHog(args)
+            PosthogFlutterPlugin.setupPostHog(args, anchor: self)
             result(nil)
         } else {
             _badArgumentError(result)

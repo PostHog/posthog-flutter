@@ -88,6 +88,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         // Returning a value here is the reply the native SDK awaits.
         final provider = _pushIdentityProvider;
         if (provider == null) {
+          printIfDebug(
+              'pushIdentityProvider invoked but no provider is configured; push subscription will be sent unauthenticated.');
           return null;
         }
         try {
@@ -881,6 +883,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (!isSupportedPlatform()) {
       return;
     }
+    if (isMacOS()) {
+      // The native macOS handler is a no-op (posthog-ios push is iOS-only).
+      printIfDebug(
+          'registerPushNotificationToken is not supported on macOS; token not registered.');
+    }
 
     try {
       await _methodChannel.invokeMethod('registerPushNotificationToken', {
@@ -896,6 +903,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> unregisterPushNotificationToken() async {
     if (!isSupportedPlatform()) {
       return;
+    }
+    if (isMacOS()) {
+      // The native macOS handler is a no-op (posthog-ios push is iOS-only).
+      printIfDebug(
+          'unregisterPushNotificationToken is not supported on macOS; nothing to unregister.');
     }
 
     try {

@@ -613,6 +613,10 @@ class Posthog {
   /// Registration also fails server-side if your PostHog project has no
   /// Firebase or APNs integration configured for [appId].
   ///
+  /// Call this only after [setup] has completed: the native SDKs silently drop
+  /// a token registered before they are initialized, and this method still
+  /// completes without an error.
+  ///
   /// Not supported on Flutter web or macOS.
   Future<void> registerPushNotificationToken(
     String deviceToken, {

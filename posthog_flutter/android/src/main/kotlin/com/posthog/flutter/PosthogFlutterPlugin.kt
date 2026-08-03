@@ -20,6 +20,7 @@ import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
 import com.posthog.PostHogBootstrapConfig
@@ -63,7 +64,13 @@ class PosthogFlutterPlugin :
     private var activity: Activity? = null
     private var application: Application? = null
 
-    internal var postHogConfig: PostHogAndroidConfig? = null
+    private var postHogConfig: PostHogAndroidConfig? = null
+
+    // Test seam: captures the built config even if setup() throws (mock Context in
+    // unit tests). postHogConfig is only published on success, so production readers
+    // never see an uninstalled config.
+    @VisibleForTesting
+    internal var lastBuiltConfig: PostHogAndroidConfig? = null
 
     // Occluded = host activity STOPPED (not just paused — a translucent/dialog
     // activity pauses the host while Flutter stays visible) AND one of our own
@@ -681,38 +688,58 @@ class PosthogFlutterPlugin :
                 }
                 posthogConfig.getIfNotNull<Boolean>("pushIdentityProviderEnabled") { enabled ->
                     if (enabled) {
-                        activeChannel = channel
+                        // Anchor only if unowned: a live owner is never displaced by a
+                        // secondary engine's setup() (e.g. a background isolate), and
+                        // detach nulls the field so a later re-setup can re-anchor.
+                        if (activeChannel == null) {
+                            activeChannel = channel
+                        }
                         pushIdentityProvider = { distinctId, appId, completion ->
-                            val target = activeChannel
-                            if (target == null) {
-                                // No engine attached: decline now rather than let the
-                                // native 10s mint watchdog time out on a reply that
-                                // can never arrive.
-                                declinePushIdentity(completion, "no Flutter engine attached")
-                            } else {
-                                runOnMainThread {
-                                    target.invokeMethod(
-                                        "pushIdentityProvider",
-                                        mapOf("distinctId" to distinctId, "appId" to appId),
-                                        object : MethodChannel.Result {
-                                            override fun success(res: Any?) = completion(res as? String)
+                            runOnMainThread {
+                                // Read on the main thread (where detach nulls the field) so
+                                // the check and send are atomic w.r.t. teardown; declining
+                                // now beats the native 10s mint watchdog timing out.
+                                val target = activeChannel
+                                if (target == null) {
+                                    declinePushIdentity(completion, "no Flutter engine attached")
+                                } else {
+                                    try {
+                                        target.invokeMethod(
+                                            "pushIdentityProvider",
+                                            mapOf("distinctId" to distinctId, "appId" to appId),
+                                            object : MethodChannel.Result {
+                                                override fun success(res: Any?) =
+                                                    if (res == null || res is String) {
+                                                        completion(res as String?)
+                                                    } else {
+                                                        declinePushIdentity(
+                                                            completion,
+                                                            "pushIdentityProvider returned a non-String reply",
+                                                        )
+                                                    }
 
-                                            override fun error(
-                                                errorCode: String,
-                                                errorMessage: String?,
-                                                errorDetails: Any?,
-                                            ) = declinePushIdentity(
-                                                completion,
-                                                "pushIdentityProvider threw: $errorCode ${errorMessage.orEmpty()}",
-                                            )
-
-                                            override fun notImplemented() =
-                                                declinePushIdentity(
+                                                override fun error(
+                                                    errorCode: String,
+                                                    errorMessage: String?,
+                                                    errorDetails: Any?,
+                                                ) = declinePushIdentity(
                                                     completion,
-                                                    "pushIdentityProvider not implemented on the Dart side",
+                                                    "pushIdentityProvider threw: $errorCode ${errorMessage.orEmpty()}",
                                                 )
-                                        },
-                                    )
+
+                                                override fun notImplemented() =
+                                                    declinePushIdentity(
+                                                        completion,
+                                                        "pushIdentityProvider not implemented on the Dart side",
+                                                    )
+                                            },
+                                        )
+                                    } catch (e: Throwable) {
+                                        declinePushIdentity(
+                                            completion,
+                                            "pushIdentityProvider dispatch failed: ${e.message}",
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -729,10 +756,9 @@ class PosthogFlutterPlugin :
                     }
             }
 
-        // Stored before the SDK call: unit tests reach the built config (and the
-        // pushIdentityProvider installed on it) even when setup throws on a mock Context.
-        postHogConfig = config
+        lastBuiltConfig = config
         PostHogAndroid.setup(applicationContext, config)
+        postHogConfig = config
         cachedReplayIntegration = null
     }
 
@@ -1803,7 +1829,9 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val deviceToken = call.argument<String>("deviceToken")
-            if (deviceToken == null) {
+            if (deviceToken.isNullOrBlank()) {
+                // A blank token is dropped silently by the native SDK, so surface
+                // it here like the missing case instead of reporting false success.
                 result.error("PosthogFlutterException", "Missing argument: deviceToken", null)
                 return
             }
@@ -2026,6 +2054,14 @@ class PosthogFlutterPlugin :
         // instead of stalling the native 10s mint watchdog.
         @Volatile
         private var activeChannel: MethodChannel? = null
+
+        // The route is process-wide; unit tests share the JVM, so each test
+        // starts from the unowned state instead of inheriting the previous
+        // test's anchor.
+        @VisibleForTesting
+        internal fun resetPushIdentityRouteForTesting() {
+            activeChannel = null
+        }
 
         // On the companion, not the instance: the pushIdentityProvider closure would
         // otherwise capture the plugin that happened to be attached at setup time.
