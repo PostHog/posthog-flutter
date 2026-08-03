@@ -35,22 +35,13 @@ class CapturedLogCall {
   });
 }
 
-/// Captured push-notification-opened call data
-class CapturedPushOpenedCall {
-  final String? title;
-  final String? subtitle;
-  final String? body;
-  final Map<String, Object?>? payload;
-  final String? action;
-
-  CapturedPushOpenedCall({
-    this.title,
-    this.subtitle,
-    this.body,
-    this.payload,
-    this.action,
-  });
-}
+typedef CapturedPushOpenedCall = ({
+  String? title,
+  String? subtitle,
+  String? body,
+  Map<String, Object?>? payload,
+  String? action,
+});
 
 class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   final List<({String deviceToken, String? appId})> registeredPushTokens = [];
@@ -78,7 +69,7 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     Map<String, Object?>? payload,
     String? action,
   }) async {
-    capturedPushOpened.add(CapturedPushOpenedCall(
+    capturedPushOpened.add((
       title: title,
       subtitle: subtitle,
       body: body,
