@@ -8,6 +8,14 @@
     import FlutterMacOS
 #endif
 
+// A nil identity token sends the request unauthenticated, which a project requiring
+// identity verification rejects server-side. Log the reason so that failure is greppable
+// and distinct from a host that deliberately returned nil.
+private func declinePushIdentity(_ completion: (String?) -> Void, _ reason: String) {
+    print("[PostHog] Push subscription will be sent unauthenticated: \(reason)")
+    completion(nil)
+}
+
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     #if os(iOS)
         // Occlusion episode protocol: a main-thread timer — independent of
@@ -316,14 +324,28 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             config.pushIdentityProvider = { distinctId, appId, completion in
                 DispatchQueue.main.async {
                     guard let channel = PosthogFlutterPlugin.instance?.channel else {
-                        completion(nil)
+                        declinePushIdentity(completion, "no Flutter engine attached")
                         return
                     }
                     channel.invokeMethod(
                         "pushIdentityProvider",
                         arguments: ["distinctId": distinctId, "appId": appId]
                     ) { res in
-                        completion(res as? String)
+                        if let token = res as? String {
+                            completion(token)
+                        } else if let error = res as? FlutterError {
+                            declinePushIdentity(
+                                completion,
+                                "pushIdentityProvider threw: \(error.code) \(error.message ?? "")"
+                            )
+                        } else if (res as AnyObject?) === (FlutterMethodNotImplemented as AnyObject) {
+                            declinePushIdentity(
+                                completion,
+                                "pushIdentityProvider not implemented on the Dart side"
+                            )
+                        } else {
+                            completion(nil)
+                        }
                     }
                 }
             }

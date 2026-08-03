@@ -272,21 +272,22 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_registerPushNotificationToken_noAppIdAndNoFirebase_skipsWithoutError() {
+    fun onMethodCall_registerPushNotificationToken_noAppIdAndNoFirebase_reportsSkip() {
         val plugin = PosthogFlutterPlugin()
 
         // Firebase isn't on the unit-test classpath, so the reflective project-id
-        // fallback finds nothing. Apps that don't use Firebase must not crash.
+        // fallback finds nothing. The token can't be registered, and reporting it as
+        // an error is what lets Dart log the skip instead of seeing a false success.
         val call = MethodCall("registerPushNotificationToken", mapOf("deviceToken" to "token-abc"))
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        Mockito.verify(mockResult).success(null)
-        Mockito.verify(mockResult, Mockito.never()).error(
-            Mockito.anyString(),
-            Mockito.anyString(),
-            Mockito.any(),
+        Mockito.verify(mockResult).error(
+            Mockito.eq("PosthogFlutterException"),
+            Mockito.contains("no appId provided"),
+            Mockito.isNull(),
         )
+        Mockito.verify(mockResult, Mockito.never()).success(Mockito.any())
     }
 
     @Test

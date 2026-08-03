@@ -674,7 +674,6 @@ class PosthogFlutterPlugin :
                     this.bootstrap = bootstrapConfigFromMap(it)
                 }
 
-                // Configure push notifications
                 posthogConfig.getIfNotNull<Boolean>("capturePushNotificationSubscriptions") {
                     capturePushNotificationSubscriptions = it
                 }
@@ -689,7 +688,7 @@ class PosthogFlutterPlugin :
                                 // No engine attached: decline now rather than let the
                                 // native 10s mint watchdog time out on a reply that
                                 // can never arrive.
-                                completion(null)
+                                declinePushIdentity(completion, "no Flutter engine attached")
                             } else {
                                 runOnMainThread {
                                     target.invokeMethod(
@@ -702,9 +701,16 @@ class PosthogFlutterPlugin :
                                                 errorCode: String,
                                                 errorMessage: String?,
                                                 errorDetails: Any?,
-                                            ) = completion(null)
+                                            ) = declinePushIdentity(
+                                                completion,
+                                                "pushIdentityProvider threw: $errorCode ${errorMessage.orEmpty()}",
+                                            )
 
-                                            override fun notImplemented() = completion(null)
+                                            override fun notImplemented() =
+                                                declinePushIdentity(
+                                                    completion,
+                                                    "pushIdentityProvider not implemented on the Dart side",
+                                                )
                                         },
                                     )
                                 }
@@ -1803,11 +1809,14 @@ class PosthogFlutterPlugin :
                 call.argument<String>("appId")?.trim()?.takeIf { it.isNotEmpty() }
                     ?: firebaseProjectId()
             if (appId.isNullOrEmpty()) {
-                // Native no-ops on a blank appId anyway; skip the call so we don't
-                // rely on that silently. Logged, not thrown: apps without Firebase
-                // shouldn't crash over this.
-                Log.w("PostHog", "registerPushNotificationToken: no appId provided and no Firebase project id could be resolved, skipping")
-                result.success(null)
+                // Reported as an error, not a silent success: iOS derives its own bundle id, so
+                // the identical Dart call would succeed there and vanish here. Dart logs it in
+                // debug and swallows it, keeping a Firebase-less app from crashing.
+                val message =
+                    "registerPushNotificationToken: no appId provided and no Firebase project id " +
+                        "could be resolved, skipping. Pass appId explicitly if this app does not use Firebase."
+                Log.w("PostHog", message)
+                result.error("PosthogFlutterException", message, null)
                 return
             }
             PostHog.registerPushNotificationToken(deviceToken, appId)
@@ -2007,15 +2016,25 @@ class PosthogFlutterPlugin :
     }
 
     companion object {
-        // The native SDK holds the pushIdentityProvider closure for the life of the
-        // process, outliving any single engine attachment. Resolving the channel here
-        // at call time keeps a re-attached engine mintable and lets a detached one
-        // decline immediately instead of stalling the native 10s mint watchdog.
+        // The pushIdentityProvider closure outlives any single engine attachment, so the
+        // channel is resolved at call time: a re-attached engine stays mintable, and a
+        // detached one declines instead of stalling the native 10s mint watchdog.
         @Volatile
         private var activeChannel: MethodChannel? = null
 
         // On the companion, not the instance: the pushIdentityProvider closure would
         // otherwise capture the plugin that happened to be attached at setup time.
+        // A null identity token sends the request unauthenticated, which a project requiring
+        // identity verification rejects server-side. Log the reason so that failure is
+        // greppable and distinct from a host that deliberately returned null.
+        private fun declinePushIdentity(
+            completion: (String?) -> Unit,
+            reason: String,
+        ) {
+            Log.w("PostHog", "Push subscription will be sent unauthenticated: $reason")
+            completion(null)
+        }
+
         private fun runOnMainThread(action: () -> Unit) {
             if (Looper.myLooper() == Looper.getMainLooper()) {
                 action()
