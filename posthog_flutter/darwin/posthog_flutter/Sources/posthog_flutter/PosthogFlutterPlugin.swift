@@ -40,10 +40,17 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private var channel: FlutterMethodChannel?
 
     // The mint route for pushIdentityProvider, anchored to the engine whose
-    // setup() installed the provider: a secondary engine (e.g. firebase_messaging's
-    // background isolate, with no Dart-side handler) can neither steal the route
-    // nor, on detach, null it; a detached owner declines promptly instead of
-    // stalling the native 10s mint watchdog. Main-thread only.
+    // setup() installed the provider: a live owner is never displaced, and an engine
+    // that never ran a provider-enabled setup (e.g. firebase_messaging's background
+    // isolate with no Dart-side handler) can neither steal the route nor, on detach,
+    // nil it. Every provider-enabled engine stays a candidate so a detaching owner
+    // hands the route to the most recent survivor instead of orphaning it; with no
+    // survivor the route declines promptly rather than stalling the native 10s mint
+    // watchdog.
+    //
+    // Main-thread confined: Flutter dispatches channel and lifecycle callbacks on
+    // the main thread, and the check-then-act on these fields relies on that.
+    private static var pushChannelCandidates: [FlutterMethodChannel] = []
     private static var pushChannel: FlutterMethodChannel?
 
     public static func getInstance() -> PosthogFlutterPlugin? {
@@ -334,7 +341,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
         if posthogConfig["pushIdentityProviderEnabled"] as? Bool == true {
             // Anchor only if unowned: a live owner is never displaced by a secondary
-            // engine's setup(), and detach nils the field so a later re-setup can re-anchor.
+            // engine's setup(). Every provider-enabled engine is kept as a candidate
+            // so detach can promote a survivor instead of orphaning the route.
+            if let channel = instance.channel,
+               !PosthogFlutterPlugin.pushChannelCandidates.contains(where: { $0 === channel })
+            {
+                PosthogFlutterPlugin.pushChannelCandidates.append(channel)
+            }
             if PosthogFlutterPlugin.pushChannel == nil {
                 PosthogFlutterPlugin.pushChannel = instance.channel
             }
@@ -768,8 +781,12 @@ extension PosthogFlutterPlugin {
     // The occlusion timer retains its closure until invalidated; without this
     // it would survive engine detach and push zombie occlusion events.
     public func detachFromEngine(for _: FlutterPluginRegistrar) {
-        if PosthogFlutterPlugin.pushChannel === channel {
-            PosthogFlutterPlugin.pushChannel = nil
+        if let channel = channel {
+            PosthogFlutterPlugin.pushChannelCandidates.removeAll { $0 === channel }
+            if PosthogFlutterPlugin.pushChannel === channel {
+                // Promote the most recent surviving provider-enabled engine (nil when none).
+                PosthogFlutterPlugin.pushChannel = PosthogFlutterPlugin.pushChannelCandidates.last
+            }
         }
         #if os(iOS)
             DispatchQueue.main.async { [weak self] in

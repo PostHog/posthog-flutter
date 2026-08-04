@@ -689,8 +689,10 @@ class PosthogFlutterPlugin :
                 posthogConfig.getIfNotNull<Boolean>("pushIdentityProviderEnabled") { enabled ->
                     if (enabled) {
                         // Anchor only if unowned: a live owner is never displaced by a
-                        // secondary engine's setup() (e.g. a background isolate), and
-                        // detach nulls the field so a later re-setup can re-anchor.
+                        // secondary engine's setup() (e.g. a background isolate). Every
+                        // provider-enabled engine is kept as a candidate so detach can
+                        // promote a survivor instead of orphaning the route.
+                        pushChannelCandidates.add(channel)
                         if (activeChannel == null) {
                             activeChannel = channel
                         }
@@ -813,8 +815,10 @@ class PosthogFlutterPlugin :
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopOcclusionDetector()
         channel.setMethodCallHandler(null)
+        pushChannelCandidates.remove(channel)
         if (activeChannel === channel) {
-            activeChannel = null
+            // Promote the most recent surviving provider-enabled engine (null when none).
+            activeChannel = pushChannelCandidates.lastOrNull()
         }
         bitmapExportExecutor.shutdown()
         snapshotSendExecutor.shutdown()
@@ -2048,10 +2052,19 @@ class PosthogFlutterPlugin :
     companion object {
         // The mint route for the pushIdentityProvider closure, resolved at call time
         // because the native SDK holds the closure for the process lifetime. Anchored to
-        // the engine whose setup() installed the provider: a secondary engine (e.g.
-        // firebase_messaging's background isolate, with no Dart-side handler) can neither
-        // steal the route nor, on detach, null it; a detached owner declines promptly
-        // instead of stalling the native 10s mint watchdog.
+        // the engine whose setup() installed the provider: a live owner is never displaced,
+        // and an engine that never ran a provider-enabled setup (e.g. firebase_messaging's
+        // background isolate with no Dart-side handler) can neither steal the route nor,
+        // on detach, null it. Every provider-enabled engine stays a candidate so a
+        // detaching owner hands the route to the most recent survivor instead of
+        // orphaning it; with no survivor the route declines promptly rather than
+        // stalling the native 10s mint watchdog.
+        //
+        // Main-thread confined: Flutter dispatches channel and lifecycle callbacks on
+        // the main thread (no custom TaskQueue is used), and the check-then-act on
+        // these fields relies on that.
+        private val pushChannelCandidates = LinkedHashSet<MethodChannel>()
+
         @Volatile
         private var activeChannel: MethodChannel? = null
 
@@ -2060,6 +2073,7 @@ class PosthogFlutterPlugin :
         // test's anchor.
         @VisibleForTesting
         internal fun resetPushIdentityRouteForTesting() {
+            pushChannelCandidates.clear()
             activeChannel = null
         }
 

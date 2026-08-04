@@ -560,4 +560,51 @@ internal class PosthogFlutterPluginTest {
         replyToMint(reattachedMessenger, successEnvelope("tok-3"))
         assertEquals("tok-3", minted)
     }
+
+    @Test
+    fun pushIdentityProvider_ownerDetachPromotesSurvivingSetupEngine() {
+        // The orphaning ordering: a background isolate sets up first and owns the
+        // route, the main engine sets up during the overlap (anchor skipped), then
+        // the background engine dies. The route must promote to the surviving main
+        // engine instead of declining for the rest of the process.
+        val background = pluginWithProvider()
+
+        val main = PosthogFlutterPlugin()
+        val mainMessenger = Mockito.mock(BinaryMessenger::class.java)
+        attach(main, mainMessenger)
+        setupWithIdentityProvider(main)
+
+        background.plugin.onDetachedFromEngine(background.binding)
+
+        var minted: String? = null
+        background.provider("user-1", "app") { minted = it }
+        replyToMint(mainMessenger, successEnvelope("tok-main"))
+        assertEquals("tok-main", minted)
+        Mockito
+            .verify(background.messenger, Mockito.never())
+            .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
+
+    @Test
+    fun pushIdentityProvider_detachedCandidateIsNeverPromoted() {
+        // A candidate that detached before the owner must not be resurrected:
+        // owner detach with no survivors declines instead of routing to a dead channel.
+        val owner = pluginWithProvider()
+
+        val background = PosthogFlutterPlugin()
+        val backgroundMessenger = Mockito.mock(BinaryMessenger::class.java)
+        val backgroundBinding = attach(background, backgroundMessenger)
+        setupWithIdentityProvider(background)
+
+        background.onDetachedFromEngine(backgroundBinding)
+        owner.plugin.onDetachedFromEngine(owner.binding)
+
+        var declined = false
+        owner.provider("user-1", "app") { declined = it == null }
+
+        assertTrue(declined)
+        Mockito
+            .verify(backgroundMessenger, Mockito.never())
+            .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
 }
