@@ -110,6 +110,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let captureApplicationLifecycleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? true
         let debug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
+        // Push flags default ON natively and setup() no-ops a second call, so a later
+        // Dart-side opt-out can never reach the SDK — the plist is the only opt-out here.
+        let capturePushNotificationSubscriptions = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_SUBSCRIPTIONS") as? Bool ?? true
+        let capturePushNotificationOpened = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED") as? Bool ?? true
 
         setupPostHog([
             "projectToken": projectToken,
@@ -117,6 +121,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             "host": host,
             "captureApplicationLifecycleEvents": captureApplicationLifecycleEvents,
             "debug": debug,
+            "capturePushNotificationSubscriptions": capturePushNotificationSubscriptions,
+            "capturePushNotificationOpened": capturePushNotificationOpened,
         ])
     }
 
