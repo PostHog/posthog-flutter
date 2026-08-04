@@ -45,8 +45,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     // of orphaning the route, and with none left it declines fast rather than
     // stalling the native 10s mint watchdog.
     //
-    // Main-thread confined: Flutter dispatches channel/lifecycle callbacks there,
-    // and the check-then-act on these fields relies on it.
+    // Main-thread confined: the check-then-act on these fields relies on it.
+    // Channel callbacks already arrive there; detach does not, so it hops.
     private static var pushChannelCandidates: [FlutterMethodChannel] = []
     private static var pushChannel: FlutterMethodChannel?
 
@@ -778,10 +778,15 @@ extension PosthogFlutterPlugin {
     // it would survive engine detach and push zombie occlusion events.
     public func detachFromEngine(for _: FlutterPluginRegistrar) {
         if let channel = channel {
-            PosthogFlutterPlugin.pushChannelCandidates.removeAll { $0 === channel }
-            if PosthogFlutterPlugin.pushChannel === channel {
-                // Promote the most recent surviving provider-enabled engine (nil when none).
-                PosthogFlutterPlugin.pushChannel = PosthogFlutterPlugin.pushChannelCandidates.last
+            // Detach runs on whichever thread releases the engine. Capturing the
+            // channel keeps it alive across the hop, so `===` can't match a
+            // recycled address.
+            DispatchQueue.main.async {
+                PosthogFlutterPlugin.pushChannelCandidates.removeAll { $0 === channel }
+                if PosthogFlutterPlugin.pushChannel === channel {
+                    // Promote the most recent surviving provider-enabled engine (nil when none).
+                    PosthogFlutterPlugin.pushChannel = PosthogFlutterPlugin.pushChannelCandidates.last
+                }
             }
         }
         #if os(iOS)
