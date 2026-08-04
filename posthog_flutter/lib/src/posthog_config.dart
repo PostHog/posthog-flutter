@@ -251,10 +251,12 @@ class PostHogConfig {
   /// callback 10 seconds before falling back to an unauthenticated request, so
   /// a slow or throwing implementation degrades rather than blocking delivery.
   ///
-  /// On iOS this requires programmatic setup: with Info.plist auto-init
-  /// (`com.posthog.posthog.AUTO_INIT`) the native SDK is already set up before
-  /// Dart runs, so the provider is never installed. Set
-  /// `com.posthog.posthog.AUTO_INIT: false` and call [Posthog.setup].
+  /// Requires programmatic setup on both platforms. Under auto-init
+  /// (`com.posthog.posthog.AUTO_INIT`, Info.plist on iOS, AndroidManifest
+  /// `<meta-data>` on Android) the native SDK is already set up before Dart
+  /// runs and a later [Posthog.setup] is a no-op, so the provider is never
+  /// installed. Set `com.posthog.posthog.AUTO_INIT` to `false` and call
+  /// [Posthog.setup].
   ///
   /// **Flutter web:** not supported. Defaults to `null`.
   PushIdentityProvider? pushIdentityProvider;
