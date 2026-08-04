@@ -93,7 +93,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           return null;
         }
         try {
-          final arguments = Map<String, dynamic>.from(call.arguments as Map);
+          final arguments = Map<String, Object?>.from(call.arguments as Map);
           return await provider(
             arguments['distinctId'] as String? ?? '',
             arguments['appId'] as String? ?? '',

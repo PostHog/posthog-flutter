@@ -1038,7 +1038,7 @@ void main() {
   });
 
   group('PosthogFlutterIO push notifications', () {
-    Map<String, dynamic> argsOf(String method) => Map<String, dynamic>.from(
+    Map<String, Object?> argsOf(String method) => Map<String, Object?>.from(
           log.firstWhere((c) => c.method == method).arguments as Map,
         );
 
