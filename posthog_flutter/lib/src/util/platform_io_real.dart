@@ -9,5 +9,9 @@ bool isSupportedPlatform() {
 }
 
 bool isMacOS() {
+  // Tests run on a macOS host but target the mocked iOS/Android channel
+  if (Platform.environment.containsKey('FLUTTER_TEST')) {
+    return false;
+  }
   return Platform.isMacOS;
 }

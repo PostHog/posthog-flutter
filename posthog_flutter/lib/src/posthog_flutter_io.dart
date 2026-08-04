@@ -887,6 +887,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       // The native macOS handler is a no-op (posthog-ios push is iOS-only).
       printIfDebug(
           'registerPushNotificationToken is not supported on macOS; token not registered.');
+      return;
     }
 
     try {
@@ -908,6 +909,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       // The native macOS handler is a no-op (posthog-ios push is iOS-only).
       printIfDebug(
           'unregisterPushNotificationToken is not supported on macOS; nothing to unregister.');
+      return;
     }
 
     try {

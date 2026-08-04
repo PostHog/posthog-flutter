@@ -358,8 +358,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                                 completion,
                                 "pushIdentityProvider not implemented on the Dart side"
                             )
-                        } else {
+                        } else if res == nil || res is NSNull {
                             completion(nil)
+                        } else {
+                            declinePushIdentity(
+                                completion,
+                                "pushIdentityProvider returned a non-String reply"
+                            )
                         }
                     }
                 }
@@ -1528,7 +1533,10 @@ extension PosthogFlutterPlugin {
     ) {
         #if os(iOS)
             if let args = call.arguments as? [String: Any],
-               let deviceToken = args["deviceToken"] as? String
+               let deviceToken = args["deviceToken"] as? String,
+               // A blank token is dropped silently by the native SDK, so surface
+               // it here like the missing case instead of reporting false success.
+               !deviceToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             {
                 PostHogSDK.shared.registerPushNotificationToken(deviceToken, appId: args["appId"] as? String)
                 result(nil)
