@@ -205,6 +205,10 @@ class PosthogFlutterPlugin :
                     bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", true)
                 }
             val debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
+            val capturePushNotificationSubscriptions =
+                bundle.getBoolean("com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_SUBSCRIPTIONS", true)
+            val capturePushNotificationOpened =
+                bundle.getBoolean("com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED", true)
 
             val posthogConfig = mutableMapOf<String, Any>()
             posthogConfig["projectToken"] = projectToken
@@ -212,6 +216,8 @@ class PosthogFlutterPlugin :
             posthogConfig["host"] = host
             posthogConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
             posthogConfig["debug"] = debug
+            posthogConfig["capturePushNotificationSubscriptions"] = capturePushNotificationSubscriptions
+            posthogConfig["capturePushNotificationOpened"] = capturePushNotificationOpened
 
             setupPostHog(posthogConfig)
         } catch (e: Throwable) {

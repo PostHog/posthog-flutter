@@ -1557,7 +1557,11 @@ extension PosthogFlutterPlugin {
                // it here like the missing case instead of reporting false success.
                !deviceToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             {
-                PostHogSDK.shared.registerPushNotificationToken(deviceToken, appId: args["appId"] as? String)
+                // Match the Android bridge: a blank appId means "not provided", so the
+                // native SDK falls back to the bundle id instead of silently no-oping.
+                let trimmedAppId = (args["appId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let appId = (trimmedAppId?.isEmpty ?? true) ? nil : trimmedAppId
+                PostHogSDK.shared.registerPushNotificationToken(deviceToken, appId: appId)
                 result(nil)
             } else {
                 _badArgumentError(result)
