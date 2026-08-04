@@ -2050,19 +2050,14 @@ class PosthogFlutterPlugin :
     }
 
     companion object {
-        // The mint route for the pushIdentityProvider closure, resolved at call time
-        // because the native SDK holds the closure for the process lifetime. Anchored to
-        // the engine whose setup() installed the provider: a live owner is never displaced,
-        // and an engine that never ran a provider-enabled setup (e.g. firebase_messaging's
-        // background isolate with no Dart-side handler) can neither steal the route nor,
-        // on detach, null it. Every provider-enabled engine stays a candidate so a
-        // detaching owner hands the route to the most recent survivor instead of
-        // orphaning it; with no survivor the route declines promptly rather than
+        // Mint route for pushIdentityProvider, anchored to the engine whose setup()
+        // installed the provider. A live owner is never displaced; provider-enabled
+        // engines stay candidates so detach promotes the most recent survivor instead
+        // of orphaning the route, and with none left it declines fast rather than
         // stalling the native 10s mint watchdog.
         //
-        // Main-thread confined: Flutter dispatches channel and lifecycle callbacks on
-        // the main thread (no custom TaskQueue is used), and the check-then-act on
-        // these fields relies on that.
+        // Main-thread confined: Flutter dispatches channel/lifecycle callbacks there,
+        // and the check-then-act on these fields relies on it.
         private val pushChannelCandidates = LinkedHashSet<MethodChannel>()
 
         @Volatile
@@ -2077,11 +2072,9 @@ class PosthogFlutterPlugin :
             activeChannel = null
         }
 
-        // On the companion, not the instance: the pushIdentityProvider closure would
-        // otherwise capture the plugin that happened to be attached at setup time.
-        // A null identity token sends the request unauthenticated, which a project requiring
-        // identity verification rejects server-side. Log the reason so that failure is
-        // greppable and distinct from a host that deliberately returned null.
+        // On the companion so the closure can't capture a setup-time plugin. A null
+        // token sends the request unauthenticated (rejected by identity-verification
+        // projects) — log why, so it's distinct from a host deliberately returning null.
         private fun declinePushIdentity(
             completion: (String?) -> Unit,
             reason: String,

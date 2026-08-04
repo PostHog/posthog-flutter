@@ -39,17 +39,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private static var instance: PosthogFlutterPlugin?
     private var channel: FlutterMethodChannel?
 
-    // The mint route for pushIdentityProvider, anchored to the engine whose
-    // setup() installed the provider: a live owner is never displaced, and an engine
-    // that never ran a provider-enabled setup (e.g. firebase_messaging's background
-    // isolate with no Dart-side handler) can neither steal the route nor, on detach,
-    // nil it. Every provider-enabled engine stays a candidate so a detaching owner
-    // hands the route to the most recent survivor instead of orphaning it; with no
-    // survivor the route declines promptly rather than stalling the native 10s mint
-    // watchdog.
+    // Mint route for pushIdentityProvider, anchored to the engine whose setup()
+    // installed the provider. A live owner is never displaced; provider-enabled
+    // engines stay candidates so detach promotes the most recent survivor instead
+    // of orphaning the route, and with none left it declines fast rather than
+    // stalling the native 10s mint watchdog.
     //
-    // Main-thread confined: Flutter dispatches channel and lifecycle callbacks on
-    // the main thread, and the check-then-act on these fields relies on that.
+    // Main-thread confined: Flutter dispatches channel/lifecycle callbacks there,
+    // and the check-then-act on these fields relies on it.
     private static var pushChannelCandidates: [FlutterMethodChannel] = []
     private static var pushChannel: FlutterMethodChannel?
 
@@ -352,9 +349,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 PosthogFlutterPlugin.pushChannel = instance.channel
             }
             // Resolved at call time, not captured: the native SDK holds this closure
-            // for the life of the process and no-ops a second setup(), so a closure
-            // bound to the setup-time instance would go permanently dead once a new
-            // Flutter engine attaches.
+            // for the process lifetime, so binding it to the setup-time instance
+            // would go dead once a new engine attaches.
             config.pushIdentityProvider = { distinctId, appId, completion in
                 DispatchQueue.main.async {
                     guard let channel = PosthogFlutterPlugin.pushChannel else {
