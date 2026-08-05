@@ -8,6 +8,14 @@
     import FlutterMacOS
 #endif
 
+// A nil identity token sends the request unauthenticated, which a project requiring
+// identity verification rejects server-side. Log the reason so that failure is greppable
+// and distinct from a host that deliberately returned nil.
+private func declinePushIdentity(_ completion: (String?) -> Void, _ reason: String) {
+    print("[PostHog] Push subscription will be sent unauthenticated: \(reason)")
+    completion(nil)
+}
+
 public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     #if os(iOS)
         // Occlusion episode protocol: a main-thread timer — independent of
@@ -30,6 +38,17 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     private static var instance: PosthogFlutterPlugin?
     private var channel: FlutterMethodChannel?
+
+    // Mint route for pushIdentityProvider, anchored to the engine whose setup()
+    // installed the provider. A live owner is never displaced; provider-enabled
+    // engines stay candidates so detach promotes the most recent survivor instead
+    // of orphaning the route, and with none left it declines fast rather than
+    // stalling the native 10s mint watchdog.
+    //
+    // Main-thread confined: the check-then-act on these fields relies on it.
+    // Channel callbacks already arrive there; detach does not, so it hops.
+    private static var pushChannelCandidates: [FlutterMethodChannel] = []
+    private static var pushChannel: FlutterMethodChannel?
 
     public static func getInstance() -> PosthogFlutterPlugin? {
         instance
@@ -95,6 +114,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let captureApplicationLifecycleEvents = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? true
         let debug = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.DEBUG") as? Bool ?? false
+        // Push flags default ON natively and setup() no-ops a second call, so a later
+        // Dart-side opt-out can never reach the SDK — the plist is the only opt-out here.
+        let capturePushNotificationSubscriptions = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_SUBSCRIPTIONS") as? Bool ?? true
+        let capturePushNotificationOpened = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED") as? Bool ?? true
 
         setupPostHog([
             "projectToken": projectToken,
@@ -102,11 +125,16 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             "host": host,
             "captureApplicationLifecycleEvents": captureApplicationLifecycleEvents,
             "debug": debug,
+            "capturePushNotificationSubscriptions": capturePushNotificationSubscriptions,
+            "capturePushNotificationOpened": capturePushNotificationOpened,
         ])
     }
 
-    private static func setupPostHog(_ posthogConfig: [String: Any]) {
-        guard let instance = PosthogFlutterPlugin.instance else {
+    // `anchor` is the engine that called setup(); the static `instance` is only the
+    // Info.plist auto-setup fallback. Resolving from `instance` would bind the mint
+    // route to whichever engine registered last.
+    private static func setupPostHog(_ posthogConfig: [String: Any], anchor: PosthogFlutterPlugin? = nil) {
+        guard let instance = anchor ?? PosthogFlutterPlugin.instance else {
             print("[PostHog] Plugin instance not found!")
             return
         }
@@ -299,6 +327,65 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             config.bootstrap = bootstrapConfig
         }
 
+        #if os(iOS) || os(macOS)
+            if let capturePushNotificationSubscriptions = posthogConfig["capturePushNotificationSubscriptions"] as? Bool {
+                config.capturePushNotificationSubscriptions = capturePushNotificationSubscriptions
+            }
+            if let capturePushNotificationOpened = posthogConfig["capturePushNotificationOpened"] as? Bool {
+                config.capturePushNotificationOpened = capturePushNotificationOpened
+            }
+        #endif
+
+        if posthogConfig["pushIdentityProviderEnabled"] as? Bool == true {
+            // Anchor only if unowned: a live owner is never displaced by a secondary
+            // engine's setup(). Every provider-enabled engine is kept as a candidate
+            // so detach can promote a survivor instead of orphaning the route.
+            if let channel = instance.channel,
+               !PosthogFlutterPlugin.pushChannelCandidates.contains(where: { $0 === channel })
+            {
+                PosthogFlutterPlugin.pushChannelCandidates.append(channel)
+            }
+            if PosthogFlutterPlugin.pushChannel == nil {
+                PosthogFlutterPlugin.pushChannel = instance.channel
+            }
+            // Resolved at call time, not captured: the native SDK holds this closure
+            // for the process lifetime, so binding it to the setup-time instance
+            // would go dead once a new engine attaches.
+            config.pushIdentityProvider = { distinctId, appId, completion in
+                DispatchQueue.main.async {
+                    guard let channel = PosthogFlutterPlugin.pushChannel else {
+                        declinePushIdentity(completion, "no Flutter engine attached")
+                        return
+                    }
+                    channel.invokeMethod(
+                        "pushIdentityProvider",
+                        arguments: ["distinctId": distinctId, "appId": appId]
+                    ) { res in
+                        if let token = res as? String {
+                            completion(token)
+                        } else if let error = res as? FlutterError {
+                            declinePushIdentity(
+                                completion,
+                                "pushIdentityProvider threw: \(error.code) \(error.message ?? "")"
+                            )
+                        } else if (res as AnyObject?) === (FlutterMethodNotImplemented as AnyObject) {
+                            declinePushIdentity(
+                                completion,
+                                "pushIdentityProvider not implemented on the Dart side"
+                            )
+                        } else if res == nil || res is NSNull {
+                            completion(nil)
+                        } else {
+                            declinePushIdentity(
+                                completion,
+                                "pushIdentityProvider returned a non-String reply"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
         postHogVersion = postHogFlutterVersion
@@ -422,6 +509,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 // surveys only supported on iOS
                 result(nil)
             #endif
+        case "registerPushNotificationToken":
+            registerPushNotificationToken(call, result: result)
+        case "unregisterPushNotificationToken":
+            unregisterPushNotificationToken(result)
+        case "capturePushNotificationOpened":
+            capturePushNotificationOpened(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -684,6 +777,18 @@ extension PosthogFlutterPlugin {
     // The occlusion timer retains its closure until invalidated; without this
     // it would survive engine detach and push zombie occlusion events.
     public func detachFromEngine(for _: FlutterPluginRegistrar) {
+        if let channel = channel {
+            // Detach runs on whichever thread releases the engine. Capturing the
+            // channel keeps it alive across the hop, so `===` can't match a
+            // recycled address.
+            DispatchQueue.main.async {
+                PosthogFlutterPlugin.pushChannelCandidates.removeAll { $0 === channel }
+                if PosthogFlutterPlugin.pushChannel === channel {
+                    // Promote the most recent surviving provider-enabled engine (nil when none).
+                    PosthogFlutterPlugin.pushChannel = PosthogFlutterPlugin.pushChannelCandidates.last
+                }
+            }
+        }
         #if os(iOS)
             DispatchQueue.main.async { [weak self] in
                 self?.stopOcclusionDetector()
@@ -1087,7 +1192,7 @@ extension PosthogFlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any] {
-            PosthogFlutterPlugin.setupPostHog(args)
+            PosthogFlutterPlugin.setupPostHog(args, anchor: self)
             result(nil)
         } else {
             _badArgumentError(result)
@@ -1444,6 +1549,62 @@ extension PosthogFlutterPlugin {
     private func flush(_ result: @escaping FlutterResult) {
         PostHogSDK.shared.flush()
         result(nil)
+    }
+
+    private func registerPushNotificationToken(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        #if os(iOS)
+            if let args = call.arguments as? [String: Any],
+               let deviceToken = args["deviceToken"] as? String,
+               // A blank token is dropped silently by the native SDK, so surface
+               // it here like the missing case instead of reporting false success.
+               !deviceToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                // Match the Android bridge: a blank appId means "not provided", so the
+                // native SDK falls back to the bundle id instead of silently no-oping.
+                let trimmedAppId = (args["appId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let appId = (trimmedAppId?.isEmpty ?? true) ? nil : trimmedAppId
+                PostHogSDK.shared.registerPushNotificationToken(deviceToken, appId: appId)
+                result(nil)
+            } else {
+                _badArgumentError(result)
+            }
+        #else
+            result(nil)
+        #endif
+    }
+
+    private func unregisterPushNotificationToken(_ result: @escaping FlutterResult) {
+        #if os(iOS)
+            PostHogSDK.shared.unregisterPushNotificationToken()
+            result(nil)
+        #else
+            result(nil)
+        #endif
+    }
+
+    private func capturePushNotificationOpened(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        #if os(iOS) || os(macOS)
+            guard let args = call.arguments as? [String: Any] else {
+                _badArgumentError(result)
+                return
+            }
+            PostHogSDK.shared.capturePushNotificationOpened(
+                title: args["title"] as? String,
+                subtitle: args["subtitle"] as? String,
+                body: args["body"] as? String,
+                payload: args["payload"] as? [String: Any],
+                action: args["action"] as? String
+            )
+            result(nil)
+        #else
+            result(nil)
+        #endif
     }
 
     private func captureException(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

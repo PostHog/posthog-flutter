@@ -418,6 +418,107 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "registerPushNotificationToken",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "deviceToken",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "appId",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "unregisterPushNotificationToken",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "capturePushNotificationOpened",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "title",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "subtitle",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "body",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "payload",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "action",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "alias",
                         "parameters": [
                             {
@@ -1288,6 +1389,107 @@
                                 "name": "url",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "registerPushNotificationToken",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "deviceToken",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "appId",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "unregisterPushNotificationToken",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "capturePushNotificationOpened",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "title",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "subtitle",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "body",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "payload",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "action",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2190,6 +2392,39 @@
                         "name": "onFeatureFlags",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "void Function()?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "capturePushNotificationSubscriptions",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "capturePushNotificationOpened",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "pushIdentityProvider",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "Future<String?> Function(String, String)?"
                     },
                     {
                         "entryPoints": [],
@@ -4106,6 +4341,107 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "registerPushNotificationToken",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "deviceToken",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "appId",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "unregisterPushNotificationToken",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "capturePushNotificationOpened",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "title",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "subtitle",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "body",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "payload",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "action",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "getFeatureFlag",
                         "parameters": [
                             {
@@ -4993,6 +5329,16 @@
                 "isDeprecated": false,
                 "isExperimental": false,
                 "name": "BeforeSendLogCallback",
+                "relativePath": "lib/src/posthog_config.dart"
+            },
+            {
+                "aliasedTypeName": "Future<String?> Function(String, String)",
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "name": "PushIdentityProvider",
                 "relativePath": "lib/src/posthog_config.dart"
             },
             {

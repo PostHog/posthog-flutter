@@ -33,6 +33,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   OnFeatureFlagsCallback? _onFeatureFlagsCallback;
 
+  PushIdentityProvider? _pushIdentityProvider;
+
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
 
@@ -82,6 +84,24 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       case 'onFeatureFlagsCallback':
         _onFeatureFlagsCallback?.call();
         break;
+      case 'pushIdentityProvider':
+        // Returning a value here is the reply the native SDK awaits.
+        final provider = _pushIdentityProvider;
+        if (provider == null) {
+          printIfDebug(
+              'pushIdentityProvider invoked but no provider is configured; push subscription will be sent unauthenticated.');
+          return null;
+        }
+        try {
+          final arguments = Map<String, Object?>.from(call.arguments as Map);
+          return await provider(
+            arguments['distinctId'] as String? ?? '',
+            arguments['appId'] as String? ?? '',
+          );
+        } catch (exception) {
+          printIfDebug('Exception on pushIdentityProvider: $exception');
+          return null;
+        }
       case 'onNativeOcclusionChanged':
         final arguments = Map<String, dynamic>.from(call.arguments as Map);
         PostHogInternalEvents.nativeOcclusionActive =
@@ -185,6 +205,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     _onFeatureFlagsCallback = config.onFeatureFlags;
+    _pushIdentityProvider = config.pushIdentityProvider;
     _beforeSendCallbacks = config.beforeSend;
 
     try {
@@ -851,6 +872,75 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       await _methodChannel.invokeMethod('openUrl', url);
     } on PlatformException catch (exception) {
       printIfDebug('Exception on openUrl: $exception');
+    }
+  }
+
+  @override
+  Future<void> registerPushNotificationToken(
+    String deviceToken, {
+    String? appId,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+    if (isMacOS()) {
+      // The native macOS handler is a no-op (posthog-ios push is iOS-only).
+      printIfDebug(
+          'registerPushNotificationToken is not supported on macOS; token not registered.');
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('registerPushNotificationToken', {
+        'deviceToken': deviceToken,
+        if (appId != null) 'appId': appId,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on registerPushNotificationToken: $exception');
+    }
+  }
+
+  @override
+  Future<void> unregisterPushNotificationToken() async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+    if (isMacOS()) {
+      // The native macOS handler is a no-op (posthog-ios push is iOS-only).
+      printIfDebug(
+          'unregisterPushNotificationToken is not supported on macOS; nothing to unregister.');
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('unregisterPushNotificationToken');
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on unregisterPushNotificationToken: $exception');
+    }
+  }
+
+  @override
+  Future<void> capturePushNotificationOpened({
+    String? title,
+    String? subtitle,
+    String? body,
+    Map<String, Object?>? payload,
+    String? action,
+  }) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('capturePushNotificationOpened', {
+        if (title != null) 'title': title,
+        if (subtitle != null) 'subtitle': subtitle,
+        if (body != null) 'body': body,
+        if (payload != null) 'payload': PropertyNormalizer.normalize(payload),
+        if (action != null) 'action': action,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on capturePushNotificationOpened: $exception');
     }
   }
 

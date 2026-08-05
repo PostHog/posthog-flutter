@@ -1,29 +1,15 @@
 PODS:
   - FlutterMacOS (1.0.0)
-  - PostHog (3.56.0)
-  - posthog_flutter (0.0.1):
-    - Flutter
-    - FlutterMacOS
-    - PostHog (< 4.0.0, >= 3.56.0)
 
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
-  - posthog_flutter (from `Flutter/ephemeral/.symlinks/plugins/posthog_flutter/darwin`)
-
-SPEC REPOS:
-  trunk:
-    - PostHog
 
 EXTERNAL SOURCES:
   FlutterMacOS:
     :path: Flutter/ephemeral
-  posthog_flutter:
-    :path: Flutter/ephemeral/.symlinks/plugins/posthog_flutter/darwin
 
 SPEC CHECKSUMS:
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  PostHog: 646b20ce2db3f07f71ce7fb004a9b3a4ba4afa4b
-  posthog_flutter: 03b15ff7a78e2a4162baaf11f8db37b079412106
 
 PODFILE CHECKSUM: 9ebaf0ce3d369aaa26a9ea0e159195ed94724cf3
 

@@ -570,6 +570,118 @@ class Posthog {
         groupProperties: groupProperties,
       );
 
+  /// Registers this device's push token so PostHog Workflows can target it.
+  ///
+  /// Both platforms register a token automatically at startup when
+  /// [PostHogConfig.capturePushNotificationSubscriptions] is enabled, so the
+  /// main reason to call this is a token refresh, which that startup fetch
+  /// cannot see.
+  ///
+  /// [appId] identifies the app the token belongs to: the Firebase
+  /// `project_id` for an FCM token, the APNs bundle id for an APNs token. It is
+  /// what tells PostHog which provider to deliver through — the platform is
+  /// only recorded alongside it. Leave it `null` and iOS falls back to the
+  /// bundle id while Android falls back to the default `FirebaseApp`'s project
+  /// id, so pass it explicitly if your app does not use Firebase or registers
+  /// for a non-default Firebase project. Android cannot register without one
+  /// and reports the skip as a `PlatformException`, logged in debug builds.
+  ///
+  /// **The default is APNs on iOS and FCM on Android**, matching what
+  /// [PostHogConfig.capturePushNotificationSubscriptions] registers on its own.
+  /// `firebase_messaging`'s `onTokenRefresh` yields an FCM token on both
+  /// platforms, so forwarding it unguarded pairs an FCM token with the iOS
+  /// bundle id and delivery fails:
+  ///
+  /// ```dart
+  /// if (Platform.isAndroid) {
+  ///   FirebaseMessaging.instance.onTokenRefresh.listen(
+  ///     (token) => Posthog().registerPushNotificationToken(token),
+  ///   );
+  /// }
+  /// ```
+  ///
+  /// **Using FCM on both platforms** is supported — pass the Firebase
+  /// `project_id` as [appId] on iOS too — but you must set
+  /// [PostHogConfig.capturePushNotificationSubscriptions] to `false` first.
+  /// PostHog stores one subscription per app id, so leaving automatic
+  /// registration on gives an iOS device two: an APNs one under the bundle id
+  /// and an FCM one under the project id. A Workflow configured with both
+  /// integrations then delivers to that device twice, and
+  /// [unregisterPushNotificationToken] only clears the most recently registered
+  /// of the two.
+  ///
+  /// Registration also fails server-side if your PostHog project has no
+  /// Firebase or APNs integration configured for [appId].
+  ///
+  /// Call this only after [setup] has completed: the native SDKs silently drop
+  /// a token registered before they are initialized, and this method still
+  /// completes without an error.
+  ///
+  /// Not supported on Flutter web or macOS.
+  Future<void> registerPushNotificationToken(
+    String deviceToken, {
+    String? appId,
+  }) =>
+      _posthog.registerPushNotificationToken(deviceToken, appId: appId);
+
+  /// Unregisters this device's push token so Workflows stop targeting it — for
+  /// example from your logout flow.
+  ///
+  /// The intent is durable: if the request fails or the device is offline, the
+  /// native SDK retries it on the next flush or app launch. [reset] already
+  /// moves a registered token to the new anonymous identity on its own, so this
+  /// is only needed when you manage subscriptions yourself.
+  ///
+  /// Not supported on Flutter web or macOS.
+  Future<void> unregisterPushNotificationToken() =>
+      _posthog.unregisterPushNotificationToken();
+
+  /// Captures `$push_notification_opened` when a user opens a push
+  /// notification.
+  ///
+  /// Call this only for opens [PostHogConfig.capturePushNotificationOpened]
+  /// cannot see itself — local notifications on either platform, plus
+  /// warm-start and foreground taps on Android — or the tap is counted twice.
+  /// That doc has the full coverage matrix.
+  ///
+  /// ```dart
+  /// if (Platform.isAndroid) {
+  ///   FirebaseMessaging.onMessageOpenedApp.listen((m) {
+  ///     Posthog().capturePushNotificationOpened(
+  ///       title: m.notification?.title,
+  ///       body: m.notification?.body,
+  ///       payload: m.data,
+  ///     );
+  ///   });
+  /// }
+  /// ```
+  ///
+  /// The event is built natively, so [PostHogConfig.beforeSend] callbacks do
+  /// not run on it — redact anything sensitive before passing it here.
+  ///
+  /// Keys of [payload]'s `posthog` entry become `$notification_<key>`
+  /// properties; it is decoded natively whether it arrives as a map or as a
+  /// JSON string. Leave [action] `null` for a plain tap — only action-button
+  /// taps carry an identifier.
+  ///
+  /// [subtitle] is iOS only and ignored on Android, which has no such field.
+  ///
+  /// Not supported on Flutter web.
+  Future<void> capturePushNotificationOpened({
+    String? title,
+    String? subtitle,
+    String? body,
+    Map<String, Object?>? payload,
+    String? action,
+  }) =>
+      _posthog.capturePushNotificationOpened(
+        title: title,
+        subtitle: subtitle,
+        body: body,
+        payload: payload,
+        action: action,
+      );
+
   /// Returns the feature flag value for [key].
   ///
   /// Returns `null` if the flag does not exist or cannot be loaded. For boolean
