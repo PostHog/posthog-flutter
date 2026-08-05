@@ -1,5 +1,11 @@
 ## Next
 
+## 5.35.1
+
+### Patch Changes
+
+- 220598f: Warn in debug builds when `preloadFeatureFlags` or `bootstrap` are set on Flutter web, where they are not applied, and document that `identify`/`group` reload feature flags
+
 ## 5.35.0
 
 ### Minor Changes
