@@ -1,3 +1,3 @@
 package com.posthog.flutter
 
-internal val postHogVersion = "5.34.2"
+internal val postHogVersion = "5.35.0"
