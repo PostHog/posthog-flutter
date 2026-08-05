@@ -124,7 +124,18 @@ class PostHogConfig {
 
   /// Whether feature flags are loaded when the SDK starts.
   ///
-  /// Defaults to `true`.
+  /// Defaults to `true`, which means every SDK start issues a `/flags` request.
+  /// Set it to `false` if you evaluate flags lazily (via
+  /// `Posthog().reloadFeatureFlags()`) and want to avoid that request.
+  ///
+  /// Note that `Posthog().identify()`, `Posthog().group()` and the
+  /// `set*PropertiesForFlags` helpers reload feature flags as well, so turning
+  /// preloading off only removes the request made at startup.
+  ///
+  /// **Flutter web:** not applied. The web SDK hooks onto an already-initialized
+  /// posthog-js instance, so set
+  /// [`advanced_disable_feature_flags_on_first_load`](https://posthog.com/docs/libraries/js/config)
+  /// in your `posthog.init({...})` call instead.
   var preloadFeatureFlags = true;
 
   /// Whether the SDK captures application lifecycle events automatically.
