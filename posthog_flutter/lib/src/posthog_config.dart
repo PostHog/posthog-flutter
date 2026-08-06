@@ -144,6 +144,11 @@ class PostHogConfig {
   /// events where supported by the platform. Defaults to `true`.
   var captureApplicationLifecycleEvents = true;
 
+  /// Configuration for rage-click autocapture on iOS and Mac Catalyst.
+  ///
+  /// Rage-click autocapture is not currently supported on other platforms.
+  var rageClickConfig = PostHogRageClickConfig();
+
   /// Whether the SDK emits verbose debug logs.
   ///
   /// Defaults to `false`.
@@ -385,6 +390,7 @@ class PostHogConfig {
       'sendFeatureFlagEvents': sendFeatureFlagEvents,
       'preloadFeatureFlags': preloadFeatureFlags,
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
+      'rageClickConfig': rageClickConfig.toMap(),
       'debug': debug,
       'optOut': optOut,
       'surveys': surveys,
@@ -619,6 +625,46 @@ class PostHogLogsConfig {
   /// set, say, 500ms. Floor at 1s, the smallest value the native API can honor.
   static int _wholeSeconds(Duration duration) =>
       duration.inSeconds < 1 ? 1 : duration.inSeconds;
+}
+
+/// Configuration for rage-click autocapture on iOS and Mac Catalyst.
+///
+/// Assign an instance to [PostHogConfig.rageClickConfig] before calling
+/// `Posthog().setup(config)`. Other platforms ignore this configuration.
+class PostHogRageClickConfig {
+  /// Creates a rage-click configuration using the native defaults.
+  PostHogRageClickConfig();
+
+  /// Whether rapid repeated taps are captured as `$rageclick` events.
+  ///
+  /// Defaults to `true`.
+  var enabled = true;
+
+  /// Maximum Manhattan distance, in logical points, between consecutive taps.
+  ///
+  /// Defaults to `30`.
+  var thresholdPoints = 30.0;
+
+  /// Maximum time between consecutive taps in the same sequence.
+  ///
+  /// Defaults to one second.
+  var timeoutInterval = const Duration(seconds: 1);
+
+  /// Number of consecutive taps required to capture a rage click.
+  ///
+  /// Defaults to `3`.
+  var minimumTapCount = 3;
+
+  /// Converts this rage-click configuration to a platform-channel map.
+  Map<String, Object> toMap() {
+    return {
+      'enabled': enabled,
+      'thresholdPoints': thresholdPoints,
+      'timeoutInterval':
+          timeoutInterval.inMicroseconds / Duration.microsecondsPerSecond,
+      'minimumTapCount': minimumTapCount,
+    };
+  }
 }
 
 /// Configuration for mobile session replay capture and masking.

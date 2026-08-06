@@ -2279,6 +2279,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "rageClickConfig",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogRageClickConfig"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "debug",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
@@ -2443,6 +2454,93 @@
                 "isRequired": false,
                 "isSealed": false,
                 "name": "PostHogConfig",
+                "relativePath": "lib/src/posthog_config.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "toMap",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "returnTypeName": "Map<String, Object>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "returnTypeName": "PostHogRageClickConfig",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "enabled",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "thresholdPoints",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "double"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "timeoutInterval",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "Duration"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "minimumTapCount",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogRageClickConfig",
                 "relativePath": "lib/src/posthog_config.dart",
                 "superTypeNames": [
                     "Object"
