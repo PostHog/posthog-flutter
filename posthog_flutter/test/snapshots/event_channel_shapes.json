@@ -1,0 +1,105 @@
+[
+  {
+    "method": "screen",
+    "arguments": {
+      "screenName": "Checkout",
+      "properties": {
+        "cart_size": 3,
+        "route": {
+          "source": "email"
+        },
+        "snapshot_before_send": "event"
+      }
+    }
+  },
+  {
+    "method": "capture",
+    "arguments": {
+      "eventName": "order completed",
+      "properties": {
+        "order_id": "ord_123",
+        "total": 42.5,
+        "items": [
+          {
+            "sku": "sku_1",
+            "quantity": 2
+          }
+        ],
+        "placed_at": "2024-03-01 12:30:00.000Z",
+        "$screen_name": "Checkout",
+        "snapshot_before_send": "event"
+      },
+      "userProperties": {
+        "plan": "pro",
+        "legacy_only": true,
+        "email_verified": true
+      },
+      "userPropertiesSetOnce": {
+        "first_checkout_at": "2024-03-01",
+        "signup_source": "invite"
+      }
+    }
+  },
+  {
+    "method": "identify",
+    "arguments": {
+      "userId": "user_123",
+      "userProperties": {
+        "email": "person@example.com",
+        "profile": {
+          "role": "admin"
+        }
+      },
+      "userPropertiesSetOnce": {
+        "created_at": "2024-01-01 00:00:00.000Z"
+      }
+    }
+  },
+  {
+    "method": "setPersonProperties",
+    "arguments": {
+      "userPropertiesToSet": {
+        "plan": "enterprise"
+      },
+      "userPropertiesToSetOnce": {
+        "first_team": "growth"
+      }
+    }
+  },
+  {
+    "method": "alias",
+    "arguments": {
+      "alias": "legacy_user_456"
+    }
+  },
+  {
+    "method": "group",
+    "arguments": {
+      "groupType": "company",
+      "groupKey": "posthog",
+      "groupProperties": {
+        "industry": "analytics",
+        "employees": 100
+      }
+    }
+  },
+  {
+    "method": "setPersonPropertiesForFlags",
+    "arguments": {
+      "userProperties": {
+        "plan": "enterprise",
+        "seats": 25
+      }
+    }
+  },
+  {
+    "method": "setGroupPropertiesForFlags",
+    "arguments": {
+      "groupType": "company",
+      "groupProperties": {
+        "region": "eu",
+        "employees": 100
+      }
+    }
+  }
+]
