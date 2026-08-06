@@ -43,8 +43,13 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
   bool _isCompleted = false;
   // Advancing past the intro is a pure UI transition: no response is recorded
   // and no survey event is sent. The X button keeps closing the survey.
+  // The intro has no default header, so an intro with no copy at all is
+  // skipped instead of drawing an empty sheet with a lone button.
   late bool _showingIntroScreen =
-      widget.survey.appearance?.displayIntroScreen ?? false;
+      (widget.survey.appearance?.displayIntroScreen ?? false) &&
+          ((widget.survey.appearance?.introScreenHeader?.isNotEmpty ?? false) ||
+              (widget.survey.appearance?.introScreenDescription?.isNotEmpty ??
+                  false));
 
   @override
   void initState() {
