@@ -211,6 +211,21 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
         #if os(iOS)
+            if let rageClickConfigMap = posthogConfig["rageClickConfig"] as? [String: Any] {
+                if let enabled = rageClickConfigMap["enabled"] as? Bool {
+                    config.rageClickConfig.enabled = enabled
+                }
+                if let thresholdPoints = rageClickConfigMap["thresholdPoints"] as? NSNumber {
+                    config.rageClickConfig.thresholdPoints = CGFloat(thresholdPoints.doubleValue)
+                }
+                if let timeoutInterval = rageClickConfigMap["timeoutInterval"] as? NSNumber {
+                    config.rageClickConfig.timeoutInterval = timeoutInterval.doubleValue
+                }
+                if let minimumTapCount = rageClickConfigMap["minimumTapCount"] as? NSNumber {
+                    config.rageClickConfig.minimumTapCount = minimumTapCount.intValue
+                }
+            }
+
             // configure session replay
             if let sessionReplay = posthogConfig["sessionReplay"] as? Bool {
                 config.sessionReplay = sessionReplay

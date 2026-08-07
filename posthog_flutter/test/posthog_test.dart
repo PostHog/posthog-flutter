@@ -181,6 +181,36 @@ void main() {
       expect(config.toMap()['host'], equals('https://us.i.posthog.com'));
     });
 
+    test('serializes the default rage-click configuration', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.rageClickConfig.toMap(), {
+        'enabled': true,
+        'thresholdPoints': 30.0,
+        'timeoutInterval': 1.0,
+        'minimumTapCount': 3,
+      });
+      expect(
+        config.toMap()['rageClickConfig'],
+        config.rageClickConfig.toMap(),
+      );
+    });
+
+    test('serializes overridden rage-click configuration', () {
+      final config = PostHogConfig('test_project_token')
+        ..rageClickConfig.enabled = false
+        ..rageClickConfig.thresholdPoints = 12.5
+        ..rageClickConfig.timeoutInterval = const Duration(milliseconds: 500)
+        ..rageClickConfig.minimumTapCount = 5;
+
+      expect(config.rageClickConfig.toMap(), {
+        'enabled': false,
+        'thresholdPoints': 12.5,
+        'timeoutInterval': 0.5,
+        'minimumTapCount': 5,
+      });
+    });
+
     test('session replay masks all platform views by default', () {
       final config = PostHogConfig('test_project_token');
 
