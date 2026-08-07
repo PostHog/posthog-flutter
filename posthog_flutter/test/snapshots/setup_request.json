@@ -12,6 +12,12 @@
       "sendFeatureFlagEvents": false,
       "preloadFeatureFlags": false,
       "captureApplicationLifecycleEvents": false,
+      "rageClickConfig": {
+        "enabled": true,
+        "thresholdPoints": 30.0,
+        "timeoutInterval": 1.0,
+        "minimumTapCount": 3
+      },
       "debug": false,
       "optOut": false,
       "surveys": true,
