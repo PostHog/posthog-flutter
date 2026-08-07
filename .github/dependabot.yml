@@ -1,31 +1,13 @@
 version: 2
 updates:
-  - package-ecosystem: "pub"
-    cooldown:
-      default-days: 7
-    directory: "/"
-    schedule:
-      interval: weekly
-    groups:
-      pub-dependencies:
-        patterns:
-          - "*"
-  - package-ecosystem: "npm"
-    cooldown:
-      default-days: 7
-    directory: "/"
-    schedule:
-      interval: weekly
-    groups:
-      release-tooling:
-        patterns:
-          - "*"
   - package-ecosystem: "github-actions"
     cooldown:
       default-days: 7
     directory: "/"
     schedule:
       interval: weekly
+    reviewers:
+      - "PostHog/team-client-libraries"
     groups:
       codeql-action:
         patterns:
