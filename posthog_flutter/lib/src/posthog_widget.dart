@@ -70,6 +70,19 @@ class PostHogWidgetState extends State<PostHogWidget> {
     PostHogInternalEvents.nativeOcclusionEvent.addListener(
       _onNativeOcclusionChanged,
     );
+    PostHogInternalEvents.forceReplaySessionReset.addListener(
+      _onForcedReplaySessionReset,
+    );
+  }
+
+  /// A session change Dart knows about before the capture path could observe it:
+  /// `reset()` and `close()` (both platforms end the session), and a start that
+  /// does not resume — which rotates on iOS but on Android may not rotate at
+  /// all, since `PostHog.startSessionReplay` returns early while recording is
+  /// already active. The drop is requested directly rather than waiting for a
+  /// tick to read the new id.
+  void _onForcedReplaySessionReset() {
+    _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
   }
 
   /// A native screen started/stopped covering Flutter (pushed by the native
@@ -92,14 +105,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
           'Native occlusion ended (episode $episode): resuming Flutter capture.');
       _setSuppressFlutterCapture(false);
       _screenshotCapturer?.onOcclusionEnded();
-      // A static screen renders no frame after the cover dismisses
-      // (addPostFrameCallback does not request one), so without forcing a
-      // frame here the replay would stay on the episode's last frame forever.
-      if (_changeDetector?.isRunning ?? false) {
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _onChangeDetected());
-        WidgetsBinding.instance.scheduleFrame();
-      }
+      // Without a sample here the replay would stay on the episode's last frame
+      // until the app happens to render again.
+      _changeDetector?.requestImmediateSample();
       return;
     }
     if (!replayConfig.captureNativeScreens) {
@@ -132,20 +140,37 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // A placeholder is only valid while its own episode is occluding.
       await _sendSnapshot(
         imageInfo,
-        isStillValid: () =>
-            PostHogInternalEvents.episodeStillCurrent(episode, occluded: true),
+        isStillValid: () => _stillValid(imageInfo, episode, occluded: true),
       );
     }
   }
 
+  /// A frame may only ship while the world it was captured in is still current:
+  /// the same occlusion episode and the same replay session — otherwise it lands
+  /// in the new session ahead of the meta event that session has not sent yet.
+  ///
+  /// The session half catches a forced reset (see [_onForcedReplaySessionReset])
+  /// landing mid-send, and a rotation observed by a concurrent occlusion
+  /// placeholder. It cannot catch a rotation observed by the capture tick: the
+  /// tick is the only other writer of the tracked id and runs serialized behind
+  /// `_isCapturing`, so the id cannot move under a capture in flight.
+  bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
+    return PostHogInternalEvents.episodeStillCurrent(episode,
+            occluded: occluded) &&
+        (_screenshotCapturer?.sessionStillCurrent(imageInfo.sessionId) ??
+            false);
+  }
+
   void _initComponents(PostHogConfig config) {
-    final throttleDelay = config.sessionReplayConfig.throttleDelay;
     _screenshotCapturer = ScreenshotCapturer(config);
     _nativeCommunicator = NativeCommunicator();
     _changeDetector = ChangeDetector(
       _onChangeDetected,
-      interval: throttleDelay,
-    );
+      // Read live so a close()/setup() reconfigure (even one mutating the
+      // same config instance) takes effect on the restart it triggers, without
+      // rebuilding the detector.
+      intervalOf: () => Posthog().config?.sessionReplayConfig.throttleDelay,
+    )..suppressForcedFrames = _suppressFlutterCapture;
   }
 
   void _onSessionRecordingChanged() {
@@ -217,11 +242,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
       }
 
       // Only valid while the world it was captured in is still current — an
-      // episode starting mid-pipeline makes it stale.
+      // episode or a forced session reset mid-pipeline makes it stale.
       await _sendSnapshot(
         imageInfo,
-        isStillValid: () => PostHogInternalEvents.episodeStillCurrent(episode,
-            occluded: occluded),
+        isStillValid: () => _stillValid(imageInfo, episode, occluded: occluded),
       );
     } finally {
       _isCapturing = false;
@@ -287,6 +311,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
     );
     PostHogInternalEvents.nativeOcclusionEvent.removeListener(
       _onNativeOcclusionChanged,
+    );
+    PostHogInternalEvents.forceReplaySessionReset.removeListener(
+      _onForcedReplaySessionReset,
     );
 
     _changeDetector?.stop();

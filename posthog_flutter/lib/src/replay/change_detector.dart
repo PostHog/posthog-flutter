@@ -13,7 +13,7 @@ import 'package:flutter/widgets.dart';
 /// final changeDetector = ChangeDetector(() {
 ///   // Code to execute when a UI change is detected.
 ///   print('UI has updated.');
-/// });
+/// }, intervalOf: () => const Duration(seconds: 1));
 ///
 /// changeDetector.start();
 /// ```
@@ -22,7 +22,12 @@ import 'package:flutter/widgets.dart';
 /// the operations performed are efficient to avoid impacting app performance.
 class ChangeDetector {
   final VoidCallback onChange;
-  final Duration interval;
+
+  /// Resolved once per [start]. The detector is stopped and restarted around
+  /// every reconfigure, so reading it there is enough for a new throttleDelay
+  /// to take effect; null means there is no config to poll for.
+  final Duration? Function() intervalOf;
+
   bool _isRunning = false;
   Timer? _timer;
 
@@ -37,8 +42,8 @@ class ChangeDetector {
 
   /// Creates a [ChangeDetector] with the given [onChange] callback.
   ///
-  /// [interval] controls how often to check for changes.
-  ChangeDetector(this.onChange, {this.interval = const Duration(seconds: 1)});
+  /// [intervalOf] controls how often to check for changes.
+  ChangeDetector(this.onChange, {required this.intervalOf});
 
   /// Starts the change detection process.
   ///
@@ -48,12 +53,14 @@ class ChangeDetector {
     if (_isRunning) {
       return;
     }
+    final interval = intervalOf();
+    if (interval == null) {
+      return;
+    }
 
     _isRunning = true;
-    _scheduleFrameCallback();
-    _timer = Timer.periodic(interval, (_) {
-      _scheduleFrameCallback();
-    });
+    requestImmediateSample();
+    _timer = Timer.periodic(interval, (_) => _scheduleFrameCallback());
   }
 
   /// Stops the change detection process.
@@ -65,13 +72,26 @@ class ChangeDetector {
     _timer = null;
   }
 
+  /// Samples once before the next poll tick, forcing a frame so a static screen
+  /// still gets sampled: nothing else schedules one there, and without a
+  /// rendered frame the post-frame callback (and so the capture) never runs.
+  ///
+  /// No-ops while the detector is stopped, and forces no frame while
+  /// [suppressForcedFrames] is set — so a caller that ends a suppressed episode
+  /// must clear the flag before calling. The other order leaves a static screen
+  /// unsampled, freezing the replay on the episode's last frame until the app
+  /// happens to render again.
+  void requestImmediateSample() {
+    _scheduleFrameCallback(forceFrame: true);
+  }
+
   /// Schedules a single post-frame callback to invoke [onChange].
-  void _scheduleFrameCallback() {
+  void _scheduleFrameCallback({bool forceFrame = false}) {
     if (!_isRunning) {
       return;
     }
 
-    if (hasCapturedPlatformViews && !suppressForcedFrames) {
+    if ((forceFrame || hasCapturedPlatformViews) && !suppressForcedFrames) {
       WidgetsBinding.instance.scheduleFrame();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {

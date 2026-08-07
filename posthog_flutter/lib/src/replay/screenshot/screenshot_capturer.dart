@@ -25,6 +25,10 @@ class ImageInfo {
   final bool shouldSendMetaEvent;
   final Uint8List imageBytes;
 
+  /// The replay session this frame was captured under, so the sender can drop
+  /// it if the session rotates mid-flight.
+  final String? sessionId;
+
   ImageInfo(
     this.id,
     this.x,
@@ -32,8 +36,9 @@ class ImageInfo {
     this.width,
     this.height,
     this.shouldSendMetaEvent,
-    this.imageBytes,
-  );
+    this.imageBytes, {
+    required this.sessionId,
+  });
 }
 
 class ViewTreeSnapshotStatus {
@@ -76,20 +81,66 @@ class ScreenshotCapturer {
   int? _pendingImageBytesHash;
   int? _pendingCompositedBytesHash;
 
+  /// The replay session the tracked snapshot state belongs to, read from native
+  /// on every capture tick. Null until the first read, and after a forced reset.
+  String? _replaySessionId;
+
   @visibleForTesting
   ViewTreeSnapshotStatus? get debugLastTargetStatus => _lastTargetStatus;
 
+  @visibleForTesting
+  String? get debugReplaySessionId => _replaySessionId;
+
   ScreenshotCapturer(this._config);
 
-  /// A second `setup()` replaces the SDK config object, but the capturer is
-  /// built once per widget lifecycle — resolving the live config at capture
-  /// time keeps masking flags from freezing at their first-setup values.
+  /// Resolves the live config at read time so masking flags never trail a
+  /// close()/setup() reconfigure.
   @visibleForTesting
   PostHogConfig get effectiveConfig => Posthog().config ?? _config;
 
   void cancel() {
     _cancelled = true;
   }
+
+  /// Drops all per-session snapshot state when [currentSessionId] differs from
+  /// the session that state was built under: the new session needs its own meta
+  /// event and must not have its first frame deduped against the previous
+  /// session's pixels. Called with the id read from native on every capture
+  /// tick, so it covers every rotation the native SDK performs (reset, idle and
+  /// max-duration expiry, an explicit new-session start) rather than the subset
+  /// the Dart API can predict.
+  ///
+  /// [force] resets even when the id is unchanged — the counterpart of the same
+  /// flag in Android's PostHogReplayIntegration (iOS has none and rotates the
+  /// session instead), for an explicit start that does not resume the current
+  /// session. The new id is unknown at that point, so it is left null until the
+  /// next tick reads it.
+  void resetSessionStateIfNeeded(
+    String? currentSessionId, {
+    bool force = false,
+  }) {
+    if (!force && _replaySessionId == currentSessionId) {
+      return;
+    }
+    _replaySessionId = currentSessionId;
+    _snapshotManager.clear();
+    _lastTargetViewId = null;
+    _lastTargetStatus = null;
+    _pendingImageBytesHash = null;
+    _pendingCompositedBytesHash = null;
+  }
+
+  /// Whether a frame captured under [sessionId] still belongs to the session the
+  /// capturer is tracking — the session-level counterpart of the occlusion
+  /// episode check, since a frame outliving its session would ship into the new
+  /// one ahead of the meta event that session has not sent yet.
+  ///
+  /// It catches a forced reset landing mid-send, and a rotation the occlusion
+  /// placeholder path observes concurrently. It does not catch a rotation the
+  /// capture tick observes: that tick is the only other writer of the tracked id
+  /// and is serialized against captures by the widget, so the id cannot move
+  /// under a capture in flight.
+  bool sessionStillCurrent(String? sessionId) => _replaySessionId == sessionId;
 
   /// Called when an occlusion episode ends: invalidates the dedup hashes (else
   /// the first Flutter frame matches the placeholder/bridged hash and freezes
@@ -380,6 +431,9 @@ class ScreenshotCapturer {
     if (target == null) {
       return null;
     }
+    // Read before the awaits below, so a rotation mid-build is visible to the
+    // sender as a stale frame.
+    final sessionId = _replaySessionId;
     final renderObject = target.renderObject;
     // Always with meta: a bridged episode already shipped the native screen's
     // meta, so without re-sending, the placeholder renders against its viewport.
@@ -429,10 +483,35 @@ class ScreenshotCapturer {
       height,
       shouldSendMetaEvent,
       pngBytes,
+      sessionId: sessionId,
     );
   }
 
-  Future<ImageInfo?> captureScreenshot() {
+  /// Captures one Flutter frame, or null when there is nothing to send. Never
+  /// throws.
+  Future<ImageInfo?> captureScreenshot() async {
+    // Also cleared in [_resolveCaptureTarget] (see there), but that runs only
+    // after the native round trip below, whose post-await `_cancelled` check
+    // would otherwise veto this capture on a prior stop's flag.
+    _cancelled = false;
+    final state = await _nativeCommunicator.getSessionReplayState();
+    if (_cancelled) {
+      return null;
+    }
+    if (!state.isActive) {
+      _snapshotManager.clear();
+      return null;
+    }
+    // Before the capture target reads the meta latch below: a rotated session
+    // must not inherit the previous session's latch or dedup hashes.
+    resetSessionStateIfNeeded(state.sessionId);
+    return _captureScreenshot(state.sessionId);
+  }
+
+  /// [sessionId] is the session this capture started in, tagged onto the frame
+  /// so the sender can drop it if the tracked session is reset while it is
+  /// being built.
+  Future<ImageInfo?> _captureScreenshot(String? sessionId) {
     final target = _resolveCaptureTarget();
     if (target == null) {
       return Future.value(null);
@@ -472,18 +551,6 @@ class ScreenshotCapturer {
       ui.Image? finalImage;
 
       Future(() async {
-        final isSessionReplayActive =
-            await _nativeCommunicator.isSessionReplayActive();
-        if (_cancelled) {
-          completer.complete(null);
-          return;
-        }
-        if (!isSessionReplayActive) {
-          _snapshotManager.clear();
-          completer.complete(null);
-          return;
-        }
-
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
         image = await renderObject.toImage(pixelRatio: pixelRatio);
@@ -496,9 +563,7 @@ class ScreenshotCapturer {
           return;
         }
 
-        if (currentImage == null ||
-            !isSessionReplayActive ||
-            !currentImage.isValidSize) {
+        if (currentImage == null || !currentImage.isValidSize) {
           _snapshotManager.clear();
           currentImage?.dispose();
           image = null;
@@ -682,6 +747,7 @@ class ScreenshotCapturer {
               srcHeight.toInt(),
               shouldSendMetaEvent,
               pngBytes,
+              sessionId: sessionId,
             );
             // No status commit here: the sender may still drop this frame, and
             // committing for a never-sent frame breaks playback / freezes dedup.

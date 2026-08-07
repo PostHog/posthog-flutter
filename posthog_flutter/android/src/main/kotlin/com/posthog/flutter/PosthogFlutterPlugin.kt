@@ -31,6 +31,7 @@ import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
 import com.posthog.android.replay.PostHogInternalReplayApi
 import com.posthog.android.replay.PostHogReplayIntegration
+import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -408,6 +409,10 @@ class PosthogFlutterPlugin :
                 result.success(isSessionReplayActive())
             }
 
+            "getSessionReplayState" -> {
+                result.success(getSessionReplayState())
+            }
+
             "startSessionRecording" -> {
                 startSessionRecording(call, result)
             }
@@ -435,6 +440,15 @@ class PosthogFlutterPlugin :
     }
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
+
+    // Read on every Flutter capture tick, so it must not mutate session state:
+    // PostHog.getSessionId() runs the expiry checks and can rotate the session,
+    // peekSessionId() only reads it.
+    private fun getSessionReplayState(): Map<String, Any?> =
+        mapOf(
+            "isActive" to isSessionReplayActive(),
+            "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
+        )
 
     private fun startSessionRecording(
         call: MethodCall,

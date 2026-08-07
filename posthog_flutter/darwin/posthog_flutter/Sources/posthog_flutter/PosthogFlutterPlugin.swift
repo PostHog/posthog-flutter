@@ -494,6 +494,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             result(nil)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
+        case "getSessionReplayState":
+            getSessionReplayState(result: result)
         case "startSessionRecording":
             startSessionRecording(call, result: result)
         case "stopSessionRecording":
@@ -1140,6 +1142,22 @@ extension PosthogFlutterPlugin {
             result(PostHogSDK.shared.isSessionReplayActive())
         #else
             result(false)
+        #endif
+    }
+
+    private func getSessionReplayState(result: @escaping FlutterResult) {
+        #if os(iOS)
+            var state: [String: Any] = [
+                "isActive": PostHogSDK.shared.isSessionReplayActive(),
+            ]
+            // Read on every Flutter capture tick: getSessionId() is the
+            // read-only accessor, so it can't rotate the session.
+            if let sessionId = PostHogSDK.shared.getSessionId() {
+                state["sessionId"] = sessionId
+            }
+            result(state)
+        #else
+            result(["isActive": false])
         #endif
     }
 
