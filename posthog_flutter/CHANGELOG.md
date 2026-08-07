@@ -1,5 +1,11 @@
 ## Next
 
+## 5.36.0
+
+### Minor Changes
+
+- 15ee01b: Expose iOS and Mac Catalyst rage-click autocapture settings through `PostHogConfig.rageClickConfig`. Apps can disable `$rageclick` capture or configure its distance, timeout, and tap-count thresholds.
+
 ## 5.35.1
 
 ### Patch Changes
