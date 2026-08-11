@@ -31,6 +31,15 @@ typedef BeforeSendLogCallback = FutureOr<PostHogLogRecord?> Function(
   PostHogLogRecord record,
 );
 
+/// Mints a signed identity-verification token for a push subscription request.
+///
+/// Called by the native SDK with the current [distinctId] and [appId]. Return
+/// `null` to send the request without an identity token.
+typedef PushIdentityProvider = Future<String?> Function(
+  String distinctId,
+  String appId,
+);
+
 /// Controls whether events create or update PostHog person profiles.
 enum PostHogPersonProfiles {
   /// Never create person profiles from captured events.
@@ -115,7 +124,18 @@ class PostHogConfig {
 
   /// Whether feature flags are loaded when the SDK starts.
   ///
-  /// Defaults to `true`.
+  /// Defaults to `true`, which means every SDK start issues a `/flags` request.
+  /// Set it to `false` if you evaluate flags lazily (via
+  /// `Posthog().reloadFeatureFlags()`) and want to avoid that request.
+  ///
+  /// Note that `Posthog().identify()`, `Posthog().group()` and the
+  /// `set*PropertiesForFlags` helpers reload feature flags as well, so turning
+  /// preloading off only removes the request made at startup.
+  ///
+  /// **Flutter web:** not applied. The web SDK hooks onto an already-initialized
+  /// posthog-js instance, so set
+  /// [`advanced_disable_feature_flags_on_first_load`](https://posthog.com/docs/libraries/js/config)
+  /// in your `posthog.init({...})` call instead.
   var preloadFeatureFlags = true;
 
   /// Whether the SDK captures application lifecycle events automatically.
@@ -123,6 +143,11 @@ class PostHogConfig {
   /// Captured events include app opened, backgrounded, installed, and updated
   /// events where supported by the platform. Defaults to `true`.
   var captureApplicationLifecycleEvents = true;
+
+  /// Configuration for rage-click autocapture on iOS and Mac Catalyst.
+  ///
+  /// Rage-click autocapture is not currently supported on other platforms.
+  var rageClickConfig = PostHogRageClickConfig();
 
   /// Whether the SDK emits verbose debug logs.
   ///
@@ -199,6 +224,58 @@ class PostHogConfig {
   /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
+
+  /// Whether to automatically register this device's push token with PostHog.
+  ///
+  /// On iOS the native SDK swizzles the app delegate's remote-notification
+  /// registration callback; on Android it fetches the FCM token at startup when
+  /// `firebase-messaging` is on the classpath. Either way the host app is still
+  /// responsible for requesting notification permission and calling
+  /// `registerForRemoteNotifications()` (iOS) — this only observes the result.
+  ///
+  /// The startup fetch does not see later token refreshes; wire those to
+  /// [Posthog.registerPushNotificationToken] yourself.
+  ///
+  /// **Flutter web:** not supported. Defaults to `true`.
+  bool capturePushNotificationSubscriptions = true;
+
+  /// Whether to automatically capture `$push_notification_opened` when a user
+  /// taps a PostHog-delivered notification.
+  ///
+  /// Coverage differs per platform. iOS hooks the notification-response
+  /// delegate, so every tap on a **remote** notification is captured whatever
+  /// the app state; locally-scheduled notifications are ignored. Android only
+  /// reads the launch intent, so it sees cold starts alone. Call
+  /// [Posthog.capturePushNotificationOpened] for the opens this misses —
+  /// local notifications on either platform, plus foreground messages and
+  /// warm-start taps on Android.
+  ///
+  /// **Flutter web:** not supported. Defaults to `true`.
+  bool capturePushNotificationOpened = true;
+
+  /// Mints a signed identity-verification token for push subscription requests.
+  ///
+  /// Only needed when your PostHog project requires identity verification for
+  /// push. The native SDK calls this with the current `distinctId` and `appId`
+  /// and attaches the returned token to the subscription request; return `null`
+  /// to send without one.
+  ///
+  /// The token is minted by your backend (HS256, with `sub` = distinctId,
+  /// `app_id`, and `aud` = `posthog:push_identity`), never in the app.
+  ///
+  /// The native SDKs cache the result per `(distinctId, appId)` and give this
+  /// callback 10 seconds before falling back to an unauthenticated request, so
+  /// a slow or throwing implementation degrades rather than blocking delivery.
+  ///
+  /// Requires programmatic setup on both platforms. Under auto-init
+  /// (`com.posthog.posthog.AUTO_INIT`, Info.plist on iOS, AndroidManifest
+  /// `<meta-data>` on Android) the native SDK is already set up before Dart
+  /// runs and a later [Posthog.setup] is a no-op, so the provider is never
+  /// installed. Set `com.posthog.posthog.AUTO_INIT` to `false` and call
+  /// [Posthog.setup].
+  ///
+  /// **Flutter web:** not supported. Defaults to `null`.
+  PushIdentityProvider? pushIdentityProvider;
 
   /// Callbacks to intercept and modify events before they are sent to PostHog.
   ///
@@ -313,6 +390,7 @@ class PostHogConfig {
       'sendFeatureFlagEvents': sendFeatureFlagEvents,
       'preloadFeatureFlags': preloadFeatureFlags,
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
+      'rageClickConfig': rageClickConfig.toMap(),
       'debug': debug,
       'optOut': optOut,
       'surveys': surveys,
@@ -322,6 +400,13 @@ class PostHogConfig {
       'sessionReplayConfig': sessionReplayConfig.toMap(),
       'errorTrackingConfig': errorTrackingConfig.toMap(),
       'logs': logsConfig.toMap(),
+      'capturePushNotificationSubscriptions':
+          capturePushNotificationSubscriptions,
+      'capturePushNotificationOpened': capturePushNotificationOpened,
+      // A closure can't cross the channel. This tells native whether to install
+      // a bridging provider at all — installing one the host didn't ask for
+      // would change how the native SDK handles a 401 on the subscription call.
+      'pushIdentityProviderEnabled': pushIdentityProvider != null,
       if (bootstrap != null) 'bootstrap': bootstrap!.toMap(),
     };
   }
@@ -540,6 +625,46 @@ class PostHogLogsConfig {
   /// set, say, 500ms. Floor at 1s, the smallest value the native API can honor.
   static int _wholeSeconds(Duration duration) =>
       duration.inSeconds < 1 ? 1 : duration.inSeconds;
+}
+
+/// Configuration for rage-click autocapture on iOS and Mac Catalyst.
+///
+/// Assign an instance to [PostHogConfig.rageClickConfig] before calling
+/// `Posthog().setup(config)`. Other platforms ignore this configuration.
+class PostHogRageClickConfig {
+  /// Creates a rage-click configuration using the native defaults.
+  PostHogRageClickConfig();
+
+  /// Whether rapid repeated taps are captured as `$rageclick` events.
+  ///
+  /// Defaults to `true`.
+  var enabled = true;
+
+  /// Maximum Manhattan distance, in logical points, between consecutive taps.
+  ///
+  /// Defaults to `30`.
+  var thresholdPoints = 30.0;
+
+  /// Maximum time between consecutive taps in the same sequence.
+  ///
+  /// Defaults to one second.
+  var timeoutInterval = const Duration(seconds: 1);
+
+  /// Number of consecutive taps required to capture a rage click.
+  ///
+  /// Defaults to `3`.
+  var minimumTapCount = 3;
+
+  /// Converts this rage-click configuration to a platform-channel map.
+  Map<String, Object> toMap() {
+    return {
+      'enabled': enabled,
+      'thresholdPoints': thresholdPoints,
+      'timeoutInterval':
+          timeoutInterval.inMicroseconds / Duration.microsecondsPerSecond,
+      'minimumTapCount': minimumTapCount,
+    };
+  }
 }
 
 /// Configuration for mobile session replay capture and masking.

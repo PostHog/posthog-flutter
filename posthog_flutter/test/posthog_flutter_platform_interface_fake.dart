@@ -35,7 +35,49 @@ class CapturedLogCall {
   });
 }
 
+typedef CapturedPushOpenedCall = ({
+  String? title,
+  String? subtitle,
+  String? body,
+  Map<String, Object?>? payload,
+  String? action,
+});
+
 class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
+  final List<({String deviceToken, String? appId})> registeredPushTokens = [];
+  int unregisterPushTokenCalls = 0;
+  final List<CapturedPushOpenedCall> capturedPushOpened = [];
+
+  @override
+  Future<void> registerPushNotificationToken(
+    String deviceToken, {
+    String? appId,
+  }) async {
+    registeredPushTokens.add((deviceToken: deviceToken, appId: appId));
+  }
+
+  @override
+  Future<void> unregisterPushNotificationToken() async {
+    unregisterPushTokenCalls++;
+  }
+
+  @override
+  Future<void> capturePushNotificationOpened({
+    String? title,
+    String? subtitle,
+    String? body,
+    Map<String, Object?>? payload,
+    String? action,
+  }) async {
+    capturedPushOpened.add((
+      title: title,
+      subtitle: subtitle,
+      body: body,
+      payload: payload,
+      action: action,
+    ));
+  }
+
   String? screenName;
   OnFeatureFlagsCallback? registeredOnFeatureFlagsCallback;
   final List<CapturedExceptionCall> capturedExceptions = [];

@@ -20,6 +20,7 @@ import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.RequiresApi
+import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
 import com.posthog.PostHogBootstrapConfig
@@ -65,6 +66,12 @@ class PosthogFlutterPlugin :
     private var application: Application? = null
 
     private var postHogConfig: PostHogAndroidConfig? = null
+
+    // Test seam: captures the built config even if setup() throws (mock Context in
+    // unit tests). postHogConfig is only published on success, so production readers
+    // never see an uninstalled config.
+    @VisibleForTesting
+    internal var lastBuiltConfig: PostHogAndroidConfig? = null
 
     // Occluded = host activity STOPPED (not just paused — a translucent/dialog
     // activity pauses the host while Flutter stays visible) AND one of our own
@@ -199,6 +206,10 @@ class PosthogFlutterPlugin :
                     bundle.getBoolean("com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS", true)
                 }
             val debug = bundle.getBoolean("com.posthog.posthog.DEBUG", false)
+            val capturePushNotificationSubscriptions =
+                bundle.getBoolean("com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_SUBSCRIPTIONS", true)
+            val capturePushNotificationOpened =
+                bundle.getBoolean("com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED", true)
 
             val posthogConfig = mutableMapOf<String, Any>()
             posthogConfig["projectToken"] = projectToken
@@ -206,6 +217,8 @@ class PosthogFlutterPlugin :
             posthogConfig["host"] = host
             posthogConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
             posthogConfig["debug"] = debug
+            posthogConfig["capturePushNotificationSubscriptions"] = capturePushNotificationSubscriptions
+            posthogConfig["capturePushNotificationOpened"] = capturePushNotificationOpened
 
             setupPostHog(posthogConfig)
         } catch (e: Throwable) {
@@ -334,6 +347,18 @@ class PosthogFlutterPlugin :
                 close(result)
             }
 
+            "registerPushNotificationToken" -> {
+                registerPushNotificationToken(call, result)
+            }
+
+            "unregisterPushNotificationToken" -> {
+                unregisterPushNotificationToken(result)
+            }
+
+            "capturePushNotificationOpened" -> {
+                capturePushNotificationOpened(call, result)
+            }
+
             "sendMetaEvent" -> {
                 handleMetaEvent(call, result)
             }
@@ -352,8 +377,10 @@ class PosthogFlutterPlugin :
                     // for an episode Dart never handed off.
                     val episode = call.argument<Int>("episode")
                     val accepted =
-                        isOccluded && episode == occlusionEpisode &&
-                            replayIntegration() != null && isSessionReplayActive()
+                        isOccluded &&
+                            episode == occlusionEpisode &&
+                            replayIntegration() != null &&
+                            isSessionReplayActive()
                     if (accepted) {
                         bridgeEnabled = true
                         nudgeOcclusionDetector()
@@ -673,6 +700,74 @@ class PosthogFlutterPlugin :
                     this.bootstrap = bootstrapConfigFromMap(it)
                 }
 
+                posthogConfig.getIfNotNull<Boolean>("capturePushNotificationSubscriptions") {
+                    capturePushNotificationSubscriptions = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("capturePushNotificationOpened") {
+                    capturePushNotificationOpened = it
+                }
+                posthogConfig.getIfNotNull<Boolean>("pushIdentityProviderEnabled") { enabled ->
+                    if (enabled) {
+                        // Anchor only if unowned: a live owner is never displaced by a
+                        // secondary engine's setup() (e.g. a background isolate). Every
+                        // provider-enabled engine is kept as a candidate so detach can
+                        // promote a survivor instead of orphaning the route.
+                        pushChannelCandidates.add(channel)
+                        if (activeChannel == null) {
+                            activeChannel = channel
+                        }
+                        pushIdentityProvider = { distinctId, appId, completion ->
+                            runOnMainThread {
+                                // Read on the main thread (where detach nulls the field) so
+                                // the check and send are atomic w.r.t. teardown; declining
+                                // now beats the native 10s mint watchdog timing out.
+                                val target = activeChannel
+                                if (target == null) {
+                                    declinePushIdentity(completion, "no Flutter engine attached")
+                                } else {
+                                    try {
+                                        target.invokeMethod(
+                                            "pushIdentityProvider",
+                                            mapOf("distinctId" to distinctId, "appId" to appId),
+                                            object : MethodChannel.Result {
+                                                override fun success(res: Any?) =
+                                                    if (res == null || res is String) {
+                                                        completion(res as String?)
+                                                    } else {
+                                                        declinePushIdentity(
+                                                            completion,
+                                                            "pushIdentityProvider returned a non-String reply",
+                                                        )
+                                                    }
+
+                                                override fun error(
+                                                    errorCode: String,
+                                                    errorMessage: String?,
+                                                    errorDetails: Any?,
+                                                ) = declinePushIdentity(
+                                                    completion,
+                                                    "pushIdentityProvider threw: $errorCode ${errorMessage.orEmpty()}",
+                                                )
+
+                                                override fun notImplemented() =
+                                                    declinePushIdentity(
+                                                        completion,
+                                                        "pushIdentityProvider not implemented on the Dart side",
+                                                    )
+                                            },
+                                        )
+                                    } catch (e: Throwable) {
+                                        declinePushIdentity(
+                                            completion,
+                                            "pushIdentityProvider dispatch failed: ${e.message}",
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
 
@@ -683,6 +778,7 @@ class PosthogFlutterPlugin :
                     }
             }
 
+        lastBuiltConfig = config
         PostHogAndroid.setup(applicationContext, config)
         postHogConfig = config
         cachedReplayIntegration = null
@@ -739,6 +835,11 @@ class PosthogFlutterPlugin :
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopOcclusionDetector()
         channel.setMethodCallHandler(null)
+        pushChannelCandidates.remove(channel)
+        if (activeChannel === channel) {
+            // Promote the most recent surviving provider-enabled engine (null when none).
+            activeChannel = pushChannelCandidates.lastOrNull()
+        }
         bitmapExportExecutor.shutdown()
         snapshotSendExecutor.shutdown()
     }
@@ -1746,6 +1847,79 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun registerPushNotificationToken(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val deviceToken = call.argument<String>("deviceToken")
+            if (deviceToken.isNullOrBlank()) {
+                // A blank token is dropped silently by the native SDK, so surface
+                // it here like the missing case instead of reporting false success.
+                result.error("PosthogFlutterException", "Missing argument: deviceToken", null)
+                return
+            }
+            val appId =
+                call.argument<String>("appId")?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: firebaseProjectId()
+            if (appId.isNullOrEmpty()) {
+                // Reported as an error, not a silent success: iOS derives its own bundle id, so
+                // the identical Dart call would succeed there and vanish here. Dart logs it in
+                // debug and swallows it, keeping a Firebase-less app from crashing.
+                val message =
+                    "registerPushNotificationToken: no appId provided and no Firebase project id " +
+                        "could be resolved, skipping. Pass appId explicitly if this app does not use Firebase."
+                Log.w("PostHog", message)
+                result.error("PosthogFlutterException", message, null)
+                return
+            }
+            PostHog.registerPushNotificationToken(deviceToken, appId)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun unregisterPushNotificationToken(result: Result) {
+        try {
+            PostHog.unregisterPushNotificationToken()
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun capturePushNotificationOpened(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val title = call.argument<String>("title")
+            val body = call.argument<String>("body")
+            // subtitle is iOS-only; posthog-android's capturePushNotificationOpened
+            // has no subtitle parameter, so Dart's value is dropped here.
+            val payload = call.argument<Map<String, Any?>>("payload")
+            val action = call.argument<String>("action")
+            PostHog.capturePushNotificationOpened(title, body, payload, action)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    // Mirrors posthog-android's own PostHogPushSubscriptionIntegration: this plugin
+    // has no Firebase dependency, so the project id is looked up reflectively and
+    // any failure (class missing, Firebase not initialized, etc.) is swallowed.
+    private fun firebaseProjectId(): String? =
+        try {
+            val firebaseAppClass = Class.forName("com.google.firebase.FirebaseApp")
+            val firebaseApp = firebaseAppClass.getMethod("getInstance").invoke(null)
+            val options = firebaseAppClass.getMethod("getOptions").invoke(firebaseApp)
+            options?.javaClass?.getMethod("getProjectId")?.invoke(options) as? String
+        } catch (e: Throwable) {
+            null
+        }
+
     private fun captureException(
         call: MethodCall,
         result: Result,
@@ -1868,13 +2042,7 @@ class PosthogFlutterPlugin :
         method: String,
         arguments: Any? = null,
     ) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            channel.invokeMethod(method, arguments)
-        } else {
-            Handler(Looper.getMainLooper()).post {
-                channel.invokeMethod(method, arguments)
-            }
-        }
+        runOnMainThread { channel.invokeMethod(method, arguments) }
     }
 
     // MARK: - Survey Action Handling
@@ -1899,6 +2067,49 @@ class PosthogFlutterPlugin :
         }
 
         flutterSurveysDelegate?.handleSurveyAction(type, args, result)
+    }
+
+    companion object {
+        // Mint route for pushIdentityProvider, anchored to the engine whose setup()
+        // installed the provider. A live owner is never displaced; provider-enabled
+        // engines stay candidates so detach promotes the most recent survivor instead
+        // of orphaning the route, and with none left it declines fast rather than
+        // stalling the native 10s mint watchdog.
+        //
+        // Main-thread confined: Flutter dispatches channel/lifecycle callbacks there,
+        // and the check-then-act on these fields relies on it.
+        private val pushChannelCandidates = LinkedHashSet<MethodChannel>()
+
+        @Volatile
+        private var activeChannel: MethodChannel? = null
+
+        // The route is process-wide; unit tests share the JVM, so each test
+        // starts from the unowned state instead of inheriting the previous
+        // test's anchor.
+        @VisibleForTesting
+        internal fun resetPushIdentityRouteForTesting() {
+            pushChannelCandidates.clear()
+            activeChannel = null
+        }
+
+        // On the companion so the closure can't capture a setup-time plugin. A null
+        // token sends the request unauthenticated (rejected by identity-verification
+        // projects) — log why, so it's distinct from a host deliberately returning null.
+        private fun declinePushIdentity(
+            completion: (String?) -> Unit,
+            reason: String,
+        ) {
+            Log.w("PostHog", "Push subscription will be sent unauthenticated: $reason")
+            completion(null)
+        }
+
+        private fun runOnMainThread(action: () -> Unit) {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                action()
+            } else {
+                Handler(Looper.getMainLooper()).post(action)
+            }
+        }
     }
 }
 

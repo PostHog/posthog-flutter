@@ -1,0 +1,77 @@
+[
+  {
+    "method": "setup",
+    "arguments": {
+      "projectToken": "snapshot_project_token",
+      "apiKey": "snapshot_project_token",
+      "host": "https://eu.i.posthog.com",
+      "flushAt": 12,
+      "maxQueueSize": 800,
+      "maxBatchSize": 25,
+      "flushInterval": 15,
+      "sendFeatureFlagEvents": false,
+      "preloadFeatureFlags": false,
+      "captureApplicationLifecycleEvents": false,
+      "rageClickConfig": {
+        "enabled": true,
+        "thresholdPoints": 30.0,
+        "timeoutInterval": 1.0,
+        "minimumTapCount": 3
+      },
+      "debug": false,
+      "optOut": false,
+      "surveys": true,
+      "personProfiles": "always",
+      "sessionReplay": true,
+      "dataMode": "any",
+      "sessionReplayConfig": {
+        "maskAllImages": false,
+        "maskAllTexts": true,
+        "throttleDelayMs": 1000,
+        "maskAllPlatformViews": true,
+        "captureNativeScreens": false,
+        "sampleRate": 0.25
+      },
+      "errorTrackingConfig": {
+        "inAppIncludes": [
+          "package:snapshot_app"
+        ],
+        "inAppExcludes": [],
+        "inAppByDefault": true,
+        "captureFlutterErrors": true,
+        "captureSilentFlutterErrors": false,
+        "capturePlatformDispatcherErrors": false,
+        "captureNativeExceptions": false,
+        "captureIsolateErrors": false,
+        "exceptionSteps": {
+          "enabled": true,
+          "maxBytes": 32768
+        }
+      },
+      "logs": {
+        "serviceName": "checkout-app",
+        "serviceVersion": "1.2.3",
+        "environment": "test",
+        "resourceAttributes": {
+          "region": "eu"
+        },
+        "flushAt": 10
+      },
+      "capturePushNotificationSubscriptions": false,
+      "capturePushNotificationOpened": false,
+      "pushIdentityProviderEnabled": false,
+      "bootstrap": {
+        "distinctId": "snapshot-user",
+        "isIdentifiedId": true,
+        "featureFlags": {
+          "checkout": "variant-a"
+        },
+        "featureFlagPayloads": {
+          "checkout": {
+            "color": "blue"
+          }
+        }
+      }
+    }
+  }
+]

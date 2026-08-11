@@ -200,6 +200,36 @@ void main() {
       expect(config.toMap()['host'], equals('https://us.i.posthog.com'));
     });
 
+    test('serializes the default rage-click configuration', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.rageClickConfig.toMap(), {
+        'enabled': true,
+        'thresholdPoints': 30.0,
+        'timeoutInterval': 1.0,
+        'minimumTapCount': 3,
+      });
+      expect(
+        config.toMap()['rageClickConfig'],
+        config.rageClickConfig.toMap(),
+      );
+    });
+
+    test('serializes overridden rage-click configuration', () {
+      final config = PostHogConfig('test_project_token')
+        ..rageClickConfig.enabled = false
+        ..rageClickConfig.thresholdPoints = 12.5
+        ..rageClickConfig.timeoutInterval = const Duration(milliseconds: 500)
+        ..rageClickConfig.minimumTapCount = 5;
+
+      expect(config.rageClickConfig.toMap(), {
+        'enabled': false,
+        'thresholdPoints': 12.5,
+        'timeoutInterval': 0.5,
+        'minimumTapCount': 5,
+      });
+    });
+
     test('session replay masks all platform views by default', () {
       final config = PostHogConfig('test_project_token');
 
@@ -758,6 +788,88 @@ void main() {
         config.errorTrackingConfig.exceptionSteps.toMap(),
         {'enabled': false, 'maxBytes': 1024},
       );
+    });
+  });
+
+  group('Posthog push notifications', () {
+    late PosthogFlutterPlatformFake fakePlatformInterface;
+
+    setUp(() {
+      fakePlatformInterface = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+    });
+
+    test('registerPushNotificationToken passes deviceToken and appId',
+        () async {
+      await Posthog().registerPushNotificationToken(
+        'token-abc',
+        appId: 'com.example.app',
+      );
+
+      expect(fakePlatformInterface.registeredPushTokens, [
+        (deviceToken: 'token-abc', appId: 'com.example.app'),
+      ]);
+    });
+
+    test('registerPushNotificationToken leaves appId null when omitted',
+        () async {
+      await Posthog().registerPushNotificationToken('token-abc');
+
+      expect(fakePlatformInterface.registeredPushTokens.single.appId, isNull);
+    });
+
+    test('unregisterPushNotificationToken reaches the platform interface',
+        () async {
+      await Posthog().unregisterPushNotificationToken();
+
+      expect(fakePlatformInterface.unregisterPushTokenCalls, 1);
+    });
+
+    test('capturePushNotificationOpened passes every field', () async {
+      await Posthog().capturePushNotificationOpened(
+        title: 'Title',
+        subtitle: 'Subtitle',
+        body: 'Body',
+        payload: {'posthog': '{"campaign_id":"x"}'},
+        action: 'reply',
+      );
+
+      final call = fakePlatformInterface.capturedPushOpened.single;
+      expect(call.title, 'Title');
+      expect(call.subtitle, 'Subtitle');
+      expect(call.body, 'Body');
+      expect(call.payload, {'posthog': '{"campaign_id":"x"}'});
+      expect(call.action, 'reply');
+    });
+  });
+
+  group('PostHogConfig push notification defaults', () {
+    test('both capture flags default to true, matching the native SDKs', () {
+      final config = PostHogConfig('test_project_token');
+
+      expect(config.capturePushNotificationSubscriptions, isTrue);
+      expect(config.capturePushNotificationOpened, isTrue);
+      expect(config.pushIdentityProvider, isNull);
+    });
+
+    test('toMap forwards the flags and the provider-enabled marker', () {
+      final map = PostHogConfig('test_project_token').toMap();
+
+      expect(map['capturePushNotificationSubscriptions'], isTrue);
+      expect(map['capturePushNotificationOpened'], isTrue);
+      expect(map['pushIdentityProviderEnabled'], isFalse);
+
+      final withOverrides = PostHogConfig('test_project_token')
+        ..capturePushNotificationSubscriptions = false
+        ..capturePushNotificationOpened = false
+        ..pushIdentityProvider = (_, __) async => 'tok';
+
+      expect(
+        withOverrides.toMap()['capturePushNotificationSubscriptions'],
+        isFalse,
+      );
+      expect(withOverrides.toMap()['capturePushNotificationOpened'], isFalse);
+      expect(withOverrides.toMap()['pushIdentityProviderEnabled'], isTrue);
     });
   });
 }
