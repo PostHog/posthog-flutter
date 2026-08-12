@@ -1,5 +1,11 @@
 ## Next
 
+## 5.36.1
+
+### Patch Changes
+
+- 910de24: Limit CocoaPods source compilation to Swift files when packaging the Darwin plugin.
+
 ## 5.36.0
 
 ### Minor Changes
