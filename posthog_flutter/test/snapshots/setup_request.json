@@ -30,6 +30,7 @@
         "throttleDelayMs": 1000,
         "maskAllPlatformViews": true,
         "captureNativeScreens": false,
+        "verifyScreenshotMaskAlignment": false,
         "sampleRate": 0.25
       },
       "errorTrackingConfig": {
