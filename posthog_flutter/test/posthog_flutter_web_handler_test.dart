@@ -157,18 +157,15 @@ void main() {
   });
 
   group('PosthogFlutterWeb captureException', () {
-    test('handles failures from posthog-js', () async {
-      void failCapture(JSAny? _, JSAny? __) {
-        throw Exception('capture failed');
-      }
-
-      void failFallbackCapture(JSAny? _, JSAny? __, JSAny? ___) {
-        throw Exception('fallback capture failed');
-      }
+    test('handles native JavaScript failures from posthog-js', () async {
+      final failWithJavaScriptError = globalContext.callMethod<JSFunction>(
+        'eval'.toJS,
+        '() => { throw new Error("capture failed"); }'.toJS,
+      );
 
       final fake = JSObject();
-      fake.setProperty('captureException'.toJS, failCapture.toJS);
-      fake.setProperty('capture'.toJS, failFallbackCapture.toJS);
+      fake.setProperty('captureException'.toJS, failWithJavaScriptError);
+      fake.setProperty('capture'.toJS, failWithJavaScriptError);
       globalContext.setProperty('posthog'.toJS, fake);
 
       await expectLater(
