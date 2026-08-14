@@ -1,7 +1,4 @@
 analyzer:
-  errors:
-    # Remove after https://github.com/PostHog/posthog-flutter/pull/532 merges.
-    unawaited_return_in_try_block: ignore
   exclude:
     - build/**
     - android/**
