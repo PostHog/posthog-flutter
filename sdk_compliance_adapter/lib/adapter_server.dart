@@ -270,9 +270,9 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
 
   void stageCapture({required String distinctId, String? timestamp}) {
     _nextDistinctId = distinctId;
-    _nextTimestamp = timestamp == null
-        ? null
-        : DateTime.parse(timestamp).toUtc().toIso8601String();
+    final parsedTimestamp =
+        timestamp == null ? null : DateTime.tryParse(timestamp);
+    _nextTimestamp = parsedTimestamp?.toUtc().toIso8601String();
   }
 
   @override
