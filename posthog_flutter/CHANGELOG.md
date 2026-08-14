@@ -1,5 +1,11 @@
 ## Next
 
+## 5.36.2
+
+### Patch Changes
+
+- 57d9db3: Handle posthog-js errors raised while capturing exceptions on web.
+
 ## 5.36.1
 
 ### Patch Changes
