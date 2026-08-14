@@ -427,7 +427,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         exceptionData.cast<String, Object>(),
       );
 
-      return handleWebMethodCall(
+      return await handleWebMethodCall(
         MethodCall('captureException', {'properties': normalizedData}),
       );
     } on Exception catch (exception) {
