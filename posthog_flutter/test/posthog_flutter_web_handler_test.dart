@@ -156,6 +156,25 @@ void main() {
     });
   });
 
+  group('PosthogFlutterWeb captureException', () {
+    test('handles native JavaScript failures from posthog-js', () async {
+      final failWithJavaScriptError = globalContext.callMethod<JSFunction>(
+        'eval'.toJS,
+        '() => { throw new Error("capture failed"); }'.toJS,
+      );
+
+      final fake = JSObject();
+      fake.setProperty('captureException'.toJS, failWithJavaScriptError);
+      fake.setProperty('capture'.toJS, failWithJavaScriptError);
+      globalContext.setProperty('posthog'.toJS, fake);
+
+      await expectLater(
+        PosthogFlutterWeb().captureException(error: StateError('boom')),
+        completes,
+      );
+    });
+  });
+
   // captureException must route through posthog-js's captureException (not the
   // generic capture) so it attaches required metadata and any buffered
   // $exception_steps. The Dart-built payload is passed as additionalProperties,
