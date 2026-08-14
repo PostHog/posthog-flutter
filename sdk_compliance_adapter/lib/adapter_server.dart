@@ -270,7 +270,9 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
 
   void stageCapture({required String distinctId, String? timestamp}) {
     _nextDistinctId = distinctId;
-    _nextTimestamp = timestamp;
+    _nextTimestamp = timestamp == null
+        ? null
+        : DateTime.parse(timestamp).toUtc().toIso8601String();
   }
 
   @override
@@ -295,7 +297,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       throw StateError('distinct_id was not staged by the adapter');
     }
 
-    final timestamp = _nextTimestamp;
+    final stagedTimestamp = _nextTimestamp;
     _nextDistinctId = null;
     _nextTimestamp = null;
 
@@ -320,7 +322,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       'event': eventName,
       'distinct_id': distinctId,
       'properties': eventProperties,
-      'timestamp': timestamp ?? DateTime.now().toUtc().toIso8601String(),
+      'timestamp': stagedTimestamp ?? DateTime.now().toUtc().toIso8601String(),
     });
     state.totalEventsCaptured++;
     state.pendingEvents = state.queue.length;
