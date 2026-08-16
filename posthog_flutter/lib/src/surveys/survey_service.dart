@@ -64,6 +64,7 @@ class SurveyService {
     try {
       await showModalBottomSheet(
         context: context,
+        useRootNavigator: true,
         isScrollControlled: true,
         isDismissible: false,
         builder: (context) =>
@@ -101,7 +102,7 @@ class SurveyService {
     final context = _currentSurveyContext;
     if (_isShowingSurvey && context != null) {
       // Use the stored context to properly dismiss the bottom sheet
-      Navigator.of(context).pop();
+      Navigator.of(context, rootNavigator: true).pop();
       _currentSurveyContext = null;
     }
     _isShowingSurvey = false;

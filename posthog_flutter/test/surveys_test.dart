@@ -1,6 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/posthog_observer.dart';
 import 'package:posthog_flutter/src/surveys/models/posthog_display_link_question.dart';
 import 'package:posthog_flutter/src/surveys/models/posthog_display_survey.dart';
+import 'package:posthog_flutter/src/surveys/survey_service.dart';
+import 'package:posthog_flutter/src/surveys/widgets/survey_bottom_sheet.dart';
 
 void main() {
   // Builds a minimal survey dict (as forwarded by the native method channel)
@@ -29,6 +33,50 @@ void main() {
     final survey = PostHogDisplaySurvey.fromDict(dict);
     return survey.questions.first as PostHogDisplayLinkQuestion;
   }
+
+  testWidgets('shows and hides surveys using the root navigator', (
+    tester,
+  ) async {
+    addTearDown(() {
+      SurveyService().hideSurvey();
+      PosthogObserver.clearCurrentContext();
+    });
+
+    final rootNavigatorKey = GlobalKey<NavigatorState>();
+    final nestedNavigatorKey = GlobalKey<NavigatorState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: rootNavigatorKey,
+        home: Navigator(
+          key: nestedNavigatorKey,
+          observers: [PosthogObserver()],
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Nested route')),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final showSurvey = SurveyService().showSurvey(
+      PostHogDisplaySurvey.fromDict(surveyWithLinkQuestion(link: '')),
+      (_) {},
+      (_, __, ___) => throw UnimplementedError(),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    final surveyContext = tester.element(find.byType(SurveyBottomSheet));
+    expect(Navigator.of(surveyContext), same(rootNavigatorKey.currentState));
+
+    SurveyService().hideSurvey();
+    await tester.pumpAndSettle();
+    await showSurvey;
+
+    expect(find.byType(SurveyBottomSheet), findsNothing);
+    expect(find.text('Nested route'), findsOneWidget);
+  });
 
   group('PostHogDisplaySurvey.fromDict link question', () {
     // (description, native link payload, expected parsed link)
