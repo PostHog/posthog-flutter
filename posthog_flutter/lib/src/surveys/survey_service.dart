@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../util/logging.dart';
@@ -19,8 +21,10 @@ class SurveyService {
   SurveyService._internal();
 
   bool _isShowingSurvey = false;
+  bool _isDismissingSurvey = false;
   bool _dismissSurveyWhenReady = false;
   Route<dynamic>? _currentSurveyRoute;
+  Completer<void>? _programmaticDismissal;
 
   /// Shows a survey using the PosthogObserver context
   Future<void> showSurvey(
@@ -61,8 +65,10 @@ class SurveyService {
     BuildContext context,
   ) async {
     _isShowingSurvey = true;
+    final programmaticDismissal = Completer<void>();
+    _programmaticDismissal = programmaticDismissal;
     try {
-      await showModalBottomSheet(
+      final modalDismissal = showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
         isScrollControlled: true,
@@ -73,19 +79,29 @@ class SurveyService {
           if (_dismissSurveyWhenReady && route != null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (_currentSurveyRoute == route) {
-                route.navigator?.removeRoute(route);
+                _dismissSurveyRoute(route);
               }
             });
           }
-          return _buildSurveyWidget(survey, onShown, onResponse, onClosed);
+          return _buildSurveyWidget(survey, onShown, onResponse, (survey) {
+            _isDismissingSurvey = true;
+            _currentSurveyRoute = null;
+            onClosed(survey);
+          });
         },
       );
+      // removeRoute did not complete a route's future before Flutter 3.32.
+      await Future.any([modalDismissal, programmaticDismissal.future]);
     } catch (e) {
       printIfDebug('[PostHog] Error showing survey: $e');
     } finally {
       _isShowingSurvey = false;
+      _isDismissingSurvey = false;
       _dismissSurveyWhenReady = false;
       _currentSurveyRoute = null;
+      if (_programmaticDismissal == programmaticDismissal) {
+        _programmaticDismissal = null;
+      }
     }
   }
 
@@ -105,9 +121,21 @@ class SurveyService {
     );
   }
 
+  void _dismissSurveyRoute(Route<dynamic> route) {
+    if (_isDismissingSurvey || _currentSurveyRoute != route) {
+      return;
+    }
+
+    _isDismissingSurvey = true;
+    _dismissSurveyWhenReady = false;
+    _currentSurveyRoute = null;
+    _programmaticDismissal?.complete();
+    route.navigator?.removeRoute(route);
+  }
+
   /// Hides any active survey
   void hideSurvey() {
-    if (!_isShowingSurvey) {
+    if (!_isShowingSurvey || _isDismissingSurvey) {
       return;
     }
 
@@ -116,6 +144,6 @@ class SurveyService {
       _dismissSurveyWhenReady = true;
       return;
     }
-    route.navigator?.removeRoute(route);
+    _dismissSurveyRoute(route);
   }
 }

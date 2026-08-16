@@ -78,6 +78,7 @@ void main() {
     await tester.pumpAndSettle();
 
     SurveyService().hideSurvey();
+    SurveyService().hideSurvey();
     await tester.pumpAndSettle();
     await showSurvey;
 
@@ -95,6 +96,7 @@ void main() {
       (_, __, ___) => throw UnimplementedError(),
       (_) {},
     );
+    SurveyService().hideSurvey();
     SurveyService().hideSurvey();
     await tester.pumpAndSettle();
     await immediatelyHiddenSurvey;
