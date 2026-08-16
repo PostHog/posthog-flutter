@@ -9,6 +9,7 @@ import 'package:posthog_flutter_example/error_example.dart';
 import 'exception_steps_screen.dart';
 import 'masking_tests_screen.dart';
 import 'platform_views_screen.dart';
+import 'survey_nested_navigator_screen.dart';
 
 const kMaskAllPlatformViews = true;
 
@@ -150,6 +151,25 @@ class InitialScreenState extends State<InitialScreen> {
                   child: const PostHogMaskWidget(
                     child: Text('Go to Second Route'),
                   ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SurveyNestedNavigatorScreen(),
+                        settings: const RouteSettings(
+                          name: 'survey_nested_navigator',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Nested Navigator Survey'),
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton(
