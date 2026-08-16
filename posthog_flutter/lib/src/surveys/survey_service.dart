@@ -75,15 +75,22 @@ class SurveyService {
         isDismissible: false,
         builder: (context) {
           final route = ModalRoute.of(context);
-          _currentSurveyRoute = route;
-          if (_dismissSurveyWhenReady && route != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_currentSurveyRoute == route) {
-                _dismissSurveyRoute(route);
-              }
-            });
+          if (_programmaticDismissal == programmaticDismissal &&
+              !_isDismissingSurvey) {
+            _currentSurveyRoute = route;
+            if (_dismissSurveyWhenReady && route != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_currentSurveyRoute == route &&
+                    _programmaticDismissal == programmaticDismissal) {
+                  _dismissSurveyRoute(route, programmaticDismissal);
+                }
+              });
+            }
           }
           return _buildSurveyWidget(survey, onShown, onResponse, (survey) {
+            if (_programmaticDismissal != programmaticDismissal) {
+              return;
+            }
             _isDismissingSurvey = true;
             _currentSurveyRoute = null;
             onClosed(survey);
@@ -95,11 +102,11 @@ class SurveyService {
     } catch (e) {
       printIfDebug('[PostHog] Error showing survey: $e');
     } finally {
-      _isShowingSurvey = false;
-      _isDismissingSurvey = false;
-      _dismissSurveyWhenReady = false;
-      _currentSurveyRoute = null;
       if (_programmaticDismissal == programmaticDismissal) {
+        _isShowingSurvey = false;
+        _isDismissingSurvey = false;
+        _dismissSurveyWhenReady = false;
+        _currentSurveyRoute = null;
         _programmaticDismissal = null;
       }
     }
@@ -121,15 +128,20 @@ class SurveyService {
     );
   }
 
-  void _dismissSurveyRoute(Route<dynamic> route) {
-    if (_isDismissingSurvey || _currentSurveyRoute != route) {
+  void _dismissSurveyRoute(
+    Route<dynamic> route,
+    Completer<void> programmaticDismissal,
+  ) {
+    if (_isDismissingSurvey ||
+        _currentSurveyRoute != route ||
+        _programmaticDismissal != programmaticDismissal) {
       return;
     }
 
     _isDismissingSurvey = true;
     _dismissSurveyWhenReady = false;
     _currentSurveyRoute = null;
-    _programmaticDismissal?.complete();
+    programmaticDismissal.complete();
     route.navigator?.removeRoute(route);
   }
 
@@ -144,6 +156,6 @@ class SurveyService {
       _dismissSurveyWhenReady = true;
       return;
     }
-    _dismissSurveyRoute(route);
+    _dismissSurveyRoute(route, _programmaticDismissal!);
   }
 }

@@ -102,6 +102,34 @@ void main() {
     await immediatelyHiddenSurvey;
 
     expect(find.byType(SurveyBottomSheet), findsNothing);
+
+    final userClosedSurvey = SurveyService().showSurvey(
+      PostHogDisplaySurvey.fromDict(surveyWithLinkQuestion(link: '')),
+      (_) {},
+      (_, __, ___) => throw UnimplementedError(),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.close));
+    await userClosedSurvey;
+
+    final nextSurvey = SurveyService().showSurvey(
+      PostHogDisplaySurvey.fromDict(surveyWithLinkQuestion(link: '')),
+      (_) {},
+      (_, __, ___) => throw UnimplementedError(),
+      (_) {},
+    );
+    await tester.pump();
+
+    SurveyService().hideSurvey();
+    await tester.pumpAndSettle();
+    await nextSurvey;
+
+    expect(
+      find.byType(SurveyBottomSheet, skipOffstage: false),
+      findsNothing,
+    );
   });
 
   group('PostHogDisplaySurvey.fromDict link question', () {
