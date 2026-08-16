@@ -19,7 +19,7 @@ class SurveyService {
   SurveyService._internal();
 
   bool _isShowingSurvey = false;
-  BuildContext? _currentSurveyContext;
+  Route<dynamic>? _currentSurveyRoute;
 
   /// Shows a survey using the PosthogObserver context
   Future<void> showSurvey(
@@ -60,24 +60,26 @@ class SurveyService {
     BuildContext context,
   ) async {
     _isShowingSurvey = true;
-    _currentSurveyContext = context;
     try {
       await showModalBottomSheet(
         context: context,
         useRootNavigator: true,
         isScrollControlled: true,
         isDismissible: false,
-        builder: (context) =>
-            _buildSurveyWidget(survey, onShown, onResponse, (s) {
-          _isShowingSurvey = false;
-          _currentSurveyContext = null;
-          onClosed(s);
-        }),
+        builder: (context) {
+          _currentSurveyRoute = ModalRoute.of(context);
+          return _buildSurveyWidget(survey, onShown, onResponse, (s) {
+            _isShowingSurvey = false;
+            _currentSurveyRoute = null;
+            onClosed(s);
+          });
+        },
       );
     } catch (e) {
       printIfDebug('[PostHog] Error showing survey: $e');
+    } finally {
       _isShowingSurvey = false;
-      _currentSurveyContext = null;
+      _currentSurveyRoute = null;
     }
   }
 
@@ -99,11 +101,10 @@ class SurveyService {
 
   /// Hides any active survey
   void hideSurvey() {
-    final context = _currentSurveyContext;
-    if (_isShowingSurvey && context != null) {
-      // Use the stored context to properly dismiss the bottom sheet
-      Navigator.of(context, rootNavigator: true).pop();
-      _currentSurveyContext = null;
+    final route = _currentSurveyRoute;
+    if (_isShowingSurvey && route != null) {
+      route.navigator?.removeRoute(route);
+      _currentSurveyRoute = null;
     }
     _isShowingSurvey = false;
   }

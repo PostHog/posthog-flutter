@@ -70,11 +70,23 @@ void main() {
     final surveyContext = tester.element(find.byType(SurveyBottomSheet));
     expect(Navigator.of(surveyContext), same(rootNavigatorKey.currentState));
 
+    final pushedRoute = rootNavigatorKey.currentState!.push<void>(
+      MaterialPageRoute(
+        builder: (_) => const Scaffold(body: Text('New root route')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     SurveyService().hideSurvey();
     await tester.pumpAndSettle();
     await showSurvey;
 
-    expect(find.byType(SurveyBottomSheet), findsNothing);
+    expect(find.text('New root route'), findsOneWidget);
+    expect(find.byType(SurveyBottomSheet, skipOffstage: false), findsNothing);
+
+    rootNavigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+    await pushedRoute;
     expect(find.text('Nested route'), findsOneWidget);
   });
 
