@@ -33,33 +33,46 @@ class SurveyIconPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size.shortestSide * 0.1
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
+    // These paths match the canonical Material Icons 24px SVGs.
+    // https://github.com/google/material-design-icons/tree/master/src/navigation
+    final path = Path();
     switch (type) {
       case SurveyIconType.close:
-        canvas
-          ..drawLine(
-            Offset(size.width * 0.25, size.height * 0.25),
-            Offset(size.width * 0.75, size.height * 0.75),
-            paint,
-          )
-          ..drawLine(
-            Offset(size.width * 0.75, size.height * 0.25),
-            Offset(size.width * 0.25, size.height * 0.75),
-            paint,
-          );
+        path
+          ..moveTo(19, 6.41)
+          ..lineTo(17.59, 5)
+          ..lineTo(12, 10.59)
+          ..lineTo(6.41, 5)
+          ..lineTo(5, 6.41)
+          ..lineTo(10.59, 12)
+          ..lineTo(5, 17.59)
+          ..lineTo(6.41, 19)
+          ..lineTo(12, 13.41)
+          ..lineTo(17.59, 19)
+          ..lineTo(19, 17.59)
+          ..lineTo(13.41, 12)
+          ..close();
       case SurveyIconType.check:
-        final path = Path()
-          ..moveTo(size.width * 0.2, size.height * 0.52)
-          ..lineTo(size.width * 0.42, size.height * 0.72)
-          ..lineTo(size.width * 0.8, size.height * 0.3);
-        canvas.drawPath(path, paint);
+        path
+          ..moveTo(9, 16.17)
+          ..lineTo(4.83, 12)
+          ..lineTo(3.41, 13.41)
+          ..lineTo(9, 19)
+          ..lineTo(21, 7)
+          ..lineTo(19.59, 5.59)
+          ..close();
     }
+
+    canvas
+      ..save()
+      ..scale(size.width / 24, size.height / 24)
+      ..drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill,
+      )
+      ..restore();
   }
 
   @override
