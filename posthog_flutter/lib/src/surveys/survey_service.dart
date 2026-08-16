@@ -19,6 +19,7 @@ class SurveyService {
   SurveyService._internal();
 
   bool _isShowingSurvey = false;
+  bool _dismissSurveyWhenReady = false;
   Route<dynamic>? _currentSurveyRoute;
 
   /// Shows a survey using the PosthogObserver context
@@ -67,18 +68,23 @@ class SurveyService {
         isScrollControlled: true,
         isDismissible: false,
         builder: (context) {
-          _currentSurveyRoute = ModalRoute.of(context);
-          return _buildSurveyWidget(survey, onShown, onResponse, (s) {
-            _isShowingSurvey = false;
-            _currentSurveyRoute = null;
-            onClosed(s);
-          });
+          final route = ModalRoute.of(context);
+          _currentSurveyRoute = route;
+          if (_dismissSurveyWhenReady && route != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_currentSurveyRoute == route) {
+                route.navigator?.removeRoute(route);
+              }
+            });
+          }
+          return _buildSurveyWidget(survey, onShown, onResponse, onClosed);
         },
       );
     } catch (e) {
       printIfDebug('[PostHog] Error showing survey: $e');
     } finally {
       _isShowingSurvey = false;
+      _dismissSurveyWhenReady = false;
       _currentSurveyRoute = null;
     }
   }
@@ -101,11 +107,15 @@ class SurveyService {
 
   /// Hides any active survey
   void hideSurvey() {
-    final route = _currentSurveyRoute;
-    if (_isShowingSurvey && route != null) {
-      route.navigator?.removeRoute(route);
-      _currentSurveyRoute = null;
+    if (!_isShowingSurvey) {
+      return;
     }
-    _isShowingSurvey = false;
+
+    final route = _currentSurveyRoute;
+    if (route == null) {
+      _dismissSurveyWhenReady = true;
+      return;
+    }
+    route.navigator?.removeRoute(route);
   }
 }

@@ -88,6 +88,18 @@ void main() {
     await tester.pumpAndSettle();
     await pushedRoute;
     expect(find.text('Nested route'), findsOneWidget);
+
+    final immediatelyHiddenSurvey = SurveyService().showSurvey(
+      PostHogDisplaySurvey.fromDict(surveyWithLinkQuestion(link: '')),
+      (_) {},
+      (_, __, ___) => throw UnimplementedError(),
+      (_) {},
+    );
+    SurveyService().hideSurvey();
+    await tester.pumpAndSettle();
+    await immediatelyHiddenSurvey;
+
+    expect(find.byType(SurveyBottomSheet), findsNothing);
   });
 
   group('PostHogDisplaySurvey.fromDict link question', () {
