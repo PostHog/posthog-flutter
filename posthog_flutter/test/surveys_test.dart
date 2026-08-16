@@ -111,7 +111,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.byType(IconButton));
     await userClosedSurvey;
 
     final nextSurvey = SurveyService().showSurvey(
