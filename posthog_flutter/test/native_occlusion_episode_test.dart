@@ -940,6 +940,38 @@ void main() {
       await unmountAndFlush(tester);
     });
 
+    testWidgets(
+        'an episode ending while the SDK is closed does not strand '
+        'capture suppressed', (tester) async {
+      // Native pushes exactly one end event, and pushes it as soon as replay
+      // goes off — i.e. right after close(), while the config is null. If Dart
+      // drops it, nothing ever re-clears the suppression and every later
+      // recording is blank.
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await pumpReplayWidget(tester);
+      enableNativeBridgeResult = true;
+      pushOcclusion(occluded: true, episode: 1);
+      await settleRealAsync(tester);
+
+      await Posthog().close();
+      pushOcclusion(occluded: false, episode: 1);
+      await settleRealAsync(tester);
+
+      recordedCalls.clear();
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await tester.pumpWidget(
+        PostHogWidget(child: Container(color: const Color(0xFF0000FF))),
+      );
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
+
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'nothing covers Flutter any more, so the recording setup() '
+              'started would otherwise stay blank for the life of the app');
+
+      await unmountAndFlush(tester);
+    });
+
     testWidgets('ships meta even when the platform keeps the session id',
         (tester) async {
       // The Android shape: close() leaves the session id in place, so nothing

@@ -22,7 +22,7 @@ list to re-check when the resolved native version moves. Verified against
 | 4 | `reset()` leaves replay briefly inactive | clears the remote config, and the replay integration stops when the flag is false | `remoteConfig?.clear()` drops `sessionReplayFlagActive`; `isSessionReplayActive()` requires it, and `reloadFeatureFlags()` restores it asynchronously (~120 ms observed) |
 | 5 | `close()` and the session id | **keeps** the id: `close()` clears `enabled` before its `endSession()`, which early-returns, and the following `setup()`'s `startSession()` returns early while an id exists | **clears** it: `close()` calls `sessionManager.endSession()` directly, bypassing the `enabled` gate |
 | 6 | `startSessionRecording(resumeCurrent: false)` | does **not** rotate while recording: `startSessionReplay` early-returns on `isActive()` | rotates via `getNextSessionId()` even while active |
-| 7 | The session accessor used per capture tick differs, and something must apply the expiry bounds on each platform | `PostHog.getSessionId()` — **expiring**; this read is what applies idle/max-duration, since the native replay loop is disabled for Flutter and the send now carries a pre-attached id | `getSessionId()` is hard-wired `readOnly: true`, so the **send** applies the bounds and a rotation is seen one tick late |
+| 7 | The session accessor used per capture tick differs, and something must apply the expiry bounds on each platform | `PostHog.getSessionId()` — **expiring**; this read is what applies idle/max-duration to Flutter frames, since the send now carries a pre-attached id. Only the native *screenshot* loop is disabled for Flutter (`isNativeSdk`); the touch interceptor still emits `$snapshot` mouse interactions through `RRUtils.capture()`, which pre-attaches nothing and so resolves an expiring id at send | `getSessionId()` is hard-wired `readOnly: true`, so the **send** applies the bounds and a rotation is seen one tick late |
 | 8 | The idle clock is refreshed only by user touches and lifecycle transitions — **not** by `capture()` — and `touchSession()` checks only the idle bound, never max-duration. So on each platform at least one thing applies both bounds (row 7), and removing it would let a replay-only session run unbounded | `touchSession()` is called only from `PostHogTouchActivityIntegration` (API ≥ 26) and `PostHogLifecycleObserverIntegration` | touch half gated on `enableSwizzling` (default on) and iOS/tvOS only; the lifecycle half is unconditional |
 | 9 | Per-session replay state is reset on rotation | `resetSessionStateIfNeeded(id, force = !resumeCurrent)`, and `start()` force-invalidates decor views on a non-resuming start | `handleSessionChanged` |
 
@@ -45,6 +45,11 @@ list to re-check when the resolved native version moves. Verified against
   in the new session ahead of its meta. **Making posthog-ios's expiring
   accessor public is what would let iOS do what posthog-ios's own replay
   integration already does.**
+- The occlusion placeholder reads the *tracked* session id rather than polling,
+  so on a static screen it can be stale. There the platforms swap roles: Android
+  pre-attaches the dead id and the placeholder appends to the ended recording,
+  while iOS resolves at send and gets it right. Cosmetic — the episode-end
+  sample repairs the new recording either way.
 - Ingestion routes by the supplied id: a `$snapshot` naming a session that
   rotated two hours earlier still appended to that recording. Not verified beyond
   that — an id older than the 24 h maximum is untested, which is another reason

@@ -1167,6 +1167,8 @@ extension PosthogFlutterPlugin {
 
     private func getSessionReplayState(result: @escaping FlutterResult) {
         #if os(iOS)
+            // Order is free here, unlike Android: none of these reads mutate
+            // session state, so isActive cannot be invalidated by the id read.
             var state: [String: Any] = [
                 "isActive": PostHogSDK.shared.isSessionReplayActive(),
             ]

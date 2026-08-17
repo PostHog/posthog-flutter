@@ -119,13 +119,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
     if (_disposed) {
       return;
     }
-    final replayConfig = Posthog().config?.sessionReplayConfig;
-    if (replayConfig == null) {
-      return;
-    }
     final occluded = PostHogInternalEvents.nativeOcclusionActive;
     final episode = PostHogInternalEvents.nativeOcclusionEpisode;
     final bridgeFailed = PostHogInternalEvents.nativeBridgeFailed;
+    // Released before the config is read: an episode ends whether or not the SDK
+    // is currently set up, and native pushes exactly one end event. Dropping it
+    // between close() and setup() would strand capture suppressed for the life
+    // of the app, leaving the next session's recording blank.
     if (!occluded) {
       printIfDebug(
           'Native occlusion ended (episode $episode): resuming Flutter capture.');
@@ -134,6 +134,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // Without a sample here the replay would stay on the episode's last frame
       // until the app happens to render again.
       _ensureSampleLands();
+      return;
+    }
+    final replayConfig = Posthog().config?.sessionReplayConfig;
+    if (replayConfig == null) {
       return;
     }
     if (!replayConfig.captureNativeScreens) {
