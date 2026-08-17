@@ -429,7 +429,7 @@ class Posthog {
   /// Returns a [Future] that completes when the reset request has been queued.
   Future<void> reset() async {
     // Bumped before the platform call because native rotates inside that round
-    // trip. (posthog-android 3.58.0, posthog-ios 3.69.0)
+    // trip. See NATIVE_BEHAVIOR.md.
     PostHogInternalEvents.requestReplaySessionReset();
     await _posthog.reset();
   }

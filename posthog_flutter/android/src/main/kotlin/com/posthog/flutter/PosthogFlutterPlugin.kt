@@ -443,14 +443,24 @@ class PosthogFlutterPlugin :
     // Deliberately the expiring accessor: PostHog.capture resolves the session
     // id the same way moments later, so peekSessionId() would hand Dart a
     // pre-expiry id and the frame would ship with no meta event ahead of it.
-    private fun getSessionReplayState(): Map<String, Any?> {
-        // Resolved before isActive is read: a rotation here notifies
-        // PostHogReplayIntegration.onSessionIdChanged(), which stops replay
-        // synchronously when event triggers are configured, so sampling isActive
-        // first would report a recording that this very call just ended.
-        val sessionId = PostHog.getSessionId()?.toString()
+    private fun getSessionReplayState(): Map<String, Any?> =
+        buildSessionReplayState(
+            readSessionId = { PostHog.getSessionId()?.toString() },
+            readIsActive = { isSessionReplayActive() },
+        )
+
+    // Split out so the read order is covered by a test. Resolving the session id
+    // can rotate it, which notifies PostHogReplayIntegration.onSessionIdChanged()
+    // and stops replay synchronously when event triggers are configured — so
+    // sampling isActive first would report a recording this very call just ended.
+    // (posthog-android 3.58.0)
+    internal fun buildSessionReplayState(
+        readSessionId: () -> String?,
+        readIsActive: () -> Boolean,
+    ): Map<String, Any?> {
+        val sessionId = readSessionId()
         return mapOf(
-            "isActive" to isSessionReplayActive(),
+            "isActive" to readIsActive(),
             "sessionId" to sessionId,
         )
     }
