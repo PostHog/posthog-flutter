@@ -440,12 +440,9 @@ class PosthogFlutterPlugin :
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
 
-    // Deliberately the expiring accessor: it applies the idle/max-duration
-    // checks that the `$snapshot` capture later in the same tick applies anyway
-    // (PostHog.capture resolves the session id the same way). Reading with
-    // PostHogSessionManager.peekSessionId() instead would hand Dart the
-    // pre-expiry id, so the frame that lands in the rotated session ships with
-    // no meta event ahead of it.
+    // Deliberately the expiring accessor: PostHog.capture resolves the session
+    // id the same way moments later, so peekSessionId() would hand Dart a
+    // pre-expiry id and the frame would ship with no meta event ahead of it.
     private fun getSessionReplayState(): Map<String, Any?> {
         // Resolved before isActive is read: a rotation here notifies
         // PostHogReplayIntegration.onSessionIdChanged(), which stops replay

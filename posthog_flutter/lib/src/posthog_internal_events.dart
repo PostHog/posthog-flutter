@@ -8,21 +8,14 @@ class PostHogInternalEvents {
 
   static final sessionRecordingActive = ValueNotifier<bool>(false);
 
-  /// Drops the replay capture's per-session state right now, without waiting
-  /// for the capture path to observe a new session id. Bumped where Dart knows
-  /// the recording has to restart before a tick could see it: `reset()`,
-  /// `close()`, and a start that does not resume the current session. None of
-  /// them may inherit the previous recording's meta latch, including where the
-  /// platform keeps the same session id.
+  /// Drops the replay capture's per-session state without waiting for a capture
+  /// tick to observe a new session id.
   ///
-  /// A missed bump usually self-heals: the capture tick re-reads the native
-  /// session id every throttle interval, so a rotation is adopted within one
-  /// tick, costing at most one frame shipped into the new session without a
-  /// meta event ahead of it. It does not self-heal when the app restarts
-  /// recording but the platform keeps the same session id — Android returns
-  /// early from `PostHog.startSessionReplay` when recording is already active,
-  /// so nothing rotates — because the tick sees no change and only this bump
-  /// re-arms the meta event.
+  /// A tick would usually notice on its own, one frame late. It never notices
+  /// when the recording restarts while the platform keeps the same session id —
+  /// Android returns early from `PostHog.startSessionReplay` while recording is
+  /// already active, so nothing rotates — and only this bump re-arms the meta
+  /// event. (posthog-android 3.58.0)
   static final forceReplaySessionReset = ValueNotifier<int>(0);
 
   static void requestReplaySessionReset() => forceReplaySessionReset.value++;

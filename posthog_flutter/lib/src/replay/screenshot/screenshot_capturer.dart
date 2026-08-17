@@ -110,10 +110,8 @@ class ScreenshotCapturer {
   /// Drops all per-session snapshot state when [currentSessionId] differs from
   /// the session that state was built under: the new session needs its own meta
   /// event and must not have its first frame deduped against the previous
-  /// session's pixels. Called with the id read from native on every capture
-  /// tick, so it covers every rotation the native SDK performs (reset, idle and
-  /// max-duration expiry, an explicit new-session start) rather than the subset
-  /// the Dart API can predict.
+  /// session's pixels. Keyed on the id native reports, so it covers every
+  /// rotation the native SDK performs rather than the subset Dart can predict.
   ///
   /// [force] resets even when the id is unchanged — the counterpart of the same
   /// flag in Android's PostHogReplayIntegration (iOS has none and rotates the
