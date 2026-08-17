@@ -208,9 +208,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     _pushIdentityProvider = config.pushIdentityProvider;
     _beforeSendCallbacks = config.beforeSend;
 
-    // Deliberately uncaught: Posthog.setup() catches it there, where it can also
-    // roll back the Dart-side state a failed setup would otherwise latch.
-    await _methodChannel.invokeMethod('setup', config.toMap());
+    try {
+      await _methodChannel.invokeMethod('setup', config.toMap());
+    } on PlatformException catch (exception) {
+      printIfDebug('Exeption on setup: $exception');
+    }
   }
 
   @override

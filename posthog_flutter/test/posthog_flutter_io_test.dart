@@ -81,20 +81,6 @@ void main() {
       expect(args['apiKey'], equals('test_project_token'));
     });
 
-    test('setup surfaces a native failure to its caller', () async {
-      // Posthog.setup() is the one place that catches it, because it is also the
-      // only place that can roll back the Dart state a failed setup latches.
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        throw PlatformException(code: 'ERROR', message: 'native boom');
-      });
-
-      await expectLater(
-        posthogFlutterIO.setup(PostHogConfig('test_project_token')),
-        throwsA(isA<PlatformException>()),
-      );
-    });
-
     test(
       'invokes callback when native sends onFeatureFlagsCallback event',
       () async {

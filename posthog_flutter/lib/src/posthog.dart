@@ -1,7 +1,4 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show PlatformException;
 // ignore: unnecessary_import
 import 'package:meta/meta.dart';
 
@@ -30,10 +27,6 @@ class Posthog {
 
   PostHogConfig? _config;
 
-  /// Bumped per setup attempt, so a failing attempt can tell whether it is
-  /// still the current one before rolling anything back.
-  int _setupAttempt = 0;
-
   /// Returns the singleton PostHog client instance.
   factory Posthog() {
     return _instance;
@@ -52,17 +45,6 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when platform setup has finished.
   ///
-  /// If the first [setup] fails, nothing is captured and session replay does not
-  /// start, so calling [setup] again retries cleanly. A repeated [setup] that
-  /// fails leaves the already-working SDK running rather than tearing it down.
-  ///
-  /// Calling [setup] while the SDK is already set up cannot change everything.
-  /// Both native SDKs ignore a repeated setup, so the project token, host and
-  /// native session replay settings keep their first values — call [close] first
-  /// to change those. The replay capture cadence
-  /// ([PostHogSessionReplayConfig.throttleDelay]) takes effect the next time
-  /// capture restarts, which [close] or [stopSessionRecording] both do.
-  ///
   /// **Example:**
   /// ```dart
   /// final config = PostHogConfig('YOUR_PROJECT_TOKEN');
@@ -76,25 +58,12 @@ class Posthog {
   /// For Android and iOS, if you are performing a manual setup,
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
-  Future<void> setup(PostHogConfig config) async {
+  Future<void> setup(PostHogConfig config) {
     if (config.projectToken.isEmpty) {
       debugPrint(
         '[PostHog] projectToken must not be blank. Setup skipped.',
       );
-      return;
-    }
-
-    final wasSetUp = _config != null;
-    if (wasSetUp) {
-      // Native returns early on a repeated setup, so the channel call succeeds
-      // and the split is otherwise invisible.
-      debugPrint(
-        '[PostHog] setup() called while already set up. Masking and other '
-        'Flutter-side settings do follow this config. The project token, host '
-        'and native session replay settings keep their current values, and '
-        'session replay cannot be turned off this way — call close() first to '
-        'change those.',
-      );
+      return Future<void>.value();
     }
 
     _config = config; // Store the config
@@ -110,39 +79,7 @@ class Posthog {
 
     _installFlutterIntegrations(config);
 
-    final attempt = ++_setupAttempt;
-    try {
-      await _posthog.setup(config);
-    } catch (e) {
-      if (attempt != _setupAttempt) {
-        // A later setup() replaced this attempt, so rolling back would tear down
-        // that one's state. Keyed on the attempt rather than on _config, which a
-        // reconfigure is free to set back to this very same instance.
-        debugPrint('[PostHog] a superseded setup failed: $e');
-        return;
-      }
-      if (wasSetUp) {
-        // Only the attempt that established the state may roll it back. _config
-        // is already null when a close() landed inside the round trip: nothing
-        // to roll back either way, but the SDK is not up.
-        debugPrint(_config != null
-            ? '[PostHog] a repeated setup failed, the SDK stays set up: $e'
-            : '[PostHog] a repeated setup failed after close(), the SDK is not '
-                'set up: $e');
-      } else {
-        // Capture and the error handlers must not outlive a setup that never
-        // completed.
-        _config = null;
-        PostHogInternalEvents.sessionRecordingActive.value = false;
-        _uninstallFlutterIntegrations();
-        debugPrint('[PostHog] setup failed, the SDK is not set up: $e');
-      }
-      // A PlatformException was already swallowed by the platform layer;
-      // everything else (notably MissingPluginException) still propagates.
-      if (e is! PlatformException) {
-        rethrow;
-      }
-    }
+    return _posthog.setup(config);
   }
 
   void _installFlutterIntegrations(PostHogConfig config) {
