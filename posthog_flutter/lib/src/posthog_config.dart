@@ -904,7 +904,8 @@ class PostHogErrorTrackingConfig {
   ///
   /// **Android:**
   ///
-  /// Captures Java/Kotlin exceptions only (no native C/C++ crashes).
+  /// Captures Java/Kotlin exceptions. For native C/C++ (NDK) crashes, also
+  /// enable [captureNativeCrashes].
   ///
   /// Stacktrace demangling for minified builds is supported by installing
   /// the PostHog Gradle plugin to upload ProGuard/R8 mappings.
@@ -912,6 +913,28 @@ class PostHogErrorTrackingConfig {
   ///
   /// Default: false
   var captureNativeExceptions = false;
+
+  /// Enable automatic capture of native C/C++ (NDK) crashes on Android.
+  ///
+  /// Requires Android 12 (API 31) or later. A native crash kills the process
+  /// immediately, so the crash is captured on the next app launch from the
+  /// records the OS kept, as an `$exception` event with raw native stack
+  /// frames. [captureNativeExceptions] must also be enabled.
+  ///
+  /// For symbolicated stack traces, upload the app's `.so` debug symbols with
+  /// the PostHog Gradle plugin.
+  /// See: https://posthog.com/docs/error-tracking/upload-mappings/android
+  ///
+  /// Because the event is sent from the next launch, properties like
+  /// `$app_version` reflect the app at capture time, not at crash time.
+  ///
+  /// **Note:**
+  /// - Apple platforms: Not applicable (native crash capture is part of
+  ///   [captureNativeExceptions])
+  /// - Flutter web: Not supported
+  ///
+  /// Default: false
+  var captureNativeCrashes = false;
 
   /// Enable automatic capture of isolate errors.
   ///
@@ -944,6 +967,7 @@ class PostHogErrorTrackingConfig {
       'captureSilentFlutterErrors': captureSilentFlutterErrors,
       'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
       'captureNativeExceptions': captureNativeExceptions,
+      'captureNativeCrashes': captureNativeCrashes,
       'captureIsolateErrors': captureIsolateErrors,
       'exceptionSteps': exceptionSteps.toMap(),
     };
