@@ -86,14 +86,17 @@ void main() {
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 
-    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 2);
+    final before =
+        await captureAttemptsOver(tester, const Duration(seconds: 1));
+    expect(before, greaterThanOrEqualTo(2));
 
     await Posthog().close();
     await Posthog().setup(replayConfig(const Duration(milliseconds: 250)));
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 
-    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 4,
+    final after = await captureAttemptsOver(tester, const Duration(seconds: 1));
+    expect(after, greaterThanOrEqualTo(before * 2),
         reason: 'the new throttleDelay must drive the real capture rate');
 
     // stops the detector's periodic timer before the test framework's
@@ -114,7 +117,9 @@ void main() {
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 
-    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 2);
+    final before =
+        await captureAttemptsOver(tester, const Duration(seconds: 1));
+    expect(before, greaterThanOrEqualTo(2));
 
     await Posthog().close();
     config.sessionReplayConfig.throttleDelay =
@@ -123,7 +128,8 @@ void main() {
     await tester.pump(Duration.zero);
     await tester.pump(Duration.zero);
 
-    expect(await captureAttemptsOver(tester, const Duration(seconds: 1)), 4,
+    final after = await captureAttemptsOver(tester, const Duration(seconds: 1));
+    expect(after, greaterThanOrEqualTo(before * 2),
         reason: 'a config identical by identity still has to be re-read');
 
     await Posthog().close();

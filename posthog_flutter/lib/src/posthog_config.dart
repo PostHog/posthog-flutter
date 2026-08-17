@@ -704,6 +704,10 @@ class PostHogSessionReplayConfig {
   /// This is used for capturing the view as a screenshot. The lower the number,
   /// the more snapshots will be captured but higher the performance impact.
   /// Defaults to 1s.
+  ///
+  /// Changing this after setup takes effect the next time replay capture
+  /// restarts — `Posthog().close()` then `setup()`, or `stopSessionRecording()`
+  /// then `startSessionRecording()`.
   var throttleDelay = const Duration(seconds: 1);
 
   /// Session replay sample rate between 0 and 1.

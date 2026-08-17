@@ -15,32 +15,39 @@ list to re-check when the resolved native version moves. Verified against
 | # | Assumption | Android | iOS |
 |---|---|---|---|
 | 1 | A repeated `setup()` is ignored | `PostHog.kt` — `if (enabled) { log; return }` | `PostHogSDK.swift` — `if enabled { hedgeLog; return }` |
-| 2 | `setup()` failure is not reported to the caller | whole body wrapped in `catch (e: Throwable)` | non-`throws`, no blanket catch |
-| 3 | `setup()` does not roll back on failure | `enabled = true` is set partway through; the outer catch only logs, so a later failure strands the SDK | n/a |
-| 4 | `reset()` rotates the session | `endSession()` + `startSession()` | `sessionManager.reset()` → `resetSession()` → `rotateSession(force: true)` |
-| 5 | `reset()` leaves replay briefly inactive | clears the remote config, and the replay integration stops when the flag is false | `remoteConfig?.clear()` drops `sessionReplayFlagActive`; `isSessionReplayActive()` requires it, and `reloadFeatureFlags()` restores it asynchronously (~120 ms observed) |
-| 6 | `close()` and the session id | **keeps** the id: `close()` clears `enabled` before its `endSession()`, which early-returns, and the following `setup()`'s `startSession()` returns early while an id exists | **clears** it: `close()` calls `sessionManager.endSession()` directly, bypassing the `enabled` gate |
-| 7 | `startSessionRecording(resumeCurrent: false)` | does **not** rotate while recording: `startSessionReplay` early-returns on `isActive()` | rotates via `getNextSessionId()` even while active |
-| 8 | The session accessor used per capture tick | `PostHog.getSessionId()` is the **expiring** accessor — applies idle/max-duration, rotates in foreground, clears while backgrounded. It does **not** refresh the activity clock (only `touchSession`/`rotateLocked` write it), so polling cannot keep a session alive | `getSessionId()` is hard-wired `readOnly: true`; the expiring accessor is `internal`, so a rotation is seen one tick late |
-| 9 | Resolving the session id can stop replay | a rotation notifies `onSessionIdChanged()`, which calls `stop()` **synchronously** when event triggers are configured — hence the read order in `getSessionReplayState`, pinned by `PosthogFlutterPluginTest.sessionReplayState_resolvesSessionIdBeforeIsActive` | n/a |
-| 10 | Per-session replay state is reset on rotation | `resetSessionStateIfNeeded(id, force = !resumeCurrent)`, and `start()` force-invalidates decor views on a non-resuming start | `handleSessionChanged` |
+| 2 | **This plugin does not pre-attach `$session_id` on `$snapshot`** — so native resolves it at send time. Both SDKs *do* honour a caller-supplied id (`PostHog.kt`: *"Skip the getter when caller pre-attached an id: getActiveSessionId() can silently rotate"*; `PostHogSDK.swift`: *"for session replay, we attach the session id on the event as early as possible to avoid sending snapshots to a wrong session"*), and **posthog-ios's own replay integration uses it** (`PostHogReplayIntegration.swift`). `SnapshotSender.kt` and the Swift plugin send only `$snapshot_data`/`$snapshot_source`. | `SnapshotSender.kt` → `RRUtils.capture()` | `PosthogFlutterPlugin.swift` |
+| 3 | `reset()` rotates the session | `endSession()` + `startSession()` | `sessionManager.reset()` → `resetSession()` → `rotateSession(force: true)` |
+| 4 | `reset()` leaves replay briefly inactive | clears the remote config, and the replay integration stops when the flag is false | `remoteConfig?.clear()` drops `sessionReplayFlagActive`; `isSessionReplayActive()` requires it, and `reloadFeatureFlags()` restores it asynchronously (~120 ms observed) |
+| 5 | `close()` and the session id | **keeps** the id: `close()` clears `enabled` before its `endSession()`, which early-returns, and the following `setup()`'s `startSession()` returns early while an id exists | **clears** it: `close()` calls `sessionManager.endSession()` directly, bypassing the `enabled` gate |
+| 6 | `startSessionRecording(resumeCurrent: false)` | does **not** rotate while recording: `startSessionReplay` early-returns on `isActive()` | rotates via `getNextSessionId()` even while active |
+| 7 | The session accessor used per capture tick | `PostHog.getSessionId()` is the **expiring** accessor — applies idle/max-duration, rotates in foreground, clears while backgrounded. It does **not** refresh the activity clock (only `touchSession`/`rotateLocked` write it), so polling cannot keep a session alive | `getSessionId()` is hard-wired `readOnly: true`; the expiring accessor is `internal`, so a rotation is seen one tick late |
+| 8 | Resolving the session id can stop replay | a rotation notifies `onSessionIdChanged()`, which calls `stop()` **synchronously** when event triggers are configured — hence the read order in `getSessionReplayState`, pinned by `PosthogFlutterPluginTest.sessionReplayState_resolvesSessionIdBeforeIsActive` | n/a |
+| 9 | Per-session replay state is reset on rotation | `resetSessionStateIfNeeded(id, force = !resumeCurrent)`, and `start()` force-invalidates decor views on a non-resuming start | `handleSessionChanged` |
 
 ## Consequences worth remembering
 
-- Rows 6 and 7 mean the platforms **disagree**, so Dart cannot key "the recording
+- Rows 5 and 6 mean the platforms **disagree**, so Dart cannot key "the recording
   restarted" on the session id changing. That is why `reset()`, `close()` and a
   non-resuming start bump `PostHogInternalEvents.forceReplaySessionReset`
   unconditionally.
-- Row 5 is why one forced sample is not enough: it can be spent while the
+- Row 4 is why one forced sample is not enough: it can be spent while the
   platform is briefly not recording. See `ChangeDetector.forceNextTicks`.
-- Row 8 (iOS half) is why a rotation is observed a tick late there, and why
+- Row 7 (iOS half) is why a rotation is observed a tick late there, and why
   `onSessionRotated` asks for a follow-up sample.
+- **Row 2 is why row 7's Android half exists at all.** Because the frame's session
+  is decided by native at send time, Dart has to read the id the way `capture()`
+  will — hence the expiring accessor. Pre-attaching `$session_id` instead would
+  let both platforms read purely, give them identical behaviour, and remove the
+  need to drop a frame whose session moved. Not done here: it changes what
+  rotates an Android session (replay traffic would stop doing so), which is a
+  product decision, and it needs confirming that ingestion accepts a snapshot
+  naming a session that has already rotated.
 
 ## What would delete rows rather than test them
 
 - Native pushing session-changed events into Dart (Android's
   `setOnSessionIdChangedListener` is `internal` and single-slot; iOS's
   `sessionManager` is module-internal) would remove the polling, the forced
-  frames and the retry budget entirely — rows 5, 8, 9, 10.
+  frames and the retry budget entirely — rows 4, 7, 8 and 9.
 - A public expiring session accessor on posthog-ios would remove the iOS half of
-  row 8.
+  row 7.

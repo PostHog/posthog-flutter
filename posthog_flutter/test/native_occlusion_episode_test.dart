@@ -7,6 +7,7 @@ import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
+import 'replay_capture_settle.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -101,23 +102,6 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 300)),
     );
     await tester.pump();
-  }
-
-  /// Drives a full periodic capture to completion: it interleaves fake-async
-  /// work (channel round-trips, the detector's timer) with real async
-  /// (rasterization), so neither pumping nor [runAsync] alone gets there.
-  ///
-  /// The round count is comfortably above the number of awaits in the capture
-  /// pipeline; raise it if a capture gains awaits, otherwise the negative
-  /// assertions built on this helper (`isNot(contains(...))`) pass for the
-  /// wrong reason — the capture simply never finished.
-  Future<void> settleCapture(WidgetTester tester) async {
-    for (var i = 0; i < 16; i++) {
-      await tester.pump(const Duration(milliseconds: 1));
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 25)),
-      );
-    }
   }
 
   setUp(() {

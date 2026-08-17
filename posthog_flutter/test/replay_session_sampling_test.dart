@@ -8,6 +8,7 @@ import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
+import 'replay_capture_settle.dart';
 
 /// A poll tick only reaches the capture path from a post-frame callback, so on a
 /// screen that never repaints nothing samples unless something forces a frame.
@@ -47,15 +48,6 @@ void main() {
       ..sessionReplayConfig.captureNativeScreens = false;
   }
 
-  Future<void> settleCapture(WidgetTester tester) async {
-    for (var i = 0; i < 16; i++) {
-      await tester.pump(const Duration(milliseconds: 1));
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 25)),
-      );
-    }
-  }
-
   /// One poll tick plus a repaint, so the tick's frame callback actually runs.
   Future<void> tickWithRepaint(WidgetTester tester, Widget child) async {
     await tester.pump(const Duration(seconds: 1));
@@ -64,10 +56,16 @@ void main() {
   }
 
   /// A poll tick on a completely static screen: no repaint, no new widget.
-  Future<void> tickStatic(WidgetTester tester) async {
+  Future<void> tickStatic(WidgetTester tester, {bool Function()? until}) async {
     await tester.pump(const Duration(seconds: 1));
-    await settleCapture(tester);
+    if (until == null) {
+      await settleCapture(tester);
+    } else {
+      await settleUntil(tester, until);
+    }
   }
+
+  bool sent(String method) => recordedCalls.any((c) => c.method == method);
 
   Future<void> unmountAndFlush(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox());
@@ -82,7 +80,10 @@ void main() {
     await tester.pumpWidget(
       PostHogWidget(child: Container(color: const Color(0xFF00FF00))),
     );
-    await settleCapture(tester);
+    await settleUntil(
+      tester,
+      () => recordedCalls.any((c) => c.method == 'sendFullSnapshot'),
+    );
     expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'));
     recordedCalls.clear();
   }
@@ -131,7 +132,7 @@ void main() {
     await deliverFirstFrame(tester);
 
     await Posthog().reset();
-    await tickStatic(tester);
+    await tickStatic(tester, until: () => sent('sendFullSnapshot'));
 
     final methods = methodsOf(recordedCalls);
     expect(methods, contains('sendMetaEvent'));
@@ -166,7 +167,7 @@ void main() {
 
     await Posthog().reset();
     await tickStatic(tester);
-    await tickStatic(tester);
+    await tickStatic(tester, until: () => sent('sendFullSnapshot'));
 
     final methods = methodsOf(recordedCalls);
     expect(methods, contains('sendMetaEvent'),
@@ -213,7 +214,7 @@ void main() {
 
     await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
     await tickStatic(tester);
-    await tickStatic(tester);
+    await tickStatic(tester, until: () => sent('sendFullSnapshot'));
 
     expect(methodsOf(recordedCalls), contains('sendFullSnapshot'),
         reason: 'the dropped frame must not cancel the retries that cover the '
