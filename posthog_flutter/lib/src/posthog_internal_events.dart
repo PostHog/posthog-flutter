@@ -25,7 +25,6 @@ class PostHogInternalEvents {
   /// re-arms the meta event.
   static final forceReplaySessionReset = ValueNotifier<int>(0);
 
-  /// Bumps [forceReplaySessionReset]; see there for when it is required.
   static void requestReplaySessionReset() => forceReplaySessionReset.value++;
 
   /// Occlusion episode protocol, pushed by the native side. A monotonic

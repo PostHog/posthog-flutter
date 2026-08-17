@@ -95,8 +95,7 @@ void main() {
             ..sessionReplay = true
             ..errorTrackingConfig.captureFlutterErrors = true;
 
-          // Failures that reached the caller before the rollback existed still
-          // do; the rollback happens either way.
+          // A non-PlatformException failure reaches the caller.
           await expectLater(Posthog().setup(config), throwsStateError);
 
           expect(Posthog().config, isNull);
@@ -182,6 +181,33 @@ void main() {
     );
 
     test(
+      'a setup superseded by a later setup leaves that one alone',
+      () async {
+        // The only route left to the attempt guard: no close(), so the live
+        // attempt is the later one and the failing one must not touch it.
+        final gated = _GatedSetupFake();
+        PosthogFlutterPlatformInterface.instance = gated;
+
+        try {
+          final abandoned = Posthog().setup(PostHogConfig('abandoned_token'));
+
+          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+          final current = PostHogConfig('current_token')..sessionReplay = true;
+          await Posthog().setup(current);
+
+          gated.gate.completeError(StateError('native setup blew up'));
+          await abandoned;
+
+          expect(Posthog().config, same(current));
+          expect(PostHogInternalEvents.sessionRecordingActive.value, isTrue);
+        } finally {
+          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+          await Posthog().close();
+        }
+      },
+    );
+
+    test(
       'a setup superseded by close still reports its failure',
       () async {
         // close() does not suppress the in-flight attempt's error; only a later
@@ -206,8 +232,8 @@ void main() {
     test(
       'a missing native implementation still reaches the caller',
       () async {
-        // Unchanged from before the rollback existed: MissingPluginException is
-        // not a PlatformException, so it was never swallowed and still is not.
+        // MissingPluginException is not a PlatformException, so it is not
+        // swallowed.
         const channel = MethodChannel('posthog_flutter');
         final messenger =
             TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;

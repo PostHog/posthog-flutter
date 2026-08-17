@@ -919,9 +919,10 @@ void main() {
   });
 
   group('close()/setup() reconfigure', () {
-    // close() ends the native session, so what setup() starts is a new session
-    // id: it needs its own meta event, and its first frame must not be deduped
-    // against the pixels the previous session already sent.
+    // The recording restarts across a close()/setup(): it needs its own meta
+    // event, and its first frame must not be deduped against the pixels the
+    // previous one already sent. iOS clears the session on close() while
+    // Android keeps the id, so the forced reset is what covers both.
     testWidgets('the new session ships meta and a full snapshot',
         (tester) async {
       sessionReplayActive = true;
@@ -934,7 +935,7 @@ void main() {
 
       recordedCalls.clear();
       await Posthog().close();
-      // close() ends the native session; the setup below starts a new one.
+      // The iOS shape, where close() clears the session.
       sessionId = 'session-b';
       await setupPosthog(replayConfig(captureNativeScreens: false));
       await settleCapture(tester);
@@ -954,12 +955,40 @@ void main() {
       await unmountAndFlush(tester);
     });
 
+    testWidgets('ships meta even when the platform keeps the session id',
+        (tester) async {
+      // The Android shape: close() leaves the session id in place, so nothing
+      // the capture tick observes says the recording restarted. Only the forced
+      // reset re-arms meta here. (posthog-android 3.58.0)
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'));
+
+      recordedCalls.clear();
+      await Posthog().close();
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await settleCapture(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason:
+              'the restarted recording needs its own meta event even though '
+              'the session id never moved');
+      expect(methods, contains('sendFullSnapshot'));
+      expect(methods.indexOf('sendMetaEvent'),
+          lessThan(methods.indexOf('sendFullSnapshot')));
+
+      await unmountAndFlush(tester);
+    });
+
     testWidgets('a capture crossing the reconfigure is dropped, not sent bare',
         (tester) async {
       // Same ordering regression as the rotation case, reached without any
-      // replay-specific API: close() ends the session while a frame captured
-      // under it is mid-send, so that frame would arrive as a full snapshot at
-      // the head of the session the following setup() starts.
+      // replay-specific API: the recording restarts while a frame captured
+      // under it is mid-send, so that frame would arrive bare at the head of
+      // what the following setup() starts.
       sessionReplayActive = true;
       var reconfigured = false;
       onSendMetaEvent = () {

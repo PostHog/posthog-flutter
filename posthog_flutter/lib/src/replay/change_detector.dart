@@ -42,8 +42,6 @@ class ChangeDetector {
   bool get isRunning => _isRunning;
 
   /// Creates a [ChangeDetector] with the given [onChange] callback.
-  ///
-  /// [intervalOf] controls how often to check for changes.
   ChangeDetector(this.onChange, {required this.intervalOf});
 
   /// Starts the change detection process.
@@ -88,8 +86,7 @@ class ChangeDetector {
   /// tick that captures nothing, and on a static screen no later tick forces a
   /// frame. Observed on iOS, where `reset()` clears the remote config and
   /// `isSessionReplayActive()` requires the session-replay flag, which only
-  /// returns once the flags reload lands. The retries cost nothing when the
-  /// first sample does land — [cancelForcedTicks] drops them unused.
+  /// returns once the flags reload lands. (posthog-ios 3.69.0)
   void forceNextTicks(int count) {
     if (count > _forcedTicksLeft) {
       _forcedTicksLeft = count;

@@ -47,10 +47,9 @@ class NativeCommunicator {
   /// Not a pure read on Android: the id comes from the expiring accessor, which
   /// runs the same idle/maximum-duration checks the `$snapshot` capture runs
   /// moments later, so this call can rotate the session — or clear it while the
-  /// app is backgrounded. On iOS the equivalent accessor is read-only at the
-  /// current dependency floor, so a rotation is observed one tick late there.
-  /// The comments on `getSessionReplayState` in `PosthogFlutterPlugin.kt` and
-  /// `PosthogFlutterPlugin.swift` explain the asymmetry.
+  /// app is backgrounded. On iOS the equivalent accessor is read-only, so a
+  /// rotation is observed one tick late there. (posthog-android 3.58.0,
+  /// posthog-ios 3.69.0)
   Future<({bool isActive, String? sessionId})> getSessionReplayState() async {
     if (kIsWeb) {
       // Flutter doesn't capture screenshots on web, JS SDK handles session replay

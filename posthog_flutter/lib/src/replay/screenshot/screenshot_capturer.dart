@@ -495,9 +495,8 @@ class ScreenshotCapturer {
   /// Captures one Flutter frame, or null when there is nothing to send. Never
   /// throws.
   Future<ImageInfo?> captureScreenshot() async {
-    // Also cleared in [_resolveCaptureTarget] (see there), but that runs only
-    // after the native round trip below, whose post-await `_cancelled` check
-    // would otherwise veto this capture on a prior stop's flag.
+    // Cleared again in _resolveCaptureTarget, but that runs after the round trip
+    // below — whose post-await check would veto this capture on a prior flag.
     _cancelled = false;
     final state = await _nativeCommunicator.getSessionReplayState();
     if (_cancelled) {
@@ -519,9 +518,6 @@ class ScreenshotCapturer {
     return _captureScreenshot(state.sessionId);
   }
 
-  /// [sessionId] is the session this capture started in, tagged onto the frame
-  /// so the sender can drop it if the tracked session is reset while it is
-  /// being built.
   Future<ImageInfo?> _captureScreenshot(String? sessionId) {
     final target = _resolveCaptureTarget();
     if (target == null) {

@@ -178,12 +178,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
   /// A frame may only ship while the world it was captured in is still current:
   /// the same occlusion episode and the same replay session — otherwise it lands
   /// in the new session ahead of the meta event that session has not sent yet.
-  ///
-  /// The session half catches a forced reset (see [_onForcedReplaySessionReset])
-  /// landing mid-send, and a rotation observed by a concurrent occlusion
-  /// placeholder. It cannot catch a rotation observed by the capture tick: the
-  /// tick is the only other writer of the tracked id and runs serialized behind
-  /// `_isCapturing`, so the id cannot move under a capture in flight.
   bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
     return PostHogInternalEvents.episodeStillCurrent(episode,
             occluded: occluded) &&
@@ -277,17 +271,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
       if (imageInfo == null || _disposed) {
         return;
       }
-      // Only valid while the world it was captured in is still current — an
-      // episode or a forced session reset mid-pipeline makes it stale.
       final delivered = await _sendSnapshot(
         imageInfo,
         isStillValid: () => _stillValid(imageInfo, episode, occluded: occluded),
       );
       if (delivered) {
-        // Keyed on delivery, not on capture: a request landing mid-capture
-        // leaves this frame tagged with the world it started in, so it can be
-        // dropped by isStillValid — and the retries are what cover whatever
-        // replaced that world.
+        // Keyed on delivery: a frame dropped for belonging to the world it
+        // started in must not cancel the retries covering what replaced it.
         _changeDetector?.cancelForcedTicks();
       }
     } finally {

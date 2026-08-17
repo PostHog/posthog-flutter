@@ -52,15 +52,16 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when platform setup has finished.
   ///
-  /// If initialization fails, the SDK is left un-set-up rather than half
-  /// initialized — nothing is captured and session replay does not start — so
-  /// calling [setup] again retries cleanly.
+  /// If the first [setup] fails, nothing is captured and session replay does not
+  /// start, so calling [setup] again retries cleanly. A repeated [setup] that
+  /// fails leaves the already-working SDK running rather than tearing it down.
   ///
   /// Calling [setup] while the SDK is already set up cannot change everything.
   /// Both native SDKs ignore a repeated setup, so the project token, host and
-  /// native session replay settings keep their first values, and the replay
-  /// capture cadence ([PostHogSessionReplayConfig.throttleDelay]) only changes
-  /// when capture restarts. Call [close] first to change any of those.
+  /// native session replay settings keep their first values — call [close] first
+  /// to change those. The replay capture cadence
+  /// ([PostHogSessionReplayConfig.throttleDelay]) takes effect the next time
+  /// capture restarts, which [close] or [stopSessionRecording] both do.
   ///
   /// **Example:**
   /// ```dart
@@ -85,15 +86,14 @@ class Posthog {
 
     final wasSetUp = _config != null;
     if (wasSetUp) {
-      // Native ignores a repeated setup silently — the channel call succeeds
-      // either way — so without this warning the split is invisible.
+      // Native returns early on a repeated setup, so the channel call succeeds
+      // and the split is otherwise invisible.
       debugPrint(
-        '[PostHog] setup() called while already set up. Settings resolved from '
-        'the live config, such as replay masking, follow this config. Anything '
-        'the native SDK owns does not — the project token, host and native '
-        'session replay settings keep their current values, as does the replay '
-        'capture cadence, and session replay cannot be turned off this way. '
-        'Call close() first to change those.',
+        '[PostHog] setup() called while already set up. Masking and other '
+        'Flutter-side settings do follow this config. The project token, host '
+        'and native session replay settings keep their current values, and '
+        'session replay cannot be turned off this way — call close() first to '
+        'change those.',
       );
     }
 
@@ -115,32 +115,30 @@ class Posthog {
       await _posthog.setup(config);
     } catch (e) {
       if (attempt != _setupAttempt) {
-        // A close() — and possibly a later setup() — landed while the platform
-        // call was in flight, so this attempt no longer owns the state below and
-        // rolling it back would tear down whatever superseded it. Keyed on the
-        // attempt rather than on _config, which a reconfigure is free to set
-        // back to this very same PostHogConfig instance.
+        // A later setup() replaced this attempt, so rolling back would tear down
+        // that one's state. Keyed on the attempt rather than on _config, which a
+        // reconfigure is free to set back to this very same instance.
         debugPrint('[PostHog] a superseded setup failed: $e');
         return;
       }
       if (wasSetUp) {
-        // An earlier setup() established this state and native is still up on
-        // it, so tearing it down here would disable a working SDK.
-        debugPrint(
-          '[PostHog] a repeated setup failed, the SDK stays set up: $e',
-        );
+        // Only the attempt that established the state may roll it back. _config
+        // is already null when a close() landed inside the round trip: nothing
+        // to roll back either way, but the SDK is not up.
+        debugPrint(_config != null
+            ? '[PostHog] a repeated setup failed, the SDK stays set up: $e'
+            : '[PostHog] a repeated setup failed after close(), the SDK is not '
+                'set up: $e');
       } else {
         // Capture and the error handlers must not outlive a setup that never
-        // completed, and clearing _config lets the app retry from a clean state.
+        // completed.
         _config = null;
         PostHogInternalEvents.sessionRecordingActive.value = false;
         _uninstallFlutterIntegrations();
         debugPrint('[PostHog] setup failed, the SDK is not set up: $e');
       }
-      // Rethrown for exactly the failures that already reached the caller
-      // before the rollback existed: a PlatformException was logged and
-      // swallowed, so swallowing it keeps that contract, and anything else
-      // (notably MissingPluginException) propagated.
+      // A PlatformException was already swallowed by the platform layer;
+      // everything else (notably MissingPluginException) still propagates.
       if (e is! PlatformException) {
         rethrow;
       }
@@ -430,11 +428,8 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when the reset request has been queued.
   Future<void> reset() async {
-    // Both platforms rotate the session here. Bumped before the platform call
-    // because native rotates inside that round trip. That narrows the window
-    // rather than closing it: a tick that starts inside the round trip re-reads
-    // the pre-rotation id, and closing it fully would need native to push the
-    // session change back to Dart.
+    // Bumped before the platform call because native rotates inside that round
+    // trip. (posthog-android 3.58.0, posthog-ios 3.69.0)
     PostHogInternalEvents.requestReplaySessionReset();
     await _posthog.reset();
   }
@@ -914,12 +909,9 @@ class Posthog {
   /// repeated [setup], so changing the project token, host, or native session
   /// replay settings means calling [close] first and then [setup] again.
   ///
-  /// Session replay drops the state it keeps per session, so the recording that
-  /// follows the next [setup] starts clean: its own meta event, and no frames
-  /// dropped as duplicates of the previous one. Whether the platform also
-  /// changes the *session* here depends on the native SDK and the version it
-  /// resolves to, so do not rely on a [close]/[setup] pair rotating the session
-  /// id.
+  /// Whatever session replay records after the next [setup] starts as a fresh
+  /// recording. Whether the platform also changes the *session* here differs by
+  /// platform, so do not rely on a [close]/[setup] pair rotating the session id.
   ///
   /// Returns a [Future] that completes when platform resources have been closed.
   ///
@@ -954,11 +946,10 @@ class Posthog {
   /// replay is disabled in your project settings.
   ///
   /// Set [resumeCurrent] to `true` (the default) to resume recording the current
-  /// session. Set it to `false` to start a new session and begin recording; on
-  /// Android the session only rotates when recording is not already active, so
-  /// call [stopSessionRecording] first if you need a new session there. Either
-  /// way, `false` restarts the replay recording — a fresh meta event and full
-  /// snapshot — even when the platform keeps the current session id.
+  /// session. Set it to `false` to start a new session and begin recording —
+  /// though a new session is not guaranteed while recording is already active,
+  /// so call [stopSessionRecording] first if you need one. Either way, `false`
+  /// restarts the recording even when the platform keeps the current session id.
   ///
   /// Returns a [Future] that completes when the start request has been sent.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {

@@ -145,10 +145,10 @@ void main() {
   testWidgets(
       'reset() still captures the new session when the platform reports replay '
       'inactive for the first sample', (tester) async {
-    // The iOS shape: PostHogSDK.reset() ends the session without starting one,
-    // and iOS reports replay inactive while there is no session id, so the
-    // forced reset's own sample captures nothing. Android starts the new
-    // session inside reset(), so it never sees this.
+    // The iOS shape: reset() clears the remote config, and isSessionReplayActive()
+    // requires the session-replay flag, so replay reports inactive until the
+    // flags reload lands and the forced reset's own sample captures nothing.
+    // (posthog-ios 3.69.0)
     await deliverFirstFrame(tester);
 
     var inactiveReadsLeft = 1;
