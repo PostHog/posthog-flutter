@@ -1,5 +1,12 @@
 ## Next
 
+## 5.36.3
+
+### Patch Changes
+
+- 26d457f: Draw survey close and check icons without requiring the Material Icons font.
+- cbb7b59: Show surveys above nested navigator shell chrome and dismiss them through the root navigator.
+
 ## 5.36.2
 
 ### Patch Changes
