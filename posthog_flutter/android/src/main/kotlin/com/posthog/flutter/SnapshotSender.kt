@@ -12,6 +12,8 @@ import com.posthog.internal.replay.RRWireframe
 
 class SnapshotSender(
     private val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
+    private val capture: (String, Map<String, Any>) -> Unit =
+        { event, properties -> PostHog.capture(event, properties = properties) },
 ) {
     fun sendFullSnapshot(
         imageBytes: ByteArray,
@@ -44,7 +46,7 @@ class SnapshotSender(
                 timestamp = timestampMs,
             )
 
-        capture(listOf(snapshotEvent), sessionId)
+        captureSnapshot(listOf(snapshotEvent), sessionId)
     }
 
     fun sendMetaEvent(
@@ -57,19 +59,19 @@ class SnapshotSender(
         val events = mutableListOf<RREvent>()
         events.add(buildMetaEvent(width, height, screen, timestampMs))
 
-        capture(events, sessionId)
+        captureSnapshot(events, sessionId)
     }
 
     // Not RRUtils' List<RREvent>.capture(): that helper cannot carry extra
     // properties, and pre-attaching the session id is what keeps a frame in the
     // session it was captured under — PostHog.capture prefers a supplied
     // $session_id over resolving one itself. See NATIVE_BEHAVIOR.md.
-    private fun capture(
+    private fun captureSnapshot(
         events: List<RREvent>,
         sessionId: String?,
-    ) = PostHog.capture(
+    ) = capture(
         PostHogEventName.SNAPSHOT.event,
-        properties = buildSnapshotProperties(events, sessionId),
+        buildSnapshotProperties(events, sessionId),
     )
 
     internal fun buildSnapshotProperties(

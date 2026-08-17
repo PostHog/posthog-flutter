@@ -7,6 +7,8 @@ test in this repository, and both dependencies are floating ranges:
 
 - `android/build.gradle` → `com.posthog:posthog-android:[3.58.0,4.0.0)`
 - `darwin/posthog_flutter/Package.swift` → `posthog-ios "3.69.0" ..< "4.0.0"`
+- `darwin/posthog_flutter.podspec` → `PostHog >= 3.69.0, < 4.0.0` (CocoaPods
+  consumers resolve through this one, not `Package.swift`)
 
 So a native patch release can silently falsify any row below. This file is the
 list to re-check when the resolved native version moves. Verified against
@@ -50,9 +52,11 @@ list to re-check when the resolved native version moves. Verified against
 
 ## What would delete rows rather than test them
 
-- Native pushing session-changed events into Dart (Android's
-  `setOnSessionIdChangedListener` is `internal` and single-slot; iOS's
-  `sessionManager` is module-internal) would remove the polling, the forced
-  frames and the retry budget entirely — rows 4, 7, 8 and 9.
+- Native pushing session-changed events into Dart would remove the polling, the
+  forced frames and the retry budget entirely — rows 4, 7, 8 and 9. What blocks
+  it is visibility on both sides: Android's `setOnSessionIdChangedListener` is
+  `internal` and single-slot, and while iOS's `PostHogSessionManager.shared` is
+  `@objc public static`, its `onSessionIdChanged` multicast callback is
+  `internal`.
 - A public expiring session accessor on posthog-ios would remove the iOS half of
   row 7.

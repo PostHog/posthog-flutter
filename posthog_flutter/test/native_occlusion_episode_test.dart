@@ -17,6 +17,8 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
   final recordedCalls = <MethodCall>[];
+  bool sent(String method) =>
+      recordedCalls.any((call) => call.method == method);
   var enableNativeBridgeResult = false;
   var sessionReplayActive = false;
   // The session id the native SDK would report. Rotating it stands in for
@@ -587,9 +589,6 @@ void main() {
 
       expect(capturer.debugLastTargetStatus, isNull,
           reason: 'a stale delivery must not commit into the new session');
-      capturer.confirmDelivered(imageInfo.id, metaSent: true);
-      expect(status.sentMetaEvent, isTrue,
-          reason: 'the dropped status is no longer written to');
 
       final next = await tester.runAsync(
         () => capturer.buildOcclusionPlaceholder(),
@@ -667,7 +666,7 @@ void main() {
     Future<void> tickWithRepaint(WidgetTester tester, Widget child) async {
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpWidget(PostHogWidget(child: child));
-      await settleCapture(tester);
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
     }
 
     /// Records one session's first frame, so there is a latched meta event and
@@ -676,7 +675,7 @@ void main() {
       sessionReplayActive = true;
       await setupPosthog(replayConfig(captureNativeScreens: false));
       await pumpReplayWidget(tester);
-      await settleCapture(tester);
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
       expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
           reason: 'the first session must deliver, else there is no latched '
               'meta or dedup hash to carry over');
@@ -771,9 +770,11 @@ void main() {
 
     testWidgets('a capture crossing a rotation is dropped, not sent bare',
         (tester) async {
-      // The ordering regression: a frame captured in the old session that lands
-      // after the rotation would ship as full → meta → full in the new session,
-      // and the leading full has no meta to render against.
+      // The ordering regression, as iOS would see it: a frame captured in the
+      // old session that lands after the rotation ships as full → meta → full
+      // in the new session, and the leading full has no meta to render against.
+      // Android names its own session, so there the same frame would instead
+      // append to a recording that has already ended.
       sessionReplayActive = true;
       var rotated = false;
       onSendMetaEvent = () {

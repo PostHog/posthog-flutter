@@ -135,14 +135,15 @@ class ScreenshotCapturer {
 
   /// Whether a frame captured under [sessionId] still belongs to the session the
   /// capturer is tracking — the session-level counterpart of the occlusion
-  /// episode check, since a frame outliving its session would ship into the new
-  /// one ahead of the meta event that session has not sent yet.
+  /// episode check. A frame outliving its session would append to a recording
+  /// that has already ended on Android, where it names its own session, and on
+  /// iOS would land in the new session ahead of that session's meta event.
   ///
-  /// It catches a forced reset landing mid-send, and a rotation the occlusion
-  /// placeholder path observes concurrently. It does not catch a rotation the
-  /// capture tick observes: that tick is the only other writer of the tracked id
-  /// and is serialized against captures by the widget, so the id cannot move
-  /// under a capture in flight.
+  /// It catches a forced reset landing mid-send, and a rotation adopted by a
+  /// capture tick that was already in flight when an occlusion placeholder was
+  /// built — that path is not serialized against tick captures. It does not
+  /// catch a rotation observed by the same tick that produced the frame: that
+  /// tick writes the tracked id before building it.
   bool sessionStillCurrent(String? sessionId) => _replaySessionId == sessionId;
 
   /// Called when an occlusion episode ends: invalidates the dedup hashes (else

@@ -88,9 +88,7 @@ class ChangeDetector {
   /// `isSessionReplayActive()` requires the session-replay flag, which only
   /// returns once the flags reload lands. (posthog-ios 3.69.0)
   void forceNextTicks(int count) {
-    if (count > _forcedTicksLeft) {
-      _forcedTicksLeft = count;
-    }
+    _forcedTicksLeft = count;
   }
 
   /// Drops any retries armed by [forceNextTicks]; the capture they were covering

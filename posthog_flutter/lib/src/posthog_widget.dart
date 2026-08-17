@@ -78,8 +78,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   /// How many poll ticks keep forcing a frame after [_ensureSampleLands], if no
-  /// frame has been delivered yet. Each is a throttleDelay apart, so this is
-  /// seconds of cover for windows measured in milliseconds.
+  /// frame has been delivered yet. Each is a throttleDelay apart, so at the
+  /// default 1 s cadence this covers windows measured in milliseconds.
   static const _sampleRetryTicks = 3;
 
   /// Drops the per-session state directly, rather than waiting for a tick to
@@ -172,8 +172,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   /// A frame may only ship while the world it was captured in is still current:
-  /// the same occlusion episode and the same replay session — otherwise it lands
-  /// in the new session ahead of the meta event that session has not sent yet.
+  /// the same occlusion episode and the same replay session. On Android a stale
+  /// frame would append to a recording that has already ended, since it names
+  /// its own session; on iOS, where the send resolves the id, it would land in
+  /// the new session ahead of the meta event that session has not sent yet.
   bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
     return PostHogInternalEvents.episodeStillCurrent(episode,
             occluded: occluded) &&

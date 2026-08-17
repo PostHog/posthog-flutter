@@ -1,5 +1,6 @@
 package com.posthog.flutter
 
+import com.posthog.PostHogEventName
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -50,5 +51,21 @@ internal class SnapshotSenderTest {
 
         assertNull(sender.buildSnapshotProperties(events, null)["\$session_id"])
         assertNull(sender.buildSnapshotProperties(events, "   ")["\$session_id"])
+    }
+
+    @Test
+    fun sendMetaEvent_capturesWithThePreAttachedSessionId() {
+        val captured = mutableListOf<Pair<String, Map<String, Any>>>()
+        val sender =
+            SnapshotSender(
+                currentTimeMillis = { 1L },
+                capture = { event, properties -> captured += event to properties },
+            )
+
+        sender.sendMetaEvent(width = 1, height = 2, screen = "Home", sessionId = "session-a")
+
+        assertEquals(1, captured.size)
+        assertEquals(PostHogEventName.SNAPSHOT.event, captured[0].first)
+        assertEquals("session-a", captured[0].second["\$session_id"])
     }
 }
