@@ -23,8 +23,6 @@ class PostHogInternalEvents {
   /// early from `PostHog.startSessionReplay` when recording is already active,
   /// so nothing rotates — because the tick sees no change and only this bump
   /// re-arms the meta event.
-  ///
-  /// Bump it through [requestReplaySessionReset].
   static final forceReplaySessionReset = ValueNotifier<int>(0);
 
   /// Bumps [forceReplaySessionReset]; see there for when it is required.

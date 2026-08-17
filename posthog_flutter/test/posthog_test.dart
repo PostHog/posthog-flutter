@@ -65,16 +65,17 @@ void main() {
     );
 
     test(
-      'setup is a no-op while the SDK is already set up',
+      'a repeated setup applies the Flutter-side config',
       () async {
         final first = PostHogConfig('test_project_token');
         await Posthog().setup(first);
 
+        // Native ignores a repeated setup, so its own settings keep the first
+        // config's values — but everything Flutter resolves from the live config
+        // (masking, replay settings, beforeSend) follows the latest one.
         final second = PostHogConfig('other_project_token');
         await Posthog().setup(second);
-
-        expect(fakePlatformInterface.receivedConfig, same(first));
-        expect(Posthog().config, same(first));
+        expect(Posthog().config, same(second));
 
         await Posthog().close();
         await Posthog().setup(second);
@@ -96,8 +97,9 @@ void main() {
             ..sessionReplay = true
             ..errorTrackingConfig.captureFlutterErrors = true;
 
-          // The SDK never throws into the host app, matching the native SDKs.
-          await Posthog().setup(config);
+          // Failures that reached the caller before the rollback existed still
+          // do; the rollback happens either way.
+          await expectLater(Posthog().setup(config), throwsStateError);
 
           expect(Posthog().config, isNull);
           expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
@@ -135,6 +137,30 @@ void main() {
         } finally {
           await Posthog().close();
           messenger.setMockMethodCallHandler(channel, null);
+        }
+      },
+    );
+
+    test(
+      'a missing native implementation still reaches the caller',
+      () async {
+        // Unchanged from before the rollback existed: MissingPluginException is
+        // not a PlatformException, so it was never swallowed and still is not.
+        const channel = MethodChannel('posthog_flutter');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(channel, null);
+        PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
+
+        try {
+          await expectLater(
+            Posthog().setup(PostHogConfig('test_project_token')),
+            throwsA(isA<MissingPluginException>()),
+          );
+          expect(Posthog().config, isNull);
+        } finally {
+          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+          await Posthog().close();
         }
       },
     );
@@ -205,90 +231,6 @@ void main() {
         } finally {
           await Posthog().close();
           FlutterError.onError = originalFlutterErrorHandler;
-        }
-      },
-    );
-
-    test(
-      'a superseded setup completing leaves the in-flight one joinable',
-      () async {
-        final superseded = _GatedSetupFake();
-        PosthogFlutterPlatformInterface.instance = superseded;
-
-        try {
-          final supersededSetup =
-              Posthog().setup(PostHogConfig('superseded_token'));
-          await Posthog().close();
-
-          final current = _GatedSetupFake();
-          PosthogFlutterPlatformInterface.instance = current;
-          final currentSetup = Posthog().setup(PostHogConfig('current_token'));
-
-          superseded.gate.complete();
-          await supersededSetup;
-
-          var joinerCompleted = false;
-          final joiner =
-              Posthog().setup(PostHogConfig('joiner_token')).then((_) {
-            joinerCompleted = true;
-          });
-          await pumpEventQueue();
-          expect(
-            joinerCompleted,
-            isFalse,
-            reason: 'a caller arriving while an attempt is in flight must join '
-                'it, not be told the SDK is already set up',
-          );
-
-          current.gate.completeError(StateError('native setup blew up'));
-          await currentSetup;
-          await joiner;
-
-          expect(Posthog().config, isNull);
-          expect(current.receivedConfigs, hasLength(1));
-        } finally {
-          await Posthog().close();
-        }
-      },
-    );
-
-    test(
-      'a setup racing an in-flight one joins it and observes its failure',
-      () async {
-        final gated = _GatedSetupFake();
-        PosthogFlutterPlatformInterface.instance = gated;
-
-        try {
-          final first = PostHogConfig('first_token');
-          final firstSetup = Posthog().setup(first);
-
-          var concurrentCompleted = false;
-          final concurrentSetup =
-              Posthog().setup(PostHogConfig('second_token')).then((_) {
-            concurrentCompleted = true;
-          });
-
-          await pumpEventQueue();
-          expect(
-            concurrentCompleted,
-            isFalse,
-            reason: 'the concurrent setup must wait for the in-flight attempt',
-          );
-
-          gated.gate.completeError(StateError('native setup blew up'));
-          await firstSetup;
-          await concurrentSetup;
-
-          expect(Posthog().config, isNull);
-          expect(gated.receivedConfigs, [same(first)]);
-
-          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
-          final retry = PostHogConfig('retry_token');
-          await Posthog().setup(retry);
-          expect(fakePlatformInterface.receivedConfig, same(retry));
-          expect(Posthog().config, same(retry));
-        } finally {
-          await Posthog().close();
         }
       },
     );

@@ -160,8 +160,7 @@ void main() {
           reason: 'a config that is not the active one must not propagate');
     });
 
-    test('a close()/setup() reconfigure hands propagation to the new config',
-        () async {
+    test('a reconfigure hands propagation to the new config', () async {
       final fake = PosthogFlutterPlatformFake();
       PosthogFlutterPlatformInterface.instance = fake;
       final first = replayConfig(captureNativeScreens: true);
@@ -169,21 +168,21 @@ void main() {
 
       final second = replayConfig(captureNativeScreens: false);
       await Posthog().setup(second);
-      second.sessionReplayConfig.captureNativeScreens = true;
-      expect(fake.captureNativeScreensChanges, isEmpty,
-          reason: 'a setup without close is ignored, so its config '
-              'must not propagate');
-
-      await Posthog().close();
-      await Posthog().setup(second);
 
       first.sessionReplayConfig.captureNativeScreens = false;
       expect(fake.captureNativeScreensChanges, isEmpty,
           reason: 'the replaced config must stop propagating');
 
+      second.sessionReplayConfig.captureNativeScreens = true;
+      expect(fake.captureNativeScreensChanges, [true],
+          reason: 'Flutter-side config follows the latest setup()');
+
+      await Posthog().close();
+      await Posthog().setup(second);
+
       second.sessionReplayConfig.captureNativeScreens = false;
-      expect(fake.captureNativeScreensChanges, [false],
-          reason: 'the active config propagates');
+      expect(fake.captureNativeScreensChanges, [true, false],
+          reason: 'and keeps propagating across a close()/setup()');
     });
   });
 

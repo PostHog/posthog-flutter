@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 // ignore: unnecessary_import
 import 'package:meta/meta.dart';
 
@@ -29,7 +30,9 @@ class Posthog {
 
   PostHogConfig? _config;
 
-  Future<void>? _setupInFlight;
+  /// Bumped per setup attempt, so a failing attempt can tell whether it is
+  /// still the current one before rolling anything back.
+  int _setupAttempt = 0;
 
   /// Returns the singleton PostHog client instance.
   factory Posthog() {
@@ -49,15 +52,15 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when platform setup has finished.
   ///
-  /// [setup] never throws. If initialization fails, the failure is logged, the
-  /// returned future still completes normally, and the SDK is left un-set-up:
-  /// nothing is captured and session replay does not start. Calling [setup]
-  /// again retries.
+  /// If initialization fails, the SDK is left un-set-up rather than half
+  /// initialized — nothing is captured and session replay does not start — so
+  /// calling [setup] again retries cleanly.
   ///
-  /// Calling [setup] while the SDK is already set up is ignored, matching the
-  /// Android and iOS SDKs — call [close] first to reconfigure. A call made while
-  /// an earlier [setup] is still running waits for that one instead of applying
-  /// its own [config].
+  /// Calling [setup] while the SDK is already set up cannot change everything.
+  /// Both native SDKs ignore a repeated setup, so the project token, host and
+  /// native session replay settings keep their first values, and the replay
+  /// capture cadence ([PostHogSessionReplayConfig.throttleDelay]) only changes
+  /// when capture restarts. Call [close] first to change any of those.
   ///
   /// **Example:**
   /// ```dart
@@ -73,22 +76,16 @@ class Posthog {
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
   Future<void> setup(PostHogConfig config) async {
-    final inFlight = _setupInFlight;
-    if (inFlight != null) {
-      // Joining, rather than taking the "already set up" branch below, is what
-      // keeps this caller from being told the SDK is set up by an attempt that
-      // is still free to fail and roll back.
-      return inFlight;
-    }
-    // Mirrors the Android and iOS SDKs, which ignore a second setup; without
-    // this guard the Dart layer would half-apply the new config while native
-    // keeps the old one.
     if (_config != null) {
+      // Native ignores a repeated setup silently — the channel call succeeds
+      // either way — so without this warning the split is invisible.
       debugPrint(
-        '[PostHog] setup() called, but the SDK is already set up. '
-        'Call close() first to reconfigure. Setup skipped.',
+        '[PostHog] setup() called while already set up. The project token, '
+        'host, native session replay settings and the replay capture cadence '
+        'keep their current values — call close() first to change those. '
+        'Settings resolved from the live config, such as masking, follow this '
+        'config.',
       );
-      return;
     }
     if (config.projectToken.isEmpty) {
       debugPrint(
@@ -110,36 +107,32 @@ class Posthog {
 
     _installFlutterIntegrations(config);
 
-    final attempt = Completer<void>();
-    final attemptFuture = attempt.future;
-    _setupInFlight = attemptFuture;
+    final attempt = ++_setupAttempt;
     try {
       await _posthog.setup(config);
     } catch (e) {
-      if (!identical(_setupInFlight, attemptFuture)) {
-        // The latch no longer holds this attempt, so a close() — and possibly a
-        // later setup() — landed while the platform call was in flight: this
-        // attempt no longer owns the state below and rolling it back would tear
-        // down whatever superseded it. Keyed on the latch rather than on
-        // _config, which a reconfigure is free to set back to this very same
-        // PostHogConfig instance.
+      if (attempt != _setupAttempt) {
+        // A close() — and possibly a later setup() — landed while the platform
+        // call was in flight, so this attempt no longer owns the state below and
+        // rolling it back would tear down whatever superseded it. Keyed on the
+        // attempt rather than on _config, which a reconfigure is free to set
+        // back to this very same PostHogConfig instance.
         debugPrint('[PostHog] a superseded setup failed: $e');
         return;
       }
-      // Clearing _config releases the already-set-up guard so the app can
-      // retry; capture and the error handlers must not outlive a setup that
-      // never completed. The error is not rethrown: neither native SDK reports
-      // a setup failure back to its caller, and this SDK never throws into the
-      // host app.
+      // Capture and the error handlers must not outlive a setup that never
+      // completed, and clearing _config lets the app retry from a clean state.
       _config = null;
       PostHogInternalEvents.sessionRecordingActive.value = false;
       _uninstallFlutterIntegrations();
       debugPrint('[PostHog] setup failed, the SDK is not set up: $e');
-    } finally {
-      if (identical(_setupInFlight, attemptFuture)) {
-        _setupInFlight = null;
+      // Rethrown for exactly the failures that already reached the caller
+      // before the rollback existed. A PlatformException from the platform
+      // channel was logged and swallowed, so swallowing it here keeps that
+      // contract; anything else (notably MissingPluginException) propagated.
+      if (e is! PlatformException) {
+        rethrow;
       }
-      attempt.complete();
     }
   }
 
@@ -906,9 +899,9 @@ class Posthog {
 
   /// Closes the PostHog SDK and cleans up resources.
   ///
-  /// This is also the entry point for reconfiguring: [setup] is ignored while
-  /// the SDK is already set up, so call [close] first and then [setup] again
-  /// with the new configuration.
+  /// This is also the entry point for reconfiguring: the native SDKs ignore a
+  /// repeated [setup], so changing the project token, host, or native session
+  /// replay settings means calling [close] first and then [setup] again.
   ///
   /// Session replay drops the state it keeps per session, so the recording that
   /// follows the next [setup] starts clean: its own meta event, and no frames
@@ -923,17 +916,15 @@ class Posthog {
   /// SDK is re-initialized and the next navigation event occurs.
   Future<void> close() {
     _config = null;
-    // A setup() still awaiting the platform is superseded here, so the setup()
-    // that follows this close() starts its own attempt instead of joining it.
-    _setupInFlight = null;
+    // Supersedes a setup() still awaiting the platform, so if it fails it will
+    // not roll back the state this close() and any later setup() established.
+    _setupAttempt++;
     _currentScreen = null;
     PostHogInternalEvents.sessionRecordingActive.value = false;
-    // The replay integration is torn down and rebuilt across a close()/setup(),
-    // so the meta latch and dedup hashes must not survive into the recording
-    // that follows. Forced rather than keyed on observing a new session id,
-    // because the platforms disagree on whether close() rotates the session at
-    // all — the reset has to hold either way. Ordered after the line above,
-    // which stopped the capture path.
+    // Forced rather than keyed on observing a new session id, because the
+    // platforms disagree on whether close() rotates the session at all — the
+    // recording that follows must start clean either way. Ordered after the
+    // line above, which stopped the capture path.
     PostHogInternalEvents.requestReplaySessionReset();
     PosthogObserver.clearCurrentContext();
 
