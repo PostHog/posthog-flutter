@@ -303,6 +303,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
         width: imageInfo.width,
         height: imageInfo.height,
         screen: Posthog().currentScreen,
+        sessionId: imageInfo.sessionId,
       );
       if (_disposed || !isStillValid()) {
         return false;
@@ -314,6 +315,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       id: imageInfo.id,
       x: imageInfo.x,
       y: imageInfo.y,
+      sessionId: imageInfo.sessionId,
     );
     // Also guards the commit below: a validity flip means a boundary handler
     // already re-armed, and committing now would clobber it.

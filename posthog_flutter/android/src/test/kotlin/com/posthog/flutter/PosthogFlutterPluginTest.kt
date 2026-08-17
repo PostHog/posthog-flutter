@@ -607,24 +607,4 @@ internal class PosthogFlutterPluginTest {
             .verify(backgroundMessenger, Mockito.never())
             .send(Mockito.any(), Mockito.any(), Mockito.any())
     }
-
-    @Test
-    fun sessionReplayState_resolvesSessionIdBeforeIsActive() {
-        // Resolving the session id can rotate it, which stops replay
-        // synchronously when event triggers are configured. Sampling isActive
-        // first would report a recording that the same call just ended.
-        var recording = true
-
-        val state =
-            PosthogFlutterPlugin().buildSessionReplayState(
-                readSessionId = {
-                    recording = false
-                    "session-a"
-                },
-                readIsActive = { recording },
-            )
-
-        assertEquals("session-a", state["sessionId"])
-        assertFalse(state["isActive"] as Boolean)
-    }
 }

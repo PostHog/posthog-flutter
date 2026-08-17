@@ -1,13 +1,13 @@
 package com.posthog.flutter
 
 import android.graphics.BitmapFactory
+import com.posthog.PostHog
 import com.posthog.android.internal.base64
 import com.posthog.internal.replay.RREvent
 import com.posthog.internal.replay.RRFullSnapshotEvent
 import com.posthog.internal.replay.RRMetaEvent
 import com.posthog.internal.replay.RRStyle
 import com.posthog.internal.replay.RRWireframe
-import com.posthog.internal.replay.capture
 
 class SnapshotSender(
     private val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
@@ -18,6 +18,7 @@ class SnapshotSender(
         x: Int,
         y: Int,
         timestampMs: Long = currentTimeMillis(),
+        sessionId: String? = null,
     ) {
         val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
         val base64String = bitmap.base64()
@@ -42,7 +43,7 @@ class SnapshotSender(
                 timestamp = timestampMs,
             )
 
-        listOf(snapshotEvent).capture()
+        capture(listOf(snapshotEvent), sessionId)
     }
 
     fun sendMetaEvent(
@@ -50,11 +51,29 @@ class SnapshotSender(
         height: Int,
         screen: String,
         timestampMs: Long = currentTimeMillis(),
+        sessionId: String? = null,
     ) {
         val events = mutableListOf<RREvent>()
         events.add(buildMetaEvent(width, height, screen, timestampMs))
 
-        events.capture()
+        capture(events, sessionId)
+    }
+
+    // Not RRUtils' List<RREvent>.capture(): that helper cannot carry extra
+    // properties, and pre-attaching the session id is what keeps a frame in the
+    // session it was captured under — PostHog.capture prefers a supplied
+    // $session_id over resolving one itself. See NATIVE_BEHAVIOR.md.
+    private fun capture(
+        events: List<RREvent>,
+        sessionId: String?,
+    ) {
+        val properties =
+            mutableMapOf<String, Any>(
+                "\$snapshot_data" to events,
+                "\$snapshot_source" to "mobile",
+            )
+        sessionId?.takeIf { it.isNotBlank() }?.let { properties["\$session_id"] = it }
+        PostHog.capture("\$snapshot", properties = properties)
     }
 
     internal fun buildMetaEvent(

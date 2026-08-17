@@ -5,11 +5,15 @@ import 'package:posthog_flutter/src/util/logging.dart';
 class NativeCommunicator {
   static const MethodChannel _channel = MethodChannel('posthog_flutter');
 
+  /// [sessionId] is attached to the `$snapshot` event so the frame lands in the
+  /// session it was captured under. Both native SDKs prefer a caller-supplied id
+  /// over resolving one at send time; see NATIVE_BEHAVIOR.md.
   Future<void> sendFullSnapshot(
     Uint8List imageBytes, {
     required int id,
     required int x,
     required int y,
+    required String? sessionId,
   }) async {
     try {
       await _channel.invokeMethod('sendFullSnapshot', {
@@ -17,6 +21,7 @@ class NativeCommunicator {
         'id': id,
         'x': x,
         'y': y,
+        'sessionId': sessionId,
       });
     } catch (e) {
       printIfDebug('Error sending full snapshot to native: $e');
@@ -27,12 +32,14 @@ class NativeCommunicator {
     required int width,
     required int height,
     required String? screen,
+    required String? sessionId,
   }) async {
     try {
       await _channel.invokeMethod('sendMetaEvent', {
         'width': width,
         'height': height,
         'screen': screen,
+        'sessionId': sessionId,
       });
     } catch (e) {
       printIfDebug('Error sending meta event to native: $e');

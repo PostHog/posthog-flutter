@@ -127,6 +127,31 @@ void main() {
     await unmountAndFlush(tester);
   });
 
+  testWidgets('frames carry the session they were captured under',
+      (tester) async {
+    // Pre-attaching $session_id is what keeps a frame in its own session: native
+    // prefers a supplied id over resolving one at send time, so a rotation
+    // between capture and send cannot re-home the frame.
+    sessionReplayActive = true;
+    PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
+    await Posthog().setup(replayConfig());
+    await tester.pumpWidget(
+      PostHogWidget(child: Container(color: const Color(0xFF00FF00))),
+    );
+    await settleUntil(tester, () => sent('sendFullSnapshot'));
+
+    final sends = recordedCalls.where(
+      (c) => c.method == 'sendMetaEvent' || c.method == 'sendFullSnapshot',
+    );
+    expect(sends, isNotEmpty);
+    for (final call in sends) {
+      expect((call.arguments as Map)['sessionId'], 'session-a',
+          reason: '${call.method} must name the session it was captured under');
+    }
+
+    await unmountAndFlush(tester);
+  });
+
   testWidgets('reset() captures the new session on a static screen',
       (tester) async {
     await deliverFirstFrame(tester);
