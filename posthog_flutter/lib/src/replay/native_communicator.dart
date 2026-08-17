@@ -5,9 +5,11 @@ import 'package:posthog_flutter/src/util/logging.dart';
 class NativeCommunicator {
   static const MethodChannel _channel = MethodChannel('posthog_flutter');
 
-  /// [sessionId] is attached to the `$snapshot` event so the frame lands in the
-  /// session it was captured under. Both native SDKs prefer a caller-supplied id
-  /// over resolving one at send time; see NATIVE_BEHAVIOR.md.
+  /// [sessionId] names the session the frame was captured under, so it cannot be
+  /// re-homed if the session moves before the send. Android attaches it; iOS
+  /// cannot yet, because attaching an id from its only public (read-only)
+  /// accessor would stop the send applying session expiry. See
+  /// NATIVE_BEHAVIOR.md.
   Future<void> sendFullSnapshot(
     Uint8List imageBytes, {
     required int id,
@@ -51,11 +53,12 @@ class NativeCommunicator {
   /// travel together so the capturer can key its per-session reset on the id the
   /// native SDK actually holds without a second round trip per tick.
   ///
-  /// Not a pure read on Android: the id comes from the expiring accessor, which
-  /// runs the same idle/maximum-duration checks the `$snapshot` capture runs
-  /// moments later, so this call can rotate the session — or clear it while the
-  /// app is backgrounded. On iOS the equivalent accessor is read-only, so a
-  /// rotation is observed one tick late there. See NATIVE_BEHAVIOR.md.
+  /// Not a pure read on Android: the id comes from the expiring accessor, so this
+  /// call is what applies the idle and maximum-duration bounds — it can rotate the
+  /// session, or clear it while the app is backgrounded. Nothing else in a Flutter
+  /// replay tick would. On iOS the equivalent accessor is read-only, so the bounds
+  /// are applied by the send instead and a rotation is observed one tick late.
+  /// See NATIVE_BEHAVIOR.md.
   Future<({bool isActive, String? sessionId})> getSessionReplayState() async {
     if (kIsWeb) {
       // Flutter doesn't capture screenshots on web, JS SDK handles session replay

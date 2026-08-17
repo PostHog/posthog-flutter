@@ -1066,7 +1066,6 @@ extension PosthogFlutterPlugin {
                 let width = args["width"] as? Int ?? 0
                 let height = args["height"] as? Int ?? 0
                 let screen = args["screen"] as? String ?? ""
-                let sessionId = args["sessionId"] as? String
 
                 if width == 0 || height == 0 {
                     _badArgumentError(result)
@@ -1080,14 +1079,11 @@ extension PosthogFlutterPlugin {
                     let snapshotData: [String: Any] = ["type": 4, "data": data, "timestamp": timestamp]
                     snapshotsData.append(snapshotData)
 
-                    var properties: [String: Any] = ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData]
-                    // Pre-attached so the frame lands in the session it was
-                    // captured under: capture() prefers a supplied id over
-                    // resolving one now. See NATIVE_BEHAVIOR.md.
-                    if let sessionId, !sessionId.isEmpty {
-                        properties["$session_id"] = sessionId
-                    }
-                    PostHogSDK.shared.capture("$snapshot", properties: properties, timestamp: date)
+                    // Deliberately not pre-attaching the session id Dart sends: iOS's only
+                    // public accessor is hard-wired readOnly: true, so an id from it would
+                    // stop capture() applying the idle and maximum-duration bounds and
+                    // leave the session unbounded. See NATIVE_BEHAVIOR.md.
+                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
                 }
 
                 result(nil)
@@ -1109,7 +1105,6 @@ extension PosthogFlutterPlugin {
                 let id = args["id"] as? Int ?? 1
                 let x = args["x"] as? Int ?? 0
                 let y = args["y"] as? Int ?? 0
-                let sessionId = args["sessionId"] as? String
 
                 guard let imageBytes = args["imageBytes"] as? FlutterStandardTypedData else {
                     _badArgumentError(result)
@@ -1149,14 +1144,11 @@ extension PosthogFlutterPlugin {
                     let snapshotData: [String: Any] = ["type": 2, "data": data, "timestamp": timestamp]
                     snapshotsData.append(snapshotData)
 
-                    var properties: [String: Any] = ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData]
-                    // Pre-attached so the frame lands in the session it was
-                    // captured under: capture() prefers a supplied id over
-                    // resolving one now. See NATIVE_BEHAVIOR.md.
-                    if let sessionId, !sessionId.isEmpty {
-                        properties["$session_id"] = sessionId
-                    }
-                    PostHogSDK.shared.capture("$snapshot", properties: properties, timestamp: date)
+                    // Deliberately not pre-attaching the session id Dart sends: iOS's only
+                    // public accessor is hard-wired readOnly: true, so an id from it would
+                    // stop capture() applying the idle and maximum-duration bounds and
+                    // leave the session unbounded. See NATIVE_BEHAVIOR.md.
+                    PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
                 }
 
                 result(nil)
@@ -1181,9 +1173,9 @@ extension PosthogFlutterPlugin {
             var state: [String: Any] = [
                 "isActive": PostHogSDK.shared.isSessionReplayActive(),
             ]
-            // Unlike Android this cannot apply the idle/max-duration expiry:
-            // getSessionId() is hard-wired to readOnly: true and the expiring
-            // accessor is internal, so a rotation is seen one tick late.
+            // Hard-wired readOnly: true, and the expiring accessor is internal, so
+            // this cannot apply the idle/max-duration expiry and a rotation is seen
+            // one tick late. Android reads the expiring accessor instead.
             if let sessionId = PostHogSDK.shared.getSessionId() {
                 state["sessionId"] = sessionId
             }

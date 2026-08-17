@@ -31,7 +31,6 @@ import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
 import com.posthog.android.replay.PostHogInternalReplayApi
 import com.posthog.android.replay.PostHogReplayIntegration
-import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -441,14 +440,31 @@ class PosthogFlutterPlugin :
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
 
-    // Pure read: the frame carries the id Dart saw (see SnapshotSender), so this
-    // neither has to predict what capture() would resolve nor can rotate the
-    // session as a side effect.
+    // Deliberately the expiring accessor, which is what applies the idle and
+    // maximum-duration bounds: nothing else in a Flutter replay tick does, since
+    // the native replay loop is disabled for this SDK and capture() now receives
+    // a pre-attached id. peekSessionId() would leave a session unbounded.
     private fun getSessionReplayState(): Map<String, Any?> =
-        mapOf(
-            "isActive" to isSessionReplayActive(),
-            "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
+        buildSessionReplayState(
+            readSessionId = { PostHog.getSessionId()?.toString() },
+            readIsActive = { isSessionReplayActive() },
         )
+
+    // Split out so the read order is covered by a test. Resolving the session id
+    // can rotate it, which notifies PostHogReplayIntegration.onSessionIdChanged()
+    // and stops replay synchronously when event triggers are configured — so
+    // sampling isActive first would report a recording this very call just ended.
+    // (posthog-android 3.58.0)
+    internal fun buildSessionReplayState(
+        readSessionId: () -> String?,
+        readIsActive: () -> Boolean,
+    ): Map<String, Any?> {
+        val sessionId = readSessionId()
+        return mapOf(
+            "isActive" to readIsActive(),
+            "sessionId" to sessionId,
+        )
+    }
 
     private fun startSessionRecording(
         call: MethodCall,
