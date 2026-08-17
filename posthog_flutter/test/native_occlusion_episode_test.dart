@@ -112,10 +112,10 @@ void main() {
   /// assertions built on this helper (`isNot(contains(...))`) pass for the
   /// wrong reason — the capture simply never finished.
   Future<void> settleCapture(WidgetTester tester) async {
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 16; i++) {
       await tester.pump(const Duration(milliseconds: 1));
       await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
       );
     }
   }
@@ -808,19 +808,30 @@ void main() {
 
       var methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, contains('sendMetaEvent'));
-      expect(methods, isNot(contains('sendFullSnapshot')),
-          reason: 'the frame belongs to the session it was captured in');
+      expect(
+        methods
+            .skip(methods.indexOf('sendMetaEvent') + 1)
+            .takeWhile((m) => m != 'getSessionReplayState'),
+        isEmpty,
+        reason: 'the frame belongs to the session it was captured in, so its '
+            'own full snapshot must never follow the meta it already sent',
+      );
+      // The forced reset also asks for a fresh sample, so the new session gets
+      // its keyframes without waiting for the app to repaint.
+      expect(methods, contains('sendFullSnapshot'));
+      expect(
+        methods.lastIndexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: "the new session's first frame is preceded by its own meta",
+      );
 
       recordedCalls.clear();
       await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
 
       methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, contains('sendFullSnapshot'));
-      expect(
-        methods.indexOf('sendMetaEvent'),
-        lessThan(methods.indexOf('sendFullSnapshot')),
-        reason: "the new session's first frame is preceded by its own meta",
-      );
+      expect(methods, isNot(contains('sendMetaEvent')),
+          reason: 'the session did not change again, so its meta still stands');
 
       await unmountAndFlush(tester);
     });
@@ -866,10 +877,17 @@ void main() {
         final methods = recordedCalls.map((c) => c.method).toList();
         expect(called, isTrue, reason: 'the call must land mid-send');
         expect(methods, contains('sendMetaEvent'));
-        expect(methods, isNot(contains('sendFullSnapshot')),
-            reason: 'the frame belongs to the session that ended, so it must '
-                'be dropped rather than ship into the session native rotates '
-                'to inside the round trip');
+        // Anything after the next state read belongs to the follow-up capture
+        // the forced reset asks for, which is a frame of the new session.
+        expect(
+          methods
+              .skip(methods.indexOf('sendMetaEvent') + 1)
+              .takeWhile((m) => m != 'getSessionReplayState'),
+          isEmpty,
+          reason: 'the frame belongs to the session that ended, so it must '
+              'be dropped rather than ship into the session native rotates '
+              'to inside the round trip',
+        );
 
         fake.onSessionBoundaryCall = null;
         await unmountAndFlush(tester);

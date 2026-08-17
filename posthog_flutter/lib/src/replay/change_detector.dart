@@ -30,6 +30,7 @@ class ChangeDetector {
 
   bool _isRunning = false;
   Timer? _timer;
+  int _forcedTicksLeft = 0;
 
   bool hasCapturedPlatformViews = false;
 
@@ -60,7 +61,13 @@ class ChangeDetector {
 
     _isRunning = true;
     requestImmediateSample();
-    _timer = Timer.periodic(interval, (_) => _scheduleFrameCallback());
+    _timer = Timer.periodic(interval, (_) {
+      final forceFrame = _forcedTicksLeft > 0;
+      if (forceFrame) {
+        _forcedTicksLeft--;
+      }
+      _scheduleFrameCallback(forceFrame: forceFrame);
+    });
   }
 
   /// Stops the change detection process.
@@ -68,8 +75,31 @@ class ChangeDetector {
   /// This prevents the [onChange] callback from being called.
   void stop() {
     _isRunning = false;
+    _forcedTicksLeft = 0;
     _timer?.cancel();
     _timer = null;
+  }
+
+  /// Keeps forcing a frame for up to [count] further poll ticks, until
+  /// [cancelForcedTicks] reports that a capture got through.
+  ///
+  /// A single forced sample is not enough after a session change: the platform
+  /// can be transiently not recording when it lands, so the sample is spent on a
+  /// tick that captures nothing, and on a static screen no later tick forces a
+  /// frame. Observed on iOS, where `reset()` clears the remote config and
+  /// `isSessionReplayActive()` requires the session-replay flag, which only
+  /// returns once the flags reload lands. The retries cost nothing when the
+  /// first sample does land — [cancelForcedTicks] drops them unused.
+  void forceNextTicks(int count) {
+    if (count > _forcedTicksLeft) {
+      _forcedTicksLeft = count;
+    }
+  }
+
+  /// Drops any retries armed by [forceNextTicks]; the capture they were covering
+  /// for has landed.
+  void cancelForcedTicks() {
+    _forcedTicksLeft = 0;
   }
 
   /// Samples once before the next poll tick, forcing a frame so a static screen

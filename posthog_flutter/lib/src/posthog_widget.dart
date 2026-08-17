@@ -35,6 +35,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
   bool _isCapturing = false;
   bool _disposed = false;
 
+  bool _sampleRequestedDuringCapture = false;
+
   /// Whether a substitute source (bridge or placeholder) owns the current
   /// episode. Not the same as "occluded": with the bridge off, occlusion is
   /// ignored and Flutter capture keeps running.
@@ -75,14 +77,42 @@ class PostHogWidgetState extends State<PostHogWidget> {
     );
   }
 
+  /// How many poll ticks keep forcing a frame after [_ensureSampleLands], if no
+  /// frame has been delivered yet. Each is a throttleDelay apart, so this is
+  /// seconds of cover for windows measured in milliseconds.
+  static const _sampleRetryTicks = 3;
+
   /// A session change Dart knows about before the capture path could observe it:
-  /// `reset()` and `close()` (both platforms end the session), and a start that
-  /// does not resume — which rotates on iOS but on Android may not rotate at
-  /// all, since `PostHog.startSessionReplay` returns early while recording is
-  /// already active. The drop is requested directly rather than waiting for a
-  /// tick to read the new id.
+  /// `reset()`, `close()`, and a start that does not resume — which rotates on
+  /// iOS but on Android may not rotate at all, since `PostHog.startSessionReplay`
+  /// returns early while recording is already active. The drop is requested
+  /// directly rather than waiting for a tick to read the new id.
   void _onForcedReplaySessionReset() {
     _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
+    // Asked for before reset()/startSessionRecording() awaits the platform, and
+    // still reads the post-rotation id: the frame this schedules cannot run
+    // before the current turn ends, so its state read is enqueued behind the
+    // rotating call, on the same channel.
+    _ensureSampleLands();
+  }
+
+  /// The single way to sample out of band, for every caller that needs the next
+  /// frame recorded and cannot wait for the screen to change on its own.
+  ///
+  /// Two things can swallow such a request, and each caller needs cover for
+  /// both: a capture already in flight (the `_isCapturing` guard in
+  /// [_onChangeDetected] would drop it), and a platform that is briefly not
+  /// recording when the sample lands, which yields no frame at all. So the
+  /// request is deferred past an in-flight capture *and* re-forced for a few
+  /// ticks until a frame is actually delivered ([_generateSnapshot] cancels the
+  /// retries then). On a static screen nothing else would ever sample again.
+  void _ensureSampleLands() {
+    if (_isCapturing) {
+      _sampleRequestedDuringCapture = true;
+    } else {
+      _changeDetector?.requestImmediateSample();
+    }
+    _changeDetector?.forceNextTicks(_sampleRetryTicks);
   }
 
   /// A native screen started/stopped covering Flutter (pushed by the native
@@ -107,7 +137,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       _screenshotCapturer?.onOcclusionEnded();
       // Without a sample here the replay would stay on the episode's last frame
       // until the app happens to render again.
-      _changeDetector?.requestImmediateSample();
+      _ensureSampleLands();
       return;
     }
     if (!replayConfig.captureNativeScreens) {
@@ -162,7 +192,14 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   void _initComponents(PostHogConfig config) {
-    _screenshotCapturer = ScreenshotCapturer(config);
+    _screenshotCapturer = ScreenshotCapturer(
+      config,
+      // The tick that observes a rotation already resets the per-session state,
+      // but its own frame can still be dropped (view not ready, capture error,
+      // stale episode) — and on a static screen no further tick would run, so
+      // the new session would never get its meta event.
+      onSessionRotated: _ensureSampleLands,
+    );
     _nativeCommunicator = NativeCommunicator();
     _changeDetector = ChangeDetector(
       _onChangeDetected,
@@ -240,15 +277,27 @@ class PostHogWidgetState extends State<PostHogWidget> {
       if (imageInfo == null || _disposed) {
         return;
       }
-
       // Only valid while the world it was captured in is still current — an
       // episode or a forced session reset mid-pipeline makes it stale.
-      await _sendSnapshot(
+      final delivered = await _sendSnapshot(
         imageInfo,
         isStillValid: () => _stillValid(imageInfo, episode, occluded: occluded),
       );
+      if (delivered) {
+        // Keyed on delivery, not on capture: a request landing mid-capture
+        // leaves this frame tagged with the world it started in, so it can be
+        // dropped by isStillValid — and the retries are what cover whatever
+        // replaced that world.
+        _changeDetector?.cancelForcedTicks();
+      }
     } finally {
       _isCapturing = false;
+      if (_sampleRequestedDuringCapture) {
+        _sampleRequestedDuringCapture = false;
+        // Straight to the detector: the capture this was deferred behind has
+        // just finished, and the retries are already armed.
+        _changeDetector?.requestImmediateSample();
+      }
     }
   }
 

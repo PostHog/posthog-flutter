@@ -1165,8 +1165,14 @@ extension PosthogFlutterPlugin {
             var state: [String: Any] = [
                 "isActive": PostHogSDK.shared.isSessionReplayActive(),
             ]
-            // Read on every Flutter capture tick: getSessionId() is the
-            // read-only accessor, so it can't rotate the session.
+            // Read on every Flutter capture tick. Unlike Android this cannot
+            // apply the idle/max-duration expiry that the `$snapshot` capture
+            // applies moments later: getSessionId() is hard-wired to
+            // readOnly: true and the expiring accessor
+            // (PostHogSessionManager.getSessionId(at:readOnly:)) is internal to
+            // posthog-ios. So a rotation is observed one tick late here, and the
+            // Dart side compensates by requesting an immediate sample when a
+            // tick sees the tracked session id change.
             if let sessionId = PostHogSDK.shared.getSessionId() {
                 state["sessionId"] = sessionId
             }

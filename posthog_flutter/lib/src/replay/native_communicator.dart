@@ -42,9 +42,15 @@ class NativeCommunicator {
   /// Reads the native replay state for one capture tick: whether capture should
   /// run at all, and the session id the captured frame belongs to. The two
   /// travel together so the capturer can key its per-session reset on the id the
-  /// native SDK actually holds without a second round trip per tick. The native
-  /// side reads the id without touching session state, so this never rotates a
-  /// session.
+  /// native SDK actually holds without a second round trip per tick.
+  ///
+  /// Not a pure read on Android: the id comes from the expiring accessor, which
+  /// runs the same idle/maximum-duration checks the `$snapshot` capture runs
+  /// moments later, so this call can rotate the session — or clear it while the
+  /// app is backgrounded. On iOS the equivalent accessor is read-only at the
+  /// current dependency floor, so a rotation is observed one tick late there.
+  /// The comments on `getSessionReplayState` in `PosthogFlutterPlugin.kt` and
+  /// `PosthogFlutterPlugin.swift` explain the asymmetry.
   Future<({bool isActive, String? sessionId})> getSessionReplayState() async {
     if (kIsWeb) {
       // Flutter doesn't capture screenshots on web, JS SDK handles session replay

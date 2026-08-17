@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 // ignore: unnecessary_import
 import 'package:meta/meta.dart';
@@ -27,6 +29,8 @@ class Posthog {
 
   PostHogConfig? _config;
 
+  Future<void>? _setupInFlight;
+
   /// Returns the singleton PostHog client instance.
   factory Posthog() {
     return _instance;
@@ -45,8 +49,15 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when platform setup has finished.
   ///
+  /// [setup] never throws. If initialization fails, the failure is logged, the
+  /// returned future still completes normally, and the SDK is left un-set-up:
+  /// nothing is captured and session replay does not start. Calling [setup]
+  /// again retries.
+  ///
   /// Calling [setup] while the SDK is already set up is ignored, matching the
-  /// Android and iOS SDKs — call [close] first to reconfigure.
+  /// Android and iOS SDKs — call [close] first to reconfigure. A call made while
+  /// an earlier [setup] is still running waits for that one instead of applying
+  /// its own [config].
   ///
   /// **Example:**
   /// ```dart
@@ -61,7 +72,14 @@ class Posthog {
   /// For Android and iOS, if you are performing a manual setup,
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
-  Future<void> setup(PostHogConfig config) {
+  Future<void> setup(PostHogConfig config) async {
+    final inFlight = _setupInFlight;
+    if (inFlight != null) {
+      // Joining, rather than taking the "already set up" branch below, is what
+      // keeps this caller from being told the SDK is set up by an attempt that
+      // is still free to fail and roll back.
+      return inFlight;
+    }
     // Mirrors the Android and iOS SDKs, which ignore a second setup; without
     // this guard the Dart layer would half-apply the new config while native
     // keeps the old one.
@@ -70,13 +88,13 @@ class Posthog {
         '[PostHog] setup() called, but the SDK is already set up. '
         'Call close() first to reconfigure. Setup skipped.',
       );
-      return Future<void>.value();
+      return;
     }
     if (config.projectToken.isEmpty) {
       debugPrint(
         '[PostHog] projectToken must not be blank. Setup skipped.',
       );
-      return Future<void>.value();
+      return;
     }
 
     _config = config; // Store the config
@@ -92,7 +110,37 @@ class Posthog {
 
     _installFlutterIntegrations(config);
 
-    return _posthog.setup(config);
+    final attempt = Completer<void>();
+    final attemptFuture = attempt.future;
+    _setupInFlight = attemptFuture;
+    try {
+      await _posthog.setup(config);
+    } catch (e) {
+      if (!identical(_setupInFlight, attemptFuture)) {
+        // The latch no longer holds this attempt, so a close() — and possibly a
+        // later setup() — landed while the platform call was in flight: this
+        // attempt no longer owns the state below and rolling it back would tear
+        // down whatever superseded it. Keyed on the latch rather than on
+        // _config, which a reconfigure is free to set back to this very same
+        // PostHogConfig instance.
+        debugPrint('[PostHog] a superseded setup failed: $e');
+        return;
+      }
+      // Clearing _config releases the already-set-up guard so the app can
+      // retry; capture and the error handlers must not outlive a setup that
+      // never completed. The error is not rethrown: neither native SDK reports
+      // a setup failure back to its caller, and this SDK never throws into the
+      // host app.
+      _config = null;
+      PostHogInternalEvents.sessionRecordingActive.value = false;
+      _uninstallFlutterIntegrations();
+      debugPrint('[PostHog] setup failed, the SDK is not set up: $e');
+    } finally {
+      if (identical(_setupInFlight, attemptFuture)) {
+        _setupInFlight = null;
+      }
+      attempt.complete();
+    }
   }
 
   void _installFlutterIntegrations(PostHogConfig config) {
@@ -378,18 +426,11 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when the reset request has been queued.
   Future<void> reset() async {
-    // Both platforms rotate the session here. Dropping the replay's per-session
-    // state now, rather than leaving it to the tick that observes the new id,
-    // also invalidates a Flutter frame still mid-send — which would otherwise
-    // land in the post-logout session with no meta event ahead of it.
-    //
-    // Bumped before the platform call because native rotates inside that round
-    // trip. That narrows the window rather than closing it: a capture tick that
-    // starts inside the round trip reads — and re-adopts — the pre-rotation id.
-    // Closing it fully needs native to push the session change back to Dart.
-    // The cost of bumping early is at most one redundant meta + full snapshot at
-    // the tail of the old recording, which beats a full snapshot with no meta at
-    // the head of the new one.
+    // Both platforms rotate the session here. Bumped before the platform call
+    // because native rotates inside that round trip. That narrows the window
+    // rather than closing it: a tick that starts inside the round trip re-reads
+    // the pre-rotation id, and closing it fully would need native to push the
+    // session change back to Dart.
     PostHogInternalEvents.requestReplaySessionReset();
     await _posthog.reset();
   }
@@ -869,8 +910,12 @@ class Posthog {
   /// the SDK is already set up, so call [close] first and then [setup] again
   /// with the new configuration.
   ///
-  /// The current session ends here, so session replay drops the state it keeps
-  /// per session — whatever is recorded next belongs to a new session.
+  /// Session replay drops the state it keeps per session, so the recording that
+  /// follows the next [setup] starts clean: its own meta event, and no frames
+  /// dropped as duplicates of the previous one. Whether the platform also
+  /// changes the *session* here depends on the native SDK and the version it
+  /// resolves to, so do not rely on a [close]/[setup] pair rotating the session
+  /// id.
   ///
   /// Returns a [Future] that completes when platform resources have been closed.
   ///
@@ -878,12 +923,17 @@ class Posthog {
   /// SDK is re-initialized and the next navigation event occurs.
   Future<void> close() {
     _config = null;
+    // A setup() still awaiting the platform is superseded here, so the setup()
+    // that follows this close() starts its own attempt instead of joining it.
+    _setupInFlight = null;
     _currentScreen = null;
     PostHogInternalEvents.sessionRecordingActive.value = false;
-    // After the line above stopped the capture path: both platforms end the
-    // session here, so the replay's per-session state (meta latch, dedup
-    // hashes, tracked session id) must not survive into whatever a later
-    // setup() starts, and a frame still mid-send belongs to the closed session.
+    // The replay integration is torn down and rebuilt across a close()/setup(),
+    // so the meta latch and dedup hashes must not survive into the recording
+    // that follows. Forced rather than keyed on observing a new session id,
+    // because the platforms disagree on whether close() rotates the session at
+    // all — the reset has to hold either way. Ordered after the line above,
+    // which stopped the capture path.
     PostHogInternalEvents.requestReplaySessionReset();
     PosthogObserver.clearCurrentContext();
 
@@ -915,13 +965,9 @@ class Posthog {
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     if (!resumeCurrent) {
       // Mirrors the `force` flag Android's PostHogReplayIntegration passes when
-      // a start does not resume: the recording that follows must send its own
-      // meta event instead of inheriting the previous session's latch. iOS has
-      // no such flag and gets there by rotating the session on this call;
-      // Android rotates only when recording is not already active, since
-      // `PostHog.startSessionReplay` returns early when it is. Bumped before the
-      // platform call because native rotates inside that round trip — see
-      // reset() for why that narrows the window without closing it.
+      // a start does not resume: the new recording must send its own meta event
+      // rather than inherit the previous session's latch, even where the
+      // platform keeps the same session id.
       PostHogInternalEvents.requestReplaySessionReset();
     }
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);

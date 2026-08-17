@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show VoidCallback, visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart' show Element, WidgetsBinding;
@@ -62,6 +62,11 @@ class _PlatformViewRects {
 
 class ScreenshotCapturer {
   final PostHogConfig _config;
+
+  /// Called when a capture tick reads a session id different from the one it
+  /// last tracked, i.e. the native SDK rotated the session behind Dart's back.
+  final VoidCallback? onSessionRotated;
+
   final ImageMaskPainter _imageMaskPainter = ImageMaskPainter();
   final _nativeCommunicator = NativeCommunicator();
   final _snapshotManager = SnapshotManager();
@@ -91,7 +96,7 @@ class ScreenshotCapturer {
   @visibleForTesting
   String? get debugReplaySessionId => _replaySessionId;
 
-  ScreenshotCapturer(this._config);
+  ScreenshotCapturer(this._config, {this.onSessionRotated});
 
   /// Resolves the live config at read time so masking flags never trail a
   /// close()/setup() reconfigure.
@@ -502,9 +507,15 @@ class ScreenshotCapturer {
       _snapshotManager.clear();
       return null;
     }
+    final previousSessionId = _replaySessionId;
     // Before the capture target reads the meta latch below: a rotated session
     // must not inherit the previous session's latch or dedup hashes.
     resetSessionStateIfNeeded(state.sessionId);
+    // Adopting an id for the first time (startup, or after a forced reset that
+    // already asked for a sample) is not a rotation.
+    if (previousSessionId != null && state.sessionId != previousSessionId) {
+      onSessionRotated?.call();
+    }
     return _captureScreenshot(state.sessionId);
   }
 

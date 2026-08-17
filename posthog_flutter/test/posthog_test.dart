@@ -1,14 +1,36 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter/src/posthog_flutter_io.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
+
+class _ThrowingSetupFake extends PosthogFlutterPlatformFake {
+  @override
+  Future<void> setup(PostHogConfig config) async {
+    throw StateError('native setup blew up');
+  }
+}
+
+/// Keeps the platform round trip of `setup` open until [gate] is completed, so a
+/// test can run close()/setup() while an attempt is still in flight.
+class _GatedSetupFake extends PosthogFlutterPlatformFake {
+  final gate = Completer<void>();
+  final receivedConfigs = <PostHogConfig>[];
+
+  @override
+  Future<void> setup(PostHogConfig config) async {
+    receivedConfigs.add(config);
+    await gate.future;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +80,216 @@ void main() {
         await Posthog().setup(second);
         expect(fakePlatformInterface.receivedConfig, same(second));
         expect(Posthog().config, same(second));
+      },
+    );
+
+    test(
+      'a failed setup rolls back and can be retried',
+      () async {
+        final originalFlutterErrorHandler = FlutterError.onError;
+        void sentinelHandler(FlutterErrorDetails _) {}
+        FlutterError.onError = sentinelHandler;
+
+        try {
+          PosthogFlutterPlatformInterface.instance = _ThrowingSetupFake();
+          final config = PostHogConfig('test_project_token')
+            ..sessionReplay = true
+            ..errorTrackingConfig.captureFlutterErrors = true;
+
+          // The SDK never throws into the host app, matching the native SDKs.
+          await Posthog().setup(config);
+
+          expect(Posthog().config, isNull);
+          expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
+          expect(FlutterError.onError, same(sentinelHandler));
+
+          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+          final retry = PostHogConfig('retry_token');
+          await Posthog().setup(retry);
+          expect(fakePlatformInterface.receivedConfig, same(retry));
+          expect(Posthog().config, same(retry));
+        } finally {
+          await Posthog().close();
+          FlutterError.onError = originalFlutterErrorHandler;
+        }
+      },
+    );
+
+    test(
+      'a native setup failure does not escape setup and rolls back',
+      () async {
+        const channel = MethodChannel('posthog_flutter');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'setup') {
+            throw PlatformException(code: 'ERROR', message: 'native boom');
+          }
+          return null;
+        });
+        PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
+
+        try {
+          await Posthog().setup(PostHogConfig('test_project_token'));
+          expect(Posthog().config, isNull);
+        } finally {
+          await Posthog().close();
+          messenger.setMockMethodCallHandler(channel, null);
+        }
+      },
+    );
+
+    test(
+      'a superseded setup failure leaves the current setup alone',
+      () async {
+        final originalFlutterErrorHandler = FlutterError.onError;
+        final gated = _GatedSetupFake();
+        PosthogFlutterPlatformInterface.instance = gated;
+
+        try {
+          final abandoned = PostHogConfig('abandoned_token')
+            ..sessionReplay = true
+            ..errorTrackingConfig.captureFlutterErrors = true;
+          final abandonedSetup = Posthog().setup(abandoned);
+
+          await Posthog().close();
+
+          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+          final current = PostHogConfig('current_token')
+            ..sessionReplay = true
+            ..errorTrackingConfig.captureFlutterErrors = true;
+          await Posthog().setup(current);
+          final installedHandler = FlutterError.onError;
+
+          gated.gate.completeError(StateError('native setup blew up'));
+          await abandonedSetup;
+
+          expect(Posthog().config, same(current));
+          expect(PostHogInternalEvents.sessionRecordingActive.value, isTrue);
+          expect(FlutterError.onError, same(installedHandler));
+        } finally {
+          await Posthog().close();
+          FlutterError.onError = originalFlutterErrorHandler;
+        }
+      },
+    );
+
+    test(
+      'a superseded setup failure leaves a reused config instance alone',
+      () async {
+        final originalFlutterErrorHandler = FlutterError.onError;
+        final gated = _GatedSetupFake();
+        PosthogFlutterPlatformInterface.instance = gated;
+
+        try {
+          // Reconfiguring by mutating and re-applying the same PostHogConfig is
+          // supported, so a superseded attempt cannot recognize itself by
+          // comparing its config against the live one.
+          final config = PostHogConfig('test_project_token')
+            ..sessionReplay = true
+            ..errorTrackingConfig.captureFlutterErrors = true;
+          final abandonedSetup = Posthog().setup(config);
+
+          await Posthog().close();
+
+          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+          await Posthog().setup(config);
+          final installedHandler = FlutterError.onError;
+
+          gated.gate.completeError(StateError('native setup blew up'));
+          await abandonedSetup;
+
+          expect(Posthog().config, same(config));
+          expect(PostHogInternalEvents.sessionRecordingActive.value, isTrue);
+          expect(FlutterError.onError, same(installedHandler));
+        } finally {
+          await Posthog().close();
+          FlutterError.onError = originalFlutterErrorHandler;
+        }
+      },
+    );
+
+    test(
+      'a superseded setup completing leaves the in-flight one joinable',
+      () async {
+        final superseded = _GatedSetupFake();
+        PosthogFlutterPlatformInterface.instance = superseded;
+
+        try {
+          final supersededSetup =
+              Posthog().setup(PostHogConfig('superseded_token'));
+          await Posthog().close();
+
+          final current = _GatedSetupFake();
+          PosthogFlutterPlatformInterface.instance = current;
+          final currentSetup = Posthog().setup(PostHogConfig('current_token'));
+
+          superseded.gate.complete();
+          await supersededSetup;
+
+          var joinerCompleted = false;
+          final joiner =
+              Posthog().setup(PostHogConfig('joiner_token')).then((_) {
+            joinerCompleted = true;
+          });
+          await pumpEventQueue();
+          expect(
+            joinerCompleted,
+            isFalse,
+            reason: 'a caller arriving while an attempt is in flight must join '
+                'it, not be told the SDK is already set up',
+          );
+
+          current.gate.completeError(StateError('native setup blew up'));
+          await currentSetup;
+          await joiner;
+
+          expect(Posthog().config, isNull);
+          expect(current.receivedConfigs, hasLength(1));
+        } finally {
+          await Posthog().close();
+        }
+      },
+    );
+
+    test(
+      'a setup racing an in-flight one joins it and observes its failure',
+      () async {
+        final gated = _GatedSetupFake();
+        PosthogFlutterPlatformInterface.instance = gated;
+
+        try {
+          final first = PostHogConfig('first_token');
+          final firstSetup = Posthog().setup(first);
+
+          var concurrentCompleted = false;
+          final concurrentSetup =
+              Posthog().setup(PostHogConfig('second_token')).then((_) {
+            concurrentCompleted = true;
+          });
+
+          await pumpEventQueue();
+          expect(
+            concurrentCompleted,
+            isFalse,
+            reason: 'the concurrent setup must wait for the in-flight attempt',
+          );
+
+          gated.gate.completeError(StateError('native setup blew up'));
+          await firstSetup;
+          await concurrentSetup;
+
+          expect(Posthog().config, isNull);
+          expect(gated.receivedConfigs, [same(first)]);
+
+          PosthogFlutterPlatformInterface.instance = fakePlatformInterface;
+          final retry = PostHogConfig('retry_token');
+          await Posthog().setup(retry);
+          expect(fakePlatformInterface.receivedConfig, same(retry));
+          expect(Posthog().config, same(retry));
+        } finally {
+          await Posthog().close();
+        }
       },
     );
 

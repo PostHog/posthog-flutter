@@ -31,7 +31,6 @@ import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
 import com.posthog.android.replay.PostHogInternalReplayApi
 import com.posthog.android.replay.PostHogReplayIntegration
-import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -441,14 +440,23 @@ class PosthogFlutterPlugin :
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
 
-    // Read on every Flutter capture tick, so it must not mutate session state:
-    // PostHog.getSessionId() runs the expiry checks and can rotate the session,
-    // peekSessionId() only reads it.
-    private fun getSessionReplayState(): Map<String, Any?> =
-        mapOf(
+    // Deliberately the expiring accessor: it applies the idle/max-duration
+    // checks that the `$snapshot` capture later in the same tick applies anyway
+    // (PostHog.capture resolves the session id the same way). Reading with
+    // PostHogSessionManager.peekSessionId() instead would hand Dart the
+    // pre-expiry id, so the frame that lands in the rotated session ships with
+    // no meta event ahead of it.
+    private fun getSessionReplayState(): Map<String, Any?> {
+        // Resolved before isActive is read: a rotation here notifies
+        // PostHogReplayIntegration.onSessionIdChanged(), which stops replay
+        // synchronously when event triggers are configured, so sampling isActive
+        // first would report a recording that this very call just ended.
+        val sessionId = PostHog.getSessionId()?.toString()
+        return mapOf(
             "isActive" to isSessionReplayActive(),
-            "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
+            "sessionId" to sessionId,
         )
+    }
 
     private fun startSessionRecording(
         call: MethodCall,
