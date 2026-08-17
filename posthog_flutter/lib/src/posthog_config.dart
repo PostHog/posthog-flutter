@@ -919,7 +919,8 @@ class PostHogErrorTrackingConfig {
   /// Requires Android 12 (API 31) or later. A native crash kills the process
   /// immediately, so the crash is captured on the next app launch from the
   /// records the OS kept, as an `$exception` event with raw native stack
-  /// frames. [captureNativeExceptions] must also be enabled.
+  /// frames. Exception autocapture must also be enabled in the project's
+  /// error tracking settings.
   ///
   /// For symbolicated stack traces, upload the app's `.so` debug symbols with
   /// the PostHog Gradle plugin.
