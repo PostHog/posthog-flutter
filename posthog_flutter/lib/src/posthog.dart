@@ -76,22 +76,25 @@ class Posthog {
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
   Future<void> setup(PostHogConfig config) async {
-    if (_config != null) {
-      // Native ignores a repeated setup silently — the channel call succeeds
-      // either way — so without this warning the split is invisible.
-      debugPrint(
-        '[PostHog] setup() called while already set up. The project token, '
-        'host, native session replay settings and the replay capture cadence '
-        'keep their current values — call close() first to change those. '
-        'Settings resolved from the live config, such as masking, follow this '
-        'config.',
-      );
-    }
     if (config.projectToken.isEmpty) {
       debugPrint(
         '[PostHog] projectToken must not be blank. Setup skipped.',
       );
       return;
+    }
+
+    final wasSetUp = _config != null;
+    if (wasSetUp) {
+      // Native ignores a repeated setup silently — the channel call succeeds
+      // either way — so without this warning the split is invisible.
+      debugPrint(
+        '[PostHog] setup() called while already set up. Settings resolved from '
+        'the live config, such as replay masking, follow this config. Anything '
+        'the native SDK owns does not — the project token, host and native '
+        'session replay settings keep their current values, as does the replay '
+        'capture cadence, and session replay cannot be turned off this way. '
+        'Call close() first to change those.',
+      );
     }
 
     _config = config; // Store the config
@@ -120,16 +123,24 @@ class Posthog {
         debugPrint('[PostHog] a superseded setup failed: $e');
         return;
       }
-      // Capture and the error handlers must not outlive a setup that never
-      // completed, and clearing _config lets the app retry from a clean state.
-      _config = null;
-      PostHogInternalEvents.sessionRecordingActive.value = false;
-      _uninstallFlutterIntegrations();
-      debugPrint('[PostHog] setup failed, the SDK is not set up: $e');
+      if (wasSetUp) {
+        // An earlier setup() established this state and native is still up on
+        // it, so tearing it down here would disable a working SDK.
+        debugPrint(
+          '[PostHog] a repeated setup failed, the SDK stays set up: $e',
+        );
+      } else {
+        // Capture and the error handlers must not outlive a setup that never
+        // completed, and clearing _config lets the app retry from a clean state.
+        _config = null;
+        PostHogInternalEvents.sessionRecordingActive.value = false;
+        _uninstallFlutterIntegrations();
+        debugPrint('[PostHog] setup failed, the SDK is not set up: $e');
+      }
       // Rethrown for exactly the failures that already reached the caller
-      // before the rollback existed. A PlatformException from the platform
-      // channel was logged and swallowed, so swallowing it here keeps that
-      // contract; anything else (notably MissingPluginException) propagated.
+      // before the rollback existed: a PlatformException was logged and
+      // swallowed, so swallowing it keeps that contract, and anything else
+      // (notably MissingPluginException) propagated.
       if (e is! PlatformException) {
         rethrow;
       }
@@ -916,9 +927,6 @@ class Posthog {
   /// SDK is re-initialized and the next navigation event occurs.
   Future<void> close() {
     _config = null;
-    // Supersedes a setup() still awaiting the platform, so if it fails it will
-    // not roll back the state this close() and any later setup() established.
-    _setupAttempt++;
     _currentScreen = null;
     PostHogInternalEvents.sessionRecordingActive.value = false;
     // Forced rather than keyed on observing a new session id, because the
