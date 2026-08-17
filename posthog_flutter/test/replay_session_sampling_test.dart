@@ -127,11 +127,11 @@ void main() {
     await unmountAndFlush(tester);
   });
 
-  testWidgets('frames carry the session they were captured under',
+  testWidgets('the channel call names the session the frame was captured under',
       (tester) async {
-    // Pre-attaching $session_id is what keeps a frame in its own session: native
-    // prefers a supplied id over resolving one at send time, so a rotation
-    // between capture and send cannot re-home the frame.
+    // Dart names it on both platforms; only Android pre-attaches it to
+    // $session_id, while iOS ignores it and resolves an id at send time. See
+    // NATIVE_BEHAVIOR.md.
     sessionReplayActive = true;
     PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
     await Posthog().setup(replayConfig());

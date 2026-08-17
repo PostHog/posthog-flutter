@@ -21,7 +21,7 @@ list to re-check when the resolved native version moves. Verified against
 | 5 | `close()` and the session id | **keeps** the id: `close()` clears `enabled` before its `endSession()`, which early-returns, and the following `setup()`'s `startSession()` returns early while an id exists | **clears** it: `close()` calls `sessionManager.endSession()` directly, bypassing the `enabled` gate |
 | 6 | `startSessionRecording(resumeCurrent: false)` | does **not** rotate while recording: `startSessionReplay` early-returns on `isActive()` | rotates via `getNextSessionId()` even while active |
 | 7 | The session accessor used per capture tick differs, and something must apply the expiry bounds on each platform | `PostHog.getSessionId()` — **expiring**; this read is what applies idle/max-duration, since the native replay loop is disabled for Flutter and the send now carries a pre-attached id | `getSessionId()` is hard-wired `readOnly: true`, so the **send** applies the bounds and a rotation is seen one tick late |
-| 8 | The idle clock is refreshed only by user touches and lifecycle transitions — **not** by `capture()` — and `touchSession()` checks only the idle bound, never max-duration. So on each platform exactly one thing applies both bounds (row 7), and removing it would let a replay-only session run unbounded | `touchSession()` is called only from `PostHogTouchActivityIntegration` (API ≥ 26) and `PostHogLifecycleObserverIntegration` | same shape, gated on `enableSwizzling` (default on) |
+| 8 | The idle clock is refreshed only by user touches and lifecycle transitions — **not** by `capture()` — and `touchSession()` checks only the idle bound, never max-duration. So on each platform at least one thing applies both bounds (row 7), and removing it would let a replay-only session run unbounded | `touchSession()` is called only from `PostHogTouchActivityIntegration` (API ≥ 26) and `PostHogLifecycleObserverIntegration` | touch half gated on `enableSwizzling` (default on) and iOS/tvOS only; the lifecycle half is unconditional |
 | 9 | Per-session replay state is reset on rotation | `resetSessionStateIfNeeded(id, force = !resumeCurrent)`, and `start()` force-invalidates decor views on a non-resuming start | `handleSessionChanged` |
 
 ## Consequences worth remembering
@@ -38,8 +38,9 @@ list to re-check when the resolved native version moves. Verified against
   correctly only if Dart names its session; the expiry bounds are applied only by
   an expiring read. Android can have both (expiring tick read + pre-attach).
   iOS can have either, not both, because its expiring accessor is `internal` — so
-  it keeps the bounds and accepts that a rotation is seen a tick late, which is
-  what the forced resets and the drop rule cover. **Making posthog-ios's expiring
+  it keeps the bounds and accepts that a rotation is seen a tick late, which
+  `onSessionRotated` repairs on the following tick — one bare frame can still land
+  in the new session ahead of its meta. **Making posthog-ios's expiring
   accessor public is what would let iOS do what posthog-ios's own replay
   integration already does.**
 - Ingestion routes by the supplied id: a `$snapshot` naming a session that

@@ -1144,10 +1144,7 @@ extension PosthogFlutterPlugin {
                     let snapshotData: [String: Any] = ["type": 2, "data": data, "timestamp": timestamp]
                     snapshotsData.append(snapshotData)
 
-                    // Deliberately not pre-attaching the session id Dart sends: iOS's only
-                    // public accessor is hard-wired readOnly: true, so an id from it would
-                    // stop capture() applying the idle and maximum-duration bounds and
-                    // leave the session unbounded. See NATIVE_BEHAVIOR.md.
+                    // Session id deliberately not pre-attached here either, as above.
                     PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
                 }
 

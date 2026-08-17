@@ -30,6 +30,7 @@ class NativeCommunicator {
     }
   }
 
+  /// [sessionId] as for [sendFullSnapshot].
   Future<void> sendMetaEvent({
     required int width,
     required int height,

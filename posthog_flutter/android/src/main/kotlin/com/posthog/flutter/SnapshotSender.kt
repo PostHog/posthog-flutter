@@ -2,6 +2,7 @@ package com.posthog.flutter
 
 import android.graphics.BitmapFactory
 import com.posthog.PostHog
+import com.posthog.PostHogEventName
 import com.posthog.android.internal.base64
 import com.posthog.internal.replay.RREvent
 import com.posthog.internal.replay.RRFullSnapshotEvent
@@ -18,7 +19,7 @@ class SnapshotSender(
         x: Int,
         y: Int,
         timestampMs: Long = currentTimeMillis(),
-        sessionId: String? = null,
+        sessionId: String?,
     ) {
         val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
         val base64String = bitmap.base64()
@@ -51,7 +52,7 @@ class SnapshotSender(
         height: Int,
         screen: String,
         timestampMs: Long = currentTimeMillis(),
-        sessionId: String? = null,
+        sessionId: String?,
     ) {
         val events = mutableListOf<RREvent>()
         events.add(buildMetaEvent(width, height, screen, timestampMs))
@@ -66,14 +67,22 @@ class SnapshotSender(
     private fun capture(
         events: List<RREvent>,
         sessionId: String?,
-    ) {
+    ) = PostHog.capture(
+        PostHogEventName.SNAPSHOT.event,
+        properties = buildSnapshotProperties(events, sessionId),
+    )
+
+    internal fun buildSnapshotProperties(
+        events: List<RREvent>,
+        sessionId: String?,
+    ): Map<String, Any> {
         val properties =
             mutableMapOf<String, Any>(
                 "\$snapshot_data" to events,
                 "\$snapshot_source" to "mobile",
             )
         sessionId?.takeIf { it.isNotBlank() }?.let { properties["\$session_id"] = it }
-        PostHog.capture("\$snapshot", properties = properties)
+        return properties
     }
 
     internal fun buildMetaEvent(
