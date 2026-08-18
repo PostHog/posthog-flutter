@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -342,6 +344,54 @@ void main() {
       expect(methods, isNot(contains('sendMetaEvent')));
 
       await unmountAndFlush(tester);
+    });
+
+    testWidgets(
+        'placeholder still ships when the first tick adopts a session id '
+        'mid-build', (tester) async {
+      // Until a tick has completed its state read the capturer tracks no
+      // session, so a placeholder built in that window names none either.
+      // Adopting an id for the first time is not a rotation, and treating it as
+      // one would drop the cover and leave the episode showing the uncovered
+      // Flutter tree.
+      final gate = Completer<void>();
+      var gated = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        recordedCalls.add(call);
+        switch (call.method) {
+          case 'getSessionReplayState':
+            if (!gated) {
+              gated = true;
+              await gate.future;
+            }
+            return {'isActive': true, 'sessionId': 'session-a'};
+          case 'enableNativeBridge':
+            return false;
+          default:
+            return null;
+        }
+      });
+
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await pumpReplayWidget(tester);
+      await settleRealAsync(tester);
+      expect(gated, isTrue,
+          reason: 'the first state read must still be parked, so nothing has '
+              'adopted a session id yet');
+
+      recordedCalls.clear();
+      pushOcclusion(occluded: true, episode: 1, bridgeFailed: true);
+      gate.complete();
+      await settleRealAsync(tester);
+      await settleRealAsync(tester);
+
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'the black cover must ship even though the tick adopted a '
+              'session id while it was being built');
+
+      await unmountAndFlush(tester);
+      mockChannel();
     });
 
     testWidgets('ignores occlusion when the bridge is off', (tester) async {

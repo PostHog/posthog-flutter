@@ -144,7 +144,14 @@ class ScreenshotCapturer {
   /// built — that path is not serialized against tick captures. It does not
   /// catch a rotation observed by the same tick that produced the frame: that
   /// tick writes the tracked id before building it.
-  bool sessionStillCurrent(String? sessionId) => _replaySessionId == sessionId;
+  ///
+  /// A frame naming no session is always current: it carries no attribution of
+  /// its own, so the send resolves whichever session is live and it cannot land
+  /// in a dead one. Without this, a placeholder built before the first tick had
+  /// read an id would be dropped by that tick adopting one, leaving the episode
+  /// showing the uncovered Flutter tree instead of the cover.
+  bool sessionStillCurrent(String? sessionId) =>
+      sessionId == null || _replaySessionId == sessionId;
 
   /// Called when an occlusion episode ends: invalidates the dedup hashes (else
   /// the first Flutter frame matches the placeholder/bridged hash and freezes
