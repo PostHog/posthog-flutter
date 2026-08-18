@@ -432,6 +432,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       );
     } catch (error) {
       printIfDebug('Exception in captureException: $error');
+      rethrow;
     }
   }
 

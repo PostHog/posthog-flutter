@@ -157,7 +157,7 @@ void main() {
   });
 
   group('PosthogFlutterWeb captureException', () {
-    test('handles native JavaScript failures from posthog-js', () async {
+    test('propagates native JavaScript failures from posthog-js', () async {
       final failWithJavaScriptError = globalContext.callMethod<JSFunction>(
         'eval'.toJS,
         '() => { throw new Error("capture failed"); }'.toJS,
@@ -170,7 +170,7 @@ void main() {
 
       await expectLater(
         PosthogFlutterWeb().captureException(error: StateError('boom')),
-        completes,
+        throwsA(anything),
       );
     });
   });
