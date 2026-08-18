@@ -194,6 +194,12 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // but its own frame can still be dropped (view not ready, capture error,
       // stale episode) — and on a static screen no further tick would run, so
       // the new session would never get its meta event.
+      //
+      // This fires from inside that tick's own capture, so the deferred sample
+      // runs one extra capture when the tick's frame did deliver. Deliberate:
+      // the alternative is to wait for the frame to be dropped and let the
+      // retries repair it a throttleDelay later, and rotations are rare enough
+      // that the wasted capture costs less than the added latency.
       onSessionRotated: _ensureSampleLands,
     );
     _nativeCommunicator = NativeCommunicator();
