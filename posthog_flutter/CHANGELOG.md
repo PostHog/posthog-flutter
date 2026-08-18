@@ -1,5 +1,30 @@
 ## Next
 
+## 5.36.4
+
+### Patch Changes
+
+- e07c8e7: Fix a session replay leak where masks could miss moving content. The mask rects are now computed in the same frame as the captured pixels, and a failed mask walk drops the frame instead of shipping an unmasked screenshot.
+
+## 5.36.3
+
+### Patch Changes
+
+- 26d457f: Draw survey close and check icons without requiring the Material Icons font.
+- cbb7b59: Show surveys above nested navigator shell chrome and dismiss them through the root navigator.
+
+## 5.36.2
+
+### Patch Changes
+
+- 57d9db3: Handle posthog-js errors raised while capturing exceptions on web.
+
+## 5.36.1
+
+### Patch Changes
+
+- 910de24: Limit CocoaPods source compilation to Swift files when packaging the Darwin plugin.
+
 ## 5.36.0
 
 ### Minor Changes

@@ -242,7 +242,11 @@ jobs:
 
       - name: Enable Swift Package Manager
         if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && (matrix.package_manager == 'spm') }}
-        run: flutter config --enable-swift-package-manager # flutter config --no-enable-swift-package-manager
+        run: flutter config --enable-swift-package-manager
+
+      - name: Disable Swift Package Manager
+        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && (matrix.package_manager == 'cocoapods') }}
+        run: flutter config --no-enable-swift-package-manager
 
       - name: Install dependencies
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'

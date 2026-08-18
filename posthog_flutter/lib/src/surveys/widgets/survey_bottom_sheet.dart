@@ -15,6 +15,7 @@ import 'open_text_question.dart';
 import 'rating_question.dart';
 import 'choice_question.dart';
 import 'confirmation_message.dart';
+import 'survey_icon.dart';
 
 /// A bottom sheet that displays a survey to the user.
 class SurveyBottomSheet extends StatefulWidget {
@@ -197,8 +198,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: Icon(
-                          Icons.close,
+                        icon: SurveyIcon(
+                          type: SurveyIconType.close,
                           color: widget.appearance.closeButtonColor,
                         ),
                         onPressed: () => _handleClose(),
