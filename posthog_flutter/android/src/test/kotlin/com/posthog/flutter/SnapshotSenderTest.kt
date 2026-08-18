@@ -1,6 +1,9 @@
 package com.posthog.flutter
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import com.posthog.PostHogEventName
+import org.mockito.Mockito
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -51,6 +54,31 @@ internal class SnapshotSenderTest {
 
         assertNull(sender.buildSnapshotProperties(events, null)["\$session_id"])
         assertNull(sender.buildSnapshotProperties(events, "   ")["\$session_id"])
+    }
+
+    @Test
+    fun sendFullSnapshot_capturesWithThePreAttachedSessionId() {
+        // The frame path matters more than the meta path: it is the one that
+        // ships on every tick, so a dropped id here re-homes whole recordings.
+        val captured = mutableListOf<Pair<String, Map<String, Any>>>()
+        val sender =
+            SnapshotSender(
+                currentTimeMillis = { 1L },
+                capture = { event, properties -> captured += event to properties },
+            )
+
+        Mockito.mockStatic(BitmapFactory::class.java).use { bitmapFactory ->
+            bitmapFactory
+                .`when`<Bitmap> {
+                    BitmapFactory.decodeByteArray(Mockito.any(), Mockito.anyInt(), Mockito.anyInt())
+                }.thenReturn(Mockito.mock(Bitmap::class.java))
+
+            sender.sendFullSnapshot(ByteArray(1), id = 1, x = 2, y = 3, sessionId = "session-a")
+        }
+
+        assertEquals(1, captured.size)
+        assertEquals(PostHogEventName.SNAPSHOT.event, captured[0].first)
+        assertEquals("session-a", captured[0].second["\$session_id"])
     }
 
     @Test

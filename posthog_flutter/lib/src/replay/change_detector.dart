@@ -73,7 +73,6 @@ class ChangeDetector {
   /// This prevents the [onChange] callback from being called.
   void stop() {
     _isRunning = false;
-    _forcedTicksLeft = 0;
     _timer?.cancel();
     _timer = null;
   }
@@ -87,6 +86,12 @@ class ChangeDetector {
   /// frame. Observed on iOS, where `reset()` clears the remote config and
   /// `isSessionReplayActive()` requires the session-replay flag, which only
   /// returns once the flags reload lands. (posthog-ios 3.69.0)
+  ///
+  /// The budget is deliberately independent of [start]/[stop]: only delivery
+  /// clears it. A `close()`/`setup()` pair arms it while the detector is
+  /// stopped, and the restart is exactly what has to spend it — clearing it in
+  /// [stop] would instead make the fix depend on the statement order inside
+  /// `Posthog.close()`.
   void forceNextTicks(int count) {
     _forcedTicksLeft = count;
   }

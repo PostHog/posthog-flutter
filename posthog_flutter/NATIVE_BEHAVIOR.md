@@ -11,8 +11,16 @@ test in this repository, and both dependencies are floating ranges:
   consumers resolve through this one, not `Package.swift`)
 
 So a native patch release can silently falsify any row below. This file is the
-list to re-check when the resolved native version moves. Verified against
-**posthog-android 3.58.0** and **posthog-ios 3.69.0**.
+list to re-check when the resolved native version moves.
+
+Every row below was verified against **posthog-android 3.58.0** (the range floor)
+and re-checked at **posthog-android 3.59.0**, which is what the range resolves to
+at the time of writing — `PostHogSessionManager.kt` is byte-identical between the
+two, and the `PostHog.kt` delta touches only opt-in and error-tracking code. iOS
+is **posthog-ios 3.69.0**, the version the example app's `Package.resolved` pins.
+
+To re-resolve Android after a native release:
+`cd example/android && ./gradlew :posthog_flutter:dependencies --configuration debugRuntimeClasspath | grep posthog-android`.
 
 | # | Assumption | Android | iOS |
 |---|---|---|---|
@@ -25,6 +33,7 @@ list to re-check when the resolved native version moves. Verified against
 | 7 | The session accessor used per capture tick differs, and something must apply the expiry bounds on each platform | `PostHog.getSessionId()` — **expiring**; this read is what applies idle/max-duration to Flutter frames, since the send now carries a pre-attached id. Only the native *screenshot* loop is disabled for Flutter (`isNativeSdk`); the touch interceptor still emits `$snapshot` mouse interactions through `RRUtils.capture()`, which pre-attaches nothing and so resolves an expiring id at send | `getSessionId()` is hard-wired `readOnly: true`, so the **send** applies the bounds and a rotation is seen one tick late |
 | 8 | The idle clock is refreshed only by user touches and lifecycle transitions — **not** by `capture()` — and `touchSession()` checks only the idle bound, never max-duration. So on each platform at least one thing applies both bounds (row 7), and removing it would let a replay-only session run unbounded | `touchSession()` is called only from `PostHogTouchActivityIntegration` (API ≥ 26) and `PostHogLifecycleObserverIntegration` | touch half gated on `enableSwizzling` (default on) and iOS/tvOS only; the lifecycle half is unconditional |
 | 9 | Per-session replay state is reset on rotation | `resetSessionStateIfNeeded(id, force = !resumeCurrent)`, and `start()` force-invalidates decor views on a non-resuming start | `handleSessionChanged` |
+| 10 | The per-tick state read can report `isActive: true` alongside a **null** session id | `getActiveSessionId()` **clears** rather than rotates when the app is backgrounded at expiry (`clearLocked()`) | `getSessionId()` returns nil only when no session exists at all |
 
 ## Consequences worth remembering
 
@@ -45,6 +54,12 @@ list to re-check when the resolved native version moves. Verified against
   in the new session ahead of its meta. **Making posthog-ios's expiring
   accessor public is what would let iOS do what posthog-ios's own replay
   integration already does.**
+- Row 10 means Dart can see a null id from a state read it treated as live. It
+  handles it as a rotation — per-session state is reset and a follow-up sample is
+  asked for — and the frame ships with no id, so the send resolves one, which is
+  the pre-existing behaviour. Reaching it needs a capture tick to run while the
+  app is backgrounded, and Flutter schedules no frames there, so it is listed to
+  keep it from going silent if the tick source ever changes.
 - The occlusion placeholder reads the *tracked* session id rather than polling,
   so on a static screen it can be stale. There the platforms swap roles: Android
   pre-attaches the dead id and the placeholder appends to the ended recording,

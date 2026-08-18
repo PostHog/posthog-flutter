@@ -205,6 +205,49 @@ void main() {
   });
 
   testWidgets(
+      'close()/setup() still captures the restarted recording when the '
+      'platform reports replay inactive for the first sample', (tester) async {
+    // The same shape as the reset() case above, reached through the reconfigure
+    // entry point. What makes it distinct: close() stops the detector, so the
+    // retry budget the forced reset arms has to survive a stop()/start() pair.
+    // Without that, the only cover left is start()'s single immediate sample —
+    // which is spent here while the platform is still bringing replay back up,
+    // and a static screen produces nothing afterwards.
+    await deliverFirstFrame(tester);
+
+    var inactiveReadsLeft = 0;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      recordedCalls.add(call);
+      if (call.method == 'getSessionReplayState') {
+        if (inactiveReadsLeft > 0) {
+          inactiveReadsLeft--;
+          return {'isActive': false, 'sessionId': null};
+        }
+        return {'isActive': true, 'sessionId': 'session-b'};
+      }
+      return null;
+    });
+
+    await Posthog().close();
+    inactiveReadsLeft = 1;
+    await Posthog().setup(replayConfig());
+    await tickStatic(tester);
+    await tickStatic(tester, until: () => sent('sendFullSnapshot'));
+
+    final methods = methodsOf(recordedCalls);
+    expect(methods, contains('sendMetaEvent'),
+        reason: 'the recording setup() started has no meta of its own yet');
+    expect(methods, contains('sendFullSnapshot'),
+        reason:
+            'a retry must cover the sample spent while replay was inactive');
+    expect(methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')));
+
+    await unmountAndFlush(tester);
+    mockChannel();
+  });
+
+  testWidgets(
       'a reset landing mid-capture still captures the new session on a static '
       'screen', (tester) async {
     // The frame in flight was tagged with the old session, so it is dropped

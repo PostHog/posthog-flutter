@@ -860,8 +860,7 @@ class Posthog {
     PostHogInternalEvents.sessionRecordingActive.value = false;
     // Forced rather than keyed on observing a new session id, because the
     // platforms disagree on whether close() rotates the session at all — the
-    // recording that follows must start clean either way. Ordered after the
-    // line above, which stopped the capture path.
+    // recording that follows must start clean either way.
     PostHogInternalEvents.requestReplaySessionReset();
     PosthogObserver.clearCurrentContext();
 
