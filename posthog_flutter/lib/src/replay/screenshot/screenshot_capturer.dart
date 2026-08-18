@@ -455,16 +455,8 @@ class ScreenshotCapturer {
       );
 
       final replayConfig = effectiveConfig.sessionReplayConfig;
-
-      final postHogWidgetWrapperElements =
-          PostHogMaskController.instance.getPostHogWidgetWrapperElements();
-
-      // call getCurrentScreenRects if really necessary
-      List<ElementData>? elementsDataWidgets;
-      if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
-        elementsDataWidgets =
-            PostHogMaskController.instance.getCurrentWidgetsElements();
-      }
+      final maskAllContent =
+          replayConfig.maskAllTexts || replayConfig.maskAllImages;
 
       ui.Image? image;
       ui.PictureRecorder? recorder;
@@ -486,6 +478,24 @@ class ScreenshotCapturer {
 
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
+
+        // Walk the tree for mask rects here, with no await before toImage(),
+        // so the rects and the pixels come from the same frame. A walk done
+        // before the async body freezes frame N's positions and paints them
+        // onto frame N+k, which leaks content when the UI moves.
+        final maskElements = PostHogMaskController.instance.getMaskElements(
+          includeAllWidgets: maskAllContent,
+        );
+        // Fail closed: a failed walk must drop the frame, never ship an
+        // unmasked screenshot.
+        if (maskElements == null) {
+          printIfDebug(
+            'The widget mask walk failed, dropping the frame.',
+          );
+          completer.complete(null);
+          return;
+        }
+
         image = await renderObject.toImage(pixelRatio: pixelRatio);
 
         final currentImage = image;
@@ -577,23 +587,12 @@ class ScreenshotCapturer {
           return;
         }
 
-        if (replayConfig.maskAllTexts || replayConfig.maskAllImages) {
-          if (elementsDataWidgets != null && elementsDataWidgets.isNotEmpty) {
-            _imageMaskPainter.drawMaskedImage(
-              canvas,
-              elementsDataWidgets,
-              pixelRatio,
-            );
-          }
-        } else {
-          if (postHogWidgetWrapperElements != null &&
-              postHogWidgetWrapperElements.isNotEmpty) {
-            _imageMaskPainter.drawMaskedImage(
-              canvas,
-              postHogWidgetWrapperElements,
-              pixelRatio,
-            );
-          }
+        if (maskElements.isNotEmpty) {
+          _imageMaskPainter.drawMaskedImage(
+            canvas,
+            maskElements,
+            pixelRatio,
+          );
         }
 
         if (pvRects.masked.isNotEmpty) {
