@@ -483,22 +483,17 @@ class ScreenshotCapturer {
         // so the rects and the pixels come from the same frame. A walk done
         // before the async body freezes frame N's positions and paints them
         // onto frame N+k, which leaks content when the UI moves.
-        final postHogWidgetWrapperElements =
-            PostHogMaskController.instance.getPostHogWidgetWrapperElements();
-
-        List<ElementData>? elementsDataWidgets;
-        if (maskAllContent) {
-          elementsDataWidgets =
-              PostHogMaskController.instance.getCurrentWidgetsElements();
-          // Fail closed: a failed walk must drop the frame, never ship an
-          // unmasked screenshot.
-          if (elementsDataWidgets == null) {
-            printIfDebug(
-              'Masking is enabled but the widget walk failed, dropping the frame.',
-            );
-            completer.complete(null);
-            return;
-          }
+        final maskElements = PostHogMaskController.instance.getMaskElements(
+          includeAllWidgets: maskAllContent,
+        );
+        // Fail closed: a failed walk must drop the frame, never ship an
+        // unmasked screenshot.
+        if (maskElements == null) {
+          printIfDebug(
+            'The widget mask walk failed, dropping the frame.',
+          );
+          completer.complete(null);
+          return;
         }
 
         image = await renderObject.toImage(pixelRatio: pixelRatio);
@@ -592,23 +587,12 @@ class ScreenshotCapturer {
           return;
         }
 
-        if (maskAllContent) {
-          if (elementsDataWidgets != null && elementsDataWidgets.isNotEmpty) {
-            _imageMaskPainter.drawMaskedImage(
-              canvas,
-              elementsDataWidgets,
-              pixelRatio,
-            );
-          }
-        } else {
-          if (postHogWidgetWrapperElements != null &&
-              postHogWidgetWrapperElements.isNotEmpty) {
-            _imageMaskPainter.drawMaskedImage(
-              canvas,
-              postHogWidgetWrapperElements,
-              pixelRatio,
-            );
-          }
+        if (maskElements.isNotEmpty) {
+          _imageMaskPainter.drawMaskedImage(
+            canvas,
+            maskElements,
+            pixelRatio,
+          );
         }
 
         if (pvRects.masked.isNotEmpty) {
