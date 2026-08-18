@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../util/logging.dart';
@@ -19,7 +21,10 @@ class SurveyService {
   SurveyService._internal();
 
   bool _isShowingSurvey = false;
-  BuildContext? _currentSurveyContext;
+  bool _isDismissingSurvey = false;
+  bool _dismissSurveyWhenReady = false;
+  Route<dynamic>? _currentSurveyRoute;
+  Completer<void>? _programmaticDismissal;
 
   /// Shows a survey using the PosthogObserver context
   Future<void> showSurvey(
@@ -60,23 +65,50 @@ class SurveyService {
     BuildContext context,
   ) async {
     _isShowingSurvey = true;
-    _currentSurveyContext = context;
+    final programmaticDismissal = Completer<void>();
+    _programmaticDismissal = programmaticDismissal;
     try {
-      await showModalBottomSheet(
+      final modalDismissal = showModalBottomSheet<void>(
         context: context,
+        useRootNavigator: true,
         isScrollControlled: true,
         isDismissible: false,
-        builder: (context) =>
-            _buildSurveyWidget(survey, onShown, onResponse, (s) {
-          _isShowingSurvey = false;
-          _currentSurveyContext = null;
-          onClosed(s);
-        }),
+        builder: (context) {
+          final route = ModalRoute.of(context);
+          if (_programmaticDismissal == programmaticDismissal &&
+              !_isDismissingSurvey) {
+            _currentSurveyRoute = route;
+            if (_dismissSurveyWhenReady && route != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_currentSurveyRoute == route &&
+                    _programmaticDismissal == programmaticDismissal) {
+                  _dismissSurveyRoute(route, programmaticDismissal);
+                }
+              });
+            }
+          }
+          return _buildSurveyWidget(survey, onShown, onResponse, (survey) {
+            if (_programmaticDismissal != programmaticDismissal) {
+              return;
+            }
+            _isDismissingSurvey = true;
+            _currentSurveyRoute = null;
+            onClosed(survey);
+          });
+        },
       );
+      // removeRoute did not complete a route's future before Flutter 3.32.
+      await Future.any([modalDismissal, programmaticDismissal.future]);
     } catch (e) {
       printIfDebug('[PostHog] Error showing survey: $e');
-      _isShowingSurvey = false;
-      _currentSurveyContext = null;
+    } finally {
+      if (_programmaticDismissal == programmaticDismissal) {
+        _isShowingSurvey = false;
+        _isDismissingSurvey = false;
+        _dismissSurveyWhenReady = false;
+        _currentSurveyRoute = null;
+        _programmaticDismissal = null;
+      }
     }
   }
 
@@ -96,14 +128,34 @@ class SurveyService {
     );
   }
 
+  void _dismissSurveyRoute(
+    Route<dynamic> route,
+    Completer<void> programmaticDismissal,
+  ) {
+    if (_isDismissingSurvey ||
+        _currentSurveyRoute != route ||
+        _programmaticDismissal != programmaticDismissal) {
+      return;
+    }
+
+    _isDismissingSurvey = true;
+    _dismissSurveyWhenReady = false;
+    _currentSurveyRoute = null;
+    programmaticDismissal.complete();
+    route.navigator?.removeRoute(route);
+  }
+
   /// Hides any active survey
   void hideSurvey() {
-    final context = _currentSurveyContext;
-    if (_isShowingSurvey && context != null) {
-      // Use the stored context to properly dismiss the bottom sheet
-      Navigator.of(context).pop();
-      _currentSurveyContext = null;
+    if (!_isShowingSurvey || _isDismissingSurvey) {
+      return;
     }
-    _isShowingSurvey = false;
+
+    final route = _currentSurveyRoute;
+    if (route == null) {
+      _dismissSurveyWhenReady = true;
+      return;
+    }
+    _dismissSurveyRoute(route, _programmaticDismissal!);
   }
 }
