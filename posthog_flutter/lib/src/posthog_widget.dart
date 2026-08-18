@@ -205,10 +205,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _nativeCommunicator = NativeCommunicator();
     _changeDetector = ChangeDetector(
       _onChangeDetected,
-      // Read live so a close()/setup() reconfigure (even one mutating the
-      // same config instance) takes effect on the restart it triggers, without
-      // rebuilding the detector.
-      intervalOf: () => Posthog().config?.sessionReplayConfig.throttleDelay,
+      interval: config.sessionReplayConfig.throttleDelay,
     )..suppressForcedFrames = _suppressFlutterCapture;
   }
 
@@ -315,7 +312,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
         width: imageInfo.width,
         height: imageInfo.height,
         screen: Posthog().currentScreen,
-        sessionId: imageInfo.sessionId,
       );
       if (_disposed || !isStillValid()) {
         return false;
@@ -327,7 +323,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
       id: imageInfo.id,
       x: imageInfo.x,
       y: imageInfo.y,
-      sessionId: imageInfo.sessionId,
     );
     // Also guards the commit below: a validity flip means a boundary handler
     // already re-armed, and committing now would clobber it.

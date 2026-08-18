@@ -127,31 +127,6 @@ void main() {
     await unmountAndFlush(tester);
   });
 
-  testWidgets('the channel call names the session the frame was captured under',
-      (tester) async {
-    // Dart names it on both platforms; only Android pre-attaches it to
-    // $session_id, while iOS ignores it and resolves an id at send time. See
-    // NATIVE_BEHAVIOR.md.
-    sessionReplayActive = true;
-    PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
-    await Posthog().setup(replayConfig());
-    await tester.pumpWidget(
-      PostHogWidget(child: Container(color: const Color(0xFF00FF00))),
-    );
-    await settleUntil(tester, () => sent('sendFullSnapshot'));
-
-    final sends = recordedCalls.where(
-      (c) => c.method == 'sendMetaEvent' || c.method == 'sendFullSnapshot',
-    );
-    expect(sends, isNotEmpty);
-    for (final call in sends) {
-      expect((call.arguments as Map)['sessionId'], 'session-a',
-          reason: '${call.method} must name the session it was captured under');
-    }
-
-    await unmountAndFlush(tester);
-  });
-
   testWidgets('reset() captures the new session on a static screen',
       (tester) async {
     await deliverFirstFrame(tester);

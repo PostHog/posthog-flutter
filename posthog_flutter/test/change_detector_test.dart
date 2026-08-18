@@ -7,7 +7,7 @@ void main() {
   group('ChangeDetector forced frames', () {
     testWidgets('forces a frame for captured platform views', (tester) async {
       final detector =
-          ChangeDetector(() {}, intervalOf: () => const Duration(seconds: 1));
+          ChangeDetector(() {}, interval: const Duration(seconds: 1));
       detector.hasCapturedPlatformViews = true;
 
       detector.start();
@@ -23,7 +23,7 @@ void main() {
       // During a native occlusion episode the Flutter capture is discarded,
       // so forcing the hidden tree to re-render every tick is pure cost.
       final detector =
-          ChangeDetector(() {}, intervalOf: () => const Duration(seconds: 1));
+          ChangeDetector(() {}, interval: const Duration(seconds: 1));
       detector.hasCapturedPlatformViews = true;
       detector.suppressForcedFrames = true;
 
@@ -46,7 +46,7 @@ void main() {
     testWidgets('forces only the first frame without captured platform views',
         (tester) async {
       final detector =
-          ChangeDetector(() {}, intervalOf: () => const Duration(seconds: 1));
+          ChangeDetector(() {}, interval: const Duration(seconds: 1));
 
       detector.start();
       expect(tester.binding.hasScheduledFrame, isTrue,
@@ -65,59 +65,12 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('resolves the interval once per start()', (tester) async {
-      // The detector is stopped and restarted around every reconfigure, so the
-      // cadence only has to follow a stop/start — not every tick.
-      var interval = const Duration(seconds: 1);
-      final detector = ChangeDetector(() {}, intervalOf: () => interval)
-        ..hasCapturedPlatformViews = true;
-
-      detector.start();
-      await tester.pump();
-
-      interval = const Duration(milliseconds: 250);
-      await tester.binding.delayed(const Duration(milliseconds: 999));
-      expect(tester.binding.hasScheduledFrame, isFalse,
-          reason: 'a running detector keeps the interval it started with');
-      await tester.binding.delayed(const Duration(milliseconds: 1));
-      expect(tester.binding.hasScheduledFrame, isTrue);
-      await tester.pump();
-
-      detector.stop();
-      detector.start();
-      await tester.pump();
-
-      await tester.binding.delayed(const Duration(milliseconds: 249));
-      expect(tester.binding.hasScheduledFrame, isFalse);
-      await tester.binding.delayed(const Duration(milliseconds: 1));
-      expect(tester.binding.hasScheduledFrame, isTrue,
-          reason: 'the restart reads the new interval');
-
-      detector.stop();
-      await tester.pump();
-    });
-
-    testWidgets('does not start without an interval', (tester) async {
-      // No interval means the SDK is not set up, so there is nothing to poll.
-      var ticks = 0;
-      final detector = ChangeDetector(() => ticks++, intervalOf: () => null)
-        ..hasCapturedPlatformViews = true;
-
-      detector.start();
-      expect(detector.isRunning, isFalse);
-      expect(tester.binding.hasScheduledFrame, isFalse);
-
-      await tester.pump();
-      await tester.binding.delayed(const Duration(seconds: 2));
-      expect(ticks, 0);
-    });
-
     testWidgets('forceNextTicks forces exactly the ticks it was given',
         (tester) async {
       // Without captured platform views nothing else forces a frame, so the
       // budget is the only thing keeping a static screen sampled.
       final detector =
-          ChangeDetector(() {}, intervalOf: () => const Duration(seconds: 1));
+          ChangeDetector(() {}, interval: const Duration(seconds: 1));
 
       detector.start();
       await tester.pump();
@@ -142,7 +95,7 @@ void main() {
     testWidgets('cancelForcedTicks drops the rest of the budget',
         (tester) async {
       final detector =
-          ChangeDetector(() {}, intervalOf: () => const Duration(seconds: 1));
+          ChangeDetector(() {}, interval: const Duration(seconds: 1));
 
       detector.start();
       await tester.pump();
@@ -164,7 +117,7 @@ void main() {
       // setup() that follows is exactly what has to spend it: its own immediate
       // sample can be spent while the platform is briefly not recording.
       final detector =
-          ChangeDetector(() {}, intervalOf: () => const Duration(seconds: 1));
+          ChangeDetector(() {}, interval: const Duration(seconds: 1));
 
       detector.start();
       await tester.pump();
@@ -192,7 +145,7 @@ void main() {
           ticks++;
           throw StateError('capture blew up');
         },
-        intervalOf: () => const Duration(seconds: 1),
+        interval: const Duration(seconds: 1),
       )..hasCapturedPlatformViews = true;
 
       detector.start();

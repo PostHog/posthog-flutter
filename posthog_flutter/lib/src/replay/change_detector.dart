@@ -13,7 +13,7 @@ import 'package:flutter/widgets.dart';
 /// final changeDetector = ChangeDetector(() {
 ///   // Code to execute when a UI change is detected.
 ///   print('UI has updated.');
-/// }, intervalOf: () => const Duration(seconds: 1));
+/// });
 ///
 /// changeDetector.start();
 /// ```
@@ -22,11 +22,7 @@ import 'package:flutter/widgets.dart';
 /// the operations performed are efficient to avoid impacting app performance.
 class ChangeDetector {
   final VoidCallback onChange;
-
-  /// Resolved once per [start]. The detector is stopped and restarted around
-  /// every reconfigure, so reading it there is enough for a new throttleDelay
-  /// to take effect; null means there is no config to poll for.
-  final Duration? Function() intervalOf;
+  final Duration interval;
 
   bool _isRunning = false;
   Timer? _timer;
@@ -42,7 +38,9 @@ class ChangeDetector {
   bool get isRunning => _isRunning;
 
   /// Creates a [ChangeDetector] with the given [onChange] callback.
-  ChangeDetector(this.onChange, {required this.intervalOf});
+  ///
+  /// [interval] controls how often to check for changes.
+  ChangeDetector(this.onChange, {this.interval = const Duration(seconds: 1)});
 
   /// Starts the change detection process.
   ///
@@ -52,11 +50,6 @@ class ChangeDetector {
     if (_isRunning) {
       return;
     }
-    final interval = intervalOf();
-    if (interval == null) {
-      return;
-    }
-
     _isRunning = true;
     requestImmediateSample();
     _timer = Timer.periodic(interval, (_) {

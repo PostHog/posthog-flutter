@@ -1,19 +1,16 @@
 package com.posthog.flutter
 
 import android.graphics.BitmapFactory
-import com.posthog.PostHog
-import com.posthog.PostHogEventName
 import com.posthog.android.internal.base64
 import com.posthog.internal.replay.RREvent
 import com.posthog.internal.replay.RRFullSnapshotEvent
 import com.posthog.internal.replay.RRMetaEvent
 import com.posthog.internal.replay.RRStyle
 import com.posthog.internal.replay.RRWireframe
+import com.posthog.internal.replay.capture
 
 class SnapshotSender(
     private val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
-    private val capture: (String, Map<String, Any>) -> Unit =
-        { event, properties -> PostHog.capture(event, properties = properties) },
 ) {
     fun sendFullSnapshot(
         imageBytes: ByteArray,
@@ -21,7 +18,6 @@ class SnapshotSender(
         x: Int,
         y: Int,
         timestampMs: Long = currentTimeMillis(),
-        sessionId: String?,
     ) {
         val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
         val base64String = bitmap.base64()
@@ -46,7 +42,7 @@ class SnapshotSender(
                 timestamp = timestampMs,
             )
 
-        captureSnapshot(listOf(snapshotEvent), sessionId)
+        listOf(snapshotEvent).capture()
     }
 
     fun sendMetaEvent(
@@ -54,37 +50,11 @@ class SnapshotSender(
         height: Int,
         screen: String,
         timestampMs: Long = currentTimeMillis(),
-        sessionId: String?,
     ) {
         val events = mutableListOf<RREvent>()
         events.add(buildMetaEvent(width, height, screen, timestampMs))
 
-        captureSnapshot(events, sessionId)
-    }
-
-    // Not RRUtils' List<RREvent>.capture(): that helper cannot carry extra
-    // properties, and pre-attaching the session id is what keeps a frame in the
-    // session it was captured under — PostHog.capture prefers a supplied
-    // $session_id over resolving one itself. See NATIVE_BEHAVIOR.md.
-    private fun captureSnapshot(
-        events: List<RREvent>,
-        sessionId: String?,
-    ) = capture(
-        PostHogEventName.SNAPSHOT.event,
-        buildSnapshotProperties(events, sessionId),
-    )
-
-    internal fun buildSnapshotProperties(
-        events: List<RREvent>,
-        sessionId: String?,
-    ): Map<String, Any> {
-        val properties =
-            mutableMapOf<String, Any>(
-                "\$snapshot_data" to events,
-                "\$snapshot_source" to "mobile",
-            )
-        sessionId?.takeIf { it.isNotBlank() }?.let { properties["\$session_id"] = it }
-        return properties
+        events.capture()
     }
 
     internal fun buildMetaEvent(

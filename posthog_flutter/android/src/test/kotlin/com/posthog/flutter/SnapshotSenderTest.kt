@@ -1,12 +1,7 @@
 package com.posthog.flutter
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import com.posthog.PostHogEventName
-import org.mockito.Mockito
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 internal class SnapshotSenderTest {
     @Test
@@ -29,71 +24,5 @@ internal class SnapshotSenderTest {
         val metaEvent = sender.buildMetaEvent(width = 1, height = 2, screen = "s", timestampMs = 99L)
 
         assertEquals(99L, metaEvent.timestamp)
-    }
-
-    @Test
-    fun buildSnapshotProperties_attachesTheSessionId() {
-        // PostHog.capture prefers a supplied id over resolving one itself, which is
-        // what keeps the frame in the session it was captured under.
-        val sender = SnapshotSender()
-        val events = listOf(sender.buildMetaEvent(width = 1, height = 2, screen = "Home"))
-
-        val properties = sender.buildSnapshotProperties(events, "session-a")
-
-        assertEquals("session-a", properties["\$session_id"])
-        assertEquals("mobile", properties["\$snapshot_source"])
-        assertEquals(events, properties["\$snapshot_data"])
-    }
-
-    @Test
-    fun buildSnapshotProperties_omitsABlankSessionId() {
-        // Omitted rather than sent blank, so this does not lean on native's own
-        // isNotBlank fallback (PostHog.kt:680 at android-v3.58.0).
-        val sender = SnapshotSender()
-        val events = listOf(sender.buildMetaEvent(width = 1, height = 2, screen = "Home"))
-
-        assertNull(sender.buildSnapshotProperties(events, null)["\$session_id"])
-        assertNull(sender.buildSnapshotProperties(events, "   ")["\$session_id"])
-    }
-
-    @Test
-    fun sendFullSnapshot_capturesWithThePreAttachedSessionId() {
-        // The frame path matters more than the meta path: it is the one that
-        // ships on every tick, so a dropped id here re-homes whole recordings.
-        val captured = mutableListOf<Pair<String, Map<String, Any>>>()
-        val sender =
-            SnapshotSender(
-                currentTimeMillis = { 1L },
-                capture = { event, properties -> captured += event to properties },
-            )
-
-        Mockito.mockStatic(BitmapFactory::class.java).use { bitmapFactory ->
-            bitmapFactory
-                .`when`<Bitmap> {
-                    BitmapFactory.decodeByteArray(Mockito.any(), Mockito.anyInt(), Mockito.anyInt())
-                }.thenReturn(Mockito.mock(Bitmap::class.java))
-
-            sender.sendFullSnapshot(ByteArray(1), id = 1, x = 2, y = 3, sessionId = "session-a")
-        }
-
-        assertEquals(1, captured.size)
-        assertEquals(PostHogEventName.SNAPSHOT.event, captured[0].first)
-        assertEquals("session-a", captured[0].second["\$session_id"])
-    }
-
-    @Test
-    fun sendMetaEvent_capturesWithThePreAttachedSessionId() {
-        val captured = mutableListOf<Pair<String, Map<String, Any>>>()
-        val sender =
-            SnapshotSender(
-                currentTimeMillis = { 1L },
-                capture = { event, properties -> captured += event to properties },
-            )
-
-        sender.sendMetaEvent(width = 1, height = 2, screen = "Home", sessionId = "session-a")
-
-        assertEquals(1, captured.size)
-        assertEquals(PostHogEventName.SNAPSHOT.event, captured[0].first)
-        assertEquals("session-a", captured[0].second["\$session_id"])
     }
 }

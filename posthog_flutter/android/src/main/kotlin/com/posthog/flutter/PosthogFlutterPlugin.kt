@@ -31,6 +31,7 @@ import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
 import com.posthog.android.replay.PostHogInternalReplayApi
 import com.posthog.android.replay.PostHogReplayIntegration
+import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -440,31 +441,15 @@ class PosthogFlutterPlugin :
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
 
-    // Deliberately the expiring accessor, which is what applies the idle and
-    // maximum-duration bounds: nothing else in a Flutter replay tick does, since
-    // the native replay loop is disabled for this SDK and capture() now receives
-    // a pre-attached id. peekSessionId() would leave a session unbounded.
+    // peekSessionId(), not getSessionId(): Dart only needs to observe whether the
+    // session moved. The expiring accessor would rotate the session from this
+    // read, moving where the idle and maximum-duration bounds are applied. The
+    // send still resolves an expiring id, exactly as before. See NATIVE_BEHAVIOR.md.
     private fun getSessionReplayState(): Map<String, Any?> =
-        buildSessionReplayState(
-            readSessionId = { PostHog.getSessionId()?.toString() },
-            readIsActive = { isSessionReplayActive() },
+        mapOf(
+            "isActive" to isSessionReplayActive(),
+            "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
         )
-
-    // Split out so the read order is covered by a test. Resolving the session id
-    // can rotate it, which notifies PostHogReplayIntegration.onSessionIdChanged()
-    // and stops replay synchronously when event triggers are configured — so
-    // sampling isActive first would report a recording this very call just ended.
-    // (posthog-android 3.58.0)
-    internal fun buildSessionReplayState(
-        readSessionId: () -> String?,
-        readIsActive: () -> Boolean,
-    ): Map<String, Any?> {
-        val sessionId = readSessionId()
-        return mapOf(
-            "isActive" to readIsActive(),
-            "sessionId" to sessionId,
-        )
-    }
 
     private fun startSessionRecording(
         call: MethodCall,
@@ -488,7 +473,6 @@ class PosthogFlutterPlugin :
             val width = call.argument<Int>("width") ?: 0
             val height = call.argument<Int>("height") ?: 0
             val screen = call.argument<String>("screen") ?: ""
-            val sessionId = call.argument<String>("sessionId")
 
             if (width == 0 || height == 0) {
                 result.error("INVALID_ARGUMENT", "Width or height is 0", null)
@@ -496,9 +480,7 @@ class PosthogFlutterPlugin :
             }
 
             val timestampMs = replayTimeMillis()
-            submitSnapshotWork(result) {
-                snapshotSender.sendMetaEvent(width, height, screen, timestampMs, sessionId)
-            }
+            submitSnapshotWork(result) { snapshotSender.sendMetaEvent(width, height, screen, timestampMs) }
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -1149,11 +1131,10 @@ class PosthogFlutterPlugin :
             val id = call.argument<Int>("id") ?: 1
             val x = call.argument<Int>("x") ?: 0
             val y = call.argument<Int>("y") ?: 0
-            val sessionId = call.argument<String>("sessionId")
             if (imageBytes != null) {
                 val timestampMs = replayTimeMillis()
                 submitSnapshotWork(result) {
-                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, sessionId)
+                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs)
                 }
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)
