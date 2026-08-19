@@ -23,6 +23,11 @@ class PostHogDisplaySurveyAppearance {
     this.thankYouMessageDescription,
     this.thankYouMessageDescriptionContentType,
     this.thankYouMessageCloseButtonText,
+    this.displayIntroScreen = false,
+    this.introScreenHeader,
+    this.introScreenDescription,
+    this.introScreenDescriptionContentType,
+    this.introScreenButtonText,
   });
 
   final String? fontFamily;
@@ -44,4 +49,9 @@ class PostHogDisplaySurveyAppearance {
   final PostHogDisplaySurveyTextContentType?
       thankYouMessageDescriptionContentType;
   final String? thankYouMessageCloseButtonText;
+  final bool displayIntroScreen;
+  final String? introScreenHeader;
+  final String? introScreenDescription;
+  final PostHogDisplaySurveyTextContentType? introScreenDescriptionContentType;
+  final String? introScreenButtonText;
 }

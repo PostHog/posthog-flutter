@@ -22,6 +22,10 @@ class SurveyAppearance {
     this.thankYouMessageHeader = 'Thank you for your feedback!',
     this.thankYouMessageDescription,
     this.thankYouMessageCloseButtonText = 'Close',
+    this.displayIntroScreen = false,
+    this.introScreenHeader,
+    this.introScreenDescription,
+    this.introScreenButtonText = 'Get started',
     this.borderColor = const Color(0xFFBDBDBD),
     this.inputBackgroundColor = Colors.white,
     this.inputTextColor = Colors.black,
@@ -45,6 +49,10 @@ class SurveyAppearance {
   final String thankYouMessageHeader;
   final String? thankYouMessageDescription;
   final String thankYouMessageCloseButtonText;
+  final bool displayIntroScreen;
+  final String? introScreenHeader;
+  final String? introScreenDescription;
+  final String introScreenButtonText;
   final Color borderColor;
   final Color inputBackgroundColor;
   final Color inputTextColor;
@@ -101,6 +109,10 @@ class SurveyAppearance {
       thankYouMessageDescription: appearance?.thankYouMessageDescription,
       thankYouMessageCloseButtonText:
           appearance?.thankYouMessageCloseButtonText ?? 'Close',
+      displayIntroScreen: appearance?.displayIntroScreen ?? false,
+      introScreenHeader: appearance?.introScreenHeader,
+      introScreenDescription: appearance?.introScreenDescription,
+      introScreenButtonText: appearance?.introScreenButtonText ?? 'Get started',
       borderColor:
           _colorFromHex(appearance?.borderColor) ?? const Color(0xFFBDBDBD),
       inputBackgroundColor: inputBackgroundColor,

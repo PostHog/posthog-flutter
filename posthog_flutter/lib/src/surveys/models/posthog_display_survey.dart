@@ -94,6 +94,11 @@ class PostHogDisplaySurvey {
       final thankYouMessageDescriptionContentType =
           PostHogDisplaySurveyTextContentType.fromInt(thankYouContentTypeRaw);
 
+      final introContentTypeRaw =
+          a['introScreenDescriptionContentType'] as int? ?? 1;
+      final introScreenDescriptionContentType =
+          PostHogDisplaySurveyTextContentType.fromInt(introContentTypeRaw);
+
       appearance = PostHogDisplaySurveyAppearance(
         fontFamily: a['fontFamily'] as String?,
         backgroundColor: a['backgroundColor'] as String?,
@@ -115,6 +120,11 @@ class PostHogDisplaySurvey {
             thankYouMessageDescriptionContentType,
         thankYouMessageCloseButtonText:
             a['thankYouMessageCloseButtonText'] as String?,
+        displayIntroScreen: a['displayIntroScreen'] as bool? ?? false,
+        introScreenHeader: a['introScreenHeader'] as String?,
+        introScreenDescription: a['introScreenDescription'] as String?,
+        introScreenDescriptionContentType: introScreenDescriptionContentType,
+        introScreenButtonText: a['introScreenButtonText'] as String?,
       );
     }
 
