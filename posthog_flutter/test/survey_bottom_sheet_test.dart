@@ -115,7 +115,7 @@ void main() {
       await pumpSurveySheet(
           tester, surveyWithIntro(displayIntroScreen: true), callbackLog);
 
-      await tester.tap(find.byIcon(Icons.close));
+      await tester.tap(find.byType(IconButton));
       await tester.pumpAndSettle();
 
       expect(callbackLog, ['shown', 'closed']);
