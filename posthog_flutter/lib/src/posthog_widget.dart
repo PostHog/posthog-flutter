@@ -176,10 +176,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   /// A frame may only ship while the world it was captured in is still current:
-  /// the same occlusion episode and the same replay session. On Android a stale
-  /// frame would append to a recording that has already ended, since it names
-  /// its own session; on iOS, where the send resolves the id, it would land in
-  /// the new session ahead of the meta event that session has not sent yet.
+  /// the same occlusion episode and the same replay session. The send resolves
+  /// the session, so a stale frame would land in the new session ahead of the
+  /// meta event that session has not sent yet.
   bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
     return PostHogInternalEvents.episodeStillCurrent(episode,
             occluded: occluded) &&
@@ -289,8 +288,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
       _isCapturing = false;
       if (_sampleRequestedDuringCapture) {
         _sampleRequestedDuringCapture = false;
-        // Straight to the detector: the capture this was deferred behind has
-        // just finished, and the retries are already armed.
         _changeDetector?.requestImmediateSample();
       }
     }

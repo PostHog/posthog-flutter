@@ -366,7 +366,7 @@ class Posthog {
   /// Returns a [Future] that completes when the reset request has been queued.
   Future<void> reset() async {
     // Bumped before the platform call because native rotates inside that round
-    // trip. See NATIVE_BEHAVIOR.md.
+    // trip.
     PostHogInternalEvents.requestReplaySessionReset();
     await _posthog.reset();
   }
@@ -890,10 +890,8 @@ class Posthog {
   /// Returns a [Future] that completes when the start request has been sent.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     if (!resumeCurrent) {
-      // Mirrors the `force` flag Android's PostHogReplayIntegration passes when
-      // a start does not resume: the new recording must send its own meta event
-      // rather than inherit the previous session's latch, even where the
-      // platform keeps the same session id.
+      // The new recording must send its own meta event rather than inherit the
+      // previous session's latch, even where the platform keeps the same id.
       PostHogInternalEvents.requestReplaySessionReset();
     }
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);

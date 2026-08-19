@@ -89,8 +89,7 @@ class ChangeDetector {
     _forcedTicksLeft = count;
   }
 
-  /// Drops any retries armed by [forceNextTicks]; the capture they were covering
-  /// for has landed.
+  /// Drops any retries armed by [forceNextTicks].
   void cancelForcedTicks() {
     _forcedTicksLeft = 0;
   }

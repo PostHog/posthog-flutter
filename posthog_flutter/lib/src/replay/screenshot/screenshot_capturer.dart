@@ -135,9 +135,8 @@ class ScreenshotCapturer {
 
   /// Whether a frame captured under [sessionId] still belongs to the session the
   /// capturer is tracking — the session-level counterpart of the occlusion
-  /// episode check. A frame outliving its session would append to a recording
-  /// that has already ended on Android, where it names its own session, and on
-  /// iOS would land in the new session ahead of that session's meta event.
+  /// episode check. A frame outliving its session would land in the new session
+  /// ahead of that session's meta event.
   ///
   /// It catches a forced reset landing mid-send, and a rotation adopted by a
   /// capture tick that was already in flight when an occlusion placeholder was

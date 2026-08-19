@@ -44,9 +44,7 @@ class NativeCommunicator {
   /// travel together so the capturer can key its per-session reset on the id the
   /// native SDK actually holds without a second round trip per tick.
   ///
-  /// A pure read on both platforms — the send still resolves the session and so
-  /// still applies the idle and maximum-duration bounds. A rotation is therefore
-  /// observed one tick late. See NATIVE_BEHAVIOR.md.
+  /// Non-mutating on both platforms, so a rotation is observed one tick late.
   Future<({bool isActive, String? sessionId})> getSessionReplayState() async {
     if (kIsWeb) {
       // Flutter doesn't capture screenshots on web, JS SDK handles session replay
