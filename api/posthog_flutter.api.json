@@ -4,28 +4,28 @@
             "name": "PosthogFlutterPlatformInterface",
             "type": "interface",
             "usages": [
-                "posthog_flutter_web.dart::PosthogFlutterWeb",
-                "src/posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance",
-                "src/posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance"
+                "posthog_flutter/posthog_flutter_web.dart::PosthogFlutterWeb",
+                "posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance",
+                "posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance"
             ]
         },
         {
             "name": "PostHogDisplaySurveyAppearance",
             "type": "interface",
             "usages": [
-                "src/surveys/models/survey_appearance.dart::SurveyAppearance::fromPostHog::appearance"
+                "surveys/models/survey_appearance.dart::SurveyAppearance::fromPostHog::appearance"
             ]
         },
         {
             "name": "PostHogDisplaySurveyTextContentType",
             "type": "interface",
             "usages": [
-                "src/surveys/models/posthog_display_survey_appearance.dart::PostHogDisplaySurveyAppearance::thankYouMessageDescriptionContentType",
-                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::html",
-                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::text",
-                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::values",
-                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::fromInt",
-                "src/surveys/models/posthog_display_survey_appearance.dart::PostHogDisplaySurveyAppearance::new::thankYouMessageDescriptionContentType"
+                "surveys/models/posthog_display_survey_appearance.dart::PostHogDisplaySurveyAppearance::thankYouMessageDescriptionContentType",
+                "surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::html",
+                "surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::text",
+                "surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::values",
+                "surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::fromInt",
+                "surveys/models/posthog_display_survey_appearance.dart::PostHogDisplaySurveyAppearance::new::thankYouMessageDescriptionContentType"
             ]
         }
     ],
