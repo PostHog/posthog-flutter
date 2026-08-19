@@ -8,7 +8,11 @@ import 'package:posthog_flutter/src/surveys/models/survey_callbacks.dart';
 import 'package:posthog_flutter/src/surveys/widgets/survey_bottom_sheet.dart';
 
 void main() {
-  PostHogDisplaySurvey surveyWithIntro({required bool displayIntroScreen}) {
+  PostHogDisplaySurvey surveyWithIntro({
+    required bool displayIntroScreen,
+    String? header = 'Welcome!',
+    String? description = 'Two quick questions.',
+  }) {
     return PostHogDisplaySurvey.fromDict({
       'id': 'survey-1',
       'name': 'Test survey',
@@ -21,8 +25,8 @@ void main() {
       ],
       'appearance': {
         'displayIntroScreen': displayIntroScreen,
-        'introScreenHeader': 'Welcome!',
-        'introScreenDescription': 'Two quick questions.',
+        if (header != null) 'introScreenHeader': header,
+        if (description != null) 'introScreenDescription': description,
         'introScreenDescriptionContentType': 1,
         'introScreenButtonText': 'Get started',
       },
@@ -88,6 +92,20 @@ void main() {
           tester, surveyWithIntro(displayIntroScreen: false), callbackLog);
 
       expect(find.text('Welcome!'), findsNothing);
+      expect(find.text('What can we do better?'), findsOneWidget);
+    });
+
+    testWidgets(
+        'skips the intro when it has neither a header nor a description',
+        (tester) async {
+      final callbackLog = <String>[];
+      await pumpSurveySheet(
+          tester,
+          surveyWithIntro(
+              displayIntroScreen: true, header: null, description: null),
+          callbackLog);
+
+      expect(find.text('Get started'), findsNothing);
       expect(find.text('What can we do better?'), findsOneWidget);
     });
 
