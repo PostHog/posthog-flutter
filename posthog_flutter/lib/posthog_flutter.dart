@@ -12,3 +12,4 @@ export 'src/posthog_observer.dart';
 export 'src/posthog_widget.dart';
 export 'src/replay/mask/posthog_mask_widget.dart';
 export 'src/replay/mask/posthog_platform_view.dart';
+export 'src/surveys/models/survey_appearance.dart' show SurveyAppearance;

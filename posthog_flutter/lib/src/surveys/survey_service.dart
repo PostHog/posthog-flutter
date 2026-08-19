@@ -6,7 +6,6 @@ import '../util/logging.dart';
 import '../posthog_observer.dart';
 import 'models/posthog_display_survey.dart';
 import 'models/survey_callbacks.dart';
-import 'models/survey_appearance.dart';
 import 'widgets/survey_bottom_sheet.dart';
 
 /// A service that manages displaying surveys
@@ -124,7 +123,6 @@ class SurveyService {
       onShown: onShown,
       onResponse: onResponse,
       onClosed: onClosed,
-      appearance: SurveyAppearance.fromPostHog(survey.appearance),
     );
   }
 

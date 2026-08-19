@@ -4,6 +4,7 @@ import 'logs/posthog_log_record.dart';
 import 'posthog.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'surveys/models/survey_appearance.dart';
 import 'util/logging.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
@@ -194,6 +195,14 @@ class PostHogConfig {
   ///
   /// Defaults to true.
   var surveys = true;
+
+  /// Client-side theming for surveys rendered on native platforms.
+  ///
+  /// Supply a light and/or dark [SurveyAppearance]; the SDK picks one based on
+  /// the device brightness when it builds the survey. Use this to give surveys a
+  /// dark palette, which the server appearance cannot express because Flutter
+  /// cannot resolve CSS values such as `var(...)` or `light-dark(...)`.
+  final surveyAppearanceConfig = PostHogSurveyAppearanceConfig();
 
   /// Configuration for error tracking and exception capture.
   final errorTrackingConfig = PostHogErrorTrackingConfig();
@@ -665,6 +674,29 @@ class PostHogRageClickConfig {
       'minimumTapCount': minimumTapCount,
     };
   }
+}
+
+/// Client-side theming for surveys rendered on native platforms.
+///
+/// Assign a [light] and/or [dark] appearance to
+/// [PostHogConfig.surveyAppearanceConfig] before calling
+/// `Posthog().setup(config)`. The SDK selects one based on the device
+/// brightness where it builds the survey, and its color fields replace the
+/// palette derived from the server appearance. Flutter web ignores this
+/// configuration; web surveys use the JavaScript SDK.
+class PostHogSurveyAppearanceConfig {
+  /// Creates an empty survey appearance configuration.
+  PostHogSurveyAppearanceConfig();
+
+  /// Appearance used when the device is in light mode.
+  ///
+  /// Leave `null` to keep the appearance derived from the server survey.
+  SurveyAppearance? light;
+
+  /// Appearance used when the device is in dark mode.
+  ///
+  /// Leave `null` to keep the appearance derived from the server survey.
+  SurveyAppearance? dark;
 }
 
 /// Configuration for mobile session replay capture and masking.

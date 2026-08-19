@@ -8,6 +8,7 @@ import '../models/posthog_display_link_question.dart';
 import '../models/posthog_display_rating_question.dart';
 import '../models/posthog_display_choice_question.dart';
 import '../models/posthog_display_survey_text_content_type.dart';
+import '../../posthog.dart';
 import '../../posthog_flutter_platform_interface.dart';
 
 import 'link_question.dart';
@@ -23,7 +24,6 @@ class SurveyBottomSheet extends StatefulWidget {
   final OnSurveyShown onShown;
   final OnSurveyResponse onResponse;
   final OnSurveyClosed onClosed;
-  final SurveyAppearance appearance;
 
   const SurveyBottomSheet({
     super.key,
@@ -31,7 +31,6 @@ class SurveyBottomSheet extends StatefulWidget {
     required this.onShown,
     required this.onResponse,
     required this.onClosed,
-    required this.appearance,
   });
 
   @override
@@ -53,7 +52,22 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
     Navigator.of(context).pop();
   }
 
-  Widget _buildQuestion(BuildContext context) {
+  /// Resolves the survey appearance for the current device brightness.
+  ///
+  /// Starts from the server appearance, then applies the light or dark override
+  /// from [PostHogConfig.surveyAppearanceConfig] when the app supplies one.
+  SurveyAppearance _resolveAppearance(BuildContext context) {
+    final config = Posthog().config?.surveyAppearanceConfig;
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final override =
+        brightness == Brightness.dark ? config?.dark : config?.light;
+    return SurveyAppearance.fromPostHog(
+      widget.survey.appearance,
+      override: override,
+    );
+  }
+
+  Widget _buildQuestion(BuildContext context, SurveyAppearance appearance) {
     final survey = widget.survey;
     final currentQuestion = survey.questions[_currentIndex];
 
@@ -64,7 +78,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           question: currentQuestion.question,
           description: currentQuestion.description,
           descriptionContentType: currentQuestion.descriptionContentType,
-          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          appearance: appearance,
           onSubmit: (response) async {
             final nextQuestion = await widget.onResponse(
               widget.survey,
@@ -84,7 +98,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           question: linkQuestion.question,
           description: linkQuestion.description,
           descriptionContentType: linkQuestion.descriptionContentType,
-          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          appearance: appearance,
           buttonText: linkQuestion.buttonText,
           link: linkQuestion.link,
           onPressed: () async {
@@ -116,7 +130,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           question: ratingQuestion.question,
           description: ratingQuestion.description,
           descriptionContentType: ratingQuestion.descriptionContentType,
-          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          appearance: appearance,
           buttonText: ratingQuestion.buttonText,
           optional: ratingQuestion.optional,
           scaleLowerBound: ratingQuestion.scaleLowerBound,
@@ -145,7 +159,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           description: choiceQuestion.description,
           descriptionContentType: choiceQuestion.descriptionContentType,
           choices: choiceQuestion.choices,
-          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          appearance: appearance,
           buttonText: choiceQuestion.buttonText,
           optional: choiceQuestion.optional,
           hasOpenChoice: choiceQuestion.hasOpenChoice,
@@ -171,6 +185,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
+    final appearance = _resolveAppearance(context);
 
     return PopScope(
       canPop: false,
@@ -181,7 +196,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: widget.appearance.backgroundColor,
+          color: appearance.backgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: SafeArea(
@@ -200,7 +215,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                       IconButton(
                         icon: SurveyIcon(
                           type: SurveyIconType.close,
-                          color: widget.appearance.closeButtonColor,
+                          color: appearance.closeButtonColor,
                         ),
                         onPressed: () => _handleClose(),
                       ),
@@ -217,11 +232,11 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (!_isCompleted)
-                            _buildQuestion(context)
+                            _buildQuestion(context, appearance)
                           else
                             ConfirmationMessage(
                               onClose: _handleClose,
-                              appearance: widget.appearance,
+                              appearance: appearance,
                               thankYouMessageDescriptionContentType: widget
                                       .survey
                                       .appearance

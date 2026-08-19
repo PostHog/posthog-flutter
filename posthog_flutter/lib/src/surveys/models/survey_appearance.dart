@@ -1,6 +1,8 @@
 import 'dart:math' show sqrt;
 
 import 'package:flutter/material.dart';
+
+import '../../util/logging.dart';
 import 'posthog_display_survey_appearance.dart';
 
 /// Appearance configuration for survey widgets
@@ -52,62 +54,82 @@ class SurveyAppearance {
   final Color choiceButtonBorderColor;
   final Color choiceButtonTextColor;
 
-  /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance]
+  /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance].
+  ///
+  /// The server appearance sets the text and thank-you content. Colors come
+  /// from the server appearance, or are derived from it for contrast. When
+  /// [override] is supplied, its color fields replace the derived palette. Use
+  /// it to theme a survey for the device brightness, which the server CSS
+  /// values (`var(...)`, `light-dark(...)`) cannot express on Flutter.
   static SurveyAppearance fromPostHog(
-    PostHogDisplaySurveyAppearance? appearance,
-  ) {
-    final backgroundColor =
-        _colorFromHex(appearance?.backgroundColor) ?? Colors.white;
-    final submitButtonColor =
-        _colorFromHex(appearance?.submitButtonColor) ?? Colors.black;
-    final ratingButtonColor =
-        _colorFromHex(appearance?.ratingButtonColor) ?? const Color(0xFFEEEEEE);
-    final ratingButtonActiveColor =
-        _colorFromHex(appearance?.ratingButtonActiveColor) ?? Colors.black;
+    PostHogDisplaySurveyAppearance? appearance, {
+    SurveyAppearance? override,
+  }) {
+    final o = override;
+
+    final backgroundColor = o?.backgroundColor ??
+        _colorFromHex(appearance?.backgroundColor) ??
+        Colors.white;
+    final submitButtonColor = o?.submitButtonColor ??
+        _colorFromHex(appearance?.submitButtonColor) ??
+        Colors.black;
+    final ratingButtonColor = o?.ratingButtonColor ??
+        _colorFromHex(appearance?.ratingButtonColor) ??
+        const Color(0xFFEEEEEE);
+    final ratingButtonActiveColor = o?.ratingButtonActiveColor ??
+        _colorFromHex(appearance?.ratingButtonActiveColor) ??
+        Colors.black;
 
     // Input background: use override, or slight adjustment for high luminance backgrounds
-    final inputBackgroundColor = _colorFromHex(appearance?.inputBackground) ??
+    final inputBackgroundColor = o?.inputBackgroundColor ??
+        _colorFromHex(appearance?.inputBackground) ??
         (backgroundColor.computeLuminance() > 0.95
             ? const Color(0xFFF8F8F8)
             : backgroundColor);
 
     // Primary text color: use textColor override if provided, otherwise auto-contrast
-    final primaryTextColor = _colorFromHex(appearance?.textColor) ??
+    final primaryTextColor = o?.questionTextColor ??
+        _colorFromHex(appearance?.textColor) ??
         _getContrastingTextColor(backgroundColor);
 
     // Input text color: use override if provided, otherwise auto-contrast from input background
-    final inputTextColor = _colorFromHex(appearance?.inputTextColor) ??
+    final inputTextColor = o?.inputTextColor ??
+        _colorFromHex(appearance?.inputTextColor) ??
         _getContrastingTextColor(inputBackgroundColor);
 
     return SurveyAppearance(
       backgroundColor: backgroundColor,
       submitButtonColor: submitButtonColor,
       submitButtonText: appearance?.submitButtonText ?? 'Submit',
-      submitButtonTextColor: _colorFromHex(appearance?.submitButtonTextColor) ??
+      submitButtonTextColor: o?.submitButtonTextColor ??
+          _colorFromHex(appearance?.submitButtonTextColor) ??
           _getContrastingTextColor(submitButtonColor),
-      descriptionTextColor:
-          _colorFromHex(appearance?.descriptionTextColor) ?? primaryTextColor,
+      descriptionTextColor: o?.descriptionTextColor ??
+          _colorFromHex(appearance?.descriptionTextColor) ??
+          primaryTextColor,
       questionTextColor: primaryTextColor,
-      closeButtonColor: primaryTextColor,
+      closeButtonColor: o?.closeButtonColor ?? primaryTextColor,
       ratingButtonColor: ratingButtonColor,
       ratingButtonActiveColor: ratingButtonActiveColor,
-      ratingButtonSelectedTextColor: _getContrastingTextColor(
-        ratingButtonActiveColor,
-      ),
-      ratingButtonUnselectedTextColor: inputTextColor.withAlpha(128),
+      ratingButtonSelectedTextColor: o?.ratingButtonSelectedTextColor ??
+          _getContrastingTextColor(ratingButtonActiveColor),
+      ratingButtonUnselectedTextColor:
+          o?.ratingButtonUnselectedTextColor ?? inputTextColor.withAlpha(128),
       displayThankYouMessage: appearance?.displayThankYouMessage ?? true,
       thankYouMessageHeader:
           appearance?.thankYouMessageHeader ?? 'Thank you for your feedback!',
       thankYouMessageDescription: appearance?.thankYouMessageDescription,
       thankYouMessageCloseButtonText:
           appearance?.thankYouMessageCloseButtonText ?? 'Close',
-      borderColor:
-          _colorFromHex(appearance?.borderColor) ?? const Color(0xFFBDBDBD),
+      borderColor: o?.borderColor ??
+          _colorFromHex(appearance?.borderColor) ??
+          const Color(0xFFBDBDBD),
       inputBackgroundColor: inputBackgroundColor,
       inputTextColor: inputTextColor,
-      inputPlaceholderColor: inputTextColor.withAlpha(153),
-      choiceButtonBorderColor: primaryTextColor,
-      choiceButtonTextColor: primaryTextColor,
+      inputPlaceholderColor:
+          o?.inputPlaceholderColor ?? inputTextColor.withAlpha(153),
+      choiceButtonBorderColor: o?.choiceButtonBorderColor ?? primaryTextColor,
+      choiceButtonTextColor: o?.choiceButtonTextColor ?? primaryTextColor,
     );
   }
 
@@ -124,12 +146,42 @@ class SurveyAppearance {
     return hsp > 127.5 ? Colors.black : Colors.white;
   }
 
+  /// Parses a CSS color value into a [Color].
+  ///
+  /// Accepts a hex string (3, 6, or 8 digits), one of the 140 CSS color names,
+  /// or an `rgb()`, `rgba()`, `hsl()`, or `hsla()` function. Returns `null` for
+  /// an empty value, and logs a debug warning for a non-empty value it cannot
+  /// read. Flutter cannot resolve `var(...)`, `light-dark(...)`, or `calc(...)`;
+  /// use `PostHogConfig.surveyAppearanceConfig` to theme the survey instead.
   static Color? _colorFromHex(String? colorString) {
     if (colorString == null || colorString.isEmpty) return null;
 
+    final value = colorString.trim();
+    final lower = value.toLowerCase();
+
+    final Color? color;
+    if (lower.startsWith('rgb')) {
+      color = _colorFromRgb(value);
+    } else if (lower.startsWith('hsl')) {
+      color = _colorFromHsl(value);
+    } else {
+      color = _colorFromHexOrName(value);
+    }
+
+    if (color == null) {
+      printIfDebug(
+        '[PostHog] Could not parse survey color "$colorString"; using the '
+        'default. Flutter accepts hex, a CSS color name, rgb(), rgba(), '
+        'hsl(), or hsla(), but cannot resolve var(), light-dark(), or calc(). '
+        'Set PostHogConfig.surveyAppearanceConfig to theme the survey.',
+      );
+    }
+    return color;
+  }
+
+  static Color? _colorFromHexOrName(String value) {
     // First check if we can map from CSS color
-    final cssHexString =
-        _cssToHexDictionary[colorString.toUpperCase()] ?? colorString;
+    final cssHexString = _cssToHexDictionary[value.toUpperCase()] ?? value;
 
     // Sanitize by removing any leading '#' character and uppercase for consistency
     var hex = cssHexString.replaceFirst('#', '').toUpperCase();
@@ -144,11 +196,91 @@ class SurveyAppearance {
       hex = 'FF$hex';
     }
 
-    try {
-      return Color(int.parse('0x$hex'));
-    } catch (e) {
-      return null;
+    if (hex.length != 8) return null;
+    final value = int.tryParse('0x$hex');
+    return value == null ? null : Color(value);
+  }
+
+  /// Parses `rgb()` and `rgba()`. Channels accept 0-255 numbers or percentages;
+  /// alpha accepts a 0-1 number or a percentage.
+  static Color? _colorFromRgb(String value) {
+    final args = _cssArgs(value);
+    if (args.length < 3 || args.length > 4) return null;
+
+    final r = _channel(args[0]);
+    final g = _channel(args[1]);
+    final b = _channel(args[2]);
+    final a = args.length == 4 ? _alphaFraction(args[3]) : 1.0;
+    if (r == null || g == null || b == null || a == null) return null;
+
+    return Color.fromRGBO(r, g, b, a);
+  }
+
+  /// Parses `hsl()` and `hsla()`. Hue accepts an optional `deg` unit;
+  /// saturation and lightness are percentages; alpha accepts a 0-1 number or a
+  /// percentage.
+  static Color? _colorFromHsl(String value) {
+    final args = _cssArgs(value);
+    if (args.length < 3 || args.length > 4) return null;
+
+    final h = _hue(args[0]);
+    final s = _percent(args[1]);
+    final l = _percent(args[2]);
+    final a = args.length == 4 ? _alphaFraction(args[3]) : 1.0;
+    if (h == null || s == null || l == null || a == null) return null;
+
+    return HSLColor.fromAHSL(a, h, s, l).toColor();
+  }
+
+  /// Splits the arguments of a CSS function on commas, slashes, and whitespace,
+  /// so both the comma and the space-separated syntaxes work.
+  static List<String> _cssArgs(String value) {
+    final open = value.indexOf('(');
+    final close = value.lastIndexOf(')');
+    if (open == -1 || close <= open) return const [];
+    return value
+        .substring(open + 1, close)
+        .split(RegExp(r'[,\s/]+'))
+        .where((token) => token.isNotEmpty)
+        .toList();
+  }
+
+  static int? _channel(String token) {
+    if (token.endsWith('%')) {
+      final pct = double.tryParse(token.substring(0, token.length - 1));
+      if (pct == null) return null;
+      return (pct / 100 * 255).round().clamp(0, 255);
     }
+    final value = double.tryParse(token);
+    if (value == null) return null;
+    return value.round().clamp(0, 255);
+  }
+
+  static double? _alphaFraction(String token) {
+    if (token.endsWith('%')) {
+      final pct = double.tryParse(token.substring(0, token.length - 1));
+      if (pct == null) return null;
+      return (pct / 100).clamp(0.0, 1.0);
+    }
+    final value = double.tryParse(token);
+    if (value == null) return null;
+    return value.clamp(0.0, 1.0);
+  }
+
+  static double? _hue(String token) {
+    final cleaned =
+        token.endsWith('deg') ? token.substring(0, token.length - 3) : token;
+    final value = double.tryParse(cleaned);
+    if (value == null) return null;
+    return value % 360;
+  }
+
+  static double? _percent(String token) {
+    final cleaned =
+        token.endsWith('%') ? token.substring(0, token.length - 1) : token;
+    final value = double.tryParse(cleaned);
+    if (value == null) return null;
+    return (value / 100).clamp(0.0, 1.0);
   }
 
   /// CSS color names to hex values mapping

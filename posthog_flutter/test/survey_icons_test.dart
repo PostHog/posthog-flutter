@@ -74,7 +74,6 @@ void main() {
               isSurveyCompleted: true,
             ),
             onClosed: (_) {},
-            appearance: SurveyAppearance.defaultAppearance,
           ),
         ),
       ),
