@@ -8,14 +8,12 @@ class PostHogInternalEvents {
 
   static final sessionRecordingActive = ValueNotifier<bool>(false);
 
-  /// Drops the replay capture's per-session state without waiting for a capture
-  /// tick to observe a new session id.
+  /// Drops the replay capture's per-session state without waiting for a tick to
+  /// observe a new session id.
   ///
-  /// A tick would usually notice on its own, one frame late. It never notices
-  /// when the recording restarts while the platform keeps the same session id —
-  /// Android returns early from `PostHog.startSessionReplay` while recording is
-  /// already active, so nothing rotates — and only this bump re-arms the meta
-  /// event. (posthog-android 3.58.0)
+  /// Needed because a tick never notices when the recording restarts while the
+  /// platform keeps the same id: Android's `startSessionReplay` returns early
+  /// while recording is already active, so nothing rotates.
   static final forceReplaySessionReset = ValueNotifier<int>(0);
 
   static void requestReplaySessionReset() => forceReplaySessionReset.value++;

@@ -109,15 +109,12 @@ class ScreenshotCapturer {
 
   /// Drops all per-session snapshot state when [currentSessionId] differs from
   /// the session that state was built under: the new session needs its own meta
-  /// event and must not have its first frame deduped against the previous
-  /// session's pixels. Keyed on the id native reports, so it covers every
-  /// rotation the native SDK performs rather than the subset Dart can predict.
+  /// event, and its first frame must not be deduped against the previous
+  /// session's pixels.
   ///
-  /// [force] resets even when the id is unchanged — the counterpart of the same
-  /// flag in Android's PostHogReplayIntegration (iOS has none and rotates the
-  /// session instead), for an explicit start that does not resume the current
-  /// session. The new id is unknown at that point, so it is left null until the
-  /// next tick reads it.
+  /// [force] resets even when the id is unchanged, for a restart the platform
+  /// performs without rotating. The new id is unknown then, so it is left null
+  /// until the next tick reads it.
   void resetSessionStateIfNeeded(
     String? currentSessionId, {
     bool force = false,

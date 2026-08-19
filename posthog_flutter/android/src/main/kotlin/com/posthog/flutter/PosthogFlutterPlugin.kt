@@ -441,10 +441,9 @@ class PosthogFlutterPlugin :
 
     private fun isSessionReplayActive(): Boolean = PostHog.isSessionReplayActive()
 
-    // peekSessionId(), not getSessionId(): Dart only needs to observe whether the
-    // session moved. The expiring accessor would rotate the session from this
-    // read, moving where the idle and maximum-duration bounds are applied. The
-    // send still resolves an expiring id, exactly as before. See NATIVE_BEHAVIOR.md.
+    // peekSessionId(), not getSessionId(): the expiring accessor would rotate the
+    // session from this read, moving where the idle and maximum-duration bounds
+    // are applied. The send still resolves an expiring id, as it always has.
     private fun getSessionReplayState(): Map<String, Any?> =
         mapOf(
             "isActive" to isSessionReplayActive(),

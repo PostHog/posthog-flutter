@@ -92,16 +92,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _ensureSampleLands();
   }
 
-  /// The single way to sample out of band, for every caller that needs the next
-  /// frame recorded and cannot wait for the screen to change on its own.
+  /// The single way to sample out of band, for callers that need the next frame
+  /// recorded and cannot wait for the screen to change on its own.
   ///
-  /// Two things can swallow such a request, and each caller needs cover for
-  /// both: a capture already in flight (the `_isCapturing` guard in
-  /// [_onChangeDetected] would drop it), and a platform that is briefly not
-  /// recording when the sample lands, which yields no frame at all. So the
-  /// request is deferred past an in-flight capture *and* re-forced for a few
-  /// ticks until a frame is actually delivered ([_generateSnapshot] cancels the
-  /// retries then). On a static screen nothing else would ever sample again.
+  /// Two things swallow such a request and every caller needs cover for both: a
+  /// capture already in flight, and a platform briefly not recording when the
+  /// sample lands. Hence deferring past the in-flight capture *and* a retry
+  /// budget, which delivery cancels.
   void _ensureSampleLands() {
     if (_isCapturing) {
       _sampleRequestedDuringCapture = true;
@@ -189,16 +186,10 @@ class PostHogWidgetState extends State<PostHogWidget> {
   void _initComponents(PostHogConfig config) {
     _screenshotCapturer = ScreenshotCapturer(
       config,
-      // The tick that observes a rotation already resets the per-session state,
-      // but its own frame can still be dropped (view not ready, capture error,
-      // stale episode) — and on a static screen no further tick would run, so
-      // the new session would never get its meta event.
-      //
-      // This fires from inside that tick's own capture, so the deferred sample
-      // runs one extra capture when the tick's frame did deliver. Deliberate:
-      // the alternative is to wait for the frame to be dropped and let the
-      // retries repair it a throttleDelay later, and rotations are rare enough
-      // that the wasted capture costs less than the added latency.
+      // The observing tick's own frame can still be dropped, and on a static
+      // screen no further tick would run. This fires from inside that tick, so
+      // it costs one redundant capture when the frame did deliver — cheaper
+      // than waiting a throttleDelay for the retries to repair it.
       onSessionRotated: _ensureSampleLands,
     );
     _nativeCommunicator = NativeCommunicator();

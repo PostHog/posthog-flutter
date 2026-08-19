@@ -70,21 +70,14 @@ class ChangeDetector {
     _timer = null;
   }
 
-  /// Keeps forcing a frame for up to [count] further poll ticks, until
-  /// [cancelForcedTicks] reports that a capture got through.
+  /// Keeps forcing a frame for up to [count] further poll ticks.
   ///
-  /// A single forced sample is not enough after a session change: the platform
-  /// can be transiently not recording when it lands, so the sample is spent on a
-  /// tick that captures nothing, and on a static screen no later tick forces a
-  /// frame. Observed on iOS, where `reset()` clears the remote config and
-  /// `isSessionReplayActive()` requires the session-replay flag, which only
-  /// returns once the flags reload lands. (posthog-ios 3.69.0)
+  /// One forced sample is not enough after a session change: iOS reports replay
+  /// inactive for ~120 ms after `reset()` while its flags reload, so the sample
+  /// is spent on a tick that captures nothing.
   ///
-  /// The budget is deliberately independent of [start]/[stop]: only delivery
-  /// clears it. A `close()`/`setup()` pair arms it while the detector is
-  /// stopped, and the restart is exactly what has to spend it — clearing it in
-  /// [stop] would instead make the fix depend on the statement order inside
-  /// `Posthog.close()`.
+  /// Only delivery clears the budget, never [stop] — `close()` arms it and the
+  /// following `setup()` is what spends it.
   void forceNextTicks(int count) {
     _forcedTicksLeft = count;
   }
@@ -94,15 +87,11 @@ class ChangeDetector {
     _forcedTicksLeft = 0;
   }
 
-  /// Samples once before the next poll tick, forcing a frame so a static screen
-  /// still gets sampled: nothing else schedules one there, and without a
-  /// rendered frame the post-frame callback (and so the capture) never runs.
+  /// Samples once before the next poll tick. A static screen renders no frame on
+  /// its own, so without forcing one the post-frame callback never runs.
   ///
-  /// No-ops while the detector is stopped, and forces no frame while
-  /// [suppressForcedFrames] is set — so a caller that ends a suppressed episode
-  /// must clear the flag before calling. The other order leaves a static screen
-  /// unsampled, freezing the replay on the episode's last frame until the app
-  /// happens to render again.
+  /// Forces nothing while [suppressForcedFrames] is set, so a caller ending a
+  /// suppressed episode must clear that flag first.
   void requestImmediateSample() {
     _scheduleFrameCallback(forceFrame: true);
   }
