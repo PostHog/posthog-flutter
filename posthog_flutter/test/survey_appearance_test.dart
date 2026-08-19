@@ -14,7 +14,8 @@ void main() {
 
   group('color parsing', () {
     test('reads a hex value', () {
-      expect(withBackground('#ff0000').backgroundColor, const Color(0xFFFF0000));
+      expect(
+          withBackground('#ff0000').backgroundColor, const Color(0xFFFF0000));
     });
 
     test('reads a CSS color name', () {
@@ -30,8 +31,8 @@ void main() {
 
     test('reads an rgba() value with alpha', () {
       expect(
-        withBackground('rgba(255, 0, 0, 0.5)').backgroundColor,
-        const Color(0x80FF0000),
+        withBackground('rgba(255, 0, 0, 0.5)').backgroundColor.toARGB32(),
+        0x80FF0000,
       );
     });
 
@@ -42,8 +43,8 @@ void main() {
 
     test('reads an hsla() value with alpha', () {
       expect(
-        withBackground('hsla(0, 100%, 50%, 0.5)').backgroundColor,
-        const Color(0x80FF0000),
+        withBackground('hsla(0, 100%, 50%, 0.5)').backgroundColor.toARGB32(),
+        0x80FF0000,
       );
     });
 

@@ -197,8 +197,8 @@ class SurveyAppearance {
     }
 
     if (hex.length != 8) return null;
-    final value = int.tryParse('0x$hex');
-    return value == null ? null : Color(value);
+    final argb = int.tryParse('0x$hex');
+    return argb == null ? null : Color(argb);
   }
 
   /// Parses `rgb()` and `rgba()`. Channels accept 0-255 numbers or percentages;

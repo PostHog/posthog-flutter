@@ -4,9 +4,28 @@
             "name": "PosthogFlutterPlatformInterface",
             "type": "interface",
             "usages": [
-                "posthog_flutter/posthog_flutter_web.dart::PosthogFlutterWeb",
-                "posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance",
-                "posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance"
+                "posthog_flutter_web.dart::PosthogFlutterWeb",
+                "src/posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance",
+                "src/posthog_flutter_platform_interface.dart::PosthogFlutterPlatformInterface::instance"
+            ]
+        },
+        {
+            "name": "PostHogDisplaySurveyAppearance",
+            "type": "interface",
+            "usages": [
+                "src/surveys/models/survey_appearance.dart::SurveyAppearance::fromPostHog::appearance"
+            ]
+        },
+        {
+            "name": "PostHogDisplaySurveyTextContentType",
+            "type": "interface",
+            "usages": [
+                "src/surveys/models/posthog_display_survey_appearance.dart::PostHogDisplaySurveyAppearance::thankYouMessageDescriptionContentType",
+                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::html",
+                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::text",
+                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::values",
+                "src/surveys/models/posthog_display_survey_text_content_type.dart::PostHogDisplaySurveyTextContentType::fromInt",
+                "src/surveys/models/posthog_display_survey_appearance.dart::PostHogDisplaySurveyAppearance::new::thankYouMessageDescriptionContentType"
             ]
         }
     ],
@@ -2367,6 +2386,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": false,
+                        "name": "surveyAppearanceConfig",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogSurveyAppearanceConfig"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
                         "name": "errorTrackingConfig",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "PostHogErrorTrackingConfig"
@@ -2787,6 +2817,1027 @@
                 "isSealed": false,
                 "name": "PostHogDataMode",
                 "relativePath": "lib/src/posthog_config.dart",
+                "superTypeNames": [
+                    "Enum",
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "returnTypeName": "PostHogSurveyAppearanceConfig",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "light",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "SurveyAppearance?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "dark",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "SurveyAppearance?"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogSurveyAppearanceConfig",
+                "relativePath": "lib/src/posthog_config.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": true,
+                        "name": "fromPostHog",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "appearance",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "PostHogDisplaySurveyAppearance?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "override",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "SurveyAppearance?"
+                            }
+                        ],
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "returnTypeName": "SurveyAppearance",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "backgroundColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "submitButtonColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "submitButtonText",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "submitButtonTextColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "descriptionTextColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "questionTextColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "closeButtonColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "ratingButtonColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "ratingButtonActiveColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "ratingButtonSelectedTextColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "ratingButtonUnselectedTextColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "displayThankYouMessage",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "bool"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "thankYouMessageHeader",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "thankYouMessageDescription",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "thankYouMessageCloseButtonText",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "borderColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "inputBackgroundColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "inputTextColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "inputPlaceholderColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "choiceButtonBorderColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "choiceButtonTextColor",
+                                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                                "typeName": "Color"
+                            }
+                        ],
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "returnTypeName": "SurveyAppearance",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "backgroundColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "submitButtonColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "submitButtonText",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "String"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "submitButtonTextColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "descriptionTextColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "questionTextColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "closeButtonColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ratingButtonColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ratingButtonActiveColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ratingButtonSelectedTextColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ratingButtonUnselectedTextColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "displayThankYouMessage",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "thankYouMessageHeader",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "String"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "thankYouMessageDescription",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "thankYouMessageCloseButtonText",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "String"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "borderColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "inputBackgroundColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "inputTextColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "inputPlaceholderColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "choiceButtonBorderColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "choiceButtonTextColor",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "Color"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "defaultAppearance",
+                        "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                        "typeName": "SurveyAppearance"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "SurveyAppearance",
+                "relativePath": "lib/src/surveys/models/survey_appearance.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "fontFamily",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "backgroundColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "borderColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "submitButtonColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "submitButtonText",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "submitButtonTextColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "textColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "descriptionTextColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "ratingButtonColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "ratingButtonActiveColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "inputBackground",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "inputTextColor",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "placeholder",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "displayThankYouMessage",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "bool"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "thankYouMessageHeader",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "thankYouMessageDescription",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "thankYouMessageDescriptionContentType",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "PostHogDisplaySurveyTextContentType?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "thankYouMessageCloseButtonText",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "returnTypeName": "PostHogDisplaySurveyAppearance",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "fontFamily",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "backgroundColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "borderColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "submitButtonColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "submitButtonText",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "submitButtonTextColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "textColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "descriptionTextColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ratingButtonColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ratingButtonActiveColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "inputBackground",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "inputTextColor",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "placeholder",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "displayThankYouMessage",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "thankYouMessageHeader",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "thankYouMessageDescription",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "thankYouMessageDescriptionContentType",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "PostHogDisplaySurveyTextContentType?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "thankYouMessageCloseButtonText",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                        "typeName": "String?"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogDisplaySurveyAppearance",
+                "relativePath": "lib/src/surveys/models/posthog_display_survey_appearance.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": true,
+                        "name": "fromInt",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "value",
+                                "relativePath": "lib/src/surveys/models/posthog_display_survey_text_content_type.dart",
+                                "typeName": "int"
+                            }
+                        ],
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_text_content_type.dart",
+                        "returnTypeName": "PostHogDisplaySurveyTextContentType",
+                        "type": "method",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "html",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_text_content_type.dart",
+                        "typeName": "PostHogDisplaySurveyTextContentType"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "text",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_text_content_type.dart",
+                        "typeName": "PostHogDisplaySurveyTextContentType"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "values",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_text_content_type.dart",
+                        "typeName": "List<PostHogDisplaySurveyTextContentType>"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "value",
+                        "relativePath": "lib/src/surveys/models/posthog_display_survey_text_content_type.dart",
+                        "typeName": "int"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogDisplaySurveyTextContentType",
+                "relativePath": "lib/src/surveys/models/posthog_display_survey_text_content_type.dart",
                 "superTypeNames": [
                     "Enum",
                     "Object"
