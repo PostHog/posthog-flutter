@@ -138,6 +138,7 @@ jobs:
   test:
     needs: detect-markdown-only
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Complete markdown-only PR check
         if: needs.detect-markdown-only.outputs.markdown_only == 'true'
