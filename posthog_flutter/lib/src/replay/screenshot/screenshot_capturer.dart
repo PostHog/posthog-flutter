@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show VoidCallback, visibleForTesting;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart' show Element, WidgetsBinding;
@@ -25,6 +25,15 @@ class ImageInfo {
   final bool shouldSendMetaEvent;
   final Uint8List imageBytes;
 
+  /// Which run of the capturer's per-session state this frame was built in.
+  /// A frame naming no session cannot be told apart from a fresh one by id
+  /// alone, so the generation is what separates them.
+  final int generation;
+
+  /// The replay session this frame was captured under, so the sender can drop
+  /// it if the session rotates mid-flight.
+  final String? sessionId;
+
   ImageInfo(
     this.id,
     this.x,
@@ -32,8 +41,10 @@ class ImageInfo {
     this.width,
     this.height,
     this.shouldSendMetaEvent,
-    this.imageBytes,
-  );
+    this.imageBytes, {
+    required this.sessionId,
+    required this.generation,
+  });
 }
 
 class ViewTreeSnapshotStatus {
@@ -57,6 +68,11 @@ class _PlatformViewRects {
 
 class ScreenshotCapturer {
   final PostHogConfig _config;
+
+  /// Called when a capture tick reads a session id different from the one it
+  /// last tracked, i.e. the native SDK rotated the session behind Dart's back.
+  final VoidCallback? onSessionRotated;
+
   final ImageMaskPainter _imageMaskPainter = ImageMaskPainter();
   final _nativeCommunicator = NativeCommunicator();
   final _snapshotManager = SnapshotManager();
@@ -64,6 +80,12 @@ class ScreenshotCapturer {
   bool _cancelled = false;
 
   bool hasCapturedPlatformViews = false;
+
+  // Bumped whenever the per-session state is dropped. Frames name a session,
+  // but a frame built before the first state read names none, and so does one
+  // built right after a forced reset — the generation is what tells those two
+  // apart.
+  int _sessionGeneration = 0;
 
   // Held so confirmDelivered/onOcclusionEnded act on the exact status a frame
   // was built against, avoiding a containerKey re-lookup that can transiently fail.
@@ -76,20 +98,77 @@ class ScreenshotCapturer {
   int? _pendingImageBytesHash;
   int? _pendingCompositedBytesHash;
 
+  /// The replay session the tracked snapshot state belongs to, read from native
+  /// on every capture tick. Null until the first read, and after a forced reset.
+  String? _replaySessionId;
+
   @visibleForTesting
   ViewTreeSnapshotStatus? get debugLastTargetStatus => _lastTargetStatus;
 
-  ScreenshotCapturer(this._config);
+  @visibleForTesting
+  String? get debugReplaySessionId => _replaySessionId;
 
-  /// A second `setup()` replaces the SDK config object, but the capturer is
-  /// built once per widget lifecycle — resolving the live config at capture
-  /// time keeps masking flags from freezing at their first-setup values.
+  ScreenshotCapturer(this._config, {this.onSessionRotated});
+
+  /// Resolves the live config at read time so masking flags never trail a
+  /// close()/setup() reconfigure.
   @visibleForTesting
   PostHogConfig get effectiveConfig => Posthog().config ?? _config;
 
   void cancel() {
     _cancelled = true;
   }
+
+  /// Drops all per-session snapshot state when [currentSessionId] differs from
+  /// the session that state was built under: the new session needs its own meta
+  /// event, and its first frame must not be deduped against the previous
+  /// session's pixels.
+  ///
+  /// [force] resets even when the id is unchanged, for a restart the platform
+  /// performs without rotating. The new id is unknown then, so it is left null
+  /// until the next tick reads it.
+  void resetSessionStateIfNeeded(
+    String? currentSessionId, {
+    bool force = false,
+  }) {
+    if (!force && _replaySessionId == currentSessionId) {
+      return;
+    }
+    // Adopting an id for the first time is the same generation: an occlusion
+    // placeholder built before any state read belongs to the session that read
+    // then names, and must survive it. Every other reset starts a new one.
+    if (force || _replaySessionId != null) {
+      _sessionGeneration++;
+    }
+    _replaySessionId = currentSessionId;
+    _snapshotManager.clear();
+    _lastTargetViewId = null;
+    _lastTargetStatus = null;
+    _pendingImageBytesHash = null;
+    _pendingCompositedBytesHash = null;
+  }
+
+  /// Whether [imageInfo] still belongs to the session the capturer is tracking
+  /// — the session-level counterpart of the occlusion episode check. A frame
+  /// outliving its session would land in the new session ahead of that
+  /// session's meta event.
+  ///
+  /// It catches a forced reset landing mid-send, and a rotation adopted by a
+  /// capture tick that was already in flight when an occlusion placeholder was
+  /// built — that path is not serialized against tick captures. It does not
+  /// catch a rotation observed by the same tick that produced the frame: that
+  /// tick writes the tracked id before building it.
+  ///
+  /// The id alone cannot judge a frame naming no session, and there are two of
+  /// those: an occlusion placeholder built before any state read, and anything
+  /// built after a forced reset, which leaves the tracked id null until the
+  /// next read. Hence the generation — the first must survive the read that
+  /// names its session (dropping it would leave the episode showing the
+  /// uncovered Flutter tree instead of the cover), the second must not survive
+  /// the reset that ended its recording.
+  bool sessionStillCurrent(ImageInfo imageInfo) =>
+      imageInfo.generation == _sessionGeneration &&
+      (imageInfo.sessionId == null || _replaySessionId == imageInfo.sessionId);
 
   /// Called when an occlusion episode ends: invalidates the dedup hashes (else
   /// the first Flutter frame matches the placeholder/bridged hash and freezes
@@ -380,6 +459,10 @@ class ScreenshotCapturer {
     if (target == null) {
       return null;
     }
+    // Read before the awaits below, so a rotation or a forced reset mid-build
+    // is visible to the sender as a stale frame.
+    final sessionId = _replaySessionId;
+    final generation = _sessionGeneration;
     final renderObject = target.renderObject;
     // Always with meta: a bridged episode already shipped the native screen's
     // meta, so without re-sending, the placeholder renders against its viewport.
@@ -429,10 +512,38 @@ class ScreenshotCapturer {
       height,
       shouldSendMetaEvent,
       pngBytes,
+      sessionId: sessionId,
+      generation: generation,
     );
   }
 
-  Future<ImageInfo?> captureScreenshot() {
+  /// Captures one Flutter frame, or null when there is nothing to send. Never
+  /// throws.
+  Future<ImageInfo?> captureScreenshot() async {
+    // Cleared again in _resolveCaptureTarget, but that runs after the round trip
+    // below — whose post-await check would veto this capture on a prior flag.
+    _cancelled = false;
+    final state = await _nativeCommunicator.getSessionReplayState();
+    if (_cancelled) {
+      return null;
+    }
+    if (!state.isActive) {
+      _snapshotManager.clear();
+      return null;
+    }
+    final previousSessionId = _replaySessionId;
+    // Before the capture target reads the meta latch below: a rotated session
+    // must not inherit the previous session's latch or dedup hashes.
+    resetSessionStateIfNeeded(state.sessionId);
+    // Adopting an id for the first time (startup, or after a forced reset that
+    // already asked for a sample) is not a rotation.
+    if (previousSessionId != null && state.sessionId != previousSessionId) {
+      onSessionRotated?.call();
+    }
+    return _captureScreenshot(state.sessionId, _sessionGeneration);
+  }
+
+  Future<ImageInfo?> _captureScreenshot(String? sessionId, int generation) {
     final target = _resolveCaptureTarget();
     if (target == null) {
       return Future.value(null);
@@ -464,18 +575,6 @@ class ScreenshotCapturer {
       ui.Image? finalImage;
 
       Future(() async {
-        final isSessionReplayActive =
-            await _nativeCommunicator.isSessionReplayActive();
-        if (_cancelled) {
-          completer.complete(null);
-          return;
-        }
-        if (!isSessionReplayActive) {
-          _snapshotManager.clear();
-          completer.complete(null);
-          return;
-        }
-
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
 
@@ -506,9 +605,7 @@ class ScreenshotCapturer {
           return;
         }
 
-        if (currentImage == null ||
-            !isSessionReplayActive ||
-            !currentImage.isValidSize) {
+        if (currentImage == null || !currentImage.isValidSize) {
           _snapshotManager.clear();
           currentImage?.dispose();
           image = null;
@@ -681,6 +778,8 @@ class ScreenshotCapturer {
               srcHeight.toInt(),
               shouldSendMetaEvent,
               pngBytes,
+              sessionId: sessionId,
+              generation: generation,
             );
             // No status commit here: the sender may still drop this frame, and
             // committing for a never-sent frame breaks playback / freezes dedup.

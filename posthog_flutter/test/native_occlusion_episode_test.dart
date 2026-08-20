@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +9,7 @@ import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
+import 'replay_capture_settle.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +19,13 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
   final recordedCalls = <MethodCall>[];
+  bool sent(String method) =>
+      recordedCalls.any((call) => call.method == method);
   var enableNativeBridgeResult = false;
+  var sessionReplayActive = false;
+  // The session id the native SDK would report. Rotating it stands in for
+  // every rotation Dart cannot predict (reset(), idle/max-duration expiry).
+  String? sessionId = 'session-a';
   // Optional side effect run inside the sendMetaEvent handler, used to
   // simulate the world changing mid-send (between meta and full snapshot).
   void Function()? onSendMetaEvent;
@@ -25,10 +34,11 @@ void main() {
     messenger.setMockMethodCallHandler(channel, (call) async {
       recordedCalls.add(call);
       switch (call.method) {
-        // false so the ChangeDetector's periodic captures self-drop before
-        // sending anything: these tests drive the occlusion paths only.
-        case 'isSessionReplayActive':
-          return false;
+        // Defaults to inactive so the ChangeDetector's periodic captures
+        // self-drop before sending anything: most tests here drive the
+        // occlusion paths only.
+        case 'getSessionReplayState':
+          return {'isActive': sessionReplayActive, 'sessionId': sessionId};
         case 'enableNativeBridge':
           return enableNativeBridgeResult;
         case 'sendMetaEvent':
@@ -58,9 +68,11 @@ void main() {
     PostHogInternalEvents.nativeBridgeFailed = false;
   }
 
-  Future<void> setupPosthog(PostHogConfig config) async {
-    PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
+  Future<PosthogFlutterPlatformFake> setupPosthog(PostHogConfig config) async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
     await Posthog().setup(config);
+    return fake;
   }
 
   PostHogConfig replayConfig({required bool captureNativeScreens}) {
@@ -99,6 +111,8 @@ void main() {
   setUp(() {
     recordedCalls.clear();
     enableNativeBridgeResult = false;
+    sessionReplayActive = false;
+    sessionId = 'session-a';
     onSendMetaEvent = null;
     resetOcclusionState();
     mockChannel();
@@ -134,7 +148,7 @@ void main() {
           reason: 'a config that is not the active one must not propagate');
     });
 
-    test('a second setup hands propagation to the new config', () async {
+    test('a reconfigure hands propagation to the new config', () async {
       final fake = PosthogFlutterPlatformFake();
       PosthogFlutterPlatformInterface.instance = fake;
       final first = replayConfig(captureNativeScreens: true);
@@ -149,7 +163,14 @@ void main() {
 
       second.sessionReplayConfig.captureNativeScreens = true;
       expect(fake.captureNativeScreensChanges, [true],
-          reason: 'the active config propagates');
+          reason: 'Flutter-side config follows the latest setup()');
+
+      await Posthog().close();
+      await Posthog().setup(second);
+
+      second.sessionReplayConfig.captureNativeScreens = false;
+      expect(fake.captureNativeScreensChanges, [true, false],
+          reason: 'and keeps propagating across a close()/setup()');
     });
   });
 
@@ -195,7 +216,7 @@ void main() {
 
       expect(
         recordedCalls.map((call) => call.method),
-        contains('isSessionReplayActive'),
+        contains('getSessionReplayState'),
         reason: 'the change detector must reach captureScreenshot off web',
       );
     });
@@ -211,15 +232,14 @@ void main() {
       recordedCalls.clear();
 
       PostHogInternalEvents.sessionRecordingActive.value = true;
-      // A restarted detector only arms a post-frame callback, so something has
-      // to render a frame for it to fire.
-      tester.binding.scheduleFrame();
+      // start() forces the frame itself, so the restart's post-frame capture
+      // fires without the test scheduling one.
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1));
 
       expect(
         recordedCalls.map((call) => call.method),
-        contains('isSessionReplayActive'),
+        contains('getSessionReplayState'),
         reason: 'a recording restart must re-arm Flutter capture off web',
       );
 
@@ -324,6 +344,104 @@ void main() {
       expect(methods, isNot(contains('sendMetaEvent')));
 
       await unmountAndFlush(tester);
+    });
+
+    testWidgets(
+        'placeholder still ships when the first tick adopts a session id '
+        'mid-build', (tester) async {
+      // Until a tick has completed its state read the capturer tracks no
+      // session, so a placeholder built in that window names none either.
+      // Adopting an id for the first time is not a rotation, and treating it as
+      // one would drop the cover and leave the episode showing the uncovered
+      // Flutter tree.
+      final gate = Completer<void>();
+      var gated = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        recordedCalls.add(call);
+        switch (call.method) {
+          case 'getSessionReplayState':
+            if (!gated) {
+              gated = true;
+              await gate.future;
+            }
+            return {'isActive': true, 'sessionId': 'session-a'};
+          case 'enableNativeBridge':
+            return false;
+          default:
+            return null;
+        }
+      });
+
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await pumpReplayWidget(tester);
+      await settleRealAsync(tester);
+      expect(gated, isTrue,
+          reason: 'the first state read must still be parked, so nothing has '
+              'adopted a session id yet');
+
+      recordedCalls.clear();
+      pushOcclusion(occluded: true, episode: 1, bridgeFailed: true);
+      gate.complete();
+      await settleRealAsync(tester);
+      await settleRealAsync(tester);
+
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'the black cover must ship even though the tick adopted a '
+              'session id while it was being built');
+
+      await unmountAndFlush(tester);
+      mockChannel();
+    });
+
+    testWidgets('placeholder is dropped when a forced reset lands mid-build',
+        (tester) async {
+      // The mirror of the adoption case above: a placeholder built before any
+      // state read names no session, and neither does the capturer right after
+      // a forced reset, so the session id alone cannot tell the stale frame
+      // from a fresh one. Without the generation it ships into the recording
+      // that replaced it.
+      final gate = Completer<void>();
+      var gated = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        recordedCalls.add(call);
+        switch (call.method) {
+          case 'getSessionReplayState':
+            if (!gated) {
+              gated = true;
+              await gate.future;
+            }
+            return {'isActive': true, 'sessionId': 'session-b'};
+          case 'enableNativeBridge':
+            return false;
+          default:
+            return null;
+        }
+      });
+
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await pumpReplayWidget(tester);
+      await settleRealAsync(tester);
+      expect(gated, isTrue,
+          reason: 'nothing may have adopted a session id yet');
+
+      recordedCalls.clear();
+      pushOcclusion(occluded: true, episode: 1, bridgeFailed: true);
+      // What reset()/close()/startSessionRecording(resumeCurrent: false) bump,
+      // landing while the placeholder is still rasterizing.
+      PostHogInternalEvents.requestReplaySessionReset();
+      gate.complete();
+      await settleRealAsync(tester);
+      await settleRealAsync(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, isNot(contains('sendFullSnapshot')),
+          reason: 'the cover belongs to the recording the reset ended');
+      expect(methods, isNot(contains('sendMetaEvent')));
+
+      await unmountAndFlush(tester);
+      mockChannel();
     });
 
     testWidgets('ignores occlusion when the bridge is off', (tester) async {
@@ -552,6 +670,66 @@ void main() {
       await unmountAndFlush(tester);
     });
 
+    testWidgets(
+        'resetSessionStateIfNeeded clears every tracked view, not just the '
+        'held one', (tester) async {
+      final config = replayConfig(captureNativeScreens: true);
+      await setupPosthog(config);
+      await pumpReplayWidget(tester);
+
+      final capturer = ScreenshotCapturer(config);
+      final imageInfo = await tester.runAsync(
+        () => capturer.buildOcclusionPlaceholder(),
+      );
+      final status = capturer.debugLastTargetStatus!;
+      capturer.confirmDelivered(imageInfo!.id, metaSent: true);
+      status.imageBytesHash = 12345;
+
+      capturer.resetSessionStateIfNeeded('session-b');
+
+      expect(capturer.debugLastTargetStatus, isNull,
+          reason: 'a stale delivery must not commit into the new session');
+
+      final next = await tester.runAsync(
+        () => capturer.buildOcclusionPlaceholder(),
+      );
+      final nextStatus = capturer.debugLastTargetStatus!;
+      expect(next, isNotNull);
+      expect(nextStatus.sentMetaEvent, isFalse);
+      expect(nextStatus.imageBytesHash, isNull,
+          reason: 'the same RepaintBoundary gets a fresh status, so the new '
+              'session is not deduped against the previous one');
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('resetSessionStateIfNeeded keeps state for the same session id',
+        (tester) async {
+      final config = replayConfig(captureNativeScreens: true);
+      await setupPosthog(config);
+      await pumpReplayWidget(tester);
+
+      final capturer = ScreenshotCapturer(config);
+      capturer.resetSessionStateIfNeeded('session-a');
+      final imageInfo = await tester.runAsync(
+        () => capturer.buildOcclusionPlaceholder(),
+      );
+      capturer.confirmDelivered(imageInfo!.id, metaSent: true);
+      final status = capturer.debugLastTargetStatus!;
+
+      capturer.resetSessionStateIfNeeded('session-a');
+      expect(capturer.debugLastTargetStatus, same(status),
+          reason: 'an unchanged session keeps its meta latch and dedup hashes: '
+              'dropping them costs a redundant full-screen frame every tick');
+
+      capturer.resetSessionStateIfNeeded('session-a', force: true);
+      expect(capturer.debugLastTargetStatus, isNull,
+          reason: 'force resets even when the platform kept the session id');
+      expect(capturer.debugReplaySessionId, 'session-a');
+
+      await unmountAndFlush(tester);
+    });
+
     testWidgets('onOcclusionEnded re-arms via the held status reference',
         (tester) async {
       final config = replayConfig(captureNativeScreens: true);
@@ -576,6 +754,393 @@ void main() {
       expect(status.compositedBytesHash, isNull,
           reason: 'dedup hashes cleared so the first post-occlusion frame '
               'is never deduped away');
+
+      await unmountAndFlush(tester);
+    });
+  });
+
+  group('new replay session', () {
+    /// Drives one poll tick and renders [child], so the frame callback the
+    /// tick armed actually fires: on a static screen nothing schedules a frame
+    /// and the tick's callback would never run.
+    Future<void> tickWithRepaint(WidgetTester tester, Widget child) async {
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(PostHogWidget(child: child));
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
+    }
+
+    /// Records one session's first frame, so there is a latched meta event and
+    /// a dedup hash for the next session to (wrongly) inherit.
+    Future<void> deliverFirstFrame(WidgetTester tester) async {
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'the first session must deliver, else there is no latched '
+              'meta or dedup hash to carry over');
+      recordedCalls.clear();
+    }
+
+    testWidgets('a native session rotation ships meta before the next frame',
+        (tester) async {
+      // The rotation Dart cannot predict: reset(), a 30-minute idle or the
+      // 24-hour maximum duration rotate the session with no Dart API call at
+      // all. Only the session id the capture path reads reveals it.
+      await deliverFirstFrame(tester);
+
+      sessionId = 'session-b';
+      await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason: 'the new session has no meta of its own yet');
+      expect(methods, contains('sendFullSnapshot'));
+      expect(
+        methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: 'meta must precede the frame it describes',
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets(
+        'startSessionRecording(resumeCurrent: false) ships meta even when the '
+        'platform keeps the session id', (tester) async {
+      // Android returns early from startSessionReplay while recording is
+      // already active, so the session id does not change there. The explicit
+      // request is the signal, exactly like the `force` flag Android's
+      // PostHogReplayIntegration passes on a non-resuming start.
+      await deliverFirstFrame(tester);
+
+      await Posthog().startSessionRecording(resumeCurrent: false);
+      await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'));
+      expect(methods, contains('sendFullSnapshot'));
+      expect(
+        methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: 'meta must precede the frame it describes',
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('reset() drops the meta latch for the post-logout session',
+        (tester) async {
+      // reset() rotates the session on both platforms. The mock keeps reporting
+      // the same id so this pins the Dart-side drop specifically, rather than
+      // the id-observation path a rotation would also trigger.
+      await deliverFirstFrame(tester);
+
+      await Posthog().reset();
+      await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason: 'the post-logout session must not inherit the previous '
+              "session's meta latch");
+      expect(methods, contains('sendFullSnapshot'));
+      expect(
+        methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: 'meta must precede the frame it describes',
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('a repeated tick in the same session does not re-send meta',
+        (tester) async {
+      await deliverFirstFrame(tester);
+
+      await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendFullSnapshot'),
+          reason: 'the repainted screen is a new frame');
+      expect(methods, isNot(contains('sendMetaEvent')),
+          reason: 'the session id did not change, so its meta still stands');
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('a capture crossing a rotation is dropped, not sent bare',
+        (tester) async {
+      // The ordering regression, as iOS would see it: a frame captured in the
+      // old session that lands after the rotation ships as full → meta → full
+      // in the new session, and the leading full has no meta to render against.
+      // Android names its own session, so there the same frame would instead
+      // append to a recording that has already ended.
+      sessionReplayActive = true;
+      var rotated = false;
+      onSendMetaEvent = () {
+        if (rotated) return;
+        rotated = true;
+        // What Posthog().startSessionRecording(resumeCurrent: false) triggers,
+        // landing while this very capture is mid-send.
+        sessionId = 'session-b';
+        PostHogInternalEvents.forceReplaySessionReset.value++;
+      };
+
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      await settleCaptureAcrossTick(tester);
+
+      var methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'));
+      expect(
+        methods
+            .skip(methods.indexOf('sendMetaEvent') + 1)
+            .takeWhile((m) => m != 'getSessionReplayState'),
+        isEmpty,
+        reason: 'the frame belongs to the session it was captured in, so its '
+            'own full snapshot must never follow the meta it already sent',
+      );
+      // The forced reset also asks for a fresh sample, so the new session gets
+      // its keyframes without waiting for the app to repaint.
+      expect(methods, contains('sendFullSnapshot'));
+      expect(
+        methods.lastIndexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: "the new session's first frame is preceded by its own meta",
+      );
+
+      recordedCalls.clear();
+      await tickWithRepaint(tester, Container(color: const Color(0xFF0000FF)));
+
+      methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendFullSnapshot'));
+      expect(methods, isNot(contains('sendMetaEvent')),
+          reason: 'the session did not change again, so its meta still stands');
+
+      await unmountAndFlush(tester);
+    });
+
+    // Every API that crosses a session boundary must drop the replay state
+    // *before* the platform round trip, because native rotates the session
+    // inside it. Moving a bump after its `await` fails these.
+    final sessionBoundaryCalls = <String, Future<void> Function()>{
+      'reset()': () => Posthog().reset(),
+      'close()': () => Posthog().close(),
+      'startSessionRecording(resumeCurrent: false)': () =>
+          Posthog().startSessionRecording(resumeCurrent: false),
+    };
+
+    for (final entry in sessionBoundaryCalls.entries) {
+      testWidgets(
+          '${entry.key} drops the in-flight frame before the platform '
+          'round trip returns', (tester) async {
+        sessionReplayActive = true;
+        final fake = await setupPosthog(replayConfig(
+          captureNativeScreens: false,
+        ));
+        var called = false;
+        fake.onSessionBoundaryCall = () async {
+          // Stands in for the rotation native performs inside the round trip.
+          // The delay is what makes the ordering observable: a bump placed
+          // after the `await` would land only after the frame already mid-send
+          // has passed its last validity check.
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+          sessionId = 'session-b';
+        };
+        onSendMetaEvent = () {
+          if (called) return;
+          called = true;
+          // Unawaited on purpose: only the Dart-side work that happens before
+          // the platform call has to land inside this send.
+          entry.value();
+        };
+
+        await pumpReplayWidget(tester);
+        await settleCapture(tester);
+
+        final methods = recordedCalls.map((c) => c.method).toList();
+        expect(called, isTrue, reason: 'the call must land mid-send');
+        expect(methods, contains('sendMetaEvent'));
+        // Anything after the next state read belongs to the follow-up capture
+        // the forced reset asks for, which is a frame of the new session.
+        expect(
+          methods
+              .skip(methods.indexOf('sendMetaEvent') + 1)
+              .takeWhile((m) => m != 'getSessionReplayState'),
+          isEmpty,
+          reason: 'the frame belongs to the session that ended, so it must '
+              'be dropped rather than ship into the session native rotates '
+              'to inside the round trip',
+        );
+
+        fake.onSessionBoundaryCall = null;
+        await unmountAndFlush(tester);
+      });
+    }
+
+    testWidgets('a same-session pause/resume does not re-send meta',
+        (tester) async {
+      // resumeCurrent keeps the session id, so its meta and dedup hashes are
+      // still valid: resending them would cost a redundant full-screen frame.
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'));
+
+      recordedCalls.clear();
+      await Posthog().stopSessionRecording();
+      await Posthog().startSessionRecording();
+      await settleCapture(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, isNot(contains('sendMetaEvent')));
+      expect(methods, isNot(contains('sendFullSnapshot')),
+          reason: 'the unchanged screen is still deduped against the frame '
+              'this very session already sent');
+
+      await unmountAndFlush(tester);
+    });
+  });
+
+  group('close()/setup() reconfigure', () {
+    // The recording restarts across a close()/setup(): it needs its own meta
+    // event, and its first frame must not be deduped against the pixels the
+    // previous one already sent. iOS clears the session on close() while
+    // Android keeps the id, so the forced reset is what covers both.
+    testWidgets('the new session ships meta and a full snapshot',
+        (tester) async {
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'the first session must deliver, else there is no latched '
+              'meta or dedup hash to carry over');
+
+      recordedCalls.clear();
+      await Posthog().close();
+      // The iOS shape, where close() clears the session.
+      sessionId = 'session-b';
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await settleCaptureAcrossTick(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason: 'the new session has no meta of its own yet');
+      expect(methods, contains('sendFullSnapshot'),
+          reason: "the unchanged screen must still be sampled: the previous "
+              "session's dedup hash may not survive into this one");
+      expect(
+        methods.indexOf('sendMetaEvent'),
+        lessThan(methods.indexOf('sendFullSnapshot')),
+        reason: 'meta must precede the frame it describes',
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets(
+        'an episode ending while the SDK is closed does not strand '
+        'capture suppressed', (tester) async {
+      // Native pushes exactly one end event, and pushes it as soon as replay
+      // goes off — i.e. right after close(), while the config is null. If Dart
+      // drops it, nothing ever re-clears the suppression and every later
+      // recording is blank.
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await pumpReplayWidget(tester);
+      enableNativeBridgeResult = true;
+      pushOcclusion(occluded: true, episode: 1);
+      await settleRealAsync(tester);
+
+      await Posthog().close();
+      pushOcclusion(occluded: false, episode: 1);
+      await settleRealAsync(tester);
+
+      recordedCalls.clear();
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await tester.pumpWidget(
+        PostHogWidget(child: Container(color: const Color(0xFF0000FF))),
+      );
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
+
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'),
+          reason: 'nothing covers Flutter any more, so the recording setup() '
+              'started would otherwise stay blank for the life of the app');
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('ships meta even when the platform keeps the session id',
+        (tester) async {
+      // The Android shape: close() leaves the session id in place, so nothing
+      // the capture tick observes says the recording restarted. Only the forced
+      // reset re-arms meta here. (posthog-android 3.58.0)
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'));
+
+      recordedCalls.clear();
+      await Posthog().close();
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await settleCaptureAcrossTick(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, contains('sendMetaEvent'),
+          reason:
+              'the restarted recording needs its own meta event even though '
+              'the session id never moved');
+      expect(methods, contains('sendFullSnapshot'));
+      expect(methods.indexOf('sendMetaEvent'),
+          lessThan(methods.indexOf('sendFullSnapshot')));
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('a capture crossing the reconfigure is dropped, not sent bare',
+        (tester) async {
+      // Same ordering regression as the rotation case, reached without any
+      // replay-specific API: the recording restarts while a frame captured
+      // under it is mid-send, so that frame would arrive bare at the head of
+      // what the following setup() starts.
+      sessionReplayActive = true;
+      var reconfigured = false;
+      onSendMetaEvent = () {
+        if (reconfigured) return;
+        reconfigured = true;
+        // Unawaited on purpose: both calls do their Dart-side work
+        // synchronously, which is what has to land inside this send.
+        Posthog().close();
+        sessionId = 'session-b';
+        Posthog().setup(replayConfig(captureNativeScreens: false));
+      };
+
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleCapture(tester);
+      await settleCaptureAcrossTick(tester);
+
+      final sends = recordedCalls
+          .map((c) => c.method)
+          .where((m) => m == 'sendMetaEvent' || m == 'sendFullSnapshot')
+          .toList();
+
+      expect(sends.first, 'sendMetaEvent',
+          reason: 'the capture in flight when close() ran had already sent the '
+              "closed session's meta");
+      expect(sends, contains('sendFullSnapshot'),
+          reason: 'the session setup() started still records');
+      expect(
+        sends.indexOf('sendFullSnapshot'),
+        greaterThan(sends.lastIndexOf('sendMetaEvent')),
+        reason:
+            'the frame captured before close() must be dropped, not shipped '
+            "ahead of the new session's meta",
+      );
 
       await unmountAndFlush(tester);
     });

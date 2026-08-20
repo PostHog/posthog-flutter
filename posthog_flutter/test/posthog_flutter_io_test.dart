@@ -461,26 +461,40 @@ void main() {
       expect(args['eventName'], 'keep me');
     });
 
-    test('beforeSend exception returns original event', () async {
+    test('beforeSend exception drops event and stops the chain', () async {
+      final callOrder = <String>[];
+
       testConfig = PostHogConfig(
         'test_project_token',
         beforeSend: [
           (event) {
+            callOrder.add('transform');
+            event.event = 'transformed_event';
+            return event;
+          },
+          (event) {
+            callOrder.add('throw');
             throw Exception('Hey I errored out');
+          },
+          (event) {
+            callOrder.add('sentinel');
+            return event;
           },
         ],
       );
       await posthogFlutterIO.setup(testConfig);
+      log.clear();
 
-      await posthogFlutterIO.capture(
-        eventName: 'test_event',
-        properties: {'key': 'value'},
+      await expectLater(
+        posthogFlutterIO.capture(
+          eventName: 'test_event',
+          properties: {'key': 'value'},
+        ),
+        completes,
       );
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
-      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'test_event');
-      expect(args['properties'], {'key': 'value'});
+      expect(callOrder, ['transform', 'throw']);
+      expect(log, isEmpty);
     });
 
     test('multiple beforeSend callbacks are applied in order', () async {
@@ -491,8 +505,12 @@ void main() {
         beforeSend: [
           (event) {
             callOrder.add(1);
-            event.event = '${event.event}_first';
-            return event;
+            return PostHogEvent(
+              event: '${event.event}_first',
+              properties: event.properties,
+              userProperties: event.userProperties,
+              userPropertiesSetOnce: event.userPropertiesSetOnce,
+            );
           },
           (event) {
             callOrder.add(2);
@@ -732,27 +750,28 @@ void main() {
       expect(callOrder, ['sync1', 'async1', 'sync2']);
     });
 
-    test('async beforeSend exception returns original event', () async {
+    test('async beforeSend exception drops event without throwing', () async {
       testConfig = PostHogConfig(
         'test_project_token',
         beforeSend: [
           (event) async {
-            await Future.delayed(const Duration(milliseconds: 100));
+            await Future<void>.delayed(Duration.zero);
             throw Exception('Async error');
           },
         ],
       );
       await posthogFlutterIO.setup(testConfig);
+      log.clear();
 
-      await posthogFlutterIO.capture(
-        eventName: 'test_event',
-        properties: {'key': 'value'},
+      await expectLater(
+        posthogFlutterIO.capture(
+          eventName: 'test_event',
+          properties: {'key': 'value'},
+        ),
+        completes,
       );
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
-      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'test_event');
-      expect(args['properties'], {'key': 'value'});
+      expect(log, isEmpty);
     });
 
     test(

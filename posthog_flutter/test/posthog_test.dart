@@ -68,8 +68,8 @@ void main() {
           ..sessionReplayConfig.maskAllImages = false;
         await Posthog().setup(first);
         // PostHogWidget builds its capturer once and keeps it across a
-        // close()/setup() reconfigure, so the capturer must follow the live
-        // config rather than the one it was constructed with.
+        // close()/setup() reconfigure, so the capturer has to resolve the
+        // config at read time rather than use the one it was constructed with.
         final capturer = ScreenshotCapturer(first);
         expect(capturer.effectiveConfig, same(first));
 

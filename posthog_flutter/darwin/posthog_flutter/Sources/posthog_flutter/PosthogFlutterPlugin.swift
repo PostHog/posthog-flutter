@@ -511,6 +511,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             result(nil)
         case "isSessionReplayActive":
             isSessionReplayActive(result: result)
+        case "getSessionReplayState":
+            getSessionReplayState(result: result)
         case "startSessionRecording":
             startSessionRecording(call, result: result)
         case "stopSessionRecording":
@@ -1191,6 +1193,23 @@ extension PosthogFlutterPlugin {
             result(PostHogSDK.shared.isSessionReplayActive())
         #else
             result(false)
+        #endif
+    }
+
+    private func getSessionReplayState(result: @escaping FlutterResult) {
+        #if os(iOS)
+            // Neither read mutates session state: getSessionId() is hard-wired
+            // readOnly: true, matching peekSessionId() on Android. The send still
+            // resolves the session and so still applies expiry.
+            var state: [String: Any] = [
+                "isActive": PostHogSDK.shared.isSessionReplayActive(),
+            ]
+            if let sessionId = PostHogSDK.shared.getSessionId() {
+                state["sessionId"] = sessionId
+            }
+            result(state)
+        #else
+            result(["isActive": false])
         #endif
     }
 

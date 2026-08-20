@@ -35,6 +35,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
   bool _isCapturing = false;
   bool _disposed = false;
 
+  bool _sampleRequestedDuringCapture = false;
+
   /// Whether a substitute source (bridge or placeholder) owns the current
   /// episode. Not the same as "occluded": with the bridge off, occlusion is
   /// ignored and Flutter capture keeps running.
@@ -70,6 +72,42 @@ class PostHogWidgetState extends State<PostHogWidget> {
     PostHogInternalEvents.nativeOcclusionEvent.addListener(
       _onNativeOcclusionChanged,
     );
+    PostHogInternalEvents.forceReplaySessionReset.addListener(
+      _onForcedReplaySessionReset,
+    );
+  }
+
+  /// How many poll ticks keep forcing a frame after [_ensureSampleLands], if no
+  /// frame has been delivered yet. Each is a throttleDelay apart, so at the
+  /// default 1 s cadence this covers windows measured in milliseconds.
+  static const _sampleRetryTicks = 3;
+
+  /// Drops the per-session state directly, rather than waiting for a tick to
+  /// read the new id. See [PostHogInternalEvents.forceReplaySessionReset].
+  void _onForcedReplaySessionReset() {
+    _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
+    // No sample this turn, only the retry budget: at an identity or project
+    // boundary the host is usually about to replace the screen, and a frame
+    // forced now would record the pre-boundary UI into the session that
+    // replaces it. A repaint within the next tick delivers the new session's
+    // first frame instead; the budget covers a screen that never repaints.
+    _changeDetector?.forceNextTicks(_sampleRetryTicks);
+  }
+
+  /// The single way to sample out of band, for callers that need the next frame
+  /// recorded and cannot wait for the screen to change on its own.
+  ///
+  /// Two things swallow such a request and every caller needs cover for both: a
+  /// capture already in flight, and a platform briefly not recording when the
+  /// sample lands. Hence deferring past the in-flight capture *and* a retry
+  /// budget, which delivery cancels.
+  void _ensureSampleLands() {
+    if (_isCapturing) {
+      _sampleRequestedDuringCapture = true;
+    } else {
+      _changeDetector?.requestImmediateSample();
+    }
+    _changeDetector?.forceNextTicks(_sampleRetryTicks);
   }
 
   /// A native screen started/stopped covering Flutter (pushed by the native
@@ -80,26 +118,25 @@ class PostHogWidgetState extends State<PostHogWidget> {
     if (_disposed) {
       return;
     }
-    final replayConfig = Posthog().config?.sessionReplayConfig;
-    if (replayConfig == null) {
-      return;
-    }
     final occluded = PostHogInternalEvents.nativeOcclusionActive;
     final episode = PostHogInternalEvents.nativeOcclusionEpisode;
     final bridgeFailed = PostHogInternalEvents.nativeBridgeFailed;
+    // Released before the config is read: an episode ends whether or not the SDK
+    // is currently set up, and native pushes exactly one end event. Dropping it
+    // between close() and setup() would strand capture suppressed for the life
+    // of the app, leaving the next session's recording blank.
     if (!occluded) {
       printIfDebug(
           'Native occlusion ended (episode $episode): resuming Flutter capture.');
       _setSuppressFlutterCapture(false);
       _screenshotCapturer?.onOcclusionEnded();
-      // A static screen renders no frame after the cover dismisses
-      // (addPostFrameCallback does not request one), so without forcing a
-      // frame here the replay would stay on the episode's last frame forever.
-      if (_changeDetector?.isRunning ?? false) {
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _onChangeDetected());
-        WidgetsBinding.instance.scheduleFrame();
-      }
+      // Without a sample here the replay would stay on the episode's last frame
+      // until the app happens to render again.
+      _ensureSampleLands();
+      return;
+    }
+    final replayConfig = Posthog().config?.sessionReplayConfig;
+    if (replayConfig == null) {
       return;
     }
     if (!replayConfig.captureNativeScreens) {
@@ -132,20 +169,35 @@ class PostHogWidgetState extends State<PostHogWidget> {
       // A placeholder is only valid while its own episode is occluding.
       await _sendSnapshot(
         imageInfo,
-        isStillValid: () =>
-            PostHogInternalEvents.episodeStillCurrent(episode, occluded: true),
+        isStillValid: () => _stillValid(imageInfo, episode, occluded: true),
       );
     }
   }
 
+  /// A frame may only ship while the world it was captured in is still current:
+  /// the same occlusion episode and the same replay session. The send resolves
+  /// the session, so a stale frame would land in the new session ahead of the
+  /// meta event that session has not sent yet.
+  bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
+    return PostHogInternalEvents.episodeStillCurrent(episode,
+            occluded: occluded) &&
+        (_screenshotCapturer?.sessionStillCurrent(imageInfo) ?? false);
+  }
+
   void _initComponents(PostHogConfig config) {
-    final throttleDelay = config.sessionReplayConfig.throttleDelay;
-    _screenshotCapturer = ScreenshotCapturer(config);
+    _screenshotCapturer = ScreenshotCapturer(
+      config,
+      // The observing tick's own frame can still be dropped, and on a static
+      // screen no further tick would run. This fires from inside that tick, so
+      // it costs one redundant capture when the frame did deliver — cheaper
+      // than waiting a throttleDelay for the retries to repair it.
+      onSessionRotated: _ensureSampleLands,
+    );
     _nativeCommunicator = NativeCommunicator();
     _changeDetector = ChangeDetector(
       _onChangeDetected,
-      interval: throttleDelay,
-    );
+      interval: config.sessionReplayConfig.throttleDelay,
+    )..suppressForcedFrames = _suppressFlutterCapture;
   }
 
   void _onSessionRecordingChanged() {
@@ -215,16 +267,21 @@ class PostHogWidgetState extends State<PostHogWidget> {
       if (imageInfo == null || _disposed) {
         return;
       }
-
-      // Only valid while the world it was captured in is still current — an
-      // episode starting mid-pipeline makes it stale.
-      await _sendSnapshot(
+      final delivered = await _sendSnapshot(
         imageInfo,
-        isStillValid: () => PostHogInternalEvents.episodeStillCurrent(episode,
-            occluded: occluded),
+        isStillValid: () => _stillValid(imageInfo, episode, occluded: occluded),
       );
+      if (delivered) {
+        // Keyed on delivery: a frame dropped for belonging to the world it
+        // started in must not cancel the retries covering what replaced it.
+        _changeDetector?.cancelForcedTicks();
+      }
     } finally {
       _isCapturing = false;
+      if (_sampleRequestedDuringCapture) {
+        _sampleRequestedDuringCapture = false;
+        _changeDetector?.requestImmediateSample();
+      }
     }
   }
 
@@ -287,6 +344,9 @@ class PostHogWidgetState extends State<PostHogWidget> {
     );
     PostHogInternalEvents.nativeOcclusionEvent.removeListener(
       _onNativeOcclusionChanged,
+    );
+    PostHogInternalEvents.forceReplaySessionReset.removeListener(
+      _onForcedReplaySessionReset,
     );
 
     _changeDetector?.stop();
