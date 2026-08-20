@@ -64,8 +64,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         if (result == null) return null;
         event = result;
       } catch (e) {
-        // Skip a throwing callback; continue with the pre-callback event.
-        printIfDebug('[PostHog] beforeSend callback threw exception: $e');
+        printIfDebug(
+          '[PostHog] Warning: beforeSend callback threw an exception; dropping event: $e',
+        );
+        return null;
       }
     }
     return event;
