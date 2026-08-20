@@ -651,6 +651,9 @@ class PosthogFlutterPlugin :
                     errorConfig.getIfNotNull<Boolean>("captureNativeExceptions") {
                         errorTrackingConfig.autoCapture = it
                     }
+                    errorConfig.getIfNotNull<Boolean>("captureNativeCrashes") {
+                        errorTrackingConfig.captureNativeCrashes = it
+                    }
                     errorConfig.getIfNotNull<List<String>>("inAppIncludes") { includes ->
                         errorTrackingConfig.inAppIncludes.addAll(includes)
                     }

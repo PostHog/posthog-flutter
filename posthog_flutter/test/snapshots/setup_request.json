@@ -42,6 +42,7 @@
         "captureSilentFlutterErrors": false,
         "capturePlatformDispatcherErrors": false,
         "captureNativeExceptions": false,
+        "captureNativeCrashes": true,
         "captureIsolateErrors": false,
         "exceptionSteps": {
           "enabled": true,

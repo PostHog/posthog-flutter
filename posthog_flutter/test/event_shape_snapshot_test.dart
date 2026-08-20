@@ -60,7 +60,8 @@ void main() {
       ..sampleRate = 0.25;
     config.errorTrackingConfig
       ..inAppIncludes.add('package:snapshot_app')
-      ..captureFlutterErrors = true;
+      ..captureFlutterErrors = true
+      ..captureNativeCrashes = true;
     config.logsConfig
       ..serviceName = 'checkout-app'
       ..serviceVersion = '1.2.3'
