@@ -28,12 +28,17 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         private var bridgeEpisodeStarted = false
         // End-transition debounce: ticks reading not-occluded while an episode is active.
         private var notOccludedTicks = 0
+        // Whether the episode is being held open across a run of inactive reads.
+        private var heldWhileInactive = false
         // Monotonic episode id, stamped into every push so Dart drops stale-episode work.
         private var occlusionEpisode = 0
         // Failed captures before the episode's first delivered frame; at the limit it
         // falls back (bridgeFailed). After first delivery, failures never demote.
         private var bridgeFailureStrikes = 0
         private static let bridgeFailureStrikeLimit = 3
+        // Ticks a not-occluded read must repeat before it ends an episode. Both
+        // the active and the inactive path debounce, and they have to agree.
+        private static let endDebounceTicks = 1
     #endif
 
     private static var instance: PosthogFlutterPlugin?
@@ -838,6 +843,8 @@ extension PosthogFlutterPlugin {
         }
 
         func stopOcclusionDetector() {
+            heldWhileInactive = false
+            notOccludedTicks = 0
             occlusionTimer?.invalidate()
             occlusionTimer = nil
             NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeVisibleNotification, object: nil)
@@ -887,6 +894,26 @@ extension PosthogFlutterPlugin {
             }
             guard PostHogSDK.shared.isSessionReplayActive() else {
                 if isOccluded || bridgeEnabled {
+                    // Replay reads inactive across a session boundary — reset(),
+                    // or a close()/setup() pair — until its flags reload lands, and
+                    // that is not the episode ending. Ending here would lift Dart's
+                    // capture suppression under a live native cover. Unbounded on
+                    // purpose: nothing is captured while replay is off, so the hold
+                    // costs no frames, and the cover going away ends the episode
+                    // either way.
+                    if Self.isFlutterOccluded() {
+                        heldWhileInactive = true
+                        // A blip seen before the hold is deliberately not carried
+                        // across it, so it cannot signal a cover swap later.
+                        notOccludedTicks = 0
+                        return
+                    } else if notOccludedTicks < Self.endDebounceTicks {
+                        // The same end-debounce the active path applies, because a
+                        // native→native handoff's first not-occluded read can land
+                        // on either side of the boundary.
+                        notOccludedTicks += 1
+                        return
+                    }
                     isOccluded = false
                     bridgeEnabled = false
                     bridgeEpisodeStarted = false
@@ -895,19 +922,29 @@ extension PosthogFlutterPlugin {
                     // occluded=true push looks like unchanged state.
                     pushOcclusionEvent(occluded: false)
                 }
+                heldWhileInactive = false
                 return
             }
+            let resumedFromHold = heldWhileInactive
+            heldWhileInactive = false
             let occluded = Self.isFlutterOccluded()
             // Debounce END only: a native→native handoff briefly reads
             // not-occluded; ending the episode there would flash a stale frame.
-            if !occluded, isOccluded, notOccludedTicks < 1 {
+            if !occluded, isOccluded, notOccludedTicks < Self.endDebounceTicks {
                 notOccludedTicks += 1
                 return
             }
             // Occluded again after a blip = the cover was swapped. The old
             // cover's bridge grant must not carry over; re-handshake under a
             // new episode id. No end event, so Dart's suppression never lapses.
-            let coverSwapped = occluded && isOccluded && notOccludedTicks > 0
+            //
+            // A hold that ends with the cover still up and no bridge re-handshakes
+            // for the same reason: the enable was refused while replay was off (it
+            // requires an active recording), so without this Dart keeps showing a
+            // placeholder it emitted for an episode the SDK has since stopped
+            // recording, and nothing replaces it until the cover goes away.
+            let resumedUnbridged = resumedFromHold && !bridgeEnabled
+            let coverSwapped = occluded && isOccluded && (notOccludedTicks > 0 || resumedUnbridged)
             notOccludedTicks = 0
             if occluded != isOccluded {
                 isOccluded = occluded
