@@ -181,8 +181,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   bool _stillValid(ImageInfo imageInfo, int episode, {required bool occluded}) {
     return PostHogInternalEvents.episodeStillCurrent(episode,
             occluded: occluded) &&
-        (_screenshotCapturer?.sessionStillCurrent(imageInfo.sessionId) ??
-            false);
+        (_screenshotCapturer?.sessionStillCurrent(imageInfo) ?? false);
   }
 
   void _initComponents(PostHogConfig config) {

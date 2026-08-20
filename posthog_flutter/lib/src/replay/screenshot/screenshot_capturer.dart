@@ -25,6 +25,11 @@ class ImageInfo {
   final bool shouldSendMetaEvent;
   final Uint8List imageBytes;
 
+  /// Which run of the capturer's per-session state this frame was built in.
+  /// A frame naming no session cannot be told apart from a fresh one by id
+  /// alone, so the generation is what separates them.
+  final int generation;
+
   /// The replay session this frame was captured under, so the sender can drop
   /// it if the session rotates mid-flight.
   final String? sessionId;
@@ -38,6 +43,7 @@ class ImageInfo {
     this.shouldSendMetaEvent,
     this.imageBytes, {
     required this.sessionId,
+    required this.generation,
   });
 }
 
@@ -74,6 +80,12 @@ class ScreenshotCapturer {
   bool _cancelled = false;
 
   bool hasCapturedPlatformViews = false;
+
+  // Bumped whenever the per-session state is dropped. Frames name a session,
+  // but a frame built before the first state read names none, and so does one
+  // built right after a forced reset — the generation is what tells those two
+  // apart.
+  int _sessionGeneration = 0;
 
   // Held so confirmDelivered/onOcclusionEnded act on the exact status a frame
   // was built against, avoiding a containerKey re-lookup that can transiently fail.
@@ -122,6 +134,12 @@ class ScreenshotCapturer {
     if (!force && _replaySessionId == currentSessionId) {
       return;
     }
+    // Adopting an id for the first time is the same generation: an occlusion
+    // placeholder built before any state read belongs to the session that read
+    // then names, and must survive it. Every other reset starts a new one.
+    if (force || _replaySessionId != null) {
+      _sessionGeneration++;
+    }
     _replaySessionId = currentSessionId;
     _snapshotManager.clear();
     _lastTargetViewId = null;
@@ -130,10 +148,10 @@ class ScreenshotCapturer {
     _pendingCompositedBytesHash = null;
   }
 
-  /// Whether a frame captured under [sessionId] still belongs to the session the
-  /// capturer is tracking — the session-level counterpart of the occlusion
-  /// episode check. A frame outliving its session would land in the new session
-  /// ahead of that session's meta event.
+  /// Whether [imageInfo] still belongs to the session the capturer is tracking
+  /// — the session-level counterpart of the occlusion episode check. A frame
+  /// outliving its session would land in the new session ahead of that
+  /// session's meta event.
   ///
   /// It catches a forced reset landing mid-send, and a rotation adopted by a
   /// capture tick that was already in flight when an occlusion placeholder was
@@ -141,13 +159,16 @@ class ScreenshotCapturer {
   /// catch a rotation observed by the same tick that produced the frame: that
   /// tick writes the tracked id before building it.
   ///
-  /// A frame naming no session is always current: it carries no attribution of
-  /// its own, so the send resolves whichever session is live and it cannot land
-  /// in a dead one. Without this, a placeholder built before the first tick had
-  /// read an id would be dropped by that tick adopting one, leaving the episode
-  /// showing the uncovered Flutter tree instead of the cover.
-  bool sessionStillCurrent(String? sessionId) =>
-      sessionId == null || _replaySessionId == sessionId;
+  /// The id alone cannot judge a frame naming no session, and there are two of
+  /// those: an occlusion placeholder built before any state read, and anything
+  /// built after a forced reset, which leaves the tracked id null until the
+  /// next read. Hence the generation — the first must survive the read that
+  /// names its session (dropping it would leave the episode showing the
+  /// uncovered Flutter tree instead of the cover), the second must not survive
+  /// the reset that ended its recording.
+  bool sessionStillCurrent(ImageInfo imageInfo) =>
+      imageInfo.generation == _sessionGeneration &&
+      (imageInfo.sessionId == null || _replaySessionId == imageInfo.sessionId);
 
   /// Called when an occlusion episode ends: invalidates the dedup hashes (else
   /// the first Flutter frame matches the placeholder/bridged hash and freezes
@@ -438,9 +459,10 @@ class ScreenshotCapturer {
     if (target == null) {
       return null;
     }
-    // Read before the awaits below, so a rotation mid-build is visible to the
-    // sender as a stale frame.
+    // Read before the awaits below, so a rotation or a forced reset mid-build
+    // is visible to the sender as a stale frame.
     final sessionId = _replaySessionId;
+    final generation = _sessionGeneration;
     final renderObject = target.renderObject;
     // Always with meta: a bridged episode already shipped the native screen's
     // meta, so without re-sending, the placeholder renders against its viewport.
@@ -491,6 +513,7 @@ class ScreenshotCapturer {
       shouldSendMetaEvent,
       pngBytes,
       sessionId: sessionId,
+      generation: generation,
     );
   }
 
@@ -517,10 +540,10 @@ class ScreenshotCapturer {
     if (previousSessionId != null && state.sessionId != previousSessionId) {
       onSessionRotated?.call();
     }
-    return _captureScreenshot(state.sessionId);
+    return _captureScreenshot(state.sessionId, _sessionGeneration);
   }
 
-  Future<ImageInfo?> _captureScreenshot(String? sessionId) {
+  Future<ImageInfo?> _captureScreenshot(String? sessionId, int generation) {
     final target = _resolveCaptureTarget();
     if (target == null) {
       return Future.value(null);
@@ -756,6 +779,7 @@ class ScreenshotCapturer {
               shouldSendMetaEvent,
               pngBytes,
               sessionId: sessionId,
+              generation: generation,
             );
             // No status commit here: the sender may still drop this frame, and
             // committing for a never-sent frame breaks playback / freezes dedup.

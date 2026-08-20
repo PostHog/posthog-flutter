@@ -394,6 +394,56 @@ void main() {
       mockChannel();
     });
 
+    testWidgets('placeholder is dropped when a forced reset lands mid-build',
+        (tester) async {
+      // The mirror of the adoption case above: a placeholder built before any
+      // state read names no session, and neither does the capturer right after
+      // a forced reset, so the session id alone cannot tell the stale frame
+      // from a fresh one. Without the generation it ships into the recording
+      // that replaced it.
+      final gate = Completer<void>();
+      var gated = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        recordedCalls.add(call);
+        switch (call.method) {
+          case 'getSessionReplayState':
+            if (!gated) {
+              gated = true;
+              await gate.future;
+            }
+            return {'isActive': true, 'sessionId': 'session-b'};
+          case 'enableNativeBridge':
+            return false;
+          default:
+            return null;
+        }
+      });
+
+      sessionReplayActive = true;
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await pumpReplayWidget(tester);
+      await settleRealAsync(tester);
+      expect(gated, isTrue,
+          reason: 'nothing may have adopted a session id yet');
+
+      recordedCalls.clear();
+      pushOcclusion(occluded: true, episode: 1, bridgeFailed: true);
+      // What reset()/close()/startSessionRecording(resumeCurrent: false) bump,
+      // landing while the placeholder is still rasterizing.
+      PostHogInternalEvents.requestReplaySessionReset();
+      gate.complete();
+      await settleRealAsync(tester);
+      await settleRealAsync(tester);
+
+      final methods = recordedCalls.map((c) => c.method).toList();
+      expect(methods, isNot(contains('sendFullSnapshot')),
+          reason: 'the cover belongs to the recording the reset ended');
+      expect(methods, isNot(contains('sendMetaEvent')));
+
+      await unmountAndFlush(tester);
+      mockChannel();
+    });
+
     testWidgets('ignores occlusion when the bridge is off', (tester) async {
       await setupPosthog(replayConfig(captureNativeScreens: false));
       final state = await pumpReplayWidget(tester);
