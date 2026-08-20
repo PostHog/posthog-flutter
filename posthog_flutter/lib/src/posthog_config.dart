@@ -771,6 +771,16 @@ class PostHogSessionReplayConfig {
     }
   }
 
+  /// Experimental Android-only mask alignment verification.
+  ///
+  /// This applies only to Android native-screen captures enabled by
+  /// [captureNativeScreens]. Normal Flutter widget screenshots are rendered and
+  /// masked by Flutter and are unaffected. Enabling this can add view hierarchy
+  /// walks while Android captures native screens.
+  ///
+  /// Default: false.
+  var verifyScreenshotMaskAlignment = false;
+
   /// Converts this session replay configuration to a platform-channel map.
   ///
   /// Returns values consumed by the Android and Apple session replay
@@ -782,6 +792,7 @@ class PostHogSessionReplayConfig {
       'throttleDelayMs': throttleDelay.inMilliseconds,
       'maskAllPlatformViews': maskAllPlatformViews,
       'captureNativeScreens': captureNativeScreens,
+      'verifyScreenshotMaskAlignment': verifyScreenshotMaskAlignment,
       if (sampleRate != null) 'sampleRate': sampleRate,
     };
   }
