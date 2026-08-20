@@ -167,6 +167,7 @@ jobs:
       # Browser-only tests (`@TestOn('browser')`) are skipped by the VM run above.
       - name: Test (web)
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        timeout-minutes: 5
         working-directory: ./posthog_flutter
         run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_widget_web_test.dart test/web_canvas_mask_provider_test.dart
 
@@ -174,6 +175,7 @@ jobs:
       # only a wasm compile exercises the dart2wasm selection this test guards.
       - name: Test (web, wasm)
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        timeout-minutes: 5
         working-directory: ./posthog_flutter
         run: flutter test --platform chrome --wasm test/posthog_isolate_error_handler_web_test.dart
 
