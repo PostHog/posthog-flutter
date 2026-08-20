@@ -51,7 +51,16 @@ class ChangeDetector {
       return;
     }
     _isRunning = true;
-    requestImmediateSample();
+    // A pending budget means a session boundary armed it, and forcing a frame
+    // now would record the screen the host has not replaced yet. Leave that
+    // first frame to the budget's own ticks. Any other start() — app launch, a
+    // recording resumed on the same session — still forces, or a static screen
+    // would record nothing until it happens to repaint.
+    if (_forcedTicksLeft > 0) {
+      _scheduleFrameCallback();
+    } else {
+      requestImmediateSample();
+    }
     _timer = Timer.periodic(interval, (_) {
       final forceFrame = _forcedTicksLeft > 0;
       if (forceFrame) {

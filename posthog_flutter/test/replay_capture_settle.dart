@@ -35,3 +35,13 @@ Future<void> settleCapture(WidgetTester tester, {int rounds = 16}) async {
     );
   }
 }
+
+/// Advances one poll tick before settling. Boundaries leave the new session's
+/// first frame to the forced-tick budget, so it cannot land in the same turn.
+Future<void> settleCaptureAcrossTick(
+  WidgetTester tester, {
+  Duration interval = const Duration(seconds: 1),
+}) async {
+  await tester.pump(interval);
+  await settleCapture(tester);
+}

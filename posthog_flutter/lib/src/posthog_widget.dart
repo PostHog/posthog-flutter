@@ -86,10 +86,12 @@ class PostHogWidgetState extends State<PostHogWidget> {
   /// read the new id. See [PostHogInternalEvents.forceReplaySessionReset].
   void _onForcedReplaySessionReset() {
     _screenshotCapturer?.resetSessionStateIfNeeded(null, force: true);
-    // Still reads the post-rotation id: this frame cannot run before the current
-    // turn ends, so its state read queues behind the rotating call on the same
-    // channel.
-    _ensureSampleLands();
+    // No sample this turn, only the retry budget: at an identity or project
+    // boundary the host is usually about to replace the screen, and a frame
+    // forced now would record the pre-boundary UI into the session that
+    // replaces it. A repaint within the next tick delivers the new session's
+    // first frame instead; the budget covers a screen that never repaints.
+    _changeDetector?.forceNextTicks(_sampleRetryTicks);
   }
 
   /// The single way to sample out of band, for callers that need the next frame

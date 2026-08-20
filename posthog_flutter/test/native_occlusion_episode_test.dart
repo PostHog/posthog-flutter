@@ -839,6 +839,7 @@ void main() {
       await setupPosthog(replayConfig(captureNativeScreens: false));
       await pumpReplayWidget(tester);
       await settleCapture(tester);
+      await settleCaptureAcrossTick(tester);
 
       var methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, contains('sendMetaEvent'));
@@ -973,7 +974,7 @@ void main() {
       // The iOS shape, where close() clears the session.
       sessionId = 'session-b';
       await setupPosthog(replayConfig(captureNativeScreens: false));
-      await settleCapture(tester);
+      await settleCaptureAcrossTick(tester);
 
       final methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, contains('sendMetaEvent'),
@@ -1036,7 +1037,7 @@ void main() {
       recordedCalls.clear();
       await Posthog().close();
       await setupPosthog(replayConfig(captureNativeScreens: false));
-      await settleCapture(tester);
+      await settleCaptureAcrossTick(tester);
 
       final methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, contains('sendMetaEvent'),
@@ -1071,6 +1072,7 @@ void main() {
       await setupPosthog(replayConfig(captureNativeScreens: false));
       await pumpReplayWidget(tester);
       await settleCapture(tester);
+      await settleCaptureAcrossTick(tester);
 
       final sends = recordedCalls
           .map((c) => c.method)
