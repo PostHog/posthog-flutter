@@ -50,9 +50,11 @@ private const val OCCLUSION_TICK_MS = 1000L
 
 // How long an occlusion episode survives while replay reads inactive. Wall time,
 // not ticks: lifecycle and window callbacks nudge extra ticks, which would burn a
-// tick budget in milliseconds. Covers a session boundary's inactive window (about
-// a second) with margin.
-private const val INACTIVE_HOLD_MS = 2000L
+// tick budget in milliseconds. A session boundary keeps replay off until the
+// flags reload lands, so the window is a network round trip, not a fixed delay —
+// this only has to outlast one attempt. It is a safety valve for a coverage
+// reading that never recovers, not the thing that ends a dismissed cover.
+private const val INACTIVE_HOLD_MS = 30_000L
 
 private const val BRIDGE_FAILURE_STRIKE_LIMIT = 3
 
@@ -940,6 +942,7 @@ class PosthogFlutterPlugin :
 
     private fun stopOcclusionDetector() {
         occlusionDetectorRunning = false
+        inactiveHoldStartedAt = 0L
         mainHandler.removeCallbacks(occlusionTicker)
         mainHandler.removeCallbacks(nudgeRunnable)
         unregisterLifecycleTracking()
@@ -984,12 +987,11 @@ class PosthogFlutterPlugin :
         if (!isSessionReplayActive()) {
             if (isOccluded || bridgeEnabled) {
                 // A session boundary — reset(), or a close()/setup() pair — turns
-                // replay off for around a second. Ending the episode there lifts
-                // Dart's capture suppression while a native screen is still on
-                // top, and the tick after re-detects that same cover as a fresh
-                // episode. Hold while still covered. Bounded, because an episode
-                // end is the only thing that releases the suppression: a recording
-                // that really did stop must still get one.
+                // replay off until its flags reload lands. Ending the episode
+                // there lifts Dart's capture suppression while a native screen is
+                // still on top, and the tick after re-detects that same cover as a
+                // fresh episode. Hold while still covered: nothing is captured
+                // while replay is off, so holding costs no frames.
                 if (isFlutterCovered()) {
                     val now = SystemClock.uptimeMillis()
                     if (inactiveHoldStartedAt == 0L) {
@@ -1021,15 +1023,6 @@ class PosthogFlutterPlugin :
         }
         val resumedFromHold = inactiveHoldStartedAt != 0L
         inactiveHoldStartedAt = 0L
-        if (resumedFromHold && bridgeEnabled) {
-            // The episode outlived a session rotation. Re-arm the per-episode
-            // bridge state so the new session's first bridged frame counts as the
-            // episode's first — resetting the decor view's snapshot state rather
-            // than leaning on the native SDK to do it on rotation — and so failure
-            // demotion can still fall back to the placeholder.
-            bridgeEpisodeStarted = false
-            bridgeFailureStrikes = 0
-        }
         val occludedNow = isFlutterCovered()
         // Debounce END only: a native→native handoff (A pauses before B resumes)
         // briefly reads not-occluded; ending the episode there would flash a
