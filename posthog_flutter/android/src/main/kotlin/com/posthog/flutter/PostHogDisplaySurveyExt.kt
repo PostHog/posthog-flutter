@@ -81,6 +81,11 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                 "thankYouMessageDescription" to app.thankYouMessageDescription,
                 "thankYouMessageDescriptionContentType" to app.thankYouMessageDescriptionContentType?.value,
                 "thankYouMessageCloseButtonText" to app.thankYouMessageCloseButtonText,
+                "displayIntroScreen" to app.displayIntroScreen,
+                "introScreenHeader" to app.introScreenHeader,
+                "introScreenDescription" to app.introScreenDescription,
+                "introScreenDescriptionContentType" to app.introScreenDescriptionContentType?.value,
+                "introScreenButtonText" to app.introScreenButtonText,
             )
     }
 

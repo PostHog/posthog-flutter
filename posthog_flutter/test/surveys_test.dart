@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/posthog_observer.dart';
 import 'package:posthog_flutter/src/surveys/models/posthog_display_link_question.dart';
 import 'package:posthog_flutter/src/surveys/models/posthog_display_survey.dart';
+import 'package:posthog_flutter/src/surveys/models/posthog_display_survey_text_content_type.dart';
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
 import 'package:posthog_flutter/src/surveys/widgets/survey_bottom_sheet.dart';
 
@@ -158,6 +159,49 @@ void main() {
         surveyWithLinkQuestion(includeLink: false),
       );
       expect(question.link, '');
+    });
+  });
+
+  group('PostHogDisplaySurvey.fromDict intro screen appearance', () {
+    Map<String, Object?> surveyWithAppearance(Map<String, Object?> appearance) {
+      return {
+        'id': 'survey-1',
+        'name': 'Test survey',
+        'questions': [
+          {'type': 'open', 'question': 'Feedback?', 'isOptional': false},
+        ],
+        'appearance': appearance,
+      };
+    }
+
+    test('parses the intro screen fields from the native payload', () {
+      final survey = PostHogDisplaySurvey.fromDict(surveyWithAppearance({
+        'displayIntroScreen': true,
+        'introScreenHeader': 'Welcome!',
+        'introScreenDescription': 'Two quick questions.',
+        'introScreenDescriptionContentType': 0,
+        'introScreenButtonText': 'Get started',
+      }));
+
+      final appearance = survey.appearance!;
+      expect(appearance.displayIntroScreen, true);
+      expect(appearance.introScreenHeader, 'Welcome!');
+      expect(appearance.introScreenDescription, 'Two quick questions.');
+      expect(appearance.introScreenDescriptionContentType,
+          PostHogDisplaySurveyTextContentType.html);
+      expect(appearance.introScreenButtonText, 'Get started');
+    });
+
+    test('absent intro screen keys default to disabled', () {
+      final survey = PostHogDisplaySurvey.fromDict(surveyWithAppearance({
+        'thankYouMessageHeader': 'Thanks!',
+      }));
+
+      final appearance = survey.appearance!;
+      expect(appearance.displayIntroScreen, false);
+      expect(appearance.introScreenHeader, isNull);
+      expect(appearance.introScreenDescriptionContentType,
+          PostHogDisplaySurveyTextContentType.text);
     });
   });
 }
