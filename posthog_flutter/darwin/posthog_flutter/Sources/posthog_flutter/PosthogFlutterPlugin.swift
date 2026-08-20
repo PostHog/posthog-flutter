@@ -28,12 +28,17 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         private var bridgeEpisodeStarted = false
         // End-transition debounce: ticks reading not-occluded while an episode is active.
         private var notOccludedTicks = 0
+        // Ticks an episode has been held open while replay reads inactive.
+        private var inactiveTicks = 0
         // Monotonic episode id, stamped into every push so Dart drops stale-episode work.
         private var occlusionEpisode = 0
         // Failed captures before the episode's first delivered frame; at the limit it
         // falls back (bridgeFailed). After first delivery, failures never demote.
         private var bridgeFailureStrikes = 0
         private static let bridgeFailureStrikeLimit = 3
+        // Ticks an episode survives while replay reads inactive. Two covers a
+        // session boundary, whose inactive window runs to about one tick.
+        private static let inactiveHoldTicks = 2
     #endif
 
     private static var instance: PosthogFlutterPlugin?
@@ -885,6 +890,19 @@ extension PosthogFlutterPlugin {
             }
             guard PostHogSDK.shared.isSessionReplayActive() else {
                 if isOccluded || bridgeEnabled {
+                    // A session boundary — reset(), or a close()/setup() pair —
+                    // turns replay off for around a tick. Ending the episode there
+                    // would lift Dart's capture suppression while a native screen
+                    // is still on top, and the tick after re-detects that same
+                    // cover as a fresh episode. Hold while still covered, long
+                    // enough to outlast a boundary (and a burst of them) at this
+                    // tick rate. Bounded, because an episode end is the only thing
+                    // that releases the suppression, so a recording that really
+                    // did stop must still get one.
+                    if Self.isFlutterOccluded(), inactiveTicks < Self.inactiveHoldTicks {
+                        inactiveTicks += 1
+                        return
+                    }
                     isOccluded = false
                     bridgeEnabled = false
                     bridgeEpisodeStarted = false
@@ -893,8 +911,10 @@ extension PosthogFlutterPlugin {
                     // occluded=true push looks like unchanged state.
                     pushOcclusionEvent(occluded: false)
                 }
+                inactiveTicks = 0
                 return
             }
+            inactiveTicks = 0
             let occluded = Self.isFlutterOccluded()
             // Debounce END only: a native→native handoff briefly reads
             // not-occluded; ending the episode there would flash a stale frame.
