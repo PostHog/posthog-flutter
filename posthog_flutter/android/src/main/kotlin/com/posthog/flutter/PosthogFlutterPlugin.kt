@@ -987,12 +987,10 @@ class PosthogFlutterPlugin :
                 // replay off for around a second. Ending the episode there lifts
                 // Dart's capture suppression while a native screen is still on
                 // top, and the tick after re-detects that same cover as a fresh
-                // episode. Hold while still covered — using the same debounced
-                // view of coverage the active path applies, so a native→native
-                // handoff reading not-covered cannot skip both guards at once.
-                // Bounded, because an episode end is the only thing that releases
-                // the suppression: a recording that really did stop must get one.
-                if (isFlutterCovered() || notOccludedTicks > 0) {
+                // episode. Hold while still covered. Bounded, because an episode
+                // end is the only thing that releases the suppression: a recording
+                // that really did stop must still get one.
+                if (isFlutterCovered()) {
                     val now = SystemClock.uptimeMillis()
                     if (inactiveHoldStartedAt == 0L) {
                         inactiveHoldStartedAt = now
@@ -1000,6 +998,14 @@ class PosthogFlutterPlugin :
                     if (now - inactiveHoldStartedAt < INACTIVE_HOLD_MS) {
                         return
                     }
+                } else if (notOccludedTicks < 1) {
+                    // The same end-debounce the active path applies, because a
+                    // native→native handoff's first not-covered read can land on
+                    // either side of the boundary. Without it, a tick reading the
+                    // gap between one native screen finishing and the next
+                    // resuming ends the episode with no guard at all.
+                    notOccludedTicks++
+                    return
                 }
                 isOccluded = false
                 bridgeEnabled = false
@@ -1015,6 +1021,15 @@ class PosthogFlutterPlugin :
         }
         val resumedFromHold = inactiveHoldStartedAt != 0L
         inactiveHoldStartedAt = 0L
+        if (resumedFromHold && bridgeEnabled) {
+            // The episode outlived a session rotation. Re-arm the per-episode
+            // bridge state so the new session's first bridged frame counts as the
+            // episode's first — resetting the decor view's snapshot state rather
+            // than leaning on the native SDK to do it on rotation — and so failure
+            // demotion can still fall back to the placeholder.
+            bridgeEpisodeStarted = false
+            bridgeFailureStrikes = 0
+        }
         val occludedNow = isFlutterCovered()
         // Debounce END only: a native→native handoff (A pauses before B resumes)
         // briefly reads not-occluded; ending the episode there would flash a

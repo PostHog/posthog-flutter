@@ -896,19 +896,25 @@ extension PosthogFlutterPlugin {
                     // turns replay off for around a second. Ending the episode
                     // there would lift Dart's capture suppression while a native
                     // screen is still on top, and the tick after re-detects that
-                    // same cover as a fresh episode. Hold while still covered —
-                    // using the same debounced view of coverage the active path
-                    // applies, so a native→native handoff reading not-covered
-                    // cannot skip both guards at once. Bounded, because an episode
-                    // end is the only thing that releases the suppression: a
-                    // recording that really did stop must still get one.
-                    if Self.isFlutterOccluded() || notOccludedTicks > 0 {
+                    // same cover as a fresh episode. Hold while still covered.
+                    // Bounded, because an episode end is the only thing that
+                    // releases the suppression: a recording that really did stop
+                    // must still get one.
+                    if Self.isFlutterOccluded() {
                         let now = ProcessInfo.processInfo.systemUptime
                         let startedAt = inactiveHoldStartedAt ?? now
                         inactiveHoldStartedAt = startedAt
                         if now - startedAt < Self.inactiveHoldSeconds {
                             return
                         }
+                    } else if notOccludedTicks < 1 {
+                        // The same end-debounce the active path applies, because a
+                        // native→native handoff's first not-occluded read can land
+                        // on either side of the boundary. Without it, a tick
+                        // reading the gap between one native screen dismissing and
+                        // the next presenting ends the episode with no guard.
+                        notOccludedTicks += 1
+                        return
                     }
                     isOccluded = false
                     bridgeEnabled = false
@@ -923,6 +929,14 @@ extension PosthogFlutterPlugin {
             }
             let resumedFromHold = inactiveHoldStartedAt != nil
             inactiveHoldStartedAt = nil
+            if resumedFromHold, bridgeEnabled {
+                // The episode outlived a session rotation. Re-arm the per-episode
+                // bridge state so the new session's first bridged frame counts as
+                // the episode's first, and so failure demotion can still fall back
+                // to the placeholder.
+                bridgeEpisodeStarted = false
+                bridgeFailureStrikes = 0
+            }
             let occluded = Self.isFlutterOccluded()
             // Debounce END only: a native→native handoff briefly reads
             // not-occluded; ending the episode there would flash a stale frame.
