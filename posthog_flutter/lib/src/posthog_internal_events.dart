@@ -8,6 +8,16 @@ class PostHogInternalEvents {
 
   static final sessionRecordingActive = ValueNotifier<bool>(false);
 
+  /// Drops the replay capture's per-session state without waiting for a tick to
+  /// observe a new session id.
+  ///
+  /// Needed because a tick never notices when the recording restarts while the
+  /// platform keeps the same id: Android's `startSessionReplay` returns early
+  /// while recording is already active, so nothing rotates.
+  static final forceReplaySessionReset = ValueNotifier<int>(0);
+
+  static void requestReplaySessionReset() => forceReplaySessionReset.value++;
+
   /// Occlusion episode protocol, pushed by the native side. A monotonic
   /// counter (not a bool, which would dedupe repeated states and swallow e.g. a
   /// bridge-failure re-push). Current state is in [nativeOcclusionActive] /

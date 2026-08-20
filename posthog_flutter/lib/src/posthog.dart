@@ -364,7 +364,12 @@ class Posthog {
   /// The SDK will behave as if it has been [setup] for the first time.
   ///
   /// Returns a [Future] that completes when the reset request has been queued.
-  Future<void> reset() => _posthog.reset();
+  Future<void> reset() async {
+    // Bumped before the platform call because native rotates inside that round
+    // trip.
+    PostHogInternalEvents.requestReplaySessionReset();
+    await _posthog.reset();
+  }
 
   /// Disables data collection for the current user.
   ///
@@ -837,6 +842,14 @@ class Posthog {
 
   /// Closes the PostHog SDK and cleans up resources.
   ///
+  /// This is also the entry point for reconfiguring: the native SDKs ignore a
+  /// repeated [setup], so changing the project token, host, or native session
+  /// replay settings means calling [close] first and then [setup] again.
+  ///
+  /// Whatever session replay records after the next [setup] starts as a fresh
+  /// recording. Whether the platform also changes the *session* here differs by
+  /// platform, so do not rely on a [close]/[setup] pair rotating the session id.
+  ///
   /// Returns a [Future] that completes when platform resources have been closed.
   ///
   /// **Note:** After calling `close()`, surveys will not be rendered until the
@@ -845,6 +858,10 @@ class Posthog {
     _config = null;
     _currentScreen = null;
     PostHogInternalEvents.sessionRecordingActive.value = false;
+    // Forced rather than keyed on observing a new session id, because the
+    // platforms disagree on whether close() rotates the session at all — the
+    // recording that follows must start clean either way.
+    PostHogInternalEvents.requestReplaySessionReset();
     PosthogObserver.clearCurrentContext();
 
     // Uninstall Flutter integrations
@@ -865,10 +882,18 @@ class Posthog {
   /// replay is disabled in your project settings.
   ///
   /// Set [resumeCurrent] to `true` (the default) to resume recording the current
-  /// session. Set it to `false` to start a new session and begin recording.
+  /// session. Set it to `false` to start a new session and begin recording —
+  /// though a new session is not guaranteed while recording is already active,
+  /// so call [stopSessionRecording] first if you need one. Either way, `false`
+  /// restarts the recording even when the platform keeps the current session id.
   ///
   /// Returns a [Future] that completes when the start request has been sent.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
+    if (!resumeCurrent) {
+      // The new recording must send its own meta event rather than inherit the
+      // previous session's latch, even where the platform keeps the same id.
+      PostHogInternalEvents.requestReplaySessionReset();
+    }
     await _posthog.startSessionRecording(resumeCurrent: resumeCurrent);
     PostHogInternalEvents.sessionRecordingActive.value = true;
   }

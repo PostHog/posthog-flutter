@@ -39,16 +39,28 @@ class NativeCommunicator {
     }
   }
 
-  Future<bool> isSessionReplayActive() async {
+  /// Reads the native replay state for one capture tick: whether capture should
+  /// run at all, and the session id the captured frame belongs to. The two
+  /// travel together so the capturer can key its per-session reset on the id the
+  /// native SDK actually holds without a second round trip per tick.
+  ///
+  /// Non-mutating on both platforms, so a rotation is observed one tick late.
+  Future<({bool isActive, String? sessionId})> getSessionReplayState() async {
     if (kIsWeb) {
       // Flutter doesn't capture screenshots on web, JS SDK handles session replay
-      return false;
+      return (isActive: false, sessionId: null);
     }
     try {
-      return await _channel.invokeMethod('isSessionReplayActive');
+      final state = await _channel.invokeMapMethod<String, Object?>(
+        'getSessionReplayState',
+      );
+      return (
+        isActive: state?['isActive'] as bool? ?? false,
+        sessionId: state?['sessionId'] as String?,
+      );
     } catch (e) {
       printIfDebug('Error checking session replay status: $e');
-      return false;
+      return (isActive: false, sessionId: null);
     }
   }
 
