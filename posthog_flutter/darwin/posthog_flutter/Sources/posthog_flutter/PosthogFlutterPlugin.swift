@@ -890,26 +890,24 @@ extension PosthogFlutterPlugin {
             }
             guard PostHogSDK.shared.isSessionReplayActive() else {
                 if isOccluded || bridgeEnabled {
-                    // A session boundary — reset(), or a close()/setup() pair —
-                    // turns replay off until its flags reload lands. Ending the
-                    // episode there would lift Dart's capture suppression while a
-                    // native screen is still on top, and the tick after re-detects
-                    // that same cover as a fresh episode. Hold for as long as the
-                    // cover is up: nothing is captured while replay is off, so the
-                    // hold costs no frames, and the cover going away is what ends
-                    // the episode either way.
+                    // Replay reads inactive across a session boundary — reset(),
+                    // or a close()/setup() pair — until its flags reload lands, and
+                    // that is not the episode ending. Ending here would lift Dart's
+                    // capture suppression under a live native cover. Unbounded on
+                    // purpose: nothing is captured while replay is off, so the hold
+                    // costs no frames, and the cover going away ends the episode
+                    // either way.
                     if Self.isFlutterOccluded() {
                         heldWhileInactive = true
-                        // Per run of not-occluded reads, matching the active path,
-                        // which clears this on every tick that keeps the episode.
+                        // Re-arms the debounce budget below for the next run of
+                        // not-occluded reads. A blip seen before the hold is not
+                        // carried across it, so it cannot signal a cover swap later.
                         notOccludedTicks = 0
                         return
                     } else if notOccludedTicks < 1 {
                         // The same end-debounce the active path applies, because a
                         // native→native handoff's first not-occluded read can land
-                        // on either side of the boundary. Without it, a tick
-                        // reading the gap between one native screen dismissing and
-                        // the next presenting ends the episode with no guard.
+                        // on either side of the boundary.
                         notOccludedTicks += 1
                         return
                     }
@@ -940,8 +938,8 @@ extension PosthogFlutterPlugin {
             // A hold that ends with the cover still up and no bridge re-handshakes
             // for the same reason: the enable was refused while replay was off (it
             // requires an active recording), so without this Dart keeps showing a
-            // placeholder it emitted for a session that has since rotated, and the
-            // new one gets nothing until the cover goes away.
+            // placeholder it emitted for an episode the SDK has since stopped
+            // recording, and nothing replaces it until the cover goes away.
             let resumedUnbridged = resumedFromHold && !bridgeEnabled
             let coverSwapped = occluded && isOccluded && (notOccludedTicks > 0 || resumedUnbridged)
             notOccludedTicks = 0

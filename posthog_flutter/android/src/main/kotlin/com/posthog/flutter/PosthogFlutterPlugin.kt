@@ -985,31 +985,29 @@ class PosthogFlutterPlugin :
     // Null activity (config-change detach) fails open — the captured Flutter tree
     // has no native pixels. Known limitation: a host recreation mid-episode never
     // re-fires onActivityResumed, ending the episode early.
-    private fun isFlutterCovered(): Boolean = activity != null && isHostActivityStopped && otherResumedCount > 0
+    private fun isFlutterOccluded(): Boolean = activity != null && isHostActivityStopped && otherResumedCount > 0
 
     @OptIn(PostHogInternalReplayApi::class)
     private fun occlusionTick() {
         if (!isSessionReplayActive()) {
             if (isOccluded || bridgeEnabled) {
-                // A session boundary — reset(), or a close()/setup() pair — turns
-                // replay off until its flags reload lands. Ending the episode
-                // there lifts Dart's capture suppression while a native screen is
-                // still on top, and the tick after re-detects that same cover as a
-                // fresh episode. Hold for as long as the cover is up: nothing is
-                // captured while replay is off, so the hold costs no frames, and
-                // the cover going away is what ends the episode either way.
-                if (isFlutterCovered()) {
+                // Replay reads inactive across a session boundary — reset(), or a
+                // close()/setup() pair — until its flags reload lands, and that is
+                // not the episode ending. Ending here would lift Dart's capture
+                // suppression under a live native cover. Unbounded on purpose:
+                // nothing is captured while replay is off, so the hold costs no
+                // frames, and the cover going away ends the episode either way.
+                if (isFlutterOccluded()) {
                     heldWhileInactive = true
-                    // Per run of not-covered reads, matching the active path,
-                    // which clears this on every tick that keeps the episode.
+                    // Re-arms the debounce budget below for the next run of
+                    // not-occluded reads. A blip seen before the hold is not
+                    // carried across it, so it cannot signal a cover swap later.
                     notOccludedTicks = 0
                     return
                 } else if (notOccludedTicks < 1) {
                     // The same end-debounce the active path applies, because a
-                    // native→native handoff's first not-covered read can land on
-                    // either side of the boundary. Without it, a tick reading the
-                    // gap between one native screen finishing and the next
-                    // resuming ends the episode with no guard at all.
+                    // native→native handoff's first not-occluded read can land on
+                    // either side of the boundary.
                     notOccludedTicks++
                     return
                 }
@@ -1027,7 +1025,7 @@ class PosthogFlutterPlugin :
         }
         val resumedFromHold = heldWhileInactive
         heldWhileInactive = false
-        val occludedNow = isFlutterCovered()
+        val occludedNow = isFlutterOccluded()
         // Debounce END only: a native→native handoff (A pauses before B resumes)
         // briefly reads not-occluded; ending the episode there would flash a
         // stale Flutter frame into the native flow.
@@ -1042,8 +1040,8 @@ class PosthogFlutterPlugin :
         // A hold that ends with the cover still up and no bridge re-handshakes
         // for the same reason: the enable was refused while replay was off (it
         // requires an active recording), so without this Dart keeps showing a
-        // placeholder it emitted for a session that has since rotated, and the
-        // new one gets nothing until the cover goes away.
+        // placeholder it emitted for an episode the SDK has since stopped
+        // recording, and nothing replaces it until the cover goes away.
         val resumedUnbridged = resumedFromHold && !bridgeEnabled
         val coverSwapped =
             occludedNow && isOccluded && (notOccludedTicks > 0 || resumedUnbridged)
