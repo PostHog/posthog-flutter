@@ -1,5 +1,11 @@
 ## Next
 
+## 5.36.6
+
+### Patch Changes
+
+- f3ccdee: Drop events when a before-send callback throws.
+
 ## 5.36.5
 
 ### Patch Changes
