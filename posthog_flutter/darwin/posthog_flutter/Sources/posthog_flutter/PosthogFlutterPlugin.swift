@@ -28,22 +28,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         private var bridgeEpisodeStarted = false
         // End-transition debounce: ticks reading not-occluded while an episode is active.
         private var notOccludedTicks = 0
-        // When the current run of inactive reads began, nil when not holding.
-        private var inactiveHoldStartedAt: TimeInterval?
+        // Whether the episode is being held open across a run of inactive reads.
+        private var heldWhileInactive = false
         // Monotonic episode id, stamped into every push so Dart drops stale-episode work.
         private var occlusionEpisode = 0
         // Failed captures before the episode's first delivered frame; at the limit it
         // falls back (bridgeFailed). After first delivery, failures never demote.
         private var bridgeFailureStrikes = 0
         private static let bridgeFailureStrikeLimit = 3
-        // How long an episode survives while replay reads inactive. Wall time, not
-        // ticks: window notifications nudge extra ticks, which would burn a tick
-        // budget in milliseconds. A session boundary keeps replay off until the
-        // flags reload lands, so the window is a network round trip, not a fixed
-        // delay — this only has to outlast one attempt. It is a safety valve for a
-        // coverage reading that never recovers, not the thing that ends a
-        // dismissed cover.
-        private static let inactiveHoldSeconds: TimeInterval = 30
     #endif
 
     private static var instance: PosthogFlutterPlugin?
@@ -846,7 +838,7 @@ extension PosthogFlutterPlugin {
         }
 
         func stopOcclusionDetector() {
-            inactiveHoldStartedAt = nil
+            heldWhileInactive = false
             occlusionTimer?.invalidate()
             occlusionTimer = nil
             NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeVisibleNotification, object: nil)
@@ -900,16 +892,16 @@ extension PosthogFlutterPlugin {
                     // turns replay off until its flags reload lands. Ending the
                     // episode there would lift Dart's capture suppression while a
                     // native screen is still on top, and the tick after re-detects
-                    // that same cover as a fresh episode. Hold while still
-                    // covered: nothing is captured while replay is off, so holding
-                    // costs no frames.
+                    // that same cover as a fresh episode. Hold for as long as the
+                    // cover is up: nothing is captured while replay is off, so the
+                    // hold costs no frames, and the cover going away is what ends
+                    // the episode either way.
                     if Self.isFlutterOccluded() {
-                        let now = ProcessInfo.processInfo.systemUptime
-                        let startedAt = inactiveHoldStartedAt ?? now
-                        inactiveHoldStartedAt = startedAt
-                        if now - startedAt < Self.inactiveHoldSeconds {
-                            return
-                        }
+                        heldWhileInactive = true
+                        // Per run of not-occluded reads, matching the active path,
+                        // which clears this on every tick that keeps the episode.
+                        notOccludedTicks = 0
+                        return
                     } else if notOccludedTicks < 1 {
                         // The same end-debounce the active path applies, because a
                         // native→native handoff's first not-occluded read can land
@@ -927,11 +919,11 @@ extension PosthogFlutterPlugin {
                     // occluded=true push looks like unchanged state.
                     pushOcclusionEvent(occluded: false)
                 }
-                inactiveHoldStartedAt = nil
+                heldWhileInactive = false
                 return
             }
-            let resumedFromHold = inactiveHoldStartedAt != nil
-            inactiveHoldStartedAt = nil
+            let resumedFromHold = heldWhileInactive
+            heldWhileInactive = false
             let occluded = Self.isFlutterOccluded()
             // Debounce END only: a native→native handoff briefly reads
             // not-occluded; ending the episode there would flash a stale frame.

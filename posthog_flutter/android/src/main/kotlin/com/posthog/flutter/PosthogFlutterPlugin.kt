@@ -14,7 +14,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.util.Log
 import android.view.PixelCopy
 import android.view.SurfaceView
@@ -47,14 +46,6 @@ import kotlin.math.roundToInt
 
 private const val FLUTTER_VIEW_CLASS_PREFIX = "io.flutter"
 private const val OCCLUSION_TICK_MS = 1000L
-
-// How long an occlusion episode survives while replay reads inactive. Wall time,
-// not ticks: lifecycle and window callbacks nudge extra ticks, which would burn a
-// tick budget in milliseconds. A session boundary keeps replay off until the
-// flags reload lands, so the window is a network round trip, not a fixed delay —
-// this only has to outlast one attempt. It is a safety valve for a coverage
-// reading that never recovers, not the thing that ends a dismissed cover.
-private const val INACTIVE_HOLD_MS = 30_000L
 
 private const val BRIDGE_FAILURE_STRIKE_LIMIT = 3
 
@@ -866,8 +857,8 @@ class PosthogFlutterPlugin :
     // End-transition debounce: ticks reading not-occluded while an episode is active.
     private var notOccludedTicks = 0
 
-    // When the current run of inactive reads began, 0 when not holding.
-    private var inactiveHoldStartedAt = 0L
+    // Whether the episode is being held open across a run of inactive reads.
+    private var heldWhileInactive = false
 
     // Monotonic episode id, stamped into every push so Dart drops stale-episode
     // async work. Volatile: re-read on the capture executor.
@@ -942,7 +933,7 @@ class PosthogFlutterPlugin :
 
     private fun stopOcclusionDetector() {
         occlusionDetectorRunning = false
-        inactiveHoldStartedAt = 0L
+        heldWhileInactive = false
         mainHandler.removeCallbacks(occlusionTicker)
         mainHandler.removeCallbacks(nudgeRunnable)
         unregisterLifecycleTracking()
@@ -990,16 +981,15 @@ class PosthogFlutterPlugin :
                 // replay off until its flags reload lands. Ending the episode
                 // there lifts Dart's capture suppression while a native screen is
                 // still on top, and the tick after re-detects that same cover as a
-                // fresh episode. Hold while still covered: nothing is captured
-                // while replay is off, so holding costs no frames.
+                // fresh episode. Hold for as long as the cover is up: nothing is
+                // captured while replay is off, so the hold costs no frames, and
+                // the cover going away is what ends the episode either way.
                 if (isFlutterCovered()) {
-                    val now = SystemClock.uptimeMillis()
-                    if (inactiveHoldStartedAt == 0L) {
-                        inactiveHoldStartedAt = now
-                    }
-                    if (now - inactiveHoldStartedAt < INACTIVE_HOLD_MS) {
-                        return
-                    }
+                    heldWhileInactive = true
+                    // Per run of not-covered reads, matching the active path,
+                    // which clears this on every tick that keeps the episode.
+                    notOccludedTicks = 0
+                    return
                 } else if (notOccludedTicks < 1) {
                     // The same end-debounce the active path applies, because a
                     // native→native handoff's first not-covered read can land on
@@ -1018,11 +1008,11 @@ class PosthogFlutterPlugin :
                 // occluded=true push looks like unchanged state.
                 pushOcclusionEvent(occluded = false)
             }
-            inactiveHoldStartedAt = 0L
+            heldWhileInactive = false
             return
         }
-        val resumedFromHold = inactiveHoldStartedAt != 0L
-        inactiveHoldStartedAt = 0L
+        val resumedFromHold = heldWhileInactive
+        heldWhileInactive = false
         val occludedNow = isFlutterCovered()
         // Debounce END only: a native→native handoff (A pauses before B resumes)
         // briefly reads not-occluded; ending the episode there would flash a
