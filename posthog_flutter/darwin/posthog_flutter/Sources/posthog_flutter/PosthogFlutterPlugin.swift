@@ -36,6 +36,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         // falls back (bridgeFailed). After first delivery, failures never demote.
         private var bridgeFailureStrikes = 0
         private static let bridgeFailureStrikeLimit = 3
+        // Ticks a not-occluded read must repeat before it ends an episode. Both
+        // the active and the inactive path debounce, and they have to agree.
+        private static let endDebounceTicks = 1
     #endif
 
     private static var instance: PosthogFlutterPlugin?
@@ -841,6 +844,7 @@ extension PosthogFlutterPlugin {
 
         func stopOcclusionDetector() {
             heldWhileInactive = false
+            notOccludedTicks = 0
             occlusionTimer?.invalidate()
             occlusionTimer = nil
             NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeVisibleNotification, object: nil)
@@ -899,12 +903,11 @@ extension PosthogFlutterPlugin {
                     // either way.
                     if Self.isFlutterOccluded() {
                         heldWhileInactive = true
-                        // Re-arms the debounce budget below for the next run of
-                        // not-occluded reads. A blip seen before the hold is not
-                        // carried across it, so it cannot signal a cover swap later.
+                        // A blip seen before the hold is deliberately not carried
+                        // across it, so it cannot signal a cover swap later.
                         notOccludedTicks = 0
                         return
-                    } else if notOccludedTicks < 1 {
+                    } else if notOccludedTicks < Self.endDebounceTicks {
                         // The same end-debounce the active path applies, because a
                         // native→native handoff's first not-occluded read can land
                         // on either side of the boundary.
@@ -927,7 +930,7 @@ extension PosthogFlutterPlugin {
             let occluded = Self.isFlutterOccluded()
             // Debounce END only: a native→native handoff briefly reads
             // not-occluded; ending the episode there would flash a stale frame.
-            if !occluded, isOccluded, notOccludedTicks < 1 {
+            if !occluded, isOccluded, notOccludedTicks < Self.endDebounceTicks {
                 notOccludedTicks += 1
                 return
             }

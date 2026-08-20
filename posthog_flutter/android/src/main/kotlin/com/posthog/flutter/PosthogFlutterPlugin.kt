@@ -48,6 +48,10 @@ import kotlin.math.roundToInt
 private const val FLUTTER_VIEW_CLASS_PREFIX = "io.flutter"
 private const val OCCLUSION_TICK_MS = 1000L
 
+// Ticks a not-occluded read must repeat before it ends an episode. Both the
+// active and the inactive path debounce, and they have to agree.
+private const val END_DEBOUNCE_TICKS = 1
+
 private const val BRIDGE_FAILURE_STRIKE_LIMIT = 3
 
 /** PosthogFlutterPlugin */
@@ -948,6 +952,7 @@ class PosthogFlutterPlugin :
     private fun stopOcclusionDetector() {
         occlusionDetectorRunning = false
         heldWhileInactive = false
+        notOccludedTicks = 0
         mainHandler.removeCallbacks(occlusionTicker)
         mainHandler.removeCallbacks(nudgeRunnable)
         unregisterLifecycleTracking()
@@ -999,12 +1004,11 @@ class PosthogFlutterPlugin :
                 // frames, and the cover going away ends the episode either way.
                 if (isFlutterOccluded()) {
                     heldWhileInactive = true
-                    // Re-arms the debounce budget below for the next run of
-                    // not-occluded reads. A blip seen before the hold is not
-                    // carried across it, so it cannot signal a cover swap later.
+                    // A blip seen before the hold is deliberately not carried
+                    // across it, so it cannot signal a cover swap later.
                     notOccludedTicks = 0
                     return
-                } else if (notOccludedTicks < 1) {
+                } else if (notOccludedTicks < END_DEBOUNCE_TICKS) {
                     // The same end-debounce the active path applies, because a
                     // native→native handoff's first not-occluded read can land on
                     // either side of the boundary.
@@ -1029,7 +1033,7 @@ class PosthogFlutterPlugin :
         // Debounce END only: a native→native handoff (A pauses before B resumes)
         // briefly reads not-occluded; ending the episode there would flash a
         // stale Flutter frame into the native flow.
-        if (!occludedNow && isOccluded && notOccludedTicks < 1) {
+        if (!occludedNow && isOccluded && notOccludedTicks < END_DEBOUNCE_TICKS) {
             notOccludedTicks++
             return
         }
