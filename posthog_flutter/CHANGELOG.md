@@ -1,5 +1,11 @@
 ## Next
 
+## 5.37.1
+
+### Patch Changes
+
+- 577c59e: Fix session replay started with `startSessionRecording()` capturing nothing on Android by requiring posthog-android 3.60.7 or newer.
+
 ## 5.37.0
 
 ### Minor Changes
