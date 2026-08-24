@@ -15,13 +15,16 @@ void main() {
               key: Key('ancestor'),
               width: 300,
               height: 300,
-              child: SizedBox(key: Key('view'), width: 200, height: 200),
+              child: Center(
+                child: SizedBox(key: Key('view'), width: 200, height: 200),
+              ),
             ),
           ),
         ),
       );
 
-      final view = tester.renderObject<RenderBox>(find.byKey(const Key('view')));
+      final view =
+          tester.renderObject<RenderBox>(find.byKey(const Key('view')));
       final ancestor =
           tester.renderObject<RenderBox>(find.byKey(const Key('ancestor')));
 
@@ -52,7 +55,8 @@ void main() {
         ),
       );
 
-      final view = tester.renderObject<RenderBox>(find.byKey(const Key('view')));
+      final view =
+          tester.renderObject<RenderBox>(find.byKey(const Key('view')));
       final ancestor =
           tester.renderObject<RenderBox>(find.byKey(const Key('ancestor')));
 
