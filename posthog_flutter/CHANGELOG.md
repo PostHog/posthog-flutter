@@ -1,5 +1,15 @@
 ## Next
 
+## 5.37.0
+
+### Minor Changes
+
+- 024d690: Add `errorTrackingConfig.captureNativeCrashes` to capture native C/C++ (NDK) crashes on Android. Requires Android 12 (API 31) and exception autocapture enabled in the project's error tracking settings; crashes are captured on the next app launch and symbolicated against `.so` debug symbols uploaded with the PostHog Gradle plugin.
+
+### Patch Changes
+
+- f21daf7: Fix session replay recording the Flutter UI from underneath a native screen when the session changes — `reset()`, or a `close()`/`setup()` pair — while that screen is up.
+
 ## 5.36.6
 
 ### Patch Changes
