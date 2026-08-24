@@ -300,9 +300,12 @@ class ScreenshotCapturer {
       return;
     }
     try {
+      final rect = clippedPaintBounds(ro, ancestor);
+      // A view clipped away by an ancestor covers nothing, so it gets no rect.
+      if (rect.isEmpty) return;
       final transform = ro.getTransformTo(ancestor);
       final data = ElementData(
-        rect: ro.paintBounds,
+        rect: rect,
         type: 'platformView',
         transform: transform,
       );
@@ -338,16 +341,20 @@ class ScreenshotCapturer {
   ) async {
     final transform = viewRect.transform;
     if (transform == null) return;
-    final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
+    // The user chose to reveal this view. A failed native capture must leave
+    // the Flutter pixels in place, never paint the mask they turned off.
     if (bytes == null) {
-      _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
+      printIfDebug(
+          'Native capture returned no bytes for a revealed platform view; keeping the Flutter pixels.');
       return;
     }
     final nativeImage = await _decodeRawPixels(bytes, nativeW, nativeH);
     if (nativeImage == null) {
-      _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
+      printIfDebug(
+          'Failed to decode the native capture for a revealed platform view; keeping the Flutter pixels.');
       return;
     }
+    final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
     canvas.drawImageRect(
       nativeImage,
       Rect.fromLTWH(
@@ -595,6 +602,16 @@ class ScreenshotCapturer {
           return;
         }
 
+        // Collect the platform view rects in the same frame as the widget mask
+        // rects, before any await. Collecting them after toImage() lets the UI
+        // move first, so a mask lands a frame late over the wrong pixels.
+        final defaultPolicy = replayConfig.maskAllPlatformViews
+            ? PostHogPlatformViewPrivacy.mask
+            : PostHogPlatformViewPrivacy.capture;
+        final pvRects = _collectPlatformViewRects(defaultPolicy);
+        final hasCapturedViews = pvRects.captured.isNotEmpty;
+        hasCapturedPlatformViews = hasCapturedViews;
+
         image = await renderObject.toImage(pixelRatio: pixelRatio);
 
         final currentImage = image;
@@ -650,13 +667,6 @@ class ScreenshotCapturer {
 
         final preMaskHash = _computeImageHash(imageBytes);
         imageBytes = null;
-
-        final defaultPolicy = replayConfig.maskAllPlatformViews
-            ? PostHogPlatformViewPrivacy.mask
-            : PostHogPlatformViewPrivacy.capture;
-        final pvRects = _collectPlatformViewRects(defaultPolicy);
-        final hasCapturedViews = pvRects.captured.isNotEmpty;
-        hasCapturedPlatformViews = hasCapturedViews;
 
         if (!hasCapturedViews && preMaskHash == statusView.imageBytesHash) {
           printIfDebug(
@@ -818,6 +828,33 @@ class ScreenshotCapturer {
       return Future.value(null);
     }
   }
+}
+
+/// Intersects [ro]'s paint bounds with every clip its ancestors apply, up to
+/// but not including [ancestor], and returns the visible rect in [ro]'s local
+/// coordinates. A platform view reports its full, unclipped paint bounds, so a
+/// map inside a scroll view or a `ClipRect` would otherwise place a mask past
+/// the visible edge and over the widgets below. Returns [Rect.zero] when the
+/// view is fully clipped away.
+@visibleForTesting
+Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
+  var clipped = ro.paintBounds;
+  RenderObject child = ro;
+  RenderObject? node = ro.parent;
+  while (node != null && !identical(node, ancestor)) {
+    final clip = node.describeApproximatePaintClip(child);
+    if (clip != null) {
+      // The clip is in node's coordinates; map it into ro's frame.
+      final toRo = Matrix4.tryInvert(ro.getTransformTo(node));
+      if (toRo != null) {
+        clipped = clipped.intersect(MatrixUtils.transformRect(toRo, clip));
+        if (clipped.isEmpty) return Rect.zero;
+      }
+    }
+    child = node;
+    node = node.parent;
+  }
+  return clipped;
 }
 
 @visibleForTesting
