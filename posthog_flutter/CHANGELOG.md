@@ -1,5 +1,11 @@
 ## Next
 
+## 5.38.0
+
+### Minor Changes
+
+- 0de477b: Add `PostHogSessionReplayConfig.verifyScreenshotMaskAlignment` for Android native screens captured with `captureNativeScreens`. Enabling it can preserve screenshots and mask alignment during pixel-only redraws, including continuously animated content, but performs additional view hierarchy walks. It remains disabled by default.
+
 ## 5.37.1
 
 ### Patch Changes
