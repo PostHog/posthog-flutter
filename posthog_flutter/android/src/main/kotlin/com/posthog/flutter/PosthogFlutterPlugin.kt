@@ -615,6 +615,8 @@ class PosthogFlutterPlugin :
                     replayConfig.getIfNotNull<Double>("sampleRate") {
                         this.sessionReplayConfig.sampleRate = it
                     }
+                    this.sessionReplayConfig.verifyScreenshotMaskAlignment =
+                        replayConfig["verifyScreenshotMaskAlignment"] as? Boolean ?: false
                     if (sessionReplay) {
                         val captureNativeScreens =
                             replayConfig["captureNativeScreens"] as? Boolean ?: false

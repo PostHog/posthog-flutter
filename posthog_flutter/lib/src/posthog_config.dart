@@ -771,6 +771,19 @@ class PostHogSessionReplayConfig {
     }
   }
 
+  /// Verify that masks remain aligned while capturing session replay screenshots.
+  ///
+  /// Android only. This applies only to native-screen captures enabled by
+  /// [captureNativeScreens]. Normal Flutter widget screenshots are rendered and
+  /// masked by Flutter and are unaffected.
+  ///
+  /// Enabling this can preserve screenshots during pixel-only redraws, including
+  /// continuously animated content, but performs additional view hierarchy walks
+  /// while a screenshot is captured.
+  ///
+  /// Default: false.
+  var verifyScreenshotMaskAlignment = false;
+
   /// Converts this session replay configuration to a platform-channel map.
   ///
   /// Returns values consumed by the Android and Apple session replay
@@ -782,6 +795,7 @@ class PostHogSessionReplayConfig {
       'throttleDelayMs': throttleDelay.inMilliseconds,
       'maskAllPlatformViews': maskAllPlatformViews,
       'captureNativeScreens': captureNativeScreens,
+      'verifyScreenshotMaskAlignment': verifyScreenshotMaskAlignment,
       if (sampleRate != null) 'sampleRate': sampleRate,
     };
   }

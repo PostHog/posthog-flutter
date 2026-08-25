@@ -2717,6 +2717,17 @@
                         "name": "captureNativeScreens",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "verifyScreenshotMaskAlignment",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
                     }
                 ],
                 "isDeprecated": false,

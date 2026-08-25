@@ -99,6 +99,44 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun setup_verifyScreenshotMaskAlignment_defaultsToFalse() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        val call =
+            MethodCall(
+                "setup",
+                mapOf(
+                    "projectToken" to "test-token",
+                    "sessionReplay" to true,
+                    "sessionReplayConfig" to emptyMap<String, Any>(),
+                ),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        assertFalse(assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig.verifyScreenshotMaskAlignment)
+    }
+
+    @Test
+    fun setup_verifyScreenshotMaskAlignment_forwardsTrue() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        val call =
+            MethodCall(
+                "setup",
+                mapOf(
+                    "projectToken" to "test-token",
+                    "sessionReplay" to true,
+                    "sessionReplayConfig" to mapOf("verifyScreenshotMaskAlignment" to true),
+                ),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        assertTrue(assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig.verifyScreenshotMaskAlignment)
+    }
+
+    @Test
     fun onMethodCall_captureLog_routesToCaptureLogAndSucceeds() {
         val plugin = PosthogFlutterPlugin()
 
