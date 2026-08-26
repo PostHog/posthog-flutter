@@ -8,10 +8,14 @@ class PostHogException implements Exception {
   final Object source;
   final String mechanism;
   final bool handled;
+  final String? captureSource;
+  final String level;
 
   const PostHogException({
     required this.source,
     required this.mechanism,
     this.handled = false,
+    this.captureSource,
+    this.level = 'error',
   });
 }

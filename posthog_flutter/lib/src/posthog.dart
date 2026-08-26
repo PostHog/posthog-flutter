@@ -780,8 +780,9 @@ class Posthog {
   }) async {
     final wrappedError = PostHogException(
       source: error,
-      mechanism: 'runZonedGuarded',
+      mechanism: 'task',
       handled: false,
+      captureSource: 'flutter.run_zoned_guarded',
     );
     await _posthog.captureException(
       error: wrappedError,
