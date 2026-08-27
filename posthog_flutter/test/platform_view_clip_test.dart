@@ -121,6 +121,56 @@ void main() {
       );
     });
 
+    testWidgets('a clip is mapped through a non-zero ancestor offset',
+        (tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: Key('ancestor'),
+              width: 600,
+              height: 600,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: 300,
+                  height: 300,
+                  child: ClipRect(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 50, top: 100),
+                      child: OverflowBox(
+                        alignment: Alignment.topLeft,
+                        minWidth: 0,
+                        minHeight: 0,
+                        maxWidth: 400,
+                        maxHeight: 400,
+                        child:
+                            SizedBox(key: Key('view'), width: 400, height: 400),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // The clip is 300x300 in the ClipRect's space but the view sits at
+      // (50, 100) inside it, so in the view's own space only 250x200 survives.
+      // Using the forward transform instead of its inverse would give
+      // (50, 100, 350, 400) here.
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 250, 200),
+      );
+    });
+
     testWidgets('a null ancestor walks to the root without throwing',
         (tester) async {
       await tester.pumpWidget(
@@ -138,42 +188,6 @@ void main() {
           null,
         ),
         const Rect.fromLTWH(0, 0, 50, 50),
-      );
-    });
-  });
-
-  group('maskRectCoveringMotion', () {
-    final identity = Matrix4.identity();
-
-    test('a still view keeps exactly its collected rect', () {
-      const collected = Rect.fromLTWH(0, 0, 200, 100);
-      expect(maskRectCoveringMotion(collected, identity, collected, identity),
-          collected);
-    });
-
-    test('a view that scrolled is covered at both positions', () {
-      const collected = Rect.fromLTWH(0, 0, 200, 100);
-      expect(
-        maskRectCoveringMotion(collected, identity, collected,
-            Matrix4.translationValues(0, -40, 0)),
-        const Rect.fromLTWH(0, -40, 200, 140),
-      );
-    });
-
-    test('a shrinking clip still covers the larger collected rect', () {
-      const collected = Rect.fromLTWH(0, 0, 200, 100);
-      expect(
-        maskRectCoveringMotion(
-            collected, identity, const Rect.fromLTWH(0, 0, 200, 40), identity),
-        collected,
-      );
-    });
-
-    test('a non-invertible transform falls back to the collected rect', () {
-      const collected = Rect.fromLTWH(0, 0, 200, 100);
-      expect(
-        maskRectCoveringMotion(collected, Matrix4.zero(), collected, identity),
-        collected,
       );
     });
   });
