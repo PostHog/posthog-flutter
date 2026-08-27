@@ -60,10 +60,35 @@ class ViewTreeSnapshotStatus {
   ViewTreeSnapshotStatus(this.sentMetaEvent);
 }
 
+/// A masked platform view, kept with its [RenderBox] so its mask can be
+/// re-measured immediately before it is painted.
+class _MaskedView {
+  final RenderBox ro;
+  final ElementData data;
+  const _MaskedView({required this.ro, required this.data});
+}
+
+/// A revealed platform view. [data] carries the view's own bounds, which the
+/// native side uses to find and crop it; [visibleRect] is the part an ancestor
+/// clip leaves on screen, which is all we are allowed to paint.
+class _CapturedView {
+  final ElementData data;
+  final Rect visibleRect;
+  const _CapturedView({required this.data, required this.visibleRect});
+}
+
 class _PlatformViewRects {
-  final List<ElementData> masked;
-  final List<ElementData> captured;
-  const _PlatformViewRects({required this.masked, required this.captured});
+  final List<_MaskedView> masked;
+  final List<_CapturedView> captured;
+
+  /// The screenshot container the rects are relative to, kept for re-measuring.
+  final RenderObject? ancestor;
+
+  const _PlatformViewRects({
+    required this.masked,
+    required this.captured,
+    required this.ancestor,
+  });
 }
 
 class ScreenshotCapturer {
@@ -243,8 +268,8 @@ class ScreenshotCapturer {
 
   _PlatformViewRects _collectPlatformViewRects(
       PostHogPlatformViewPrivacy defaultPolicy) {
-    final masked = <ElementData>[];
-    final captured = <ElementData>[];
+    final masked = <_MaskedView>[];
+    final captured = <_CapturedView>[];
     final ancestor = PostHogMaskController.instance.containerKey.currentContext
         ?.findRenderObject();
     final seen = <int>{};
@@ -259,14 +284,15 @@ class ScreenshotCapturer {
       printIfDebug(
           'Found ${masked.length} masked and ${captured.length} captured platform view rect(s)');
     }
-    return _PlatformViewRects(masked: masked, captured: captured);
+    return _PlatformViewRects(
+        masked: masked, captured: captured, ancestor: ancestor);
   }
 
   void _visitElementForPlatformViews(
     Element element,
     RenderObject? ancestor,
-    List<ElementData> masked,
-    List<ElementData> captured,
+    List<_MaskedView> masked,
+    List<_CapturedView> captured,
     Set<int> seen,
     PostHogPlatformViewPrivacy inheritedPolicy,
   ) {
@@ -288,8 +314,8 @@ class ScreenshotCapturer {
   void _addIfNew(
     RenderBox ro,
     RenderObject? ancestor,
-    List<ElementData> masked,
-    List<ElementData> captured,
+    List<_MaskedView> masked,
+    List<_CapturedView> captured,
     Set<int> seen,
     PostHogPlatformViewPrivacy policy,
   ) {
@@ -301,15 +327,27 @@ class ScreenshotCapturer {
     }
     try {
       final transform = ro.getTransformTo(ancestor);
-      final data = ElementData(
-        rect: ro.paintBounds,
-        type: 'platformView',
-        transform: transform,
-      );
+      final visible = clippedPaintBounds(ro, ancestor);
+      // A view an ancestor clips away entirely covers nothing on screen.
+      if (visible.isEmpty) return;
       if (policy == PostHogPlatformViewPrivacy.capture) {
-        captured.add(data);
+        captured.add(_CapturedView(
+          data: ElementData(
+            rect: ro.paintBounds,
+            type: 'platformView',
+            transform: transform,
+          ),
+          visibleRect: visible,
+        ));
       } else {
-        masked.add(data);
+        masked.add(_MaskedView(
+          ro: ro,
+          data: ElementData(
+            rect: visible,
+            type: 'platformView',
+            transform: transform,
+          ),
+        ));
       }
     } catch (e) {
       printIfDebug('Error collecting platform view rect: $e');
@@ -328,14 +366,42 @@ class ScreenshotCapturer {
     };
   }
 
+  /// Re-measures [view] and widens its mask to cover both where the view was
+  /// when the rect was collected and where it is now.
+  ///
+  /// Clipping the mask to the visible region makes it tight enough to expose
+  /// content whenever the tree moves between collection and this paint — the
+  /// oversized rect used to hide that slop. Covering both positions fails
+  /// closed; when nothing moved the two rects are equal and this is a no-op.
+  ElementData _maskCoveringMotion(_MaskedView view, RenderObject? ancestor) {
+    final collected = view.data;
+    final collectedTransform = collected.transform;
+    if (collectedTransform == null) return collected;
+    try {
+      if (!view.ro.attached || !view.ro.hasSize) return collected;
+      final fresh = clippedPaintBounds(view.ro, ancestor);
+      if (fresh.isEmpty) return collected;
+      return ElementData(
+        rect: maskRectCoveringMotion(collected.rect, collectedTransform, fresh,
+            view.ro.getTransformTo(ancestor)),
+        type: collected.type,
+        transform: collectedTransform,
+      );
+    } catch (e) {
+      printIfDebug('Error re-measuring a masked platform view: $e');
+      return collected;
+    }
+  }
+
   Future<void> _compositeRevealedView(
     Canvas canvas,
-    ElementData viewRect,
+    _CapturedView view,
     Uint8List? bytes,
     int nativeW,
     int nativeH,
     double pixelRatio,
   ) async {
+    final viewRect = view.data;
     final transform = viewRect.transform;
     if (transform == null) return;
     final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
@@ -348,6 +414,12 @@ class ScreenshotCapturer {
       _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
       return;
     }
+    // The native request covers the view's own frame, because that is what the
+    // platform matches it by. Clipping here, rather than shrinking the request,
+    // keeps the revealed pixels inside the ancestor clip without changing what
+    // the native side is asked for.
+    canvas.save();
+    canvas.clipRect(MatrixUtils.transformRect(transform, view.visibleRect));
     canvas.drawImageRect(
       nativeImage,
       Rect.fromLTWH(
@@ -355,6 +427,7 @@ class ScreenshotCapturer {
       transformedRect,
       Paint()..blendMode = ui.BlendMode.srcOver,
     );
+    canvas.restore();
     nativeImage.dispose();
   }
 
@@ -695,13 +768,15 @@ class ScreenshotCapturer {
         if (pvRects.masked.isNotEmpty) {
           _imageMaskPainter.drawMaskedImage(
             canvas,
-            pvRects.masked,
+            pvRects.masked
+                .map((m) => _maskCoveringMotion(m, pvRects.ancestor))
+                .toList(),
             pixelRatio,
           );
         }
         if (pvRects.captured.isNotEmpty) {
           final specs = pvRects.captured
-              .map((r) => _viewSpec(r, globalPosition))
+              .map((v) => _viewSpec(v.data, globalPosition))
               .toList();
           final bytesList =
               await _nativeCommunicator.captureNativeScreenshots(specs);
@@ -818,6 +893,52 @@ class ScreenshotCapturer {
       return Future.value(null);
     }
   }
+}
+
+/// Intersects [ro]'s paint bounds with every clip its ancestors apply, up to
+/// but not including [ancestor], and returns the visible rect in [ro]'s local
+/// coordinates.
+///
+/// A platform view reports its full, unclipped paint bounds, so a map inside a
+/// scroll view or a `ClipRect` would otherwise be masked past its visible edge
+/// and over the widgets below it. Returns [Rect.zero] when the view is fully
+/// clipped away.
+@visibleForTesting
+Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
+  var clipped = ro.paintBounds;
+  RenderObject child = ro;
+  RenderObject? node = ro.parent;
+  while (node != null && !identical(node, ancestor)) {
+    final clip = node.describeApproximatePaintClip(child);
+    if (clip != null) {
+      // The clip is in node's coordinates; map it into ro's frame.
+      final toRo = Matrix4.tryInvert(ro.getTransformTo(node));
+      if (toRo != null) {
+        clipped = clipped.intersect(MatrixUtils.transformRect(toRo, clip));
+        if (clipped.isEmpty) return Rect.zero;
+      }
+    }
+    child = node;
+    node = node.parent;
+  }
+  return clipped;
+}
+
+/// The rect to mask, widened to cover a view at both the position it was
+/// collected at and the position it now occupies. See [_maskCoveringMotion].
+@visibleForTesting
+Rect maskRectCoveringMotion(
+  Rect collectedRect,
+  Matrix4 collectedTransform,
+  Rect freshRect,
+  Matrix4 freshTransform,
+) {
+  final inverse = Matrix4.tryInvert(collectedTransform);
+  if (inverse == null) return collectedRect;
+  return collectedRect.expandToInclude(MatrixUtils.transformRect(
+    inverse.multiplied(freshTransform),
+    freshRect,
+  ));
 }
 
 @visibleForTesting
