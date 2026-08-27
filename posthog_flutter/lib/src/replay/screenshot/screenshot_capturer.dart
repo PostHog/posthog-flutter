@@ -869,17 +869,12 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   RenderObject child = ro;
   RenderObject? node = ro.parent;
   while (node != null && !identical(node, ancestor)) {
-    // describeApproximatePaintClip is a semantics helper with no guarantee of
-    // being a superset of the real paint clip, and RenderViewportBase subtracts
-    // a sliver overlap correction that makes it smaller. Use the viewport's own
-    // bounds there so an overlapping header cannot shrink a mask.
+    // This can run application code through a CustomClipper. Letting it throw
+    // would drop the mask for this view entirely, so a failing clip is skipped
+    // and the wider, unclipped bounds survive.
     Rect? clip;
     try {
-      clip = node is RenderViewportBase && node.hasSize
-          ? Offset.zero & node.size
-          // A CustomClipper runs app code here; widening beyond the real clip
-          // only over-masks, while letting it throw would drop the mask.
-          : node.describeApproximatePaintClip(child);
+      clip = node.describeApproximatePaintClip(child);
     } catch (e) {
       printIfDebug('Skipping an ancestor clip that threw: $e');
       clip = null;
