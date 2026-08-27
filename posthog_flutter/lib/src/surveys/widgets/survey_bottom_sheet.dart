@@ -16,6 +16,7 @@ import 'rating_question.dart';
 import 'choice_question.dart';
 import 'confirmation_message.dart';
 import 'survey_icon.dart';
+import 'intro_message.dart';
 
 /// A bottom sheet that displays a survey to the user.
 class SurveyBottomSheet extends StatefulWidget {
@@ -41,6 +42,10 @@ class SurveyBottomSheet extends StatefulWidget {
 class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
   int _currentIndex = 0;
   bool _isCompleted = false;
+  // Advancing past the intro is a pure UI transition: no response is recorded
+  // and no survey event is sent. The X button keeps closing the survey.
+  late bool _showingIntroScreen =
+      widget.survey.appearance?.displayIntroScreen ?? false;
 
   @override
   void initState() {
@@ -216,9 +221,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (!_isCompleted)
-                            _buildQuestion(context)
-                          else
+                          if (_isCompleted)
                             ConfirmationMessage(
                               onClose: _handleClose,
                               appearance: widget.appearance,
@@ -227,7 +230,20 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
                                       .appearance
                                       ?.thankYouMessageDescriptionContentType ??
                                   PostHogDisplaySurveyTextContentType.text,
-                            ),
+                            )
+                          else if (_showingIntroScreen)
+                            IntroMessage(
+                              onStart: () =>
+                                  setState(() => _showingIntroScreen = false),
+                              appearance: widget.appearance,
+                              introScreenDescriptionContentType: widget
+                                      .survey
+                                      .appearance
+                                      ?.introScreenDescriptionContentType ??
+                                  PostHogDisplaySurveyTextContentType.text,
+                            )
+                          else
+                            _buildQuestion(context),
                         ],
                       ),
                     ),

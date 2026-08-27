@@ -101,6 +101,17 @@
                 if let thankYouMessageCloseButtonText = appearance.thankYouMessageCloseButtonText {
                     appearanceDict["thankYouMessageCloseButtonText"] = thankYouMessageCloseButtonText
                 }
+                appearanceDict["displayIntroScreen"] = appearance.displayIntroScreen
+                if let introScreenHeader = appearance.introScreenHeader {
+                    appearanceDict["introScreenHeader"] = introScreenHeader
+                }
+                if let introScreenDescription = appearance.introScreenDescription {
+                    appearanceDict["introScreenDescription"] = introScreenDescription
+                    appearanceDict["introScreenDescriptionContentType"] = appearance.introScreenDescriptionContentType?.rawValue
+                }
+                if let introScreenButtonText = appearance.introScreenButtonText {
+                    appearanceDict["introScreenButtonText"] = introScreenButtonText
+                }
                 dict["appearance"] = appearanceDict
             }
 
