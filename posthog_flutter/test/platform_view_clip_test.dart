@@ -243,6 +243,83 @@ void main() {
     });
   });
 
+  group('clippedPaintBounds — projective ancestors', () {
+    testWidgets(
+        'a perspective ancestor keeps the full bounds, not a shrunk one',
+        (tester) async {
+      // Mapping a rect through the inverse of a projective matrix by its four
+      // corners can produce a far smaller rect than the real one, which would
+      // silently shrink or drop the mask.
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 400,
+              height: 400,
+              child: ClipRect(
+                child: Transform(
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.004)
+                    ..rotateX(1.4),
+                  child:
+                      const SizedBox(key: Key('view'), width: 200, height: 200),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final view =
+          tester.renderObject<RenderBox>(find.byKey(const Key('view')));
+      expect(
+        clippedPaintBounds(
+          view,
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        view.paintBounds,
+      );
+    });
+
+    testWidgets('a ListWheelScrollView item keeps a non-empty mask rect',
+        (tester) async {
+      // CupertinoPicker's viewport applies a per-child perspective transform
+      // and reports a clip, so its items hit the projective path in ordinary use.
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 400,
+              height: 400,
+              child: ListWheelScrollView(
+                itemExtent: 120,
+                children: List.generate(
+                  7,
+                  (i) => SizedBox(key: Key('i$i'), width: 300, height: 120),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final ancestor =
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor')));
+      // Only the items the wheel actually builds are on screen.
+      for (final key in ['i1', 'i2']) {
+        final item = tester.renderObject<RenderBox>(find.byKey(Key(key)));
+        expect(clippedPaintBounds(item, ancestor).isEmpty, isFalse,
+            reason: '$key is on screen and must keep a mask');
+      }
+    });
+  });
+
   group('clippedPaintBounds — failing and degenerate clips', () {
     testWidgets('a clipper that throws leaves the full paint bounds',
         (tester) async {

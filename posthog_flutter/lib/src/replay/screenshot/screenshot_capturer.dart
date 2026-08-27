@@ -865,9 +865,11 @@ class ScreenshotCapturer {
 /// and over the widgets outside that clip. Returns [Rect.zero] when the view is
 /// fully clipped away.
 ///
-/// Relies on `describeApproximatePaintClip` over-approximating the real paint
-/// clip, which every framework implementation does. A `CustomClipper` whose
-/// `getApproximateClipRect` reports less than its own `getClip` will under-mask.
+/// `describeApproximatePaintClip` answers "what can a viewer see", which is what
+/// masking wants, but it is not a paint-clip guarantee: `RenderViewportBase`
+/// subtracts a sliver overlap correction, and a `CustomClipper` may report less
+/// than its own `getClip`. Either under-masks a view drawn under a translucent
+/// overlapping header.
 @visibleForTesting
 Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   var clipped = ro.paintBounds;
@@ -878,19 +880,27 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
     // would drop the mask for this view entirely, so a failing clip is skipped
     // and the wider, unclipped bounds survive.
     Rect? clip;
+    Matrix4? toRo;
     try {
       clip = node.describeApproximatePaintClip(child);
-    } catch (e) {
-      printIfDebug('Skipping an ancestor clip that threw: $e');
-      clip = null;
-    }
-    if (clip != null) {
-      // The clip is in node's coordinates; map it into ro's frame.
-      final toRo = Matrix4.tryInvert(ro.getTransformTo(node));
-      if (toRo != null) {
-        clipped = clipped.intersect(MatrixUtils.transformRect(toRo, clip));
-        if (clipped.isEmpty) return Rect.zero;
+      if (clip != null) {
+        final toNode = ro.getTransformTo(node);
+        // transformRect maps the four corners and takes their bounding box,
+        // which only over-approximates for an affine matrix. Under perspective
+        // the mapped hull can be far smaller than the real one, which would
+        // shrink the mask or drop it — so those keep the unclipped bounds.
+        final m = toNode.storage;
+        final projective = m[3] != 0 || m[7] != 0 || m[11] != 0;
+        toRo = projective ? null : Matrix4.tryInvert(toNode);
       }
+    } catch (e) {
+      printIfDebug('Skipping an ancestor clip that could not be mapped: $e');
+      clip = null;
+      toRo = null;
+    }
+    if (clip != null && toRo != null) {
+      clipped = clipped.intersect(MatrixUtils.transformRect(toRo, clip));
+      if (clipped.isEmpty) return Rect.zero;
     }
     child = node;
     node = node.parent;
