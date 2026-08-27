@@ -62,7 +62,8 @@ class ViewTreeSnapshotStatus {
 
 /// A revealed platform view. [data] carries the view's own bounds, which the
 /// native side uses to find and crop it; [visibleRect] is the part an ancestor
-/// clip leaves on screen, which is all we are allowed to paint.
+/// clip leaves visible, which is all we are allowed to paint. Both are in the
+/// view's own coordinates and share [data]'s transform.
 class _CapturedView {
   final ElementData data;
   final Rect visibleRect;
@@ -358,9 +359,7 @@ class ScreenshotCapturer {
     final transform = viewRect.transform;
     if (transform == null) return;
     final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
-    // [viewRect] carries the view's full frame because that is what the native
-    // side matches it by, so the fallback mask has to use the visible region
-    // instead or it covers the widgets below the ancestor clip.
+    // Masking [viewRect] here would cover everything outside the ancestor clip.
     final fallbackMask = ElementData(
       rect: view.visibleRect,
       type: viewRect.type,
@@ -380,6 +379,8 @@ class ScreenshotCapturer {
     // keeps the revealed pixels inside the ancestor clip without changing what
     // the native side is asked for.
     canvas.save();
+    // An antialiased clip edge blends the native pixels roughly a pixel past
+    // the ancestor clip, which is a hairline of the leak this clip prevents.
     canvas.clipRect(MatrixUtils.transformRect(transform, view.visibleRect),
         doAntiAlias: false);
     canvas.drawImageRect(
@@ -861,8 +862,12 @@ class ScreenshotCapturer {
 ///
 /// A platform view reports its full, unclipped paint bounds, so a map inside a
 /// scroll view or a `ClipRect` would otherwise be masked past its visible edge
-/// and over the widgets below it. Returns [Rect.zero] when the view is fully
-/// clipped away.
+/// and over the widgets outside that clip. Returns [Rect.zero] when the view is
+/// fully clipped away.
+///
+/// Relies on `describeApproximatePaintClip` over-approximating the real paint
+/// clip, which every framework implementation does. A `CustomClipper` whose
+/// `getApproximateClipRect` reports less than its own `getClip` will under-mask.
 @visibleForTesting
 Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   var clipped = ro.paintBounds;

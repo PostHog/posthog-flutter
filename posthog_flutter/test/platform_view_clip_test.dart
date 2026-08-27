@@ -191,4 +191,174 @@ void main() {
       );
     });
   });
+
+  group('clippedPaintBounds — scroll viewport', () {
+    // RenderViewportBase.describeApproximatePaintClip is a different framework
+    // implementation from RenderCustomClip, and a scrolled view is the only
+    // case that produces a non-zero origin.
+    Widget list(ScrollController controller) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ListView(
+                controller: controller,
+                children: const [
+                  SizedBox(height: 250),
+                  SizedBox(key: Key('view'), width: 300, height: 200),
+                  SizedBox(height: 400),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    Rect boundsOf(WidgetTester tester) => clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        );
+
+    testWidgets('a view straddling the bottom edge keeps only the visible band',
+        (tester) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(list(controller));
+
+      expect(boundsOf(tester), const Rect.fromLTRB(0, 0, 300, 50));
+    });
+
+    testWidgets('a view straddling the top edge is trimmed from its origin',
+        (tester) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(list(controller));
+
+      controller.jumpTo(400);
+      await tester.pump();
+
+      expect(boundsOf(tester), const Rect.fromLTRB(0, 150, 300, 200));
+    });
+  });
+
+  group('clippedPaintBounds — failing and degenerate clips', () {
+    testWidgets('a clipper that throws leaves the full paint bounds',
+        (tester) async {
+      // RenderCustomClip asks getApproximateClipRect, not getClip, so a clipper
+      // that throws from getClip never reaches the walk and would prove nothing.
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipRect(
+                clipper: _ThrowingApproxClipper(),
+                child:
+                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 300, 300),
+      );
+    });
+
+    testWidgets('the same clipper not throwing reports its narrow clip',
+        (tester) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipRect(
+                clipper: _NarrowClipper(),
+                child:
+                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 100, 100),
+      );
+    });
+
+    testWidgets('a view clipped entirely away reports an empty rect',
+        (tester) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipRect(
+                child: Transform.translate(
+                  offset: const Offset(1000, 1000),
+                  child:
+                      const SizedBox(key: Key('view'), width: 100, height: 100),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final bounds = clippedPaintBounds(
+        tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+        tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+      );
+      expect(bounds.isEmpty, isTrue);
+      expect(bounds, Rect.zero);
+    });
+  });
+}
+
+class _ThrowingApproxClipper extends CustomClipper<Rect> {
+  @override
+  Rect getClip(Size size) => const Rect.fromLTWH(0, 0, 100, 100);
+
+  @override
+  Rect getApproximateClipRect(Size size) => throw StateError('from app code');
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
+}
+
+/// The non-throwing control for [_ThrowingApproxClipper]: identical shape, so
+/// the narrow rect here proves the throwing case really did fall back.
+class _NarrowClipper extends CustomClipper<Rect> {
+  @override
+  Rect getClip(Size size) => const Rect.fromLTWH(0, 0, 100, 100);
+
+  @override
+  Rect getApproximateClipRect(Size size) => getClip(size);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
 }
