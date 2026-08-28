@@ -8,6 +8,7 @@ import 'package:posthog_flutter_example/error_example.dart';
 
 import 'exception_steps_screen.dart';
 import 'masking_tests_screen.dart';
+import 'platform_view_spill_screen.dart';
 import 'platform_views_screen.dart';
 import 'survey_nested_navigator_screen.dart';
 
@@ -218,6 +219,24 @@ class InitialScreenState extends State<InitialScreen> {
                     );
                   },
                   child: const Text('Platform Views (Replay)'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PlatformViewSpillScreen(),
+                        settings:
+                            const RouteSettings(name: 'platform_view_spill'),
+                      ),
+                    );
+                  },
+                  child: const Text('Platform View Spill (Replay)'),
                 ),
                 const Padding(
                   padding: EdgeInsets.all(8.0),
