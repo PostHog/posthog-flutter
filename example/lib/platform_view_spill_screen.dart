@@ -36,8 +36,9 @@ grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:100vh">
 <div style="background:#ffff00"></div><div style="background:#ff00ff"></div>
 </body></html>''';
 
-WebViewController _quadrantWv() => WebViewController()
-  ..loadRequest(Uri.dataFromString(_quadrantPage, mimeType: 'text/html'));
+WebViewController _quadrantWv() =>
+    WebViewController()
+      ..loadRequest(Uri.dataFromString(_quadrantPage, mimeType: 'text/html'));
 
 class _Sentinel extends StatelessWidget {
   final String token;
@@ -45,19 +46,19 @@ class _Sentinel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 90,
-        width: double.infinity,
-        color: const Color(0xFFFFE24A),
-        alignment: Alignment.center,
-        child: Text(
-          token,
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 34,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      );
+    height: 90,
+    width: double.infinity,
+    color: const Color(0xFFFFE24A),
+    alignment: Alignment.center,
+    child: Text(
+      token,
+      style: const TextStyle(
+        color: Colors.black,
+        fontSize: 34,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
 }
 
 /// A tall platform view trimmed by a `ClipRect`, sentinel directly below.
@@ -74,30 +75,30 @@ class _ClippedMaskedState extends State<ClippedMasked> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('spill repro')),
-        body: Column(
-          children: [
-            ClipRect(
+    appBar: AppBar(title: const Text('spill repro')),
+    body: Column(
+      children: [
+        ClipRect(
+          child: SizedBox(
+            height: 160,
+            child: OverflowBox(
+              alignment: Alignment.topLeft,
+              minHeight: 0,
+              maxHeight: 520,
               child: SizedBox(
-                height: 160,
-                child: OverflowBox(
-                  alignment: Alignment.topLeft,
-                  minHeight: 0,
-                  maxHeight: 520,
-                  child: SizedBox(
-                    height: 520,
-                    child: PostHogPlatformView(
-                      privacy: widget.privacy,
-                      child: WebViewWidget(controller: _c),
-                    ),
-                  ),
+                height: 520,
+                child: PostHogPlatformView(
+                  privacy: widget.privacy,
+                  child: WebViewWidget(controller: _c),
                 ),
               ),
             ),
-            _Sentinel(widget.token),
-          ],
+          ),
         ),
-      );
+        _Sentinel(widget.token),
+      ],
+    ),
+  );
 }
 
 /// Nested clips: the innermost one wins and the mask must respect it.
@@ -113,35 +114,35 @@ class _NestedClipMaskedState extends State<NestedClipMasked> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('spill repro')),
-        body: Column(
-          children: [
-            ClipRect(
+    appBar: AppBar(title: const Text('spill repro')),
+    body: Column(
+      children: [
+        ClipRect(
+          child: SizedBox(
+            height: 300,
+            child: ClipRect(
               child: SizedBox(
-                height: 300,
-                child: ClipRect(
+                height: 140,
+                child: OverflowBox(
+                  alignment: Alignment.topLeft,
+                  minHeight: 0,
+                  maxHeight: 520,
                   child: SizedBox(
-                    height: 140,
-                    child: OverflowBox(
-                      alignment: Alignment.topLeft,
-                      minHeight: 0,
-                      maxHeight: 520,
-                      child: SizedBox(
-                        height: 520,
-                        child: PostHogPlatformView(
-                          privacy: PostHogPlatformViewPrivacy.mask,
-                          child: WebViewWidget(controller: _c),
-                        ),
-                      ),
+                    height: 520,
+                    child: PostHogPlatformView(
+                      privacy: PostHogPlatformViewPrivacy.mask,
+                      child: WebViewWidget(controller: _c),
                     ),
                   ),
                 ),
               ),
             ),
-            _Sentinel(widget.token),
-          ],
+          ),
         ),
-      );
+        _Sentinel(widget.token),
+      ],
+    ),
+  );
 }
 
 /// A platform view scrolled half out of a viewport, sentinel pinned below it.
@@ -177,23 +178,23 @@ class _ScrolledPartlyOutState extends State<ScrolledPartlyOut> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('spill repro')),
-        body: ListView(
-          controller: _controller,
-          children: [
-            const SizedBox(height: 40),
-            SizedBox(
-              height: 460,
-              child: PostHogPlatformView(
-                privacy: widget.privacy,
-                child: WebViewWidget(controller: _c),
-              ),
-            ),
-            _Sentinel(widget.token),
-            const SizedBox(height: 700),
-          ],
+    appBar: AppBar(title: const Text('spill repro')),
+    body: ListView(
+      controller: _controller,
+      children: [
+        const SizedBox(height: 40),
+        SizedBox(
+          height: 460,
+          child: PostHogPlatformView(
+            privacy: widget.privacy,
+            child: WebViewWidget(controller: _c),
+          ),
         ),
-      );
+        _Sentinel(widget.token),
+        const SizedBox(height: 700),
+      ],
+    ),
+  );
 }
 
 /// A masked view directly above a revealed one: the mask must not overrun and
@@ -211,36 +212,36 @@ class _MaskedOverRevealedState extends State<MaskedOverRevealed> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('spill repro')),
-        body: Column(
-          children: [
-            ClipRect(
+    appBar: AppBar(title: const Text('spill repro')),
+    body: Column(
+      children: [
+        ClipRect(
+          child: SizedBox(
+            height: 150,
+            child: OverflowBox(
+              alignment: Alignment.topLeft,
+              minHeight: 0,
+              maxHeight: 520,
               child: SizedBox(
-                height: 150,
-                child: OverflowBox(
-                  alignment: Alignment.topLeft,
-                  minHeight: 0,
-                  maxHeight: 520,
-                  child: SizedBox(
-                    height: 520,
-                    child: PostHogPlatformView(
-                      privacy: PostHogPlatformViewPrivacy.mask,
-                      child: WebViewWidget(controller: _top),
-                    ),
-                  ),
+                height: 520,
+                child: PostHogPlatformView(
+                  privacy: PostHogPlatformViewPrivacy.mask,
+                  child: WebViewWidget(controller: _top),
                 ),
               ),
             ),
-            _Sentinel(widget.token),
-            Expanded(
-              child: PostHogPlatformView(
-                privacy: PostHogPlatformViewPrivacy.capture,
-                child: WebViewWidget(controller: _bottom),
-              ),
-            ),
-          ],
+          ),
         ),
-      );
+        _Sentinel(widget.token),
+        Expanded(
+          child: PostHogPlatformView(
+            privacy: PostHogPlatformViewPrivacy.capture,
+            child: WebViewWidget(controller: _bottom),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Control: no clip anywhere. The mask must be unchanged by the fix.
@@ -256,20 +257,20 @@ class _UnclippedMaskedControlState extends State<UnclippedMaskedControl> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('spill repro')),
-        body: Column(
-          children: [
-            SizedBox(
-              height: 200,
-              child: PostHogPlatformView(
-                privacy: PostHogPlatformViewPrivacy.mask,
-                child: WebViewWidget(controller: _c),
-              ),
-            ),
-            _Sentinel(widget.token),
-          ],
+    appBar: AppBar(title: const Text('spill repro')),
+    body: Column(
+      children: [
+        SizedBox(
+          height: 200,
+          child: PostHogPlatformView(
+            privacy: PostHogPlatformViewPrivacy.mask,
+            child: WebViewWidget(controller: _c),
+          ),
         ),
-      );
+        _Sentinel(widget.token),
+      ],
+    ),
+  );
 }
 
 /// A revealed platform view under a transform, showing four coloured
@@ -336,47 +337,54 @@ class _TransformedRevealedState extends State<TransformedRevealed> {
 
 /// Every repro case, in the order the device matrix runs them.
 List<(String, Widget)> spillCases() => [
-      (
-        '1_clipped_masked',
-        const ClippedMasked(
-            privacy: PostHogPlatformViewPrivacy.mask, token: 'SPILLONE')
-      ),
-      (
-        '2_scrolled_masked',
-        const ScrolledPartlyOut(
-            privacy: PostHogPlatformViewPrivacy.mask, token: 'SPILLTWO')
-      ),
-      ('3_nested_clip_masked', const NestedClipMasked(token: 'SPILLTHREE')),
-      (
-        '4_clipped_revealed',
-        const ClippedMasked(
-            privacy: PostHogPlatformViewPrivacy.capture, token: 'SPILLFOUR')
-      ),
-      (
-        '5_scrolled_revealed',
-        const ScrolledPartlyOut(
-            privacy: PostHogPlatformViewPrivacy.capture, token: 'SPILLFIVE')
-      ),
-      ('6_masked_over_revealed', const MaskedOverRevealed(token: 'SPILLSIX')),
-      (
-        '7_unclipped_control',
-        const UnclippedMaskedControl(token: 'SPILLSEVEN')
-      ),
-      ('8_revealed_untransformed', const TransformedRevealed(transform: null)),
-      (
-        '9_revealed_quarter_turn',
-        TransformedRevealed(transform: Matrix4.rotationZ(1.5707963267948966))
-      ),
-      (
-        '10_revealed_mirrored',
-        TransformedRevealed(transform: Matrix4.diagonal3Values(-1, 1, 1))
-      ),
-      (
-        '11_revealed_quarter_turn_clipped',
-        TransformedRevealed(
-            transform: Matrix4.rotationZ(1.5707963267948966), clipped: true)
-      ),
-    ];
+  (
+    '1_clipped_masked',
+    const ClippedMasked(
+      privacy: PostHogPlatformViewPrivacy.mask,
+      token: 'SPILLONE',
+    ),
+  ),
+  (
+    '2_scrolled_masked',
+    const ScrolledPartlyOut(
+      privacy: PostHogPlatformViewPrivacy.mask,
+      token: 'SPILLTWO',
+    ),
+  ),
+  ('3_nested_clip_masked', const NestedClipMasked(token: 'SPILLTHREE')),
+  (
+    '4_clipped_revealed',
+    const ClippedMasked(
+      privacy: PostHogPlatformViewPrivacy.capture,
+      token: 'SPILLFOUR',
+    ),
+  ),
+  (
+    '5_scrolled_revealed',
+    const ScrolledPartlyOut(
+      privacy: PostHogPlatformViewPrivacy.capture,
+      token: 'SPILLFIVE',
+    ),
+  ),
+  ('6_masked_over_revealed', const MaskedOverRevealed(token: 'SPILLSIX')),
+  ('7_unclipped_control', const UnclippedMaskedControl(token: 'SPILLSEVEN')),
+  ('8_revealed_untransformed', const TransformedRevealed(transform: null)),
+  (
+    '9_revealed_quarter_turn',
+    TransformedRevealed(transform: Matrix4.rotationZ(1.5707963267948966)),
+  ),
+  (
+    '10_revealed_mirrored',
+    TransformedRevealed(transform: Matrix4.diagonal3Values(-1, 1, 1)),
+  ),
+  (
+    '11_revealed_quarter_turn_clipped',
+    TransformedRevealed(
+      transform: Matrix4.rotationZ(1.5707963267948966),
+      clipped: true,
+    ),
+  ),
+];
 
 /// Menu listing every case, so the repros are reachable from the example app.
 class PlatformViewSpillScreen extends StatelessWidget {

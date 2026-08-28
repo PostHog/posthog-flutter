@@ -231,8 +231,9 @@ class InitialScreenState extends State<InitialScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const PlatformViewSpillScreen(),
-                        settings:
-                            const RouteSettings(name: 'platform_view_spill'),
+                        settings: const RouteSettings(
+                          name: 'platform_view_spill',
+                        ),
                       ),
                     );
                   },
