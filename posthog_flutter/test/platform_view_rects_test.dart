@@ -68,7 +68,8 @@ void main() {
     await tester.pumpWidget(_clippedView(clipHeight: 100, viewHeight: 300));
     final rects =
         capturer.debugPlatformViewRects(PostHogPlatformViewPrivacy.mask);
-    expect(rects.masked, [const Rect.fromLTWH(0, 0, 100, 100)]);
+    expect(rects, isNotNull);
+    expect(rects!.masked, [const Rect.fromLTWH(0, 0, 100, 100)]);
     expect(rects.revealed, isEmpty);
   });
 
@@ -77,7 +78,8 @@ void main() {
     await tester.pumpWidget(_clippedView(clipHeight: 100, viewHeight: 300));
     final rects =
         capturer.debugPlatformViewRects(PostHogPlatformViewPrivacy.capture);
-    expect(rects.masked, isEmpty);
+    expect(rects, isNotNull);
+    expect(rects!.masked, isEmpty);
     expect(rects.revealed, [const Rect.fromLTWH(0, 0, 100, 100)]);
   });
 
@@ -114,6 +116,29 @@ void main() {
     );
     final rects =
         capturer.debugPlatformViewRects(PostHogPlatformViewPrivacy.mask);
-    expect(rects.masked, isEmpty);
+    expect(rects, isNotNull);
+    expect(rects!.masked, isEmpty);
+  });
+
+  testWidgets('a masked view that cannot be measured drops the frame',
+      (tester) async {
+    // The container the walk measures against sits in a detached tree, so
+    // getTransformTo throws "not in the same render tree".
+    final detached = RenderConstrainedBox(
+        additionalConstraints: const BoxConstraints.tightFor(width: 1));
+    addTearDown(detached.dispose);
+    await tester.pumpWidget(_clippedView(clipHeight: 100, viewHeight: 300));
+
+    expect(
+      capturer.debugPlatformViewRectsAgainst(
+          PostHogPlatformViewPrivacy.mask, detached),
+      isNull,
+    );
+    // A revealed view has no mask to lose, so the frame still ships.
+    expect(
+      capturer.debugPlatformViewRectsAgainst(
+          PostHogPlatformViewPrivacy.capture, detached),
+      isNotNull,
+    );
   });
 }

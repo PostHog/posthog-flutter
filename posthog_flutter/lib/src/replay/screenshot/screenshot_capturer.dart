@@ -251,18 +251,23 @@ class ScreenshotCapturer {
       ro is RenderDarwinPlatformView ||
       ro is TextureBox;
 
-  _PlatformViewRects _collectPlatformViewRects(
-      PostHogPlatformViewPrivacy defaultPolicy) {
+  /// Null when a view that must be masked could not be measured; the caller
+  /// drops the frame rather than ship it unmasked.
+  _PlatformViewRects? _collectPlatformViewRects(
+      PostHogPlatformViewPrivacy defaultPolicy,
+      [RenderObject? ancestorOverride]) {
     final masked = <ElementData>[];
     final captured = <_CapturedView>[];
-    final ancestor = PostHogMaskController.instance.containerKey.currentContext
-        ?.findRenderObject();
+    final ancestor = ancestorOverride ??
+        PostHogMaskController.instance.containerKey.currentContext
+            ?.findRenderObject();
     final seen = <int>{};
 
     final rootElement = WidgetsBinding.instance.rootElement;
-    if (rootElement != null) {
-      _visitElementForPlatformViews(
-          rootElement, ancestor, masked, captured, seen, defaultPolicy);
+    if (rootElement != null &&
+        !_visitElementForPlatformViews(
+            rootElement, ancestor, masked, captured, seen, defaultPolicy)) {
+      return null;
     }
 
     if (masked.isNotEmpty || captured.isNotEmpty) {
@@ -272,7 +277,7 @@ class ScreenshotCapturer {
     return _PlatformViewRects(masked: masked, captured: captured);
   }
 
-  void _visitElementForPlatformViews(
+  bool _visitElementForPlatformViews(
     Element element,
     RenderObject? ancestor,
     List<ElementData> masked,
@@ -282,20 +287,26 @@ class ScreenshotCapturer {
   ) {
     final policy = resolvePrivacyPolicyForElement(element, inheritedPolicy);
 
+    var safe = true;
     final ro = element.renderObject;
     if (ro is RenderBox &&
         ro.hasSize &&
         ro.size.isValidSize &&
         _isPlatformViewRenderObject(ro)) {
-      _addIfNew(ro, ancestor, masked, captured, seen, policy);
+      safe = _addIfNew(ro, ancestor, masked, captured, seen, policy);
     }
-    element.visitChildren(
-      (child) => _visitElementForPlatformViews(
-          child, ancestor, masked, captured, seen, policy),
-    );
+    element.visitChildren((child) {
+      if (!_visitElementForPlatformViews(
+          child, ancestor, masked, captured, seen, policy)) {
+        safe = false;
+      }
+    });
+    return safe;
   }
 
-  void _addIfNew(
+  /// Returns false when a view that must be masked could not be measured, so
+  /// the caller drops the frame rather than ship it with the mask missing.
+  bool _addIfNew(
     RenderBox ro,
     RenderObject? ancestor,
     List<ElementData> masked,
@@ -303,16 +314,16 @@ class ScreenshotCapturer {
     Set<int> seen,
     PostHogPlatformViewPrivacy policy,
   ) {
-    if (!seen.add(identityHashCode(ro))) return;
+    if (!seen.add(identityHashCode(ro))) return true;
     // TextureBox content is already composited into the Flutter image, so no
     // native screenshot is needed when revealing. Only mask it when requested.
     if (ro is TextureBox && policy == PostHogPlatformViewPrivacy.capture) {
-      return;
+      return true;
     }
     try {
       final transform = ro.getTransformTo(ancestor);
       final visible = clippedPaintBounds(ro, ancestor);
-      if (visible.isEmpty) return;
+      if (visible.isEmpty) return true;
       if (policy == PostHogPlatformViewPrivacy.capture) {
         captured.add(_CapturedView(
           data: ElementData(
@@ -329,8 +340,13 @@ class ScreenshotCapturer {
           transform: transform,
         ));
       }
+      return true;
     } catch (e) {
       printIfDebug('Error collecting platform view rect: $e');
+      // A revealed view loses nothing here — it has no mask to place. A masked
+      // one does, and a texture-backed view's pixels are already in the
+      // screenshot, so the frame cannot be shipped without its mask.
+      return policy == PostHogPlatformViewPrivacy.capture;
     }
   }
 
@@ -355,9 +371,17 @@ class ScreenshotCapturer {
   /// The rects the mask painter is handed for the platform views on screen,
   /// and the visible region each revealed view is clipped to.
   @visibleForTesting
-  ({List<Rect> masked, List<Rect> revealed}) debugPlatformViewRects(
-      PostHogPlatformViewPrivacy defaultPolicy) {
-    final rects = _collectPlatformViewRects(defaultPolicy);
+  ({List<Rect> masked, List<Rect> revealed})? debugPlatformViewRects(
+          PostHogPlatformViewPrivacy defaultPolicy) =>
+      debugPlatformViewRectsAgainst(defaultPolicy, null);
+
+  /// As [debugPlatformViewRects], but measured against [ancestor] so a test can
+  /// force the walk to fail.
+  @visibleForTesting
+  ({List<Rect> masked, List<Rect> revealed})? debugPlatformViewRectsAgainst(
+      PostHogPlatformViewPrivacy defaultPolicy, RenderObject? ancestor) {
+    final rects = _collectPlatformViewRects(defaultPolicy, ancestor);
+    if (rects == null) return null;
     return (
       masked: rects.masked.map((e) => e.rect).toList(),
       revealed: rects.captured.map((v) => v.visibleRect).toList(),
@@ -707,6 +731,20 @@ class ScreenshotCapturer {
             ? PostHogPlatformViewPrivacy.mask
             : PostHogPlatformViewPrivacy.capture;
         final pvRects = _collectPlatformViewRects(defaultPolicy);
+        // Fail closed, like the widget mask walk above: a platform view we
+        // could not measure would ship unmasked, and a texture-backed one's
+        // pixels are already in the screenshot.
+        if (pvRects == null) {
+          printIfDebug(
+            'The platform view mask walk failed, dropping the frame.',
+          );
+          currentRecorder.endRecording().dispose();
+          recorder = null;
+          currentImage.dispose();
+          image = null;
+          completer.complete(null);
+          return;
+        }
         final hasCapturedViews = pvRects.captured.isNotEmpty;
         hasCapturedPlatformViews = hasCapturedViews;
 
