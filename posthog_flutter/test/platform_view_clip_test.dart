@@ -278,7 +278,7 @@ void main() {
 
       // The viewport excludes the band the header covers. That is right for an
       // opaque header, and masking it would black the header out of the replay;
-      // a translucent header leaves the band visible and unmasked.
+      // under a translucent one the band can still show the view's own pixels.
       expect(
         clippedPaintBounds(
           tester.renderObject<RenderBox>(find.byKey(const Key('view'))),

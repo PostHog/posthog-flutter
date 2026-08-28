@@ -372,21 +372,12 @@ class ScreenshotCapturer {
       _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
       return;
     }
-    canvas.save();
-    // Clipping in the view's own space keeps a rotated or skewed clip exact;
-    // its bounding box would let native pixels past the real clip edge. An
-    // antialiased edge would blend them a hairline past it too.
-    canvas.transform(transform.storage);
-    canvas.clipRect(view.visibleRect, doAntiAlias: false);
-    canvas.drawImageRect(
-      nativeImage,
-      Rect.fromLTWH(
-          0, 0, nativeImage.width.toDouble(), nativeImage.height.toDouble()),
-      viewRect.rect,
-      Paint()..blendMode = ui.BlendMode.srcOver,
-    );
-    canvas.restore();
-    nativeImage.dispose();
+    try {
+      compositeRevealedImage(
+          canvas, nativeImage, transform, viewRect.rect, view.visibleRect);
+    } finally {
+      nativeImage.dispose();
+    }
   }
 
   Future<ui.Image?> _decodeRawPixels(Uint8List bytes, int width, int height) {
@@ -933,6 +924,45 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
     node = node.parent;
   }
   return clipped;
+}
+
+/// Paints [image] — an axis-aligned screen crop of the platform view — back
+/// over the region the view occupies, showing only the part [visibleRect]
+/// leaves. [viewRect] and [visibleRect] are in the view's own space and
+/// [transform] maps that space to the canvas.
+///
+/// The crop already holds the view's on-screen appearance, so it goes back
+/// into the same device-space rect; painting it in the view's own space would
+/// apply the view's rotation or flip a second time.
+@visibleForTesting
+void compositeRevealedImage(
+  Canvas canvas,
+  ui.Image image,
+  Matrix4 transform,
+  Rect viewRect,
+  Rect visibleRect,
+) {
+  final toDevice = Matrix4.tryInvert(transform);
+  if (toDevice == null) return;
+  canvas.save();
+  try {
+    // The clip is set in the view's own space so a rotated or skewed edge
+    // stays exact; its device-space hull would let native pixels past it. An
+    // antialiased edge would blend them a hairline past it too. visibleRect is
+    // itself a hull of the ancestor clip, so a rotated view can still reveal a
+    // corner of native content outside that clip.
+    canvas.transform(transform.storage);
+    canvas.clipRect(visibleRect, doAntiAlias: false);
+    canvas.transform(toDevice.storage);
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      MatrixUtils.transformRect(transform, viewRect),
+      Paint()..blendMode = ui.BlendMode.srcOver,
+    );
+  } finally {
+    canvas.restore();
+  }
 }
 
 @visibleForTesting
