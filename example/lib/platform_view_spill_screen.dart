@@ -15,15 +15,6 @@ import 'package:webview_flutter/webview_flutter.dart';
 ///   must show the same quadrant in the same corner. A swapped corner means the
 ///   crop was composited in the view's own space and the view's rotation or
 ///   flip was applied a second time.
-const spillSentinels = <String, String>{
-  'clipped_masked': 'SPILLONE',
-  'scrolled_masked': 'SPILLTWO',
-  'nested_clip_masked': 'SPILLTHREE',
-  'clipped_revealed': 'SPILLFOUR',
-  'scrolled_revealed': 'SPILLFIVE',
-  'masked_over_revealed': 'SPILLSIX',
-  'unclipped_masked_control': 'SPILLSEVEN',
-};
 
 WebViewController _wv() =>
     WebViewController()..loadRequest(Uri.parse('https://www.wikipedia.org'));
