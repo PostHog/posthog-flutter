@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 const _topLeft = Color(0xFFFF0000);
@@ -126,6 +127,26 @@ void main() {
     expect(await _pixel(image, 75, 150), _background);
   });
 
+  test('an eighth turn does not paint the corners of the clip hull', () async {
+    // A quarter turn maps an axis-aligned rect onto another axis-aligned rect,
+    // so it cannot tell the view-space clip apart from that rect's device-space
+    // hull. At 45 degrees the hull is twice the area of the real clip.
+    final eighthTurn = Matrix4.identity()
+      ..translateByDouble(50.0, 20.0, 0.0, 1.0)
+      ..rotateZ(pi / 4);
+    final image = await _composite(
+      await _screenCrop(100, 200),
+      eighthTurn,
+      const Rect.fromLTWH(0, 0, 60, 60),
+      const Rect.fromLTWH(0, 0, 60, 60),
+    );
+    expect(await _pixel(image, 40, 60), _topLeft);
+    expect(await _pixel(image, 15, 30), _background);
+    expect(await _pixel(image, 85, 30), _background);
+    expect(await _pixel(image, 15, 95), _background);
+    expect(await _pixel(image, 85, 95), _background);
+  });
+
   test('a singular transform paints nothing rather than throwing', () async {
     final image = await _composite(
       await _screenCrop(100, 200),
@@ -134,5 +155,21 @@ void main() {
       const Rect.fromLTWH(0, 0, 100, 200),
     );
     expect(await _pixel(image, 50, 100), _background);
+  });
+
+  test('a failed native capture masks only the visible region', () async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawRect(
+        const Rect.fromLTWH(0, 0, 100, 200), Paint()..color = _background);
+    await ScreenshotCapturer(PostHogConfig('test')).debugMaskFailedCapture(
+      canvas,
+      const Rect.fromLTWH(0, 0, 100, 200),
+      const Rect.fromLTWH(0, 0, 100, 100),
+      Matrix4.identity(),
+    );
+    final image = await recorder.endRecording().toImage(100, 200);
+    expect(await _pixel(image, 50, 50), const Color(0xFF000000));
+    expect(await _pixel(image, 50, 150), _background);
   });
 }

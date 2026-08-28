@@ -334,6 +334,36 @@ class ScreenshotCapturer {
     }
   }
 
+  /// Masks a revealed view whose native capture came back empty, so a test can
+  /// check the fallback covers only the visible region.
+  @visibleForTesting
+  Future<void> debugMaskFailedCapture(
+          Canvas canvas, Rect viewRect, Rect visibleRect, Matrix4 transform) =>
+      _compositeRevealedView(
+        canvas,
+        _CapturedView(
+          data: ElementData(
+              rect: viewRect, type: 'platformView', transform: transform),
+          visibleRect: visibleRect,
+        ),
+        null,
+        0,
+        0,
+        1.0,
+      );
+
+  /// The rects the mask painter is handed for the platform views on screen,
+  /// and the visible region each revealed view is clipped to.
+  @visibleForTesting
+  ({List<Rect> masked, List<Rect> revealed}) debugPlatformViewRects(
+      PostHogPlatformViewPrivacy defaultPolicy) {
+    final rects = _collectPlatformViewRects(defaultPolicy);
+    return (
+      masked: rects.masked.map((e) => e.rect).toList(),
+      revealed: rects.captured.map((v) => v.visibleRect).toList(),
+    );
+  }
+
   Map<String, int> _viewSpec(ElementData viewRect, Offset globalPosition) {
     final transform = viewRect.transform;
     if (transform == null) return {'x': 0, 'y': 0, 'width': 0, 'height': 0};
@@ -926,14 +956,18 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   return clipped;
 }
 
-/// Paints [image] — an axis-aligned screen crop of the platform view — back
-/// over the region the view occupies, showing only the part [visibleRect]
-/// leaves. [viewRect] and [visibleRect] are in the view's own space and
-/// [transform] maps that space to the canvas.
+/// Paints [image] — the platform view's native pixels — back over the region
+/// the view occupies, showing only the part [visibleRect] leaves. [viewRect]
+/// and [visibleRect] are in the view's own space and [transform] maps that
+/// space to the canvas.
 ///
-/// The crop already holds the view's on-screen appearance, so it goes back
-/// into the same device-space rect; painting it in the view's own space would
-/// apply the view's rotation or flip a second time.
+/// Android crops an axis-aligned region of the screen, so the crop already
+/// holds the view's on-screen appearance and goes back into the same
+/// device-space rect; painting it in the view's own space would apply the
+/// view's rotation or flip a second time. iOS snapshots a `WKWebView` in the
+/// view's own space instead, so a rotated or scaled revealed view composites
+/// unrotated there — measured on a simulator, unchanged by this function, and
+/// tracked separately.
 @visibleForTesting
 void compositeRevealedImage(
   Canvas canvas,
