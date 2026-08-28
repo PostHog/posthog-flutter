@@ -359,7 +359,7 @@ class ScreenshotCapturer {
     final transform = viewRect.transform;
     if (transform == null) return;
     final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
-    // Masking [viewRect] here would cover everything outside the ancestor clip.
+    // The native crop covers the whole view; only the clipped part may be painted.
     final fallbackMask = ElementData(
       rect: view.visibleRect,
       type: viewRect.type,
@@ -865,11 +865,9 @@ class ScreenshotCapturer {
 /// and over the widgets outside that clip. Returns [Rect.zero] when the view is
 /// fully clipped away.
 ///
-/// `describeApproximatePaintClip` answers "what can a viewer see", which is what
-/// masking wants, but it is not a paint-clip guarantee: `RenderViewportBase`
-/// subtracts a sliver overlap correction, and a `CustomClipper` may report less
-/// than its own `getClip`. Either under-masks a view drawn under a translucent
-/// overlapping header.
+/// `describeApproximatePaintClip` is a semantics helper, not a paint-clip
+/// guarantee: a `CustomClipper` may report less than its own `getClip`, which
+/// would under-mask.
 @visibleForTesting
 Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   var clipped = ro.paintBounds;
@@ -883,6 +881,13 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
     Matrix4? toRo;
     try {
       clip = node.describeApproximatePaintClip(child);
+      // A viewport reports what a viewer can see, which subtracts the band an
+      // overlapping sliver header covers. The header may be translucent, so the
+      // view is still on screen there; the viewport's own bounds are the clip
+      // it actually paints with.
+      if (clip != null && node is RenderViewportBase && node.hasSize) {
+        clip = Offset.zero & node.size;
+      }
       if (clip != null) {
         final toNode = ro.getTransformTo(node);
         // transformRect maps the four corners and takes their bounding box,

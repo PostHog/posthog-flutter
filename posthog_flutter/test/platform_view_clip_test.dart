@@ -243,6 +243,53 @@ void main() {
     });
   });
 
+  group('clippedPaintBounds — overlapping sliver header', () {
+    testWidgets('a pinned header does not trim the band it overlaps',
+        (tester) async {
+      // A viewport reports what a viewer sees, minus the overlap a pinned
+      // header covers. That header can be translucent, so the band is still on
+      // screen and must stay masked.
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: CustomScrollView(
+                controller: controller,
+                slivers: [
+                  const SliverPersistentHeader(
+                      pinned: true, delegate: _PinnedHeader()),
+                  SliverToBoxAdapter(
+                    child: Container(
+                        key: const Key('view'), height: 200, color: null),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 800)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      controller.jumpTo(100);
+      await tester.pump();
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTRB(0, 20, 300, 200),
+      );
+    });
+  });
+
   group('clippedPaintBounds — projective ancestors', () {
     testWidgets(
         'a perspective ancestor keeps the full bounds, not a shrunk one',
@@ -266,6 +313,45 @@ void main() {
                     ..rotateX(1.4),
                   child:
                       const SizedBox(key: Key('view'), width: 200, height: 200),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final view =
+          tester.renderObject<RenderBox>(find.byKey(const Key('view')));
+      expect(
+        clippedPaintBounds(
+          view,
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        view.paintBounds,
+      );
+    });
+
+    testWidgets('perspective reached only through the third term still guards',
+        (tester) async {
+      // Rotating outside a perspective transform leaves storage[3] and [7] zero
+      // and only storage[11] set, so dropping that term would shrink the mask.
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 400,
+              height: 400,
+              child: ClipRect(
+                child: Transform(
+                  transform: Matrix4.rotationX(1.2),
+                  child: Transform(
+                    transform: Matrix4.identity()..setEntry(3, 2, 0.01),
+                    child: const SizedBox(
+                        key: Key('view'), width: 200, height: 200),
+                  ),
                 ),
               ),
             ),
@@ -438,4 +524,22 @@ class _NarrowClipper extends CustomClipper<Rect> {
 
   @override
   bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
+}
+
+class _PinnedHeader extends SliverPersistentHeaderDelegate {
+  const _PinnedHeader();
+
+  @override
+  double get minExtent => 80;
+
+  @override
+  double get maxExtent => 80;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlaps) =>
+      const SizedBox.expand();
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) =>
+      false;
 }
