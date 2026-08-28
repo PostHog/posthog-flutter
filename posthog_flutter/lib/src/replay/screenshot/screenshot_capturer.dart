@@ -859,14 +859,36 @@ class ScreenshotCapturer {
 /// scroll view or a `ClipRect` would otherwise be masked past its visible edge
 /// and over the widgets outside that clip. Returns [Rect.zero] when the view is
 /// fully clipped away.
+///
+/// A viewport reports the region a viewer can see, which excludes the band an
+/// overlapping sliver header covers. That is what masking wants for the usual
+/// opaque header — masking the band would black the header out of the replay —
+/// but a translucent header leaves that band visible and unmasked.
 
+/// The region [node] actually clips to, when it is a clip render object whose
+/// app-supplied clipper may report a smaller approximation than it clips with.
+///
+/// Returns null when the node clips nothing, so a clipper attached with
+/// [Clip.none] cannot shrink a mask over content Flutter paints in full.
 Rect? _appClipperBounds(RenderObject node) {
   if (node is! RenderBox || !node.hasSize) return null;
   final size = node.size;
-  if (node is RenderClipRect) return node.clipper?.getClip(size);
-  if (node is RenderClipOval) return node.clipper?.getClip(size);
-  if (node is RenderClipRRect) return node.clipper?.getClip(size).outerRect;
-  if (node is RenderClipPath) return node.clipper?.getClip(size).getBounds();
+  if (node is RenderClipRect) {
+    return node.clipBehavior == Clip.none ? null : node.clipper?.getClip(size);
+  }
+  if (node is RenderClipOval) {
+    return node.clipBehavior == Clip.none ? null : node.clipper?.getClip(size);
+  }
+  if (node is RenderClipRRect) {
+    return node.clipBehavior == Clip.none
+        ? null
+        : node.clipper?.getClip(size).outerRect;
+  }
+  if (node is RenderClipPath) {
+    return node.clipBehavior == Clip.none
+        ? null
+        : node.clipper?.getClip(size).getBounds();
+  }
   return null;
 }
 
@@ -885,11 +907,6 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
       // region it actually clips to, which would mask less than the view shows.
       clip =
           _appClipperBounds(node) ?? node.describeApproximatePaintClip(child);
-      // A viewport subtracts the band an overlapping sliver header covers, but
-      // that header may be translucent and it paints with its own bounds.
-      if (clip != null && node is RenderViewportBase && node.hasSize) {
-        clip = Offset.zero & node.size;
-      }
       if (clip != null) {
         final toNode = ro.getTransformTo(node);
         // transformRect's four-corner hull only over-approximates for an

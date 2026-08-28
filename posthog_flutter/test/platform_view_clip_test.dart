@@ -244,8 +244,7 @@ void main() {
   });
 
   group('clippedPaintBounds — overlapping sliver header', () {
-    testWidgets('a pinned header does not trim the band it overlaps',
-        (tester) async {
+    testWidgets('a pinned header trims the band it covers', (tester) async {
       // A viewport reports what a viewer sees, minus the overlap a pinned
       // header covers. That header can be translucent, so the band is still on
       // screen and must stay masked.
@@ -280,12 +279,15 @@ void main() {
       controller.jumpTo(100);
       await tester.pump();
 
+      // The viewport excludes the band the header covers. That is right for an
+      // opaque header, and masking it would black the header out of the replay;
+      // a translucent header leaves the band visible and unmasked.
       expect(
         clippedPaintBounds(
           tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
           tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
         ),
-        const Rect.fromLTRB(0, 20, 300, 200),
+        const Rect.fromLTRB(0, 100, 300, 200),
       );
     });
   });
@@ -407,6 +409,38 @@ void main() {
   });
 
   group('clippedPaintBounds — failing and degenerate clips', () {
+    testWidgets('a clipper attached with Clip.none does not shrink the mask',
+        (tester) async {
+      // Flutter paints the view in full, so the clipper describes nothing.
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipRect(
+                clipper: _NarrowClipper(),
+                clipBehavior: Clip.none,
+                child:
+                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 300, 300),
+      );
+    });
+
     testWidgets('an under-reporting clipper does not shrink the mask',
         (tester) async {
       // getApproximateClipRect may report less than the clipper actually clips
