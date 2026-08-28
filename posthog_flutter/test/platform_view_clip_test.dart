@@ -245,9 +245,6 @@ void main() {
 
   group('clippedPaintBounds — overlapping sliver header', () {
     testWidgets('a pinned header trims the band it covers', (tester) async {
-      // A viewport reports what a viewer sees, minus the overlap a pinned
-      // header covers. That header can be translucent, so the band is still on
-      // screen and must stay masked.
       final controller = ScrollController();
       addTearDown(controller.dispose);
       await tester.pumpWidget(
@@ -409,6 +406,99 @@ void main() {
   });
 
   group('clippedPaintBounds — failing and degenerate clips', () {
+    testWidgets('an under-reporting ClipRRect clipper does not shrink the mask',
+        (tester) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipRRect(
+                clipper: _UnderReportingRRectClipper(),
+                child:
+                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 100, 100),
+      );
+    });
+
+    testWidgets('an under-reporting ClipPath clipper does not shrink the mask',
+        (tester) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipPath(
+                clipper: _UnderReportingPathClipper(),
+                child:
+                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 100, 100),
+      );
+    });
+
+    testWidgets('a clipper returning a non-finite rect leaves the full bounds',
+        (tester) async {
+      // A NaN rect is not empty, so an unguarded walk would carry it into the
+      // mask geometry and the mask would never be drawn.
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipRect(
+                clipper: _NaNClipper(),
+                child:
+                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              ),
+            ),
+          ),
+        ),
+      );
+      tester.takeException();
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 300, 300),
+      );
+    });
+
     testWidgets('a clipper attached with Clip.none does not shrink the mask',
         (tester) async {
       // Flutter paints the view in full, so the clipper describes nothing.
@@ -452,12 +542,17 @@ void main() {
             alignment: Alignment.topLeft,
             child: SizedBox(
               key: const Key('ancestor'),
-              width: 300,
-              height: 300,
-              child: ClipRect(
-                clipper: _UnderReportingClipper(),
-                child:
-                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              width: 400,
+              height: 400,
+              // Offset so the clip's frame differs from the ancestor's, which
+              // a walk measuring against the wrong node would not notice.
+              child: Padding(
+                padding: const EdgeInsets.only(left: 40, top: 60),
+                child: ClipRect(
+                  clipper: _UnderReportingClipper(),
+                  child:
+                      const SizedBox(key: Key('view'), width: 300, height: 300),
+                ),
               ),
             ),
           ),
@@ -619,4 +714,36 @@ class _PinnedHeader extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) =>
       false;
+}
+
+class _UnderReportingRRectClipper extends CustomClipper<RRect> {
+  @override
+  RRect getClip(Size size) =>
+      RRect.fromRectXY(const Rect.fromLTWH(0, 0, 100, 100), 8, 8);
+
+  @override
+  Rect getApproximateClipRect(Size size) => const Rect.fromLTWH(0, 0, 10, 10);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<RRect> oldClipper) => false;
+}
+
+class _UnderReportingPathClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) =>
+      Path()..addRect(const Rect.fromLTWH(0, 0, 100, 100));
+
+  @override
+  Rect getApproximateClipRect(Size size) => const Rect.fromLTWH(0, 0, 10, 10);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _NaNClipper extends CustomClipper<Rect> {
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(double.nan, 0, 100, 100);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
 }

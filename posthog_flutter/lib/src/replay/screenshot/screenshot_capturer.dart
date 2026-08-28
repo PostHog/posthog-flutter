@@ -851,20 +851,6 @@ class ScreenshotCapturer {
   }
 }
 
-/// Intersects [ro]'s paint bounds with every clip its ancestors apply, up to
-/// but not including [ancestor], and returns the visible rect in [ro]'s local
-/// coordinates.
-///
-/// A platform view reports its full, unclipped paint bounds, so a map inside a
-/// scroll view or a `ClipRect` would otherwise be masked past its visible edge
-/// and over the widgets outside that clip. Returns [Rect.zero] when the view is
-/// fully clipped away.
-///
-/// A viewport reports the region a viewer can see, which excludes the band an
-/// overlapping sliver header covers. That is what masking wants for the usual
-/// opaque header — masking the band would black the header out of the replay —
-/// but a translucent header leaves that band visible and unmasked.
-
 /// The region [node] actually clips to, when it is a clip render object whose
 /// app-supplied clipper may report a smaller approximation than it clips with.
 ///
@@ -892,6 +878,21 @@ Rect? _appClipperBounds(RenderObject node) {
   return null;
 }
 
+/// Intersects [ro]'s paint bounds with every clip its ancestors apply, up to
+/// but not including [ancestor], and returns the visible rect in [ro]'s local
+/// coordinates.
+///
+/// A platform view reports its full, unclipped paint bounds, so a map inside a
+/// scroll view or a `ClipRect` would otherwise be masked past its visible edge
+/// and over the widgets outside that clip. Returns [Rect.zero] when the view is
+/// fully clipped away.
+///
+/// A viewport reports the region a viewer can see, which excludes the band an
+/// overlapping sliver header covers. That is what masking wants for the usual
+/// opaque header, and masking the band would black the header out of the
+/// replay. Under a translucent header the band stays visible, and for a
+/// [TextureBox] — whose content is already in the Flutter image — that means
+/// the view's own pixels reach the recording.
 @visibleForTesting
 Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   var clipped = ro.paintBounds;
@@ -907,6 +908,9 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
       // region it actually clips to, which would mask less than the view shows.
       clip =
           _appClipperBounds(node) ?? node.describeApproximatePaintClip(child);
+      // A NaN rect is not empty, so it would pass every check below and leave
+      // the mask undrawn; an app clipper's arithmetic can produce one.
+      if (clip != null && !clip.isFinite) clip = null;
       if (clip != null) {
         final toNode = ro.getTransformTo(node);
         // transformRect's four-corner hull only over-approximates for an

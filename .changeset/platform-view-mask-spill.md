@@ -2,4 +2,4 @@
 'posthog_flutter': patch
 ---
 
-Fix session replay masking past a clipped map, WebView, or camera preview and hiding the widgets around it
+Fix session replay painting a clipped map, WebView, or camera preview past its visible edge and over the widgets around it
