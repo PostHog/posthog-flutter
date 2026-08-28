@@ -407,10 +407,40 @@ void main() {
   });
 
   group('clippedPaintBounds — failing and degenerate clips', () {
+    testWidgets('an under-reporting clipper does not shrink the mask',
+        (tester) async {
+      // getApproximateClipRect may report less than the clipper actually clips
+      // to; masking the smaller rect would leave the difference uncovered.
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: const Key('ancestor'),
+              width: 300,
+              height: 300,
+              child: ClipRect(
+                clipper: _UnderReportingClipper(),
+                child:
+                    const SizedBox(key: Key('view'), width: 300, height: 300),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        clippedPaintBounds(
+          tester.renderObject<RenderBox>(find.byKey(const Key('view'))),
+          tester.renderObject<RenderBox>(find.byKey(const Key('ancestor'))),
+        ),
+        const Rect.fromLTWH(0, 0, 100, 100),
+      );
+    });
+
     testWidgets('a clipper that throws leaves the full paint bounds',
         (tester) async {
-      // RenderCustomClip asks getApproximateClipRect, not getClip, so a clipper
-      // that throws from getClip never reaches the walk and would prove nothing.
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
@@ -429,6 +459,10 @@ void main() {
           ),
         ),
       );
+
+      // The framework hits the same throw while painting the clip; that is the
+      // app's own bug, and it must not stop the mask from being computed.
+      expect(tester.takeException(), isStateError);
 
       expect(
         clippedPaintBounds(
@@ -504,10 +538,19 @@ void main() {
 
 class _ThrowingApproxClipper extends CustomClipper<Rect> {
   @override
+  Rect getClip(Size size) => throw StateError('from app code');
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
+}
+
+/// Reports far less than it clips to, which is legal and would under-mask.
+class _UnderReportingClipper extends CustomClipper<Rect> {
+  @override
   Rect getClip(Size size) => const Rect.fromLTWH(0, 0, 100, 100);
 
   @override
-  Rect getApproximateClipRect(Size size) => throw StateError('from app code');
+  Rect getApproximateClipRect(Size size) => const Rect.fromLTWH(0, 0, 10, 10);
 
   @override
   bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;

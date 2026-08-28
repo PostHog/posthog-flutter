@@ -357,7 +357,6 @@ class ScreenshotCapturer {
     final viewRect = view.data;
     final transform = viewRect.transform;
     if (transform == null) return;
-    final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
     // The native crop covers the whole view; only the clipped part may be painted.
     final fallbackMask = ElementData(
       rect: view.visibleRect,
@@ -374,14 +373,16 @@ class ScreenshotCapturer {
       return;
     }
     canvas.save();
-    // An antialiased edge would blend native pixels a hairline past the clip.
-    canvas.clipRect(MatrixUtils.transformRect(transform, view.visibleRect),
-        doAntiAlias: false);
+    // Clipping in the view's own space keeps a rotated or skewed clip exact;
+    // its bounding box would let native pixels past the real clip edge. An
+    // antialiased edge would blend them a hairline past it too.
+    canvas.transform(transform.storage);
+    canvas.clipRect(view.visibleRect, doAntiAlias: false);
     canvas.drawImageRect(
       nativeImage,
       Rect.fromLTWH(
           0, 0, nativeImage.width.toDouble(), nativeImage.height.toDouble()),
-      transformedRect,
+      viewRect.rect,
       Paint()..blendMode = ui.BlendMode.srcOver,
     );
     canvas.restore();
@@ -859,6 +860,16 @@ class ScreenshotCapturer {
 /// and over the widgets outside that clip. Returns [Rect.zero] when the view is
 /// fully clipped away.
 
+Rect? _appClipperBounds(RenderObject node) {
+  if (node is! RenderBox || !node.hasSize) return null;
+  final size = node.size;
+  if (node is RenderClipRect) return node.clipper?.getClip(size);
+  if (node is RenderClipOval) return node.clipper?.getClip(size);
+  if (node is RenderClipRRect) return node.clipper?.getClip(size).outerRect;
+  if (node is RenderClipPath) return node.clipper?.getClip(size).getBounds();
+  return null;
+}
+
 @visibleForTesting
 Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   var clipped = ro.paintBounds;
@@ -870,7 +881,10 @@ Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
     Rect? clip;
     Matrix4? toRo;
     try {
-      clip = node.describeApproximatePaintClip(child);
+      // An app-supplied clipper may report an approximation smaller than the
+      // region it actually clips to, which would mask less than the view shows.
+      clip =
+          _appClipperBounds(node) ?? node.describeApproximatePaintClip(child);
       // A viewport subtracts the band an overlapping sliver header covers, but
       // that header may be translucent and it paints with its own bounds.
       if (clip != null && node is RenderViewportBase && node.hasSize) {
