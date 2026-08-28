@@ -312,7 +312,6 @@ class ScreenshotCapturer {
     try {
       final transform = ro.getTransformTo(ancestor);
       final visible = clippedPaintBounds(ro, ancestor);
-      // A view an ancestor clips away entirely covers nothing on screen.
       if (visible.isEmpty) return;
       if (policy == PostHogPlatformViewPrivacy.capture) {
         captured.add(_CapturedView(
@@ -374,13 +373,8 @@ class ScreenshotCapturer {
       _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
       return;
     }
-    // The native request covers the view's own frame, because that is what the
-    // platform matches it by. Clipping here, rather than shrinking the request,
-    // keeps the revealed pixels inside the ancestor clip without changing what
-    // the native side is asked for.
     canvas.save();
-    // An antialiased clip edge blends the native pixels roughly a pixel past
-    // the ancestor clip, which is a hairline of the leak this clip prevents.
+    // An antialiased edge would blend native pixels a hairline past the clip.
     canvas.clipRect(MatrixUtils.transformRect(transform, view.visibleRect),
         doAntiAlias: false);
     canvas.drawImageRect(
@@ -864,36 +858,29 @@ class ScreenshotCapturer {
 /// scroll view or a `ClipRect` would otherwise be masked past its visible edge
 /// and over the widgets outside that clip. Returns [Rect.zero] when the view is
 /// fully clipped away.
-///
-/// `describeApproximatePaintClip` is a semantics helper, not a paint-clip
-/// guarantee: a `CustomClipper` may report less than its own `getClip`, which
-/// would under-mask.
+
 @visibleForTesting
 Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
   var clipped = ro.paintBounds;
   RenderObject child = ro;
   RenderObject? node = ro.parent;
   while (node != null && !identical(node, ancestor)) {
-    // This can run application code through a CustomClipper. Letting it throw
-    // would drop the mask for this view entirely, so a failing clip is skipped
-    // and the wider, unclipped bounds survive.
+    // A CustomClipper runs application code here; a throw would drop the mask
+    // entirely, so a failing clip is skipped and the wider bounds survive.
     Rect? clip;
     Matrix4? toRo;
     try {
       clip = node.describeApproximatePaintClip(child);
-      // A viewport reports what a viewer can see, which subtracts the band an
-      // overlapping sliver header covers. The header may be translucent, so the
-      // view is still on screen there; the viewport's own bounds are the clip
-      // it actually paints with.
+      // A viewport subtracts the band an overlapping sliver header covers, but
+      // that header may be translucent and it paints with its own bounds.
       if (clip != null && node is RenderViewportBase && node.hasSize) {
         clip = Offset.zero & node.size;
       }
       if (clip != null) {
         final toNode = ro.getTransformTo(node);
-        // transformRect maps the four corners and takes their bounding box,
-        // which only over-approximates for an affine matrix. Under perspective
-        // the mapped hull can be far smaller than the real one, which would
-        // shrink the mask or drop it — so those keep the unclipped bounds.
+        // transformRect's four-corner hull only over-approximates for an
+        // affine matrix; under perspective it can be far smaller than the real
+        // region, which would shrink the mask or drop it.
         final m = toNode.storage;
         final projective = m[3] != 0 || m[7] != 0 || m[11] != 0;
         toRo = projective ? null : Matrix4.tryInvert(toNode);
