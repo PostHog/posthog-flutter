@@ -60,9 +60,19 @@ class ViewTreeSnapshotStatus {
   ViewTreeSnapshotStatus(this.sentMetaEvent);
 }
 
+/// A revealed platform view. [data] carries the view's own bounds, which the
+/// native side uses to find and crop it; [visibleRect] is the part an ancestor
+/// clip leaves visible, which is all we are allowed to paint. Both are in the
+/// view's own coordinates and share [data]'s transform.
+class _CapturedView {
+  final ElementData data;
+  final Rect visibleRect;
+  const _CapturedView({required this.data, required this.visibleRect});
+}
+
 class _PlatformViewRects {
   final List<ElementData> masked;
-  final List<ElementData> captured;
+  final List<_CapturedView> captured;
   const _PlatformViewRects({required this.masked, required this.captured});
 }
 
@@ -241,18 +251,23 @@ class ScreenshotCapturer {
       ro is RenderDarwinPlatformView ||
       ro is TextureBox;
 
-  _PlatformViewRects _collectPlatformViewRects(
-      PostHogPlatformViewPrivacy defaultPolicy) {
+  /// Null when a view that must be masked could not be measured; the caller
+  /// drops the frame rather than ship it unmasked.
+  _PlatformViewRects? _collectPlatformViewRects(
+      PostHogPlatformViewPrivacy defaultPolicy,
+      [RenderObject? ancestorOverride]) {
     final masked = <ElementData>[];
-    final captured = <ElementData>[];
-    final ancestor = PostHogMaskController.instance.containerKey.currentContext
-        ?.findRenderObject();
+    final captured = <_CapturedView>[];
+    final ancestor = ancestorOverride ??
+        PostHogMaskController.instance.containerKey.currentContext
+            ?.findRenderObject();
     final seen = <int>{};
 
     final rootElement = WidgetsBinding.instance.rootElement;
-    if (rootElement != null) {
-      _visitElementForPlatformViews(
-          rootElement, ancestor, masked, captured, seen, defaultPolicy);
+    if (rootElement != null &&
+        !_visitElementForPlatformViews(
+            rootElement, ancestor, masked, captured, seen, defaultPolicy)) {
+      return null;
     }
 
     if (masked.isNotEmpty || captured.isNotEmpty) {
@@ -262,58 +277,115 @@ class ScreenshotCapturer {
     return _PlatformViewRects(masked: masked, captured: captured);
   }
 
-  void _visitElementForPlatformViews(
+  bool _visitElementForPlatformViews(
     Element element,
     RenderObject? ancestor,
     List<ElementData> masked,
-    List<ElementData> captured,
+    List<_CapturedView> captured,
     Set<int> seen,
     PostHogPlatformViewPrivacy inheritedPolicy,
   ) {
     final policy = resolvePrivacyPolicyForElement(element, inheritedPolicy);
 
+    var safe = true;
     final ro = element.renderObject;
     if (ro is RenderBox &&
         ro.hasSize &&
         ro.size.isValidSize &&
         _isPlatformViewRenderObject(ro)) {
-      _addIfNew(ro, ancestor, masked, captured, seen, policy);
+      safe = _addIfNew(ro, ancestor, masked, captured, seen, policy);
     }
-    element.visitChildren(
-      (child) => _visitElementForPlatformViews(
-          child, ancestor, masked, captured, seen, policy),
-    );
+    element.visitChildren((child) {
+      if (!_visitElementForPlatformViews(
+          child, ancestor, masked, captured, seen, policy)) {
+        safe = false;
+      }
+    });
+    return safe;
   }
 
-  void _addIfNew(
+  /// Returns false when a view that must be masked could not be measured, so
+  /// the caller drops the frame rather than ship it with the mask missing.
+  bool _addIfNew(
     RenderBox ro,
     RenderObject? ancestor,
     List<ElementData> masked,
-    List<ElementData> captured,
+    List<_CapturedView> captured,
     Set<int> seen,
     PostHogPlatformViewPrivacy policy,
   ) {
-    if (!seen.add(identityHashCode(ro))) return;
+    if (!seen.add(identityHashCode(ro))) return true;
     // TextureBox content is already composited into the Flutter image, so no
     // native screenshot is needed when revealing. Only mask it when requested.
     if (ro is TextureBox && policy == PostHogPlatformViewPrivacy.capture) {
-      return;
+      return true;
     }
     try {
       final transform = ro.getTransformTo(ancestor);
-      final data = ElementData(
-        rect: ro.paintBounds,
-        type: 'platformView',
-        transform: transform,
-      );
+      final visible = clippedPaintBounds(ro, ancestor);
+      if (visible.isEmpty) return true;
       if (policy == PostHogPlatformViewPrivacy.capture) {
-        captured.add(data);
+        captured.add(_CapturedView(
+          data: ElementData(
+            rect: ro.paintBounds,
+            type: 'platformView',
+            transform: transform,
+          ),
+          visibleRect: visible,
+        ));
       } else {
-        masked.add(data);
+        masked.add(ElementData(
+          rect: visible,
+          type: 'platformView',
+          transform: transform,
+        ));
       }
+      return true;
     } catch (e) {
       printIfDebug('Error collecting platform view rect: $e');
+      // A revealed view loses nothing here — it has no mask to place. A masked
+      // one does, and a texture-backed view's pixels are already in the
+      // screenshot, so the frame cannot be shipped without its mask.
+      return policy == PostHogPlatformViewPrivacy.capture;
     }
+  }
+
+  /// Masks a revealed view whose native capture came back empty, so a test can
+  /// check the fallback covers only the visible region.
+  @visibleForTesting
+  Future<void> debugMaskFailedCapture(
+          Canvas canvas, Rect viewRect, Rect visibleRect, Matrix4 transform) =>
+      _compositeRevealedView(
+        canvas,
+        _CapturedView(
+          data: ElementData(
+              rect: viewRect, type: 'platformView', transform: transform),
+          visibleRect: visibleRect,
+        ),
+        null,
+        0,
+        0,
+        1.0,
+      );
+
+  /// The rects the mask painter is handed for the platform views on screen,
+  /// and the visible region each revealed view is clipped to.
+  @visibleForTesting
+  ({List<Rect> masked, List<Rect> revealed})? debugPlatformViewRects(
+          PostHogPlatformViewPrivacy defaultPolicy) =>
+      debugPlatformViewRectsAgainst(defaultPolicy, null);
+
+  /// As [debugPlatformViewRects], but measured against [ancestor] so a test can
+  /// force the walk to fail.
+  @visibleForTesting
+  ({List<Rect> masked, List<Rect> revealed})? debugPlatformViewRectsAgainst(
+      PostHogPlatformViewPrivacy defaultPolicy, RenderObject? ancestor) {
+    final rects = _collectPlatformViewRects(defaultPolicy, ancestor);
+    if (rects == null) return null;
+    return (
+      masked: rects.masked.map((e) => e.rect).toList(),
+      revealed: rects.captured.map((v) => v.visibleRect).toList(),
+    );
   }
 
   Map<String, int> _viewSpec(ElementData viewRect, Offset globalPosition) {
@@ -330,32 +402,36 @@ class ScreenshotCapturer {
 
   Future<void> _compositeRevealedView(
     Canvas canvas,
-    ElementData viewRect,
+    _CapturedView view,
     Uint8List? bytes,
     int nativeW,
     int nativeH,
     double pixelRatio,
   ) async {
+    final viewRect = view.data;
     final transform = viewRect.transform;
     if (transform == null) return;
-    final transformedRect = MatrixUtils.transformRect(transform, viewRect.rect);
+    // The native crop covers the whole view; only the clipped part may be painted.
+    final fallbackMask = ElementData(
+      rect: view.visibleRect,
+      type: viewRect.type,
+      transform: transform,
+    );
     if (bytes == null) {
-      _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
+      _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
       return;
     }
     final nativeImage = await _decodeRawPixels(bytes, nativeW, nativeH);
     if (nativeImage == null) {
-      _imageMaskPainter.drawMaskedImage(canvas, [viewRect], pixelRatio);
+      _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
       return;
     }
-    canvas.drawImageRect(
-      nativeImage,
-      Rect.fromLTWH(
-          0, 0, nativeImage.width.toDouble(), nativeImage.height.toDouble()),
-      transformedRect,
-      Paint()..blendMode = ui.BlendMode.srcOver,
-    );
-    nativeImage.dispose();
+    try {
+      compositeRevealedImage(
+          canvas, nativeImage, transform, viewRect.rect, view.visibleRect);
+    } finally {
+      nativeImage.dispose();
+    }
   }
 
   Future<ui.Image?> _decodeRawPixels(Uint8List bytes, int width, int height) {
@@ -655,6 +731,20 @@ class ScreenshotCapturer {
             ? PostHogPlatformViewPrivacy.mask
             : PostHogPlatformViewPrivacy.capture;
         final pvRects = _collectPlatformViewRects(defaultPolicy);
+        // Fail closed, like the widget mask walk above: a platform view we
+        // could not measure would ship unmasked, and a texture-backed one's
+        // pixels are already in the screenshot.
+        if (pvRects == null) {
+          printIfDebug(
+            'The platform view mask walk failed, dropping the frame.',
+          );
+          currentRecorder.endRecording().dispose();
+          recorder = null;
+          currentImage.dispose();
+          image = null;
+          completer.complete(null);
+          return;
+        }
         final hasCapturedViews = pvRects.captured.isNotEmpty;
         hasCapturedPlatformViews = hasCapturedViews;
 
@@ -701,7 +791,7 @@ class ScreenshotCapturer {
         }
         if (pvRects.captured.isNotEmpty) {
           final specs = pvRects.captured
-              .map((r) => _viewSpec(r, globalPosition))
+              .map((v) => _viewSpec(v.data, globalPosition))
               .toList();
           final bytesList =
               await _nativeCommunicator.captureNativeScreenshots(specs);
@@ -817,6 +907,133 @@ class ScreenshotCapturer {
       printIfDebug('Error initializing capture: $e');
       return Future.value(null);
     }
+  }
+}
+
+/// The region [node] actually clips to, when it is a clip render object whose
+/// app-supplied clipper may report a smaller approximation than it clips with.
+///
+/// Returns null when the node clips nothing, so a clipper attached with
+/// [Clip.none] cannot shrink a mask over content Flutter paints in full.
+Rect? _appClipperBounds(RenderObject node) {
+  if (node is! RenderBox || !node.hasSize) return null;
+  final size = node.size;
+  if (node is RenderClipRect) {
+    return node.clipBehavior == Clip.none ? null : node.clipper?.getClip(size);
+  }
+  if (node is RenderClipOval) {
+    return node.clipBehavior == Clip.none ? null : node.clipper?.getClip(size);
+  }
+  if (node is RenderClipRRect) {
+    return node.clipBehavior == Clip.none
+        ? null
+        : node.clipper?.getClip(size).outerRect;
+  }
+  if (node is RenderClipPath) {
+    return node.clipBehavior == Clip.none
+        ? null
+        : node.clipper?.getClip(size).getBounds();
+  }
+  return null;
+}
+
+/// Intersects [ro]'s paint bounds with every clip its ancestors apply, up to
+/// but not including [ancestor], and returns the visible rect in [ro]'s local
+/// coordinates.
+///
+/// A platform view reports its full, unclipped paint bounds, so a map inside a
+/// scroll view or a `ClipRect` would otherwise be masked past its visible edge
+/// and over the widgets outside that clip. Returns [Rect.zero] when the view is
+/// fully clipped away.
+///
+/// A viewport reports the region a viewer can see, which excludes the band an
+/// overlapping sliver header covers. That is what masking wants for the usual
+/// opaque header, and masking the band would black the header out of the
+/// replay. Under a translucent header the band stays visible, and for a
+/// [TextureBox] — whose content is already in the Flutter image — that means
+/// the view's own pixels reach the recording.
+@visibleForTesting
+Rect clippedPaintBounds(RenderBox ro, RenderObject? ancestor) {
+  var clipped = ro.paintBounds;
+  RenderObject child = ro;
+  RenderObject? node = ro.parent;
+  while (node != null && !identical(node, ancestor)) {
+    // A CustomClipper runs application code here; a throw would drop the mask
+    // entirely, so a failing clip is skipped and the wider bounds survive.
+    Rect? clip;
+    Matrix4? toRo;
+    try {
+      // An app-supplied clipper may report an approximation smaller than the
+      // region it actually clips to, which would mask less than the view shows.
+      clip =
+          _appClipperBounds(node) ?? node.describeApproximatePaintClip(child);
+      // A NaN rect is not empty, so it would pass every check below and leave
+      // the mask undrawn; an app clipper's arithmetic can produce one.
+      if (clip != null && !clip.isFinite) clip = null;
+      if (clip != null) {
+        final toNode = ro.getTransformTo(node);
+        // transformRect's four-corner hull only over-approximates for an
+        // affine matrix; under perspective it can be far smaller than the real
+        // region, which would shrink the mask or drop it.
+        final m = toNode.storage;
+        final projective = m[3] != 0 || m[7] != 0 || m[11] != 0;
+        toRo = projective ? null : Matrix4.tryInvert(toNode);
+      }
+    } catch (e) {
+      printIfDebug('Skipping an ancestor clip that could not be mapped: $e');
+      clip = null;
+      toRo = null;
+    }
+    if (clip != null && toRo != null) {
+      clipped = clipped.intersect(MatrixUtils.transformRect(toRo, clip));
+      if (clipped.isEmpty) return Rect.zero;
+    }
+    child = node;
+    node = node.parent;
+  }
+  return clipped;
+}
+
+/// Paints [image] — the platform view's native pixels — back over the region
+/// the view occupies, showing only the part [visibleRect] leaves. [viewRect]
+/// and [visibleRect] are in the view's own space and [transform] maps that
+/// space to the canvas.
+///
+/// Android crops an axis-aligned region of the screen, so the crop already
+/// holds the view's on-screen appearance and goes back into the same
+/// device-space rect; painting it in the view's own space would apply the
+/// view's rotation or flip a second time. iOS snapshots a `WKWebView` in the
+/// view's own space instead, so a rotated or scaled revealed view composites
+/// unrotated there — measured on a simulator, unchanged by this function, and
+/// tracked separately.
+@visibleForTesting
+void compositeRevealedImage(
+  Canvas canvas,
+  ui.Image image,
+  Matrix4 transform,
+  Rect viewRect,
+  Rect visibleRect,
+) {
+  final toDevice = Matrix4.tryInvert(transform);
+  if (toDevice == null) return;
+  canvas.save();
+  try {
+    // The clip is set in the view's own space so a rotated or skewed edge
+    // stays exact; its device-space hull would let native pixels past it. An
+    // antialiased edge would blend them a hairline past it too. visibleRect is
+    // itself a hull of the ancestor clip, so a rotated view can still reveal a
+    // corner of native content outside that clip.
+    canvas.transform(transform.storage);
+    canvas.clipRect(visibleRect, doAntiAlias: false);
+    canvas.transform(toDevice.storage);
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      MatrixUtils.transformRect(transform, viewRect),
+      Paint()..blendMode = ui.BlendMode.srcOver,
+    );
+  } finally {
+    canvas.restore();
   }
 }
 
