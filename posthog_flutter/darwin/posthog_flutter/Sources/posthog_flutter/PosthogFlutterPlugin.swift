@@ -83,6 +83,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         let instance = PosthogFlutterPlugin()
         instance.channel = methodChannel
         PosthogFlutterPlugin.instance = instance
+        prewarmPushNotificationOpenCapture()
         initPlugin()
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
     }
@@ -93,6 +94,21 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
                                               target: .global(qos: .utility))
+
+    /// A cold launch from a notification tap delivers the response about 150ms in, before Dart can
+    /// reach `Posthog().setup()`. Registration runs inside `didFinishLaunchingWithOptions`, early
+    /// enough for the native SDK to hold that response until setup() installs the integration.
+    ///
+    /// The Info.plist key is the only opt-out reachable this early. `setup()` releases an unwanted
+    /// prewarm afterwards, except when PostHog is already set up with push-open capture disabled and
+    /// a later `FlutterEngine` registers — that setup() has already run, so use the plist key there.
+    private static func prewarmPushNotificationOpenCapture() {
+        let capturePushNotificationOpened = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED") as? Bool ?? true
+        guard capturePushNotificationOpened else { return }
+        if #available(iOS 14.0, macOS 11.0, *) {
+            PostHogSDK.prewarmPushNotificationOpenCapture()
+        }
+    }
 
     public static func initPlugin() {
         let autoInit = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.AUTO_INIT") as? Bool ?? true
