@@ -1,5 +1,5 @@
 ---
-'posthog_flutter': patch
+'posthog_flutter': minor
 ---
 
-Fix `$push_notification_opened` not being captured on Android, both on a cold launch from a notification tap and on a tap while the app is already running. Requires posthog-android 3.62.0.
+Capture `$push_notification_opened` on Android for every notification tap, both on a cold launch and while the app is already running. Remove any manual `capturePushNotificationOpened` call wired to `FirebaseMessaging.onMessageOpenedApp` — that tap is now captured automatically and the manual call is not deduplicated against it. Requires posthog-android 3.62.0.
