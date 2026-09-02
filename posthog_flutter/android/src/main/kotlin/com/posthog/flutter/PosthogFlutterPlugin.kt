@@ -38,6 +38,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.util.Date
@@ -67,6 +68,7 @@ class PosthogFlutterPlugin :
 
     private lateinit var applicationContext: Context
     private var activity: Activity? = null
+    private var activityBinding: ActivityPluginBinding? = null
     private var application: Application? = null
 
     private var postHogConfig: PostHogAndroidConfig? = null
@@ -810,9 +812,22 @@ class PosthogFlutterPlugin :
         PostHogAndroid.capturePushNotificationOpened(activity?.intent)
     }
 
+    /**
+     * A tap that arrives while the process is alive is delivered to `Activity.onNewIntent`, which
+     * `ActivityLifecycleCallbacks` does not expose — so the native SDK cannot see it and this plugin
+     * is the only layer that can. Returning false leaves the intent for other listeners.
+     */
+    private val newIntentListener =
+        PluginRegistry.NewIntentListener { intent ->
+            PostHogAndroid.capturePushNotificationOpened(intent)
+            false
+        }
+
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
         application = binding.activity.application
+        activityBinding = binding
+        binding.addOnNewIntentListener(newIntentListener)
         capturePushNotificationOpenedFromLaunchIntent()
         // Only if the detector is already running; else the setup path registers
         // it. Keeps a default-off feature from installing app-wide callbacks.
@@ -823,12 +838,15 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromActivityForConfigChanges() {
         unregisterLifecycleTracking()
+        removeNewIntentListener()
         activity = null
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
         application = binding.activity.application
+        activityBinding = binding
+        binding.addOnNewIntentListener(newIntentListener)
         if (occlusionDetectorRunning) {
             registerLifecycleTracking()
         }
@@ -836,7 +854,13 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromActivity() {
         unregisterLifecycleTracking()
+        removeNewIntentListener()
         activity = null
+    }
+
+    private fun removeNewIntentListener() {
+        activityBinding?.removeOnNewIntentListener(newIntentListener)
+        activityBinding = null
     }
 
     // Idempotent: registering the same callbacks twice makes them fire twice.
