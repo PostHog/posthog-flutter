@@ -21,7 +21,7 @@ Postog flutter plugin
   s.ios.dependency 'Flutter'
   s.osx.dependency 'FlutterMacOS'
 
-  # ~> Version 3.70.0 up to, but not including, 4.0.0
+  # ~> Version 3.72.0 up to, but not including, 4.0.0
   s.dependency 'PostHog', '>= 3.72.0', '< 4.0.0'
 
   s.ios.deployment_target = '13.0'
