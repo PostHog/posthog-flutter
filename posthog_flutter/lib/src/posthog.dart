@@ -655,16 +655,16 @@ class Posthog {
   /// you display yourself from a foreground message, and push delivered outside
   /// FCM on Android. That doc has the full coverage matrix.
   ///
-  /// Do not wire this to `FirebaseMessaging.onMessageOpenedApp`: the SDK already
-  /// captures that tap, and this call is not deduplicated against it, so the open
-  /// would be counted twice.
+  /// Do not wire this to `FirebaseMessaging.onMessageOpenedApp` or
+  /// `getInitialMessage()`: the SDK already captures those taps, and this call is
+  /// not deduplicated against them, so the open would be counted twice.
   ///
   /// ```dart
   /// // A notification you built and displayed yourself.
   /// Posthog().capturePushNotificationOpened(
-  ///   title: notification.title,
-  ///   body: notification.body,
-  ///   payload: notification.payload,
+  ///   title: 'Your order shipped',
+  ///   body: 'Track it in the app',
+  ///   payload: {'order_id': '1234'},
   /// );
   /// ```
   ///
