@@ -791,11 +791,29 @@ class PosthogFlutterPlugin :
         PostHogAndroid.setup(applicationContext, config)
         postHogConfig = config
         cachedReplayIntegration = null
+        capturePushNotificationOpenedFromLaunchIntent()
+    }
+
+    /**
+     * The SDK reads a notification tap from the launch Activity's intent when that Activity is
+     * created, which is long before Dart reaches `Posthog().setup()` — by then `onCreate`, `onStart`
+     * and `onResume` have all run. The intent is still on the Activity, so hand it over once both the
+     * SDK and the Activity exist.
+     *
+     * Called from both ends because neither alone covers both configurations: `onAttachedToEngine`
+     * (which runs `initPlugin`) always precedes `onAttachedToActivity`, so the AUTO_INIT path has no
+     * Activity yet, while on the Dart path the Activity is attached long before setup runs. Whichever
+     * precondition is satisfied last does the work; `PostHogAndroid` dedupes by message id, so a
+     * double call cannot double-count.
+     */
+    private fun capturePushNotificationOpenedFromLaunchIntent() {
+        PostHogAndroid.capturePushNotificationOpened(activity?.intent)
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
         application = binding.activity.application
+        capturePushNotificationOpenedFromLaunchIntent()
         // Only if the detector is already running; else the setup path registers
         // it. Keeps a default-off feature from installing app-wide callbacks.
         if (occlusionDetectorRunning) {
