@@ -242,13 +242,12 @@ class PostHogConfig {
   /// Whether to automatically capture `$push_notification_opened` when a user
   /// taps a PostHog-delivered notification.
   ///
-  /// Coverage differs per platform. iOS hooks the notification-response
-  /// delegate, so every tap on a **remote** notification is captured whatever
-  /// the app state; locally-scheduled notifications are ignored. Android only
-  /// reads the launch intent, so it sees cold starts alone. Call
-  /// [Posthog.capturePushNotificationOpened] for the opens this misses —
-  /// local notifications on either platform, plus foreground messages and
-  /// warm-start taps on Android.
+  /// Every tap on a **remote** notification is captured on both platforms,
+  /// whether it cold-launched the app or the app was already running.
+  /// Locally-scheduled notifications are ignored. On Android a tap is
+  /// recognised by the `google.message_id` extra Firebase puts on the intent,
+  /// so push delivered outside FCM is not seen. Call
+  /// [Posthog.capturePushNotificationOpened] for the opens this misses.
   ///
   /// **Flutter web:** not supported. Defaults to `true`.
   bool capturePushNotificationOpened = true;
