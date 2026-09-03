@@ -1,8 +1,19 @@
 import UIKit
 import Flutter
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+
+  // Notification taps only reach the app through a UNUserNotificationCenter delegate; without this
+  // the SDK has nothing to observe and never captures $push_notification_opened.
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    UNUserNotificationCenter.current().delegate = self
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
 
   private var ownWindow: UIWindow?
 
