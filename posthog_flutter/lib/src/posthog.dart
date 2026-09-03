@@ -651,20 +651,21 @@ class Posthog {
   /// notification.
   ///
   /// Call this only for opens [PostHogConfig.capturePushNotificationOpened]
-  /// cannot see itself — local notifications on either platform, plus
-  /// warm-start and foreground taps on Android — or the tap is counted twice.
-  /// That doc has the full coverage matrix.
+  /// cannot see itself — local notifications on either platform, notifications
+  /// you display yourself from a foreground message, and push delivered outside
+  /// FCM on Android. That doc has the full coverage matrix.
+  ///
+  /// Do not wire this to `FirebaseMessaging.onMessageOpenedApp` or
+  /// `getInitialMessage()`: the SDK already captures those taps, and this call is
+  /// not deduplicated against them, so the open would be counted twice.
   ///
   /// ```dart
-  /// if (Platform.isAndroid) {
-  ///   FirebaseMessaging.onMessageOpenedApp.listen((m) {
-  ///     Posthog().capturePushNotificationOpened(
-  ///       title: m.notification?.title,
-  ///       body: m.notification?.body,
-  ///       payload: m.data,
-  ///     );
-  ///   });
-  /// }
+  /// // A notification you built and displayed yourself.
+  /// Posthog().capturePushNotificationOpened(
+  ///   title: 'Your order shipped',
+  ///   body: 'Track it in the app',
+  ///   payload: {'order_id': '1234'},
+  /// );
   /// ```
   ///
   /// The event is built natively, so [PostHogConfig.beforeSend] callbacks do
