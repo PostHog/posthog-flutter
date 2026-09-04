@@ -153,8 +153,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
       final wrappedError = PostHogException(
         source: details.exception,
-        mechanism: 'FlutterError',
+        mechanism: 'onuncaughtexception',
         handled: false,
+        captureSource: 'flutter.flutter_error',
       );
 
       _captureException(
@@ -192,8 +193,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
   bool _posthogPlatformErrorHandler(Object error, StackTrace stackTrace) {
     final wrappedError = PostHogException(
       source: error,
-      mechanism: 'PlatformDispatcher',
+      mechanism: 'onuncaughtexception',
       handled: false,
+      captureSource: 'flutter.platform_dispatcher',
     );
 
     _captureException(error: wrappedError, stackTrace: stackTrace);
@@ -230,8 +232,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
       final wrappedError = PostHogException(
         source: errorString,
-        mechanism: 'isolateError',
+        mechanism: 'task',
         handled: false,
+        captureSource: 'flutter.isolate_error',
       );
 
       _captureException(

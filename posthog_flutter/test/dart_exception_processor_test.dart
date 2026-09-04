@@ -74,6 +74,7 @@ void main() {
       expect(mechanism['handled'], isTrue);
       expect(mechanism['synthetic'], isFalse);
       expect(mechanism['type'], equals('generic'));
+      expect(mechanism['exception_id'], equals(0));
 
       // Verify stack trace structure
       final stackTraceData =
@@ -491,7 +492,7 @@ void main() {
       },
     );
 
-    test('allows user properties to override system properties', () {
+    test('protects system properties from generic user properties', () {
       final exception = Exception('Test exception');
       final stackTrace = StackTrace.fromString('#0 test (test.dart:1:1)');
 
@@ -507,8 +508,7 @@ void main() {
         properties: overrideProperties,
       );
 
-      // Verify that user properties take precedence
-      expect(result['\$exception_level'], equals('warning'));
+      expect(result['\$exception_level'], equals('error'));
       expect(result['custom_property'], equals('custom_value'));
     });
 
@@ -703,9 +703,12 @@ void main() {
               isTrue,
             );
 
-            // Causes reuse the outer mechanism
-            expect(exceptionList[1]['mechanism']['handled'], isTrue);
-            expect(exceptionList[1]['mechanism']['type'], equals('generic'));
+            expect(
+                exceptionList[1]['mechanism'].containsKey('handled'), isFalse);
+            expect(exceptionList[1]['mechanism']['type'], equals('chained'));
+            expect(exceptionList[1]['mechanism']['source'], equals('unwrap'));
+            expect(exceptionList[1]['mechanism']['exception_id'], equals(1));
+            expect(exceptionList[1]['mechanism']['parent_id'], equals(0));
             expect(exceptionList[1]['mechanism']['synthetic'], isFalse);
           },
         ),
@@ -789,6 +792,12 @@ void main() {
           exceptionList[4]['value'],
           equals('FormatException: second parallel failure'),
         );
+        expect(exceptionList[1]['mechanism']['source'], equals('member'));
+        expect(exceptionList[1]['mechanism']['parent_id'], equals(0));
+        expect(exceptionList[2]['mechanism']['source'], equals('unwrap'));
+        expect(exceptionList[2]['mechanism']['parent_id'], equals(1));
+        expect(exceptionList[3]['mechanism']['source'], equals('member'));
+        expect(exceptionList[3]['mechanism']['parent_id'], equals(0));
       });
 
       test('guards against cause cycles', () {
@@ -812,7 +821,7 @@ void main() {
 
       test('caps the cause chain length', () {
         Object error = FormatException('root');
-        for (var i = 0; i < 20; i++) {
+        for (var i = 0; i < 60; i++) {
           error = _ChainedException('wrapper $i', error);
         }
 
@@ -828,7 +837,7 @@ void main() {
           exceptionList,
           hasLength(DartExceptionProcessor.maxExceptionChainLength),
         );
-        expect(exceptionList.first['value'], equals('wrapper 19'));
+        expect(exceptionList.first['value'], equals('wrapper 59'));
       });
     });
   });

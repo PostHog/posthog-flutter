@@ -145,23 +145,6 @@ Map<String, String> _getLocationProperties() {
   }
 }
 
-// The human-readable message used only as the posthog-js captureException
-// trigger; its parse is overridden by the Dart-built properties we pass as
-// additionalProperties. Read from the exception list the Dart side builds.
-String _exceptionMessage(Map<String, Object?> properties) {
-  final exceptionList = properties[r'$exception_list'];
-  if (exceptionList is List && exceptionList.isNotEmpty) {
-    final first = exceptionList.first;
-    if (first is Map) {
-      final value = first['value'];
-      if (value is String && value.isNotEmpty) {
-        return value;
-      }
-    }
-  }
-  return 'Exception';
-}
-
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
   _maybeOverrideSDKInfo();
 
@@ -427,26 +410,13 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
 
-      // Route through posthog-js's captureException so it attaches required
-      // metadata and any buffered $exception_steps. posthog-js spreads the
-      // additionalProperties last, so our Dart-built $exception_list (frames,
-      // mechanism.handled, level) overrides its synthetic parse of `message`.
-      try {
-        posthog?.captureException(
-          stringToJSAny(_exceptionMessage(properties)),
-          mapToJSAny(properties),
-        );
-      } catch (error) {
-        // Very old posthog-js lacks captureException; still record the event.
-        printIfDebug(
-          '[PostHog] captureException via posthog-js failed; falling back to capture: $error',
-        );
-        posthog?.capture(
-          stringToJSAny('\$exception'),
-          mapToJSAny(properties),
-          null,
-        );
-      }
+      // Dart has already assembled the canonical exception event. Send it directly so
+      // posthog-js's manual-capture defaults cannot replace trusted Dart metadata.
+      posthog?.capture(
+        stringToJSAny('\$exception'),
+        mapToJSAny(properties),
+        null,
+      );
       break;
     default:
       throw PlatformException(
