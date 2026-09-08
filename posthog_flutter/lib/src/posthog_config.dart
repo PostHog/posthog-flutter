@@ -254,6 +254,10 @@ class PostHogConfig {
   ///
   /// On iOS this requires your app to set `UNUserNotificationCenter.current().delegate`.
   /// Without one, iOS reports the tap to nobody and no open can be captured.
+  ///
+  /// Setting this to `false` does not prevent the iOS cold-start prewarm, which runs before
+  /// Dart does — opt that out with the `com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED`
+  /// key in `Info.plist`.
   bool capturePushNotificationOpened = true;
 
   /// Mints a signed identity-verification token for push subscription requests.
