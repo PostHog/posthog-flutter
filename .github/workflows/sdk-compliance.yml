@@ -21,9 +21,15 @@ jobs:
           flutter-version: '3.44.0'
           channel: stable
           cache: true
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
+          version: '0.12.10'
           python-version: '3.12.12'
+          activate-environment: true
+          venv-path: ${{ runner.temp }}/harness-venv
+          enable-cache: false
+        env:
+          UV_PYTHON_INSTALL_DIR: ${{ runner.temp }}/managed-python
       # Native runners do not require a Docker engine. This is the unchanged
       # release source corresponding to ghcr.io/posthog/sdk-test-harness:1.0.0.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,7 +38,11 @@ jobs:
           ref: 6d19abb9c81e2262dacbe340e7dddda9c871c178 # 1.0.0
           path: harness
       - name: Install harness
-        run: python -m pip install -e ./harness
+        run: |
+          uv pip install --python "$VIRTUAL_ENV/bin/python" -e ./harness
+          mkdir -p "$RUNNER_TEMP/flutter-report"
+          python -c 'import sys; assert sys.version_info[:3] == (3, 12, 12); print(sys.version); print(sys.executable)' \
+            > "$RUNNER_TEMP/flutter-report/python-version.txt"
       - name: Build real Flutter application and test observer
         run: |
           set -o pipefail
