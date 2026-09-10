@@ -51,7 +51,7 @@ jobs:
           echo "✓ Tag '${TAG_VERSION}' is valid: commit message and pubspec.yaml version match."
 
       - name: Setup Dart
-        uses: dart-lang/setup-dart@7654d458321ee25acccccfdb86cd48bd95768ff1 # v1.8.0
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
 
       - name: Setup Flutter
         # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
