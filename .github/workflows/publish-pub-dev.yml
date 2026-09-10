@@ -50,9 +50,6 @@ jobs:
 
           echo "✓ Tag '${TAG_VERSION}' is valid: commit message and pubspec.yaml version match."
 
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-
       - name: Setup Flutter
         # axi92/flutter-action is a fork of subosito/flutter-action that SHA-pins its internal
         # actions/cache calls; subosito itself uses tag refs which conflicts with our org-wide
@@ -64,6 +61,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Validate package
+        working-directory: ./posthog_flutter
+        run: flutter pub publish --dry-run
+
       - name: Get version from tag
         id: get-version
         run: |
@@ -71,9 +72,15 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing version: $VERSION"
 
+      # setup-dart registers a pub.dev OIDC token that breaks public dependency downloads.
+      # Authenticate only after dependency resolution and package validation have succeeded.
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+
       - name: Publish to pub.dev
         working-directory: ./posthog_flutter
-        run: flutter pub publish --force
+        # Validation above is mandatory; repeating it here would download with the OIDC token.
+        run: flutter pub publish --force --skip-validation
 
       - name: Create GitHub release
         env:
