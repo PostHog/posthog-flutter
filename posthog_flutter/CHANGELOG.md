@@ -1,5 +1,16 @@
 ## Next
 
+## 5.40.0
+
+### Minor Changes
+
+- 00337ab: Capture `$push_notification_opened` on Android for every notification tap, both on a cold launch and while the app is already running. Remove any manual `capturePushNotificationOpened` call wired to `FirebaseMessaging.onMessageOpenedApp` or `getInitialMessage()` — that tap is now captured automatically and the manual call is not deduplicated against it. Requires posthog-android 3.62.0.
+
+### Patch Changes
+
+- 00337ab: Fix `$push_notification_opened` not being captured on iOS when the app is cold-launched from a notification tap. Requires posthog-ios 3.72.0, and your app must set `UNUserNotificationCenter.current().delegate` — without one iOS reports the tap to nobody.
+- 00337ab: Change `com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED` to also suppress the new iOS cold-start prewarm in apps that do not use `com.posthog.posthog.AUTO_INIT`.
+
 ## 5.39.0
 
 ### Minor Changes
