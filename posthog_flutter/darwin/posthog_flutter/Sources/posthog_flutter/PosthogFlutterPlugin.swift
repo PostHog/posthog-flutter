@@ -103,11 +103,14 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     /// prewarm afterwards, except when PostHog is already set up with push-open capture disabled and
     /// a later `FlutterEngine` registers — that setup() has already run, so use the plist key there.
     private static func prewarmPushNotificationOpenCapture() {
-        let capturePushNotificationOpened = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED") as? Bool ?? true
-        guard capturePushNotificationOpened else { return }
+        guard plistCapturePushNotificationOpened else { return }
         if #available(iOS 14.0, macOS 11.0, *) {
             PostHogSDK.prewarmPushNotificationOpenCapture()
         }
+    }
+
+    private static var plistCapturePushNotificationOpened: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED") as? Bool ?? true
     }
 
     public static func initPlugin() {
@@ -138,7 +141,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         // Push flags default ON natively and setup() no-ops a second call, so a later
         // Dart-side opt-out can never reach the SDK — the plist is the only opt-out here.
         let capturePushNotificationSubscriptions = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_SUBSCRIPTIONS") as? Bool ?? true
-        let capturePushNotificationOpened = Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED") as? Bool ?? true
 
         setupPostHog([
             "projectToken": projectToken,
@@ -147,7 +149,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             "captureApplicationLifecycleEvents": captureApplicationLifecycleEvents,
             "debug": debug,
             "capturePushNotificationSubscriptions": capturePushNotificationSubscriptions,
-            "capturePushNotificationOpened": capturePushNotificationOpened,
+            "capturePushNotificationOpened": plistCapturePushNotificationOpened,
         ])
     }
 
