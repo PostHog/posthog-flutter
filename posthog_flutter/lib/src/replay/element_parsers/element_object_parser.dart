@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/element_parsers_const.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
 class ElementObjectParser {
@@ -61,6 +62,20 @@ class ElementObjectParser {
           activeElementData.addChildren(elementData);
           return elementData;
         }
+      }
+    }
+
+    final renderObject = element.renderObject;
+    if (renderObject is RenderCustomPaint &&
+        (renderObject.painter != null ||
+            renderObject.foregroundPainter != null)) {
+      // Canvas commands cannot be inspected for sensitive text or images.
+      final parser = PostHogMaskController.instance
+          .parsers[ElementParsersConst.getRuntimeType<RenderCustomPaint>()];
+      final elementData = parser?.relate(element);
+      if (elementData != null) {
+        activeElementData.addChildren(elementData);
+        return elementData;
       }
     }
 

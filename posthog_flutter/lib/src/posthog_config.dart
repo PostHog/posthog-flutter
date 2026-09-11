@@ -684,6 +684,13 @@ class PostHogSessionReplayConfig {
   /// Enable masking of all text and text input fields.
   /// Default: true.
   ///
+  /// When this or [maskAllImages] is enabled, CustomPaint widgets with a
+  /// painter or foregroundPainter are masked over their entire bounds,
+  /// including their children, because canvas contents cannot be inspected.
+  /// This also masks custom-painted decorations in Flutter widgets. Disable
+  /// MaterialApp's debugShowCheckedModeBanner when testing replay: its
+  /// full-window CustomPaint otherwise masks the entire screen.
+  ///
   /// With [captureNativeScreens] enabled, setting this false also unmasks text
   /// on captured native screens, including native input fields (passwords,
   /// card numbers) you may not have built.
@@ -691,6 +698,9 @@ class PostHogSessionReplayConfig {
 
   /// Enable masking of all images.
   /// Default: true.
+  ///
+  /// Custom-painted content is masked when this or [maskAllTexts] is enabled;
+  /// see [maskAllTexts] for details.
   var maskAllImages = true;
 
   /// Deprecated setter that forwards assigned values to [throttleDelay].

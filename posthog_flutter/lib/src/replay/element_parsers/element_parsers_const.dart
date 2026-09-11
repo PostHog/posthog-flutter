@@ -8,6 +8,9 @@ class ElementParsersConst {
   final Map<String, ElementParser> parsersMap = {};
 
   ElementParsersConst(this._factory, PostHogSessionReplayConfig? config) {
+    if ((config?.maskAllTexts ?? true) || (config?.maskAllImages ?? true)) {
+      registerElementParser<RenderCustomPaint>();
+    }
     if (config?.maskAllImages ?? true) {
       registerElementParser<RenderImage>();
     }
