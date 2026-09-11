@@ -684,8 +684,7 @@ class PostHogSessionReplayConfig {
   /// Capture touch coordinates in session replay on Android and iOS.
   ///
   /// Masking screenshots does not hide touches on a known keypad layout.
-  /// Set this before [Posthog.setup]. To change it after setup, await
-  /// [Posthog.setCaptureTouches] before displaying a sensitive screen.
+  /// Set this before [Posthog.setup]. Runtime changes are not supported.
   /// Disabling touches does not stop screenshot capture.
   ///
   /// Default: true. Not supported on web or desktop.

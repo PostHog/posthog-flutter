@@ -130,23 +130,6 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_setCaptureTouches_beforeSetup_returnsError() {
-        com.posthog.PostHog.close()
-        val result = Mockito.mock(MethodChannel.Result::class.java)
-        PosthogFlutterPlugin().onMethodCall(MethodCall("setCaptureTouches", mapOf("enabled" to false)), result)
-        Mockito.verify(result).error("PosthogFlutterException", "PostHog is not set up", null)
-        Mockito.verify(result, Mockito.never()).success(Mockito.any())
-    }
-
-    @Test
-    fun onMethodCall_setCaptureTouches_withoutEnabled_returnsError() {
-        val result = Mockito.mock(MethodChannel.Result::class.java)
-        PosthogFlutterPlugin().onMethodCall(MethodCall("setCaptureTouches", emptyMap<String, Any>()), result)
-        Mockito.verify(result).error("InvalidArguments", "Missing enabled boolean", null)
-        Mockito.verify(result, Mockito.never()).success(Mockito.any())
-    }
-
-    @Test
     fun setup_verifyScreenshotMaskAlignment_defaultsToFalse() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
