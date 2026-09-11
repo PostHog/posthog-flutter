@@ -345,7 +345,9 @@ class WebCanvasMaskProvider {
       'or declare maskRegionsFn in posthog.init to enable it.',
     );
     final replayConfig = _config.sessionReplayConfig;
-    if (!replayConfig.maskAllTexts && !replayConfig.maskAllImages) {
+    if (!replayConfig.maskAllTexts &&
+        !replayConfig.maskAllImages &&
+        !replayConfig.maskCustomPaint) {
       return;
     }
     final captureCanvas =
@@ -644,8 +646,9 @@ class WebCanvasMaskProvider {
 
     final replayConfig = _config.sessionReplayConfig;
     final elements = PostHogMaskController.instance.getMaskElements(
-      includeAllWidgets:
-          replayConfig.maskAllTexts || replayConfig.maskAllImages,
+      includeAllWidgets: replayConfig.maskAllTexts ||
+          replayConfig.maskAllImages ||
+          replayConfig.maskCustomPaint,
     );
     if (elements == null) {
       _cachedContainerRects = null;

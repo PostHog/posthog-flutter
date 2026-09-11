@@ -1,5 +1,5 @@
 ---
-"posthog_flutter": patch
+"posthog_flutter": minor
 ---
 
-Mask the full bounds of `CustomPaint` widgets with a painter or foreground painter when either `maskAllTexts` or `maskAllImages` is enabled, preventing custom-painted text and images from appearing unmasked in session replay. This also masks children and custom-painted Flutter decorations within those bounds.
+Add `sessionReplayConfig.maskCustomPaint`, defaulting to `false`, to opt into masking the full bounds of custom-painted widgets independently of text and image masking.

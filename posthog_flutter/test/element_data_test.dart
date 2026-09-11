@@ -35,8 +35,6 @@ Future<void> _pumpMaskedApp(WidgetTester tester, Widget child) async {
   await tester.pumpWidget(
     PostHogWidget(
       child: MaterialApp(
-        // The debug banner is a full-window CustomPaint and is masked as such.
-        debugShowCheckedModeBanner: false,
         home: Scaffold(body: Center(child: child)),
       ),
     ),

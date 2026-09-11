@@ -2667,6 +2667,17 @@
                         "entryPoints": [],
                         "isDeprecated": false,
                         "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "maskCustomPaint",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
                         "isReadable": false,
                         "isStatic": false,
                         "isWriteable": true,

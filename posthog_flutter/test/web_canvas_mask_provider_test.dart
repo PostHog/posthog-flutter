@@ -114,6 +114,78 @@ void main() {
     return sessionRecording as JSObject;
   }
 
+  testWidgets('emits custom-paint regions when other masking flags are off',
+      (tester) async {
+    installPosthogStub();
+    final config = PostHogConfig('phc_test');
+    config.sessionReplayConfig
+      ..maskAllTexts = false
+      ..maskAllImages = false
+      ..maskCustomPaint = true;
+    WebCanvasMaskProvider(config).register();
+
+    await tester.pumpWidget(
+      PostHogWidget(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: CustomPaint(
+            size: const Size(100, 40),
+            painter: BannerPainter(
+              message: 'sensitive',
+              layoutDirection: TextDirection.ltr,
+              textDirection: TextDirection.ltr,
+              location: BannerLocation.topStart,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final flutterView = web.document.createElement('flutter-view');
+    final canvas = web.document.createElement('canvas');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+    try {
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      final regions =
+          regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>;
+      expect(regions.toDart, isNotEmpty);
+      expect(
+        regions.toDart.any((region) =>
+            region.getProperty<JSNumber>('width'.toJS).toDartDouble >= 100 &&
+            region.getProperty<JSNumber>('height'.toJS).toDartDouble >= 40),
+        isTrue,
+      );
+    } finally {
+      flutterView.remove();
+    }
+  });
+
+  test('warns when only custom-paint masking is requested without a provider',
+      () {
+    final captureCanvas = JSObject()
+      ..setProperty('recordCanvas'.toJS, true.toJS);
+    final sessionRecording = JSObject()
+      ..setProperty('captureCanvas'.toJS, captureCanvas);
+    installPosthogStub(
+      declaresMaskProvider: false,
+      sessionRecording: sessionRecording,
+    );
+    final warns = interceptWarns();
+    final config = PostHogConfig('phc_test');
+    config.sessionReplayConfig
+      ..maskAllTexts = false
+      ..maskAllImages = false
+      ..maskCustomPaint = true;
+
+    WebCanvasMaskProvider(config).register();
+
+    expect(warns(), 1);
+  });
+
   test('leaves posthog-js untouched when the app declares no mask provider',
       () {
     installPosthogStub(declaresMaskProvider: true, recordingStarted: true);

@@ -1,14 +1,19 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/replay/mask/image_mask_painter.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart'
+    as replay;
 
 import 'posthog_flutter_platform_interface_fake.dart';
+import 'replay_capture_settle.dart';
 
 class _ValuePainter extends CustomPainter {
   const _ValuePainter();
@@ -34,12 +39,22 @@ void main() {
   const paintKey = ValueKey('sensitive-paint');
   final controller = PostHogMaskController.instance;
 
-  Future<void> setup({bool texts = true, bool images = true}) async {
+  setUp(() {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
+  });
+
+  Future<void> setup({
+    bool texts = true,
+    bool images = true,
+    bool? customPaint,
+  }) async {
     final config = PostHogConfig('test_project_token');
     config.sessionReplayConfig
       ..maskAllTexts = texts
       ..maskAllImages = images;
+    if (customPaint != null) {
+      config.sessionReplayConfig.maskCustomPaint = customPaint;
+    }
     await Posthog().setup(config);
     controller.refreshParsers(config.sessionReplayConfig);
   }
@@ -96,23 +111,42 @@ void main() {
     );
   }
 
-  for (final foreground in [false, true]) {
-    for (final texts in [false, true]) {
-      for (final images in [false, true]) {
-        testWidgets(
-            'masks CustomPaint foreground=$foreground texts=$texts images=$images',
-            (tester) async {
-          await setup(texts: texts, images: images);
-          await pumpTree(tester, painted(foreground: foreground));
+  test('custom-paint masking is disabled by default', () {
+    expect(PostHogSessionReplayConfig().maskCustomPaint, isFalse);
+    controller.refreshParsers(null);
+    expect(controller.parsers, isNot(contains('RenderCustomPaint')));
+  });
 
-          final rects = maskRects(includeAllWidgets: texts || images);
-          final paintRect = boundsOf(tester, find.byKey(paintKey));
-          expect(rects.contains(paintRect), texts || images);
-          expect(
-            rects.contains(boundsOf(tester, find.byType(Text))),
-            texts,
-          );
-        });
+  testWidgets('leaves CustomPaint visible by default', (tester) async {
+    await setup();
+    await pumpTree(tester, painted());
+
+    expect(
+        maskRects(), isNot(contains(boundsOf(tester, find.byKey(paintKey)))));
+    expect(maskRects(), contains(boundsOf(tester, find.byType(Text))));
+  });
+
+  for (final foreground in [false, true]) {
+    for (final customPaint in [false, true]) {
+      for (final texts in [false, true]) {
+        for (final images in [false, true]) {
+          testWidgets(
+              'CustomPaint foreground=$foreground customPaint=$customPaint '
+              'texts=$texts images=$images', (tester) async {
+            await setup(texts: texts, images: images, customPaint: customPaint);
+            await pumpTree(tester, painted(foreground: foreground));
+
+            final rects = maskRects(
+              includeAllWidgets: texts || images || customPaint,
+            );
+            final paintRect = boundsOf(tester, find.byKey(paintKey));
+            expect(rects.contains(paintRect), customPaint);
+            expect(
+              rects.contains(boundsOf(tester, find.byType(Text))),
+              texts,
+            );
+          });
+        }
       }
     }
   }
@@ -130,7 +164,7 @@ void main() {
 
   testWidgets('does not mask an empty CustomPaint but still walks its child',
       (tester) async {
-    await setup();
+    await setup(customPaint: true);
     await pumpTree(
       tester,
       const CustomPaint(
@@ -149,7 +183,7 @@ void main() {
   });
 
   testWidgets('masks children underneath a foreground painter', (tester) async {
-    await setup();
+    await setup(customPaint: true);
     await pumpTree(
       tester,
       const CustomPaint(
@@ -162,9 +196,9 @@ void main() {
     expect(maskRects(), contains(boundsOf(tester, find.byKey(paintKey))));
   });
 
-  testWidgets('conservatively masks a full-window debug banner',
+  testWidgets('conservatively masks a full-window debug banner when opted in',
       (tester) async {
-    await setup();
+    await setup(customPaint: true);
     await tester.pumpWidget(
       RepaintBoundary(
         key: controller.containerKey,
@@ -181,7 +215,7 @@ void main() {
 
   testWidgets('uses painted bounds and transform for CustomPaint masks',
       (tester) async {
-    await setup();
+    await setup(customPaint: true);
     await pumpTree(
       tester,
       Transform.translate(
@@ -199,9 +233,58 @@ void main() {
     expect(maskRects(), contains(paintRect));
   });
 
+  testWidgets('native captureScreenshot honors custom-paint masking on its own',
+      (tester) async {
+    await setup(texts: false, images: false, customPaint: true);
+    await pumpTree(tester, painted());
+
+    const channel = MethodChannel('posthog_flutter');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'getSessionReplayState') {
+        return {'isActive': true, 'sessionId': 'custom-paint-session'};
+      }
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final capturer = replay.ScreenshotCapturer(Posthog().config!);
+    addTearDown(capturer.cancel);
+    var completed = false;
+    final capture = capturer.captureScreenshot().whenComplete(() {
+      completed = true;
+    });
+    await settleUntil(tester, () => completed);
+    expect(completed, isTrue);
+    final captured = await capture;
+    expect(captured, isNotNull);
+
+    final paintRect = boundsOf(tester, find.byKey(paintKey));
+    final boundary = tester.renderObject<RenderBox>(
+      find.byKey(controller.containerKey),
+    );
+    await tester.runAsync(() async {
+      final codec = await ui.instantiateImageCodec(captured!.imageBytes);
+      final image = (await codec.getNextFrame()).image;
+      try {
+        final data =
+            (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+        final ratio = image.width / boundary.size.width;
+        final x = (5 * ratio).floor();
+        final insideY = ((paintRect.bottom - 5) * ratio).floor();
+        final outsideY = ((paintRect.bottom + 10) * ratio).floor();
+        expect(data.getUint32((insideY * image.width + x) * 4), 0x000000ff);
+        expect(data.getUint32((outsideY * image.width + x) * 4), 0xffffffff);
+      } finally {
+        image.dispose();
+        codec.dispose();
+      }
+    });
+  }, skip: kIsWeb);
+
   testWidgets('masking replaces custom-painted screenshot pixels with black',
       (tester) async {
-    await setup();
+    await setup(texts: false, images: false, customPaint: true);
     await pumpTree(tester, painted());
 
     final boundary = controller.containerKey.currentContext!.findRenderObject()
