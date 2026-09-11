@@ -69,6 +69,10 @@ void main() {
       AutofillHints.newPassword,
       AutofillHints.creditCardNumber,
       AutofillHints.creditCardSecurityCode,
+      AutofillHints.creditCardExpirationDate,
+      AutofillHints.creditCardExpirationDay,
+      AutofillHints.creditCardExpirationMonth,
+      AutofillHints.creditCardExpirationYear,
       AutofillHints.oneTimeCode,
     ]) {
       for (final kind in ['Material', 'Form', 'Cupertino', 'Editable']) {
@@ -240,6 +244,54 @@ void main() {
             _isMasked(tester.getRect(find.byWidget(element.widget))), isTrue);
       }
     });
+  }
+
+  for (final hint in [
+    AutofillHints.creditCardExpirationDate,
+    AutofillHints.creditCardExpirationDay,
+    AutofillHints.creditCardExpirationMonth,
+    AutofillHints.creditCardExpirationYear,
+  ]) {
+    for (final maskAllTexts in [false, true]) {
+      testWidgets('$hint stays masked inside unmask with texts=$maskAllTexts',
+          (tester) async {
+        await _setup(maskAllTexts: maskAllTexts, maskAllImages: false);
+        final controller = TextEditingController(text: '12/2030');
+        final focusNode = FocusNode();
+        addTearDown(controller.dispose);
+        addTearDown(focusNode.dispose);
+        await _pump(
+            tester,
+            PostHogUnmaskWidget(
+                child: Column(children: [
+              const Text('Expiration date'),
+              TextField(autofillHints: [hint]),
+              TextFormField(autofillHints: [hint]),
+              CupertinoTextField(autofillHints: [hint]),
+              EditableText(
+                controller: controller,
+                focusNode: focusNode,
+                style: const TextStyle(fontSize: 16),
+                cursorColor: Colors.blue,
+                backgroundCursorColor: Colors.grey,
+                autofillHints: [hint],
+              ),
+            ])));
+        expect(
+            _isMasked(tester.getRect(find.text('Expiration date'))), isFalse);
+        expect(find.byType(EditableText), findsNWidgets(4));
+        for (final element in find.byType(EditableText).evaluate()) {
+          final target = tester.getRect(find.byWidget(element.widget));
+          expect(
+              _masks().any((e) =>
+                  _rect(e).left <= target.left &&
+                  _rect(e).top <= target.top &&
+                  _rect(e).right >= target.right &&
+                  _rect(e).bottom >= target.bottom),
+              isTrue);
+        }
+      });
+    }
   }
 
   testWidgets('updates masking when an unmask wrapper is added or removed',

@@ -6,6 +6,10 @@ const _sensitiveAutofillHints = {
   AutofillHints.newPassword,
   AutofillHints.creditCardNumber,
   AutofillHints.creditCardSecurityCode,
+  AutofillHints.creditCardExpirationDate,
+  AutofillHints.creditCardExpirationDay,
+  AutofillHints.creditCardExpirationMonth,
+  AutofillHints.creditCardExpirationYear,
   AutofillHints.oneTimeCode,
 };
 

@@ -687,8 +687,9 @@ class PostHogSessionReplayConfig {
   ///
   /// Sensitive Flutter inputs stay masked regardless of this flag or unmask
   /// widgets: `obscureText`, `TextInputType.visiblePassword`, and autofill hints
-  /// for passwords, new passwords, credit card numbers/security codes, and
-  /// one-time codes. Explicit `PostHogMaskWidget` masks also always apply.
+  /// for passwords, new passwords, credit card numbers/security codes,
+  /// expiration dates (including day/month/year), and one-time codes.
+  /// Explicit `PostHogMaskWidget` masks also always apply.
   ///
   /// With [captureNativeScreens] enabled, setting this false also unmasks text
   /// on captured native screens, including native input fields (passwords,
