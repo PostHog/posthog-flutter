@@ -3,16 +3,22 @@ import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/render_editable_parser.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
+import 'package:posthog_flutter/src/replay/mask/sensitive_text_input.dart';
 
 class ElementObjectParser {
   final ElementParser _elementParser = ElementParser();
+  final RenderEditableParser _renderEditableParser = RenderEditableParser();
 
   ElementData? relateRenderObject(
     ElementData activeElementData,
-    Element element,
-  ) {
-    if (element.widget is PostHogMaskWidget) {
+    Element element, {
+    bool unmask = false,
+    bool sensitiveText = false,
+  }) {
+    if (element.widget is PostHogMaskWidget ||
+        isSensitiveTextInput(element.widget)) {
       final elementData = _elementParser.relate(element);
 
       if (elementData != null) {
@@ -20,6 +26,21 @@ class ElementObjectParser {
         return elementData;
       }
     }
+
+    // Dense/scaled inputs can paint beyond their widget bounds. Preserve the
+    // RenderEditable mask as part of the sensitivity floor, even when unmasked.
+    if (sensitiveText &&
+        element is RenderObjectElement &&
+        element.renderObject is RenderEditable) {
+      final elementData = _renderEditableParser.relate(element);
+      if (elementData != null) {
+        elementData.isSensitiveText = true;
+        activeElementData.addChildren(elementData);
+        return elementData;
+      }
+    }
+
+    if (unmask) return null;
 
     if (element.widget is Text) {
       final config = Posthog().config?.sessionReplayConfig;
@@ -35,34 +56,9 @@ class ElementObjectParser {
       }
     }
 
-    // Handle TextField and TextFormField masking
-    // Only mask at widget level for obscureText fields when maskAllTexts is false
-    // When maskAllTexts is true, RenderEditable detection will handle it with better bounds
-    if (element.widget is TextField || element.widget is TextFormField) {
-      final config = Posthog().config?.sessionReplayConfig;
-      final maskAllTexts = config?.maskAllTexts ?? true;
-
-      var isObscured = false;
-      if (element.widget is TextField) {
-        isObscured = (element.widget as TextField).obscureText;
-      }
-
-      // Note: TextFormField obscureText is handled differently in Flutter.
-      // TextFormField creates an internal TextField, but the obscureText property
-      // is not directly accessible on the TextFormField widget itself.
-      // For TextFormField, we rely on the maskAllTexts configuration.
-      // Otherwise, let RenderEditable handle it (it has better bounds via preferredLineHeight)
-      final shouldMask = !maskAllTexts && isObscured;
-
-      if (shouldMask) {
-        final elementData = _elementParser.relate(element);
-
-        if (elementData != null) {
-          activeElementData.addChildren(elementData);
-          return elementData;
-        }
-      }
-    }
+    // Component elements can forward a descendant's render object before an
+    // intervening unmask widget has been visited. Match only its owning element.
+    if (element is! RenderObjectElement) return null;
 
     if (element.renderObject is RenderImage) {
       final dataType = element.renderObject.runtimeType.toString();

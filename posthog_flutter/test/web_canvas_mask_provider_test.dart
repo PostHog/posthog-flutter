@@ -767,6 +767,62 @@ void main() {
     }
   });
 
+  testWidgets(
+      'canvas regions honor unmasking without revealing sensitive inputs',
+      (tester) async {
+    await tester.pumpWidget(const PostHogWidget(
+      child: MaterialApp(
+          home: Scaffold(
+              body: Column(children: [
+        Text('private sibling'),
+        PostHogUnmaskWidget(
+            child: Column(children: [
+          Text('safe label'),
+          TextField(autofillHints: [AutofillHints.creditCardNumber]),
+          PostHogMaskWidget(child: Text('explicitly private')),
+        ])),
+      ]))),
+    ));
+    final flutterView = web.document.createElement('flutter-view');
+    flutterView.setAttribute('style', 'position: fixed; left: 0; top: 0');
+    final canvas = web.document.createElement('canvas');
+    canvas.setAttribute('style', 'position: absolute; left: 0; top: 0');
+    flutterView.appendChild(canvas);
+    web.document.body!.appendChild(flutterView);
+    installPosthogStub();
+    try {
+      WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+      WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
+      final regionsFn = capturedSessionRecording()
+          .getProperty<JSObject>('canvasCapture'.toJS)
+          .getProperty<JSFunction>('maskRegionsFn'.toJS);
+      final regions =
+          (regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>)
+              .toDart
+              .map((region) => Rect.fromLTWH(
+                    region.getProperty<JSNumber>('x'.toJS).toDartDouble,
+                    region.getProperty<JSNumber>('y'.toJS).toDartDouble,
+                    region.getProperty<JSNumber>('width'.toJS).toDartDouble,
+                    region.getProperty<JSNumber>('height'.toJS).toDartDouble,
+                  ))
+              .toList();
+      expect(
+          regions.any((rect) =>
+              rect.contains(tester.getCenter(find.text('safe label')))),
+          isFalse);
+      for (final finder in [
+        find.text('private sibling'),
+        find.byType(EditableText),
+        find.text('explicitly private')
+      ]) {
+        expect(regions.any((rect) => rect.contains(tester.getCenter(finder))),
+            isTrue);
+      }
+    } finally {
+      flutterView.remove();
+    }
+  });
+
   testWidgets('maps mask rects into canvas-relative coordinates',
       (tester) async {
     final config = PostHogConfig('phc_test')

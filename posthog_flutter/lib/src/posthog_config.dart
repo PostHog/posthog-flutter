@@ -682,7 +682,13 @@ class PostHogSessionReplayConfig {
   PostHogSessionReplayConfig();
 
   /// Enable masking of all text and text input fields.
-  /// Default: true.
+  /// Default: true. Wrap known-safe Flutter content in `PostHogUnmaskWidget`
+  /// to reveal it without disabling masking globally.
+  ///
+  /// Sensitive Flutter inputs stay masked regardless of this flag or unmask
+  /// widgets: `obscureText`, `TextInputType.visiblePassword`, and autofill hints
+  /// for passwords, new passwords, credit card numbers/security codes, and
+  /// one-time codes. Explicit `PostHogMaskWidget` masks also always apply.
   ///
   /// With [captureNativeScreens] enabled, setting this false also unmasks text
   /// on captured native screens, including native input fields (passwords,
@@ -690,7 +696,8 @@ class PostHogSessionReplayConfig {
   var maskAllTexts = true;
 
   /// Enable masking of all images.
-  /// Default: true.
+  /// Default: true. `PostHogUnmaskWidget` can reveal known-safe Flutter images;
+  /// explicit `PostHogMaskWidget` masks still take precedence.
   var maskAllImages = true;
 
   /// Deprecated setter that forwards assigned values to [throttleDelay].
