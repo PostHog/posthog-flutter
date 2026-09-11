@@ -178,6 +178,28 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "setCaptureTouches",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "enabled",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "identify",
                         "parameters": [
                             {
@@ -1140,6 +1162,28 @@
                         "isExperimental": false,
                         "isStatic": false,
                         "name": "setCaptureNativeScreens",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "enabled",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "setCaptureTouches",
                         "parameters": [
                             {
                                 "isDeprecated": false,
@@ -2641,6 +2685,17 @@
                     }
                 ],
                 "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureTouches",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
@@ -4808,6 +4863,28 @@
                         "isStatic": false,
                         "name": "stopSessionRecording",
                         "parameters": [],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "setCaptureTouches",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "enabled",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "bool"
+                            }
+                        ],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<void>",
                         "type": "method",

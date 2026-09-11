@@ -909,6 +909,23 @@ class Posthog {
     PostHogInternalEvents.sessionRecordingActive.value = false;
   }
 
+  /// Enables or disables replay touch coordinates without stopping screenshots.
+  ///
+  /// Android and iOS only. Await this before displaying a sensitive keypad,
+  /// and re-enable it after leaving that screen. Screenshot masking alone does
+  /// not protect values that can be reconstructed from tap positions.
+  ///
+  /// Requires [setup]. Errors are propagated if the platform cannot apply the
+  /// change; a failed call must not be treated as disabling touch capture.
+  Future<void> setCaptureTouches(bool enabled) async {
+    final config = _config;
+    if (config == null) {
+      throw StateError('Call Posthog.setup before setCaptureTouches.');
+    }
+    await _posthog.setCaptureTouches(enabled);
+    config.sessionReplayConfig.captureTouches = enabled;
+  }
+
   /// Returns whether session replay is currently active.
   ///
   /// Returns `false` when session replay is inactive or unsupported by the

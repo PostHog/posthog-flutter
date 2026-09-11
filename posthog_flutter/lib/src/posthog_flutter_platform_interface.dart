@@ -43,6 +43,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// must not throw when the config setter fires.
   Future<void> setCaptureNativeScreens(bool enabled) async {}
 
+  Future<void> setCaptureTouches(bool enabled) async {
+    throw UnsupportedError('Touch capture control requires Android or iOS.');
+  }
+
   Future<void> identify({
     required String userId,
     Map<String, Object>? userProperties,

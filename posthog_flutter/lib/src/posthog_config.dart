@@ -681,6 +681,16 @@ class PostHogSessionReplayConfig {
   /// Creates a session replay configuration with default masking enabled.
   PostHogSessionReplayConfig();
 
+  /// Capture touch coordinates in session replay on Android and iOS.
+  ///
+  /// Masking screenshots does not hide touches on a known keypad layout.
+  /// Set this before [Posthog.setup]. To change it after setup, await
+  /// [Posthog.setCaptureTouches] before displaying a sensitive screen.
+  /// Disabling touches does not stop screenshot capture.
+  ///
+  /// Default: true. Not supported on web or desktop.
+  var captureTouches = true;
+
   /// Enable masking of all text and text input fields.
   /// Default: true.
   ///
@@ -796,6 +806,7 @@ class PostHogSessionReplayConfig {
   /// implementations.
   Map<String, dynamic> toMap() {
     return {
+      'captureTouches': captureTouches,
       'maskAllImages': maskAllImages,
       'maskAllTexts': maskAllTexts,
       'throttleDelayMs': throttleDelay.inMilliseconds,

@@ -973,6 +973,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setCaptureTouches(bool enabled) async {
+    if (!isSupportedPlatform() || isMacOS()) {
+      throw UnsupportedError('Touch capture control requires Android or iOS.');
+    }
+    await _methodChannel
+        .invokeMethod('setCaptureTouches', {'enabled': enabled});
+  }
+
+  @override
   Future<bool> isSessionReplayActive() async {
     if (!isSupportedPlatform() || isMacOS()) {
       return false;

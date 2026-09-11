@@ -257,6 +257,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             config.sessionReplayConfig.captureNetworkTelemetry = false
 
             if let sessionReplayConfigMap = posthogConfig["sessionReplayConfig"] as? [String: Any] {
+                config.sessionReplayConfig.captureTouches = sessionReplayConfigMap["captureTouches"] as? Bool ?? true
                 if let sampleRate = sessionReplayConfigMap["sampleRate"] as? NSNumber {
                     config.sessionReplayConfig.sampleRate = sampleRate
                 }
@@ -429,6 +430,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         postHogVersion = postHogFlutterVersion
 
         PostHogSDK.shared.setup(config)
+        #if os(iOS)
+            PostHogSDK.shared.setCaptureTouches(config.sessionReplayConfig.captureTouches)
+        #endif
     }
 
     private var currentSurvey: PostHogDisplaySurvey?
@@ -519,6 +523,20 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 }
             #else
                 result(false)
+            #endif
+        case "setCaptureTouches":
+            #if os(iOS)
+                guard let enabled = (call.arguments as? [String: Any])?["enabled"] as? Bool else {
+                    _badArgumentError(result)
+                    return
+                }
+                guard PostHogSDK.shared.setCaptureTouches(enabled) else {
+                    result(FlutterError(code: "PosthogFlutterException", message: "PostHog is not set up", details: nil))
+                    return
+                }
+                result(nil)
+            #else
+                result(FlutterMethodNotImplemented)
             #endif
         case "setCaptureNativeScreens":
             #if os(iOS)

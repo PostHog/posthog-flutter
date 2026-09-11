@@ -399,6 +399,19 @@ class PosthogFlutterPlugin :
                 }
             }
 
+            "setCaptureTouches" -> {
+                val enabled = call.argument<Boolean>("enabled")
+                val config = PostHog.getConfig<PostHogAndroidConfig>()
+                if (enabled == null) {
+                    result.error("InvalidArguments", "Missing enabled boolean", null)
+                } else if (config == null) {
+                    result.error("PosthogFlutterException", "PostHog is not set up", null)
+                } else {
+                    config.sessionReplayConfig.captureTouches = enabled
+                    result.success(null)
+                }
+            }
+
             "setCaptureNativeScreens" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 mainHandler.post {
@@ -614,6 +627,7 @@ class PosthogFlutterPlugin :
                 this.sessionReplayConfig.captureLogcat = false
 
                 posthogConfig.getIfNotNull<Map<String, Any>>("sessionReplayConfig") { replayConfig ->
+                    this.sessionReplayConfig.captureTouches = replayConfig["captureTouches"] as? Boolean ?: true
                     replayConfig.getIfNotNull<Double>("sampleRate") {
                         this.sessionReplayConfig.sampleRate = it
                     }
@@ -791,6 +805,7 @@ class PosthogFlutterPlugin :
 
         lastBuiltConfig = config
         PostHogAndroid.setup(applicationContext, config)
+        PostHog.getConfig<PostHogAndroidConfig>()?.sessionReplayConfig?.captureTouches = config.sessionReplayConfig.captureTouches
         postHogConfig = config
         cachedReplayIntegration = null
         capturePushNotificationOpenedFromLaunchIntent()
