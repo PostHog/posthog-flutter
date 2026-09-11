@@ -56,6 +56,13 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
     final config = Posthog().config;
     if (config == null) {
+      if (!kIsWeb) {
+        debugPrint(
+          '[PostHog] PostHogWidget mounted before Posthog().setup(). '
+          'Mobile session replay will not start for this widget instance. '
+          'Call setup() before runApp(), or remount PostHogWidget after setup().',
+        );
+      }
       return;
     }
 
