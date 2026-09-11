@@ -2,4 +2,4 @@
 'posthog_flutter': patch
 ---
 
-Stop double-counting `$push_notification_opened` on Android when a manual `capturePushNotificationOpened` call repeats a PostHog notification tap the SDK already captured.
+Require posthog-android 3.64.0 so a manual `capturePushNotificationOpened` call for a PostHog notification tap the SDK already captured on Android is counted once.

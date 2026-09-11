@@ -657,8 +657,9 @@ class Posthog {
   ///
   /// Do not wire this to `FirebaseMessaging.onMessageOpenedApp` or
   /// `getInitialMessage()`: the SDK already captures those taps. On Android, a
-  /// call for a PostHog-sent notification the SDK already captured is dropped
-  /// with a warning; anywhere else the open would be counted twice.
+  /// repeat of a PostHog-sent notification captured in the last 5 minutes is
+  /// skipped; anywhere else (iOS, or pushes not sent by PostHog) the open would
+  /// be counted twice.
   ///
   /// ```dart
   /// // A notification you built and displayed yourself.
