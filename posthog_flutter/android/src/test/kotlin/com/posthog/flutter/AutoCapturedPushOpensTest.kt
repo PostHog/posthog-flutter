@@ -17,12 +17,12 @@ internal class AutoCapturedPushOpensTest {
     }
 
     @Test
-    fun matchesAMapEntryByInvocationId() {
+    fun matchesAMapEntryByInvocationAndActionId() {
         val opens = AutoCapturedPushOpens()
 
         opens.remember(fcmEntry)
 
-        assertTrue(mapOf("workflow_id" to "other", "invocation_id" to "inv-1") in opens)
+        assertTrue(mapOf("workflow_id" to "other", "invocation_id" to "inv-1", "action_id" to "a") in opens)
     }
 
     @Test
@@ -31,7 +31,27 @@ internal class AutoCapturedPushOpensTest {
 
         opens.remember(fcmEntry)
 
-        assertFalse("""{"invocation_id":"inv-2"}""" in opens)
+        assertFalse("""{"invocation_id":"inv-2","action_id":"a"}""" in opens)
+    }
+
+    @Test
+    fun doesNotMatchAnotherStepOfTheSameRun() {
+        val opens = AutoCapturedPushOpens()
+
+        opens.remember(fcmEntry)
+
+        assertFalse("""{"workflow_id":"wf","invocation_id":"inv-1","action_id":"b"}""" in opens)
+        assertFalse("""{"workflow_id":"wf","invocation_id":"inv-1"}""" in opens)
+    }
+
+    @Test
+    fun matchesAnEntryWithoutAnActionId() {
+        val opens = AutoCapturedPushOpens()
+
+        opens.remember("""{"invocation_id":"inv-1"}""")
+
+        assertTrue(mapOf("invocation_id" to "inv-1") in opens)
+        assertFalse(mapOf("invocation_id" to "inv-1", "action_id" to "a") in opens)
     }
 
     @Test
