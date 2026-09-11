@@ -656,8 +656,9 @@ class Posthog {
   /// FCM on Android. That doc has the full coverage matrix.
   ///
   /// Do not wire this to `FirebaseMessaging.onMessageOpenedApp` or
-  /// `getInitialMessage()`: the SDK already captures those taps, and this call is
-  /// not deduplicated against them, so the open would be counted twice.
+  /// `getInitialMessage()`: the SDK already captures those taps. On Android, a
+  /// call for a PostHog-sent notification the SDK already captured is dropped
+  /// with a warning; anywhere else the open would be counted twice.
   ///
   /// ```dart
   /// // A notification you built and displayed yourself.

@@ -73,6 +73,8 @@ class PosthogFlutterPlugin :
 
     private var postHogConfig: PostHogAndroidConfig? = null
 
+    private val autoCapturedPushOpens = AutoCapturedPushOpens()
+
     // Test seam: captures the built config even if setup() throws (mock Context in
     // unit tests). postHogConfig is only published on success, so production readers
     // never see an uninstalled config.
@@ -810,7 +812,7 @@ class PosthogFlutterPlugin :
      * double call cannot double-count.
      */
     private fun capturePushNotificationOpenedFromLaunchIntent() {
-        PostHogAndroid.capturePushNotificationOpened(activity?.intent)
+        captureAutomaticPushNotificationOpened(activity?.intent)
     }
 
     /**
@@ -820,9 +822,28 @@ class PosthogFlutterPlugin :
      */
     private val newIntentListener =
         PluginRegistry.NewIntentListener { intent ->
-            PostHogAndroid.capturePushNotificationOpened(intent)
+            captureAutomaticPushNotificationOpened(intent)
             false
         }
+
+    /**
+     * Hands [intent] to the SDK, then remembers the tap so a manual capture of it can be dropped.
+     *
+     * `PostHogAndroid` reports nothing back, so its no-op gates are mirrored instead: no
+     * `google.message_id`, SDK not set up or opted out, or `capturePushNotificationOpened` off. A
+     * tap it skips as already captured is still remembered, because it was captured.
+     */
+    private fun captureAutomaticPushNotificationOpened(intent: Intent?) {
+        PostHogAndroid.capturePushNotificationOpened(intent)
+        try {
+            if (intent?.getStringExtra("google.message_id") == null) return
+            if (PostHog.isOptOut()) return
+            if (PostHog.getConfig<PostHogAndroidConfig>()?.capturePushNotificationOpened != true) return
+            autoCapturedPushOpens.remember(intent.getStringExtra("posthog"))
+        } catch (e: Throwable) {
+            // Unmarshalling a launch intent's extras can throw; the SDK swallows the same failure.
+        }
+    }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
@@ -1987,6 +2008,16 @@ class PosthogFlutterPlugin :
             // subtitle is iOS-only; posthog-android's capturePushNotificationOpened
             // has no subtitle parameter, so Dart's value is dropped here.
             val payload = call.argument<Map<String, Any?>>("payload")
+            if (payload?.get("posthog") in autoCapturedPushOpens) {
+                Log.w(
+                    "PostHog",
+                    "Skipped capturePushNotificationOpened: \$push_notification_opened for this notification was " +
+                        "already captured automatically (since posthog_flutter 5.40.0). Remove the manual call " +
+                        "from your onMessageOpenedApp/getInitialMessage handler.",
+                )
+                result.success(null)
+                return
+            }
             val action = call.argument<String>("action")
             PostHog.capturePushNotificationOpened(title, body, payload, action)
             result.success(null)
