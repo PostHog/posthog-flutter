@@ -2,12 +2,15 @@ package com.posthog.flutter
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.os.BadParcelableException
 import com.google.firebase.FirebaseApp
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.StandardMethodCodec
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
@@ -18,6 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /*
@@ -446,6 +450,86 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, mockResult)
 
         Mockito.verify(mockResult).success(null)
+    }
+
+    @Test
+    fun onNewIntent_trayTap_isRememberedForSetupToReplay() {
+        val plugin = PosthogFlutterPlugin()
+        val listener = attachActivity(plugin)
+        val intent = trayIntent("m1")
+
+        assertFalse(listener.onNewIntent(intent))
+        assertSame(intent, plugin.pendingPushIntent)
+    }
+
+    @Test
+    fun onNewIntent_withoutMessageId_isNotRemembered() {
+        val plugin = PosthogFlutterPlugin()
+        val listener = attachActivity(plugin)
+
+        assertFalse(listener.onNewIntent(Mockito.mock(Intent::class.java)))
+        assertNull(plugin.pendingPushIntent)
+    }
+
+    @Test
+    fun onNewIntent_unreadableExtras_isNotRememberedAndDoesNotThrow() {
+        val plugin = PosthogFlutterPlugin()
+        val listener = attachActivity(plugin)
+        val intent = Mockito.mock(Intent::class.java)
+        Mockito
+            .`when`(intent.getStringExtra("google.message_id"))
+            .thenThrow(BadParcelableException("unknown extra class"))
+
+        assertFalse(listener.onNewIntent(intent))
+        assertNull(plugin.pendingPushIntent)
+    }
+
+    @Test
+    fun onNewIntent_secondTrayTap_supersedesTheFirst() {
+        val plugin = PosthogFlutterPlugin()
+        val listener = attachActivity(plugin)
+        val second = trayIntent("m2")
+
+        listener.onNewIntent(trayIntent("m1"))
+        listener.onNewIntent(second)
+
+        assertSame(second, plugin.pendingPushIntent)
+    }
+
+    @Test
+    fun launchIntentReplay_consumesTheRememberedTapOnce() {
+        val plugin = PosthogFlutterPlugin()
+        val listener = attachActivity(plugin)
+        listener.onNewIntent(trayIntent("m1"))
+
+        plugin.capturePushNotificationOpenedFromLaunchIntent()
+
+        assertNull(plugin.pendingPushIntent)
+    }
+
+    @Test
+    fun onDetachedFromActivity_dropsTheRememberedTap() {
+        val plugin = PosthogFlutterPlugin()
+        val listener = attachActivity(plugin)
+        listener.onNewIntent(trayIntent("m1"))
+
+        plugin.onDetachedFromActivity()
+
+        assertNull(plugin.pendingPushIntent)
+    }
+
+    private fun trayIntent(messageId: String): Intent =
+        Mockito.mock(Intent::class.java).also {
+            Mockito.`when`(it.getStringExtra("google.message_id")).thenReturn(messageId)
+        }
+
+    private fun attachActivity(plugin: PosthogFlutterPlugin): PluginRegistry.NewIntentListener {
+        val binding = Mockito.mock(ActivityPluginBinding::class.java)
+        Mockito.`when`(binding.activity).thenReturn(Mockito.mock(Activity::class.java))
+        plugin.onAttachedToActivity(binding)
+        val captor = ArgumentCaptor.forClass(PluginRegistry.NewIntentListener::class.java)
+        Mockito.verify(binding).addOnNewIntentListener(captor.capture())
+        return captor.value
     }
 
     // The stubbed test Looper makes runOnMainThread run inline (myLooper and
