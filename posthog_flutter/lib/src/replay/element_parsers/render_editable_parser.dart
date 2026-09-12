@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
@@ -6,18 +8,18 @@ import 'package:posthog_flutter/src/replay/size_extension.dart';
 
 /// Parser for [RenderEditable] objects (TextField input text).
 ///
-/// Unlike [RenderParagraph] (used by Text widgets) where `size` and `paintBounds`
-/// reflect the actual rendered text dimensions including font scaling, [RenderEditable]
-/// only reports its layout bounds which can be very small (e.g., 1-2px height) when
-/// used with `isDense: true` or constrained layouts like `Expanded`.
+/// The mask height is the larger of two bounds, because neither is enough on
+/// its own:
 ///
-/// Example with ScreenUtil scaling:
-/// - RenderParagraph: size = 28px (actual text height) ✓
-/// - RenderEditable: size = 1.3px (layout bounds), preferredLineHeight = 39px (actual)
-///
-/// This parser uses [RenderEditable.preferredLineHeight] to determine the actual
-/// rendered text height, ensuring the mask properly covers the visible text regardless
-/// of the font scaling mechanism used (ScreenUtil, MediaQuery.textScaleFactor, etc.).
+/// - `size.height` is the layout height. Unlike [RenderParagraph], whose `size`
+///   reflects the rendered text, a [RenderEditable] can be laid out far smaller
+///   than the text it paints when the field is dense or constrained
+///   (`isDense: true`, `Expanded`, ScreenUtil scaling): 1.3px tall with a
+///   `preferredLineHeight` of 39px has been measured.
+/// - `preferredLineHeight * maxLines` estimates the painted text from the line
+///   count, but `maxLines` is null for an auto-growing field (`maxLines: null`,
+///   `expands: true`), whose real height grows with its content. Treated as a
+///   single line, only the first line of such a field would be masked.
 class RenderEditableParser extends ElementParser {
   @override
   ElementGeometry? buildElementData(Element element) {
@@ -28,14 +30,12 @@ class RenderEditableParser extends ElementParser {
       return null;
     }
 
-    // Use preferredLineHeight instead of size.height because RenderEditable's
-    // layout height can be much smaller than the actual rendered text height
-    final textHeight = renderObject.preferredLineHeight;
     final width = renderObject.size.width;
-
-    // Account for multiline TextFields
     final lines = renderObject.maxLines ?? 1;
-    final height = textHeight * lines;
+    final height = math.max(
+      renderObject.size.height,
+      renderObject.preferredLineHeight * lines,
+    );
 
     final localRect = Rect.fromLTWH(0, 0, width, height);
     final ancestor = PostHogMaskController.instance.containerKey.currentContext
