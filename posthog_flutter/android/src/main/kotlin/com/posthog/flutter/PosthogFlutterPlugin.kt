@@ -49,6 +49,9 @@ import kotlin.math.roundToInt
 private const val FLUTTER_VIEW_CLASS_PREFIX = "io.flutter"
 private const val OCCLUSION_TICK_MS = 1000L
 
+// The extra posthog-android reads a tray tap from, and dedupes it by.
+private const val GOOGLE_MESSAGE_ID = "google.message_id"
+
 // Ticks a not-occluded read must repeat before it ends an episode. Both the
 // active and the inactive path debounce, and they have to agree.
 private const val END_DEBOUNCE_TICKS = 1
@@ -798,6 +801,19 @@ class PosthogFlutterPlugin :
     }
 
     /**
+     * The last tray tap seen by [newIntentListener], kept so setup can replay it. A tap that lands
+     * before `Posthog().setup()` is dropped by `PostHogAndroid` (the SDK isn't set up yet) and does
+     * not stay on `Activity.getIntent()` — Android only updates that if someone calls `setIntent`,
+     * which is `firebase_messaging`'s doing, not the framework's. Without this the event survives
+     * only by that accident, and any other FCM layer loses it.
+     *
+     * At most one: a newer tap supersedes an unreplayed older one, and an `Intent` retains its
+     * extras, not the Activity.
+     */
+    @VisibleForTesting
+    internal var pendingPushIntent: Intent? = null
+
+    /**
      * The SDK reads a notification tap from the launch Activity's intent when that Activity is
      * created, which is long before Dart reaches `Posthog().setup()` — by then `onCreate`, `onStart`
      * and `onResume` have all run. The intent is still on the Activity, so hand it over once both the
@@ -808,9 +824,15 @@ class PosthogFlutterPlugin :
      * Activity yet, while on the Dart path the Activity is attached long before setup runs. Whichever
      * precondition is satisfied last does the work; `PostHogAndroid` dedupes by message id, so a
      * double call cannot double-count.
+     *
+     * A tap remembered by [newIntentListener] wins over the Activity's intent: it is the tap the user
+     * actually made, while `getIntent()` may still hold the stale launch intent.
      */
-    private fun capturePushNotificationOpenedFromLaunchIntent() {
-        PostHogAndroid.capturePushNotificationOpened(activity?.intent)
+    @VisibleForTesting
+    internal fun capturePushNotificationOpenedFromLaunchIntent() {
+        val intent = pendingPushIntent ?: activity?.intent
+        pendingPushIntent = null
+        PostHogAndroid.capturePushNotificationOpened(intent)
     }
 
     /**
@@ -820,9 +842,23 @@ class PosthogFlutterPlugin :
      */
     private val newIntentListener =
         PluginRegistry.NewIntentListener { intent ->
+            rememberPushIntent(intent)
             PostHogAndroid.capturePushNotificationOpened(intent)
             false
         }
+
+    /** Only a tray tap is worth replaying; anything else would just be a reference held for nothing. */
+    private fun rememberPushIntent(intent: Intent?) {
+        try {
+            if (intent?.getStringExtra(GOOGLE_MESSAGE_ID) != null) {
+                pendingPushIntent = intent
+            }
+        } catch (e: Throwable) {
+            // Reading an extra unmarshals the whole Bundle, which throws
+            // BadParcelableException for a class this app cannot load.
+            Log.w("PostHog", "Failed to read push notification intent: $e")
+        }
+    }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
@@ -862,6 +898,9 @@ class PosthogFlutterPlugin :
     private fun removeNewIntentListener() {
         activityBinding?.removeOnNewIntentListener(newIntentListener)
         activityBinding = null
+        // The tap belonged to the Activity going away. Replaying it into the next one — or into a
+        // second engine that sets up later — would attribute it to a launch the user never made.
+        pendingPushIntent = null
     }
 
     // Idempotent: registering the same callbacks twice makes them fire twice.
