@@ -693,6 +693,9 @@ class PostHogSessionReplayConfig {
   /// Enable masking of all text and text input fields.
   /// Default: true.
   ///
+  /// Does not mask text drawn by CustomPainter. Enable [maskCustomPaint] or
+  /// wrap sensitive custom-painted widgets in PostHogMaskWidget to mask them.
+  ///
   /// With [captureNativeScreens] enabled, setting this false also unmasks text
   /// on captured native screens, including native input fields (passwords,
   /// card numbers) you may not have built.
@@ -700,7 +703,21 @@ class PostHogSessionReplayConfig {
 
   /// Enable masking of all images.
   /// Default: true.
+  ///
+  /// Does not mask images drawn by CustomPainter. Enable [maskCustomPaint] or
+  /// wrap sensitive custom-painted widgets in PostHogMaskWidget to mask them.
   var maskAllImages = true;
+
+  /// Mask the full bounds of CustomPaint widgets with a painter or
+  /// foregroundPainter, including their children.
+  /// Default: false.
+  ///
+  /// This is independent of [maskAllTexts] and [maskAllImages]. Canvas contents
+  /// cannot be inspected for individual text or images, so enabling this also
+  /// masks custom-painted decorations in Flutter widgets. Disable MaterialApp's
+  /// debugShowCheckedModeBanner when using this option: its full-window
+  /// CustomPaint otherwise masks the entire screen.
+  var maskCustomPaint = false;
 
   /// Deprecated setter that forwards assigned values to [throttleDelay].
   ///

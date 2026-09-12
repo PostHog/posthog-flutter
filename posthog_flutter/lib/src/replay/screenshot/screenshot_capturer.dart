@@ -642,8 +642,9 @@ class ScreenshotCapturer {
       );
 
       final replayConfig = effectiveConfig.sessionReplayConfig;
-      final maskAllContent =
-          replayConfig.maskAllTexts || replayConfig.maskAllImages;
+      final maskAllContent = replayConfig.maskAllTexts ||
+          replayConfig.maskAllImages ||
+          replayConfig.maskCustomPaint;
 
       ui.Image? image;
       ui.PictureRecorder? recorder;
