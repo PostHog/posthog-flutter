@@ -11,6 +11,7 @@ import 'utils/isolate_utils.dart' as isolate_utils;
 import 'posthog_exception.dart';
 import 'origin.dart';
 import 'chunk_ids.dart';
+import 'release_id.dart';
 
 typedef ChunkIdMapType = Map<String, String>;
 
@@ -118,10 +119,16 @@ class DartExceptionProcessor {
       inAppByDefault: inAppByDefault,
     );
 
+    // The release id posthog-cli injected into the chunk. posthog-js reads the
+    // same global from 1.409.0 on, but the page picks its own posthog-js, so
+    // reading it here keeps the release on the event whatever version loaded.
+    final releaseId = getPosthogReleaseId();
+
     // Final result, merging system properties with user properties (user properties take precedence)
     final result = <String, dynamic>{
       '\$exception_level': 'error', // Never crashes, so always error
       '\$exception_list': exceptionList,
+      if (releaseId != null) '\$release_id': releaseId,
       if (properties != null) ...properties,
     };
 
