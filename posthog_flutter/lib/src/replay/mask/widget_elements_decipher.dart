@@ -3,6 +3,8 @@ import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data_factory.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_object_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/root_element_provider.dart';
+import 'package:posthog_flutter/src/replay/mask/posthog_unmask_widget.dart';
+import 'package:posthog_flutter/src/replay/mask/sensitive_text_input.dart';
 
 class WidgetElementsDecipher {
   late ElementData _rootElementData;
@@ -36,14 +38,21 @@ class WidgetElementsDecipher {
     return _rootElementData;
   }
 
-  void _parseAllElements(ElementData activeElementData, Element element) {
+  void _parseAllElements(ElementData activeElementData, Element element,
+      {bool unmask = false, bool sensitiveText = false}) {
+    final unmaskSubtree = unmask || element.widget is PostHogUnmaskWidget;
+    final sensitiveSubtree =
+        sensitiveText || isSensitiveTextInput(element.widget);
     ElementData? newElementData = _elementObjectParser.relateRenderObject(
       activeElementData,
       element,
+      unmask: unmaskSubtree,
+      sensitiveText: sensitiveSubtree,
     );
 
     element.debugVisitOnstageChildren((childElement) {
-      _parseAllElements(newElementData ?? activeElementData, childElement);
+      _parseAllElements(newElementData ?? activeElementData, childElement,
+          unmask: unmaskSubtree, sensitiveText: sensitiveSubtree);
     });
   }
 }

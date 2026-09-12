@@ -5295,6 +5295,71 @@
                                 "isNamed": true,
                                 "isRequired": false,
                                 "name": "key",
+                                "relativePath": "lib/src/replay/mask/posthog_unmask_widget.dart",
+                                "typeName": "Key?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "child",
+                                "relativePath": "lib/src/replay/mask/posthog_unmask_widget.dart",
+                                "typeName": "Widget"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_unmask_widget.dart",
+                        "returnTypeName": "PostHogUnmaskWidget",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "child",
+                        "relativePath": "lib/src/replay/mask/posthog_unmask_widget.dart",
+                        "typeName": "Widget"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogUnmaskWidget",
+                "relativePath": "lib/src/replay/mask/posthog_unmask_widget.dart",
+                "superTypeNames": [
+                    "StatelessWidget",
+                    "Widget",
+                    "DiagnosticableTree",
+                    "Object",
+                    "Diagnosticable"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "key",
                                 "relativePath": "lib/src/replay/mask/posthog_platform_view.dart",
                                 "typeName": "Key?"
                             },

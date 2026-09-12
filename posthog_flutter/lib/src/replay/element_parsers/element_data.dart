@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_widget.dart';
+import 'package:posthog_flutter/src/replay/mask/sensitive_text_input.dart';
 
 class ElementData {
   Rect rect;
@@ -7,6 +8,7 @@ class ElementData {
   List<ElementData>? children;
   Widget? widget;
   Matrix4? transform;
+  bool isSensitiveText;
 
   ElementData({
     required this.rect,
@@ -14,6 +16,7 @@ class ElementData {
     this.children,
     this.widget,
     this.transform,
+    this.isSensitiveText = false,
   });
 
   void addChildren(ElementData elementData) {
@@ -43,13 +46,10 @@ class ElementData {
 
   void _collectMaskWidgetElements(
       ElementData element, List<ElementData> elements) {
-    if (element.widget is PostHogMaskWidget) {
+    if (element.widget is PostHogMaskWidget ||
+        element.isSensitiveText ||
+        isSensitiveTextInput(element.widget)) {
       elements.add(element);
-    } else if (element.widget is TextField) {
-      final textField = element.widget as TextField;
-      if (textField.obscureText) {
-        elements.add(element);
-      }
     }
 
     final children = element.children;
