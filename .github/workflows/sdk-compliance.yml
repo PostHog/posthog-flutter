@@ -2,8 +2,6 @@ name: SDK Compliance Tests
 
 permissions:
   contents: read
-  packages: read
-  pull-requests: write
 
 on:
   pull_request:
@@ -12,10 +10,63 @@ on:
       - main
 
 jobs:
-  compliance:
-    name: PostHog SDK compliance tests
-    uses: PostHog/posthog-sdk-test-harness/.github/workflows/test-sdk-action.yml@03d972e49be84402c491324320b0a0f38c2ddc53 # main @ 2026-07-27
-    with:
-      adapter-dockerfile: "sdk_compliance_adapter/Dockerfile"
-      adapter-context: "."
-      test-harness-version: "0.9.0"
+  macos-flutter:
+    name: Flutter MethodChannel / macOS
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          version: '0.12.10'
+          python-version: '3.12.12'
+          activate-environment: true
+          venv-path: ${{ runner.temp }}/harness-venv
+          enable-cache: false
+        env:
+          UV_PYTHON_INSTALL_DIR: ${{ runner.temp }}/managed-python
+      # Native runners do not require a Docker engine. This is the unchanged
+      # release source corresponding to ghcr.io/posthog/sdk-test-harness:1.0.0.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PostHog/posthog-sdk-test-harness
+          ref: 6d19abb9c81e2262dacbe340e7dddda9c871c178 # 1.0.0
+          path: harness
+      - name: Install harness
+        run: |
+          uv pip install --python "$VIRTUAL_ENV/bin/python" -e ./harness
+          mkdir -p "$RUNNER_TEMP/flutter-report"
+          python -c 'import sys; assert sys.version_info[:3] == (3, 12, 12); print(sys.version); print(sys.executable)' \
+            > "$RUNNER_TEMP/flutter-report/python-version.txt"
+      - name: Build real Flutter application and test observer
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/flutter-report"
+          bash sdk_compliance_adapter/build_macos.sh "$RUNNER_TEMP/flutter-compliance" \
+            2>&1 | tee "$RUNNER_TEMP/flutter-report/build.log"
+      - name: Run advisory compliance assertions
+        continue-on-error: true
+        run: |
+          bash sdk_compliance_adapter/run_macos.sh \
+            "$RUNNER_TEMP/flutter-compliance" "$GITHUB_WORKSPACE/harness" \
+            "$RUNNER_TEMP/flutter-report"
+      - name: Require complete nonempty inventory
+        if: always()
+        run: |
+          python sdk_compliance_adapter/check_report.py "$RUNNER_TEMP/flutter-report/report.json"
+      - name: Upload macOS Flutter results and resolved delegates
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sdk-compliance-macos-flutter-method-channel
+          path: |
+            ${{ runner.temp }}/flutter-report/*.json
+            ${{ runner.temp }}/flutter-report/*.log
+            ${{ runner.temp }}/flutter-report/*.txt
+            ${{ runner.temp }}/flutter-report/*.lock
+          if-no-files-found: error
