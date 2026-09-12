@@ -844,7 +844,10 @@ class PosthogFlutterPlugin :
             false
         }
 
-    /** Only a tray tap is worth replaying; anything else would just be a reference held for nothing. */
+    /**
+     * Only a tray tap is worth remembering: anything else kept here would shadow the
+     * `activity?.intent` fallback at setup, on top of being a reference held for nothing.
+     */
     private fun rememberPushIntent(intent: Intent?) {
         try {
             if (intent?.getStringExtra(GOOGLE_MESSAGE_ID) != null) {
@@ -895,8 +898,9 @@ class PosthogFlutterPlugin :
     private fun removeNewIntentListener() {
         activityBinding?.removeOnNewIntentListener(newIntentListener)
         activityBinding = null
-        // The tap belonged to the Activity going away. Replaying it into the next one — or into a
-        // second engine that sets up later — would attribute it to a launch the user never made.
+        // The tap belonged to the Activity going away; replaying it into the next one would
+        // attribute it to a launch the user never made. A configuration change between the tap and
+        // setup() therefore loses the event — a miss beats a wrong attribution.
         pendingPushIntent = null
     }
 
