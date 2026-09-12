@@ -806,9 +806,6 @@ class PosthogFlutterPlugin :
      * not stay on `Activity.getIntent()` — Android only updates that if someone calls `setIntent`,
      * which is `firebase_messaging`'s doing, not the framework's. Without this the event survives
      * only by that accident, and any other FCM layer loses it.
-     *
-     * At most one: a newer tap supersedes an unreplayed older one, and an `Intent` retains its
-     * extras, not the Activity.
      */
     @VisibleForTesting
     internal var pendingPushIntent: Intent? = null
