@@ -656,8 +656,15 @@ class Posthog {
   /// FCM on Android. That doc has the full coverage matrix.
   ///
   /// Do not wire this to `FirebaseMessaging.onMessageOpenedApp` or
-  /// `getInitialMessage()`: the SDK already captures those taps, and this call is
-  /// not deduplicated against them, so the open would be counted twice.
+  /// `getInitialMessage()`: the SDK already captures those taps. On both
+  /// platforms a second report of a PostHog-sent notification within 5 minutes
+  /// of the first is skipped; an open of a push PostHog did not send carries
+  /// nothing to match on, so it is counted twice.
+  ///
+  /// That dedupe also means a manual call cannot enrich an automatic capture.
+  /// The Android tray intent carries no notification text, so its automatic
+  /// event has no `$notification_title` or `$notification_body`, and
+  /// re-reporting the tap with them is skipped rather than merged.
   ///
   /// ```dart
   /// // A notification you built and displayed yourself.
