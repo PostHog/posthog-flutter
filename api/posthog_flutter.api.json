@@ -2648,6 +2648,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "captureTouches",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "maskAllTexts",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"

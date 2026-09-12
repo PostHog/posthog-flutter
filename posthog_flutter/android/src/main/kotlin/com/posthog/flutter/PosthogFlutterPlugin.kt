@@ -614,6 +614,7 @@ class PosthogFlutterPlugin :
                 this.sessionReplayConfig.captureLogcat = false
 
                 posthogConfig.getIfNotNull<Map<String, Any>>("sessionReplayConfig") { replayConfig ->
+                    this.sessionReplayConfig.captureTouches = replayConfig["captureTouches"] as? Boolean ?: true
                     replayConfig.getIfNotNull<Double>("sampleRate") {
                         this.sessionReplayConfig.sampleRate = it
                     }
