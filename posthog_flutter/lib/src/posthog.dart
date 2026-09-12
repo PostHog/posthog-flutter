@@ -656,10 +656,10 @@ class Posthog {
   /// FCM on Android. That doc has the full coverage matrix.
   ///
   /// Do not wire this to `FirebaseMessaging.onMessageOpenedApp` or
-  /// `getInitialMessage()`: the SDK already captures those taps. On Android, a
-  /// repeat of a PostHog-sent notification captured in the last 5 minutes is
-  /// skipped; anywhere else (iOS, or pushes not sent by PostHog) the open would
-  /// be counted twice.
+  /// `getInitialMessage()`: the SDK already captures those taps. On Android and
+  /// iOS, a repeat of a PostHog-sent notification captured in the last 5
+  /// minutes is skipped; for pushes not sent by PostHog the open would be
+  /// counted twice.
   ///
   /// ```dart
   /// // A notification you built and displayed yourself.
