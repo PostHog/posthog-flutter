@@ -99,6 +99,37 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun setup_captureTouches_defaultsToTrue() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "sessionReplayConfig" to emptyMap<String, Any>())),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+        assertTrue(assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig.captureTouches)
+    }
+
+    @Test
+    fun setup_captureTouches_forwardsFalseWithoutDisablingReplay() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall(
+                "setup",
+                mapOf(
+                    "projectToken" to "test-token",
+                    "sessionReplay" to true,
+                    "sessionReplayConfig" to mapOf("captureTouches" to false),
+                ),
+            ),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+        val config = assertNotNull(plugin.lastBuiltConfig)
+        assertFalse(config.sessionReplayConfig.captureTouches)
+        assertTrue(config.sessionReplay)
+    }
+
+    @Test
     fun setup_verifyScreenshotMaskAlignment_defaultsToFalse() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))

@@ -14,11 +14,15 @@ class MaskingTestsScreen extends StatefulWidget {
 class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
   final TextEditingController _singleLineController = TextEditingController();
   final TextEditingController _multiLineController = TextEditingController();
+  final TextEditingController _autoGrowController = TextEditingController(
+    text: 'Line one\nLine two\nLine three\nLine four',
+  );
 
   @override
   void dispose() {
     _singleLineController.dispose();
     _multiLineController.dispose();
+    _autoGrowController.dispose();
     super.dispose();
   }
 
@@ -212,6 +216,21 @@ class _MaskingTestsScreenState extends State<MaskingTestsScreen> {
                   style: const TextStyle(fontSize: 16),
                   decoration: const InputDecoration(
                     hintText: 'Enter multiline text...',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.all(12),
+                  ),
+                ),
+              ),
+
+              // Test 11b: Auto-growing TextField
+              _buildTestSection(
+                'Test 11b: Auto-growing TextField (maxLines: null)',
+                TextField(
+                  controller: _autoGrowController,
+                  maxLines: null,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: const InputDecoration(
+                    hintText: 'Enter text, the field grows with it...',
                     border: OutlineInputBorder(),
                     contentPadding: EdgeInsets.all(12),
                   ),
