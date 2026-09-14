@@ -708,6 +708,9 @@ class PostHogSessionReplayConfig {
   /// Declare it as `() => null` to skip frames before Flutter installs its mask
   /// provider. Canvas recording must be enabled separately.
   ///
+  /// Does not mask text drawn by CustomPainter. Enable [maskCustomPaint] or
+  /// wrap sensitive custom-painted widgets in PostHogMaskWidget to mask them.
+  ///
   /// With [captureNativeScreens] enabled, setting this false also unmasks text
   /// on captured native screens, including native input fields (passwords,
   /// card numbers) you may not have built.
@@ -717,7 +720,26 @@ class PostHogSessionReplayConfig {
   /// Default: true. `PostHogUnmaskWidget` can reveal known-safe Flutter images;
   /// it overrides explicit masks within the same subtree too. Flutter web
   /// requires canvas masking to be enabled as described in [maskAllTexts].
+  ///
+  /// Does not mask images drawn by CustomPainter. Enable [maskCustomPaint] or
+  /// wrap sensitive custom-painted widgets in PostHogMaskWidget to mask them.
   var maskAllImages = true;
+
+  /// Mask the full bounds of CustomPaint widgets with a painter or
+  /// foregroundPainter, including their children.
+  /// Default: false.
+  ///
+  /// This is independent of [maskAllTexts] and [maskAllImages]. Canvas contents
+  /// cannot be inspected for individual text or images, so enabling this also
+  /// masks custom-painted decorations in Flutter widgets, including TabBar,
+  /// checkboxes, switches, and progress indicators. Framework scrollbar-only
+  /// painters are excluded, but their children are still checked for masks.
+  /// Disable MaterialApp's debugShowCheckedModeBanner when using this option:
+  /// its full-window CustomPaint otherwise masks the entire screen.
+  ///
+  /// Frames containing a painter whose bounds cannot be determined, such as a
+  /// zero-sized CustomPaint, are skipped rather than sent with a missing mask.
+  var maskCustomPaint = false;
 
   /// Deprecated setter that forwards assigned values to [throttleDelay].
   ///

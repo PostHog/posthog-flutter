@@ -14,6 +14,7 @@ import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/native_communicator.dart';
 import 'package:posthog_flutter/src/replay/screenshot/snapshot_manager.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
+import 'package:posthog_flutter/src/replay/session_replay_config_extension.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 class ImageInfo {
@@ -642,8 +643,7 @@ class ScreenshotCapturer {
       );
 
       final replayConfig = effectiveConfig.sessionReplayConfig;
-      final maskAllContent =
-          replayConfig.maskAllTexts || replayConfig.maskAllImages;
+      final maskAllContent = replayConfig.masksAnyContent;
 
       ui.Image? image;
       ui.PictureRecorder? recorder;
