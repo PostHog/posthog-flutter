@@ -124,6 +124,34 @@ void main() {
     );
   }
 
+  testWidgets('unmask overrides opt-in custom-paint masking', (tester) async {
+    await setup(texts: false, images: false, customPaint: true);
+    await pumpTree(tester, PostHogUnmaskWidget(child: painted()));
+    final bounds = boundsOf(tester, find.byKey(paintKey));
+    expect(maskRects().any((rect) => rect.overlaps(bounds)), isFalse);
+  });
+
+  testWidgets(
+      'unmask excludes only its region from an enclosing custom painter',
+      (tester) async {
+    await setup(texts: false, images: false, customPaint: true);
+    await pumpTree(
+        tester,
+        const CustomPaint(
+          painter: _ValuePainter(),
+          child: Column(children: [
+            Text('private painted child'),
+            PostHogUnmaskWidget(child: Text('safe painted child')),
+          ]),
+        ));
+    final privateBounds = boundsOf(tester, find.text('private painted child'));
+    final safeBounds = boundsOf(tester, find.text('safe painted child'));
+    expect(
+        maskRects().any((rect) => rect.contains(privateBounds.center)), isTrue);
+    expect(
+        maskRects().any((rect) => rect.contains(safeBounds.center)), isFalse);
+  });
+
   Future<replay.ImageInfo?> captureFrame(WidgetTester tester) async {
     const channel = MethodChannel('posthog_flutter');
     final messenger =
