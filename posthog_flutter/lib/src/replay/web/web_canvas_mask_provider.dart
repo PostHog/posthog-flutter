@@ -14,6 +14,7 @@ import '../../posthog_config.dart';
 import '../../posthog_flutter_web_handler.dart';
 import '../../util/logging.dart';
 import '../mask/posthog_mask_controller.dart';
+import '../session_replay_config_extension.dart';
 import 'web_canvas_mask_geometry.dart';
 
 extension type _JSMaskRegion._(JSObject _) implements JSObject {
@@ -345,7 +346,7 @@ class WebCanvasMaskProvider {
       'or declare maskRegionsFn in posthog.init to enable it.',
     );
     final replayConfig = _config.sessionReplayConfig;
-    if (!replayConfig.maskAllTexts && !replayConfig.maskAllImages) {
+    if (!replayConfig.masksAnyContent) {
       return;
     }
     final captureCanvas =
@@ -644,8 +645,7 @@ class WebCanvasMaskProvider {
 
     final replayConfig = _config.sessionReplayConfig;
     final elements = PostHogMaskController.instance.getMaskElements(
-      includeAllWidgets:
-          replayConfig.maskAllTexts || replayConfig.maskAllImages,
+      includeAllWidgets: replayConfig.masksAnyContent,
     );
     if (elements == null) {
       _cachedContainerRects = null;
