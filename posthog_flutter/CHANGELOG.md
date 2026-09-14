@@ -1,5 +1,11 @@
 ## Next
 
+## 5.41.1
+
+### Patch Changes
+
+- 696ab7f: Warn when PostHogWidget mounts before Posthog().setup() on mobile, explaining that session replay requires setup before mounting or remounting the widget after setup.
+
 ## 5.41.0
 
 ### Minor Changes
