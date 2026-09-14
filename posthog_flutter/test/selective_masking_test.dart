@@ -209,8 +209,7 @@ void main() {
   });
 
   for (final maskOutside in [false, true]) {
-    testWidgets('explicit mask wins with maskOutside=$maskOutside',
-        (tester) async {
+    testWidgets('unmask wins with maskOutside=$maskOutside', (tester) async {
       await _setup();
       const text = Text('private');
       final child = maskOutside
@@ -219,7 +218,7 @@ void main() {
               child:
                   PostHogMaskWidget(child: PostHogUnmaskWidget(child: text)));
       await _pump(tester, child);
-      expect(_isMasked(tester.getRect(find.text('private'))), isTrue);
+      expect(_isMasked(tester.getRect(find.text('private'))), isFalse);
     });
   }
 
@@ -294,6 +293,171 @@ void main() {
     }
   }
 
+  testWidgets('a nested unmask reveals only its region of an explicit mask',
+      (tester) async {
+    await _setup();
+    await _pump(
+        tester,
+        const PostHogMaskWidget(
+            child: Column(children: [
+          Text('private sibling'),
+          PostHogUnmaskWidget(child: Text('public label')),
+          SizedBox(key: Key('private decoration'), width: 60, height: 20),
+        ])));
+    expect(_isMasked(tester.getRect(find.text('public label'))), isFalse);
+    expect(_isMasked(tester.getRect(find.text('private sibling'))), isTrue);
+    expect(
+        _isMasked(tester.getRect(find.byKey(const Key('private decoration')))),
+        isTrue);
+  });
+
+  testWidgets('a clipped unmask does not reveal content outside its viewport',
+      (tester) async {
+    await _setup();
+    await _pump(
+        tester,
+        const PostHogMaskWidget(
+            child: Column(children: [
+          ClipRect(
+              child: SizedBox(
+                  height: 40,
+                  child: OverflowBox(
+                    alignment: Alignment.topLeft,
+                    minHeight: 100,
+                    maxHeight: 100,
+                    child: PostHogUnmaskWidget(
+                        child: SizedBox(height: 100, width: 400)),
+                  ))),
+          Text('private below viewport'),
+        ])));
+    expect(
+        _masks().any((e) => _rect(e).contains(const Offset(10, 10))), isFalse);
+    expect(
+        _isMasked(tester.getRect(find.text('private below viewport'))), isTrue);
+  });
+
+  for (final opacity in [0.0, 0.001]) {
+    testWidgets(
+        'an invisible unmask retains its ancestor mask at opacity=$opacity',
+        (tester) async {
+      await _setup();
+      await _pump(
+          tester,
+          PostHogMaskWidget(
+              child: PostHogUnmaskWidget(
+            child: Opacity(
+                opacity: opacity,
+                child: const SizedBox(width: 100, height: 100)),
+          )));
+      expect(
+          _masks().any((e) => _rect(e).contains(const Offset(20, 20))), isTrue);
+    });
+
+    testWidgets(
+        'an invisible sliver retains its ancestor mask at opacity=$opacity',
+        (tester) async {
+      await _setup();
+      await _pump(
+          tester,
+          PostHogMaskWidget(
+              child: SizedBox(
+            height: 100,
+            child: CustomScrollView(slivers: [
+              SliverOpacity(
+                opacity: opacity,
+                sliver: const SliverToBoxAdapter(
+                    child: PostHogUnmaskWidget(
+                  child: SizedBox(width: 100, height: 100),
+                )),
+              )
+            ]),
+          )));
+      expect(
+          _masks().any((e) => _rect(e).contains(const Offset(20, 20))), isTrue);
+    });
+  }
+
+  testWidgets('non-rectangular clips retain the enclosing mask',
+      (tester) async {
+    await _setup();
+    await _pump(
+        tester,
+        PostHogMaskWidget(
+            child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: const PostHogUnmaskWidget(
+              child: SizedBox(width: 100, height: 100)),
+        )));
+    expect(
+        _masks().any((e) => _rect(e).contains(const Offset(20, 20))), isTrue);
+  });
+
+  testWidgets('a rotated child cannot cut an oversized rectangular hole',
+      (tester) async {
+    await _setup();
+    await _pump(
+        tester,
+        PostHogMaskWidget(
+            child: SizedBox(
+          width: 200,
+          height: 200,
+          child: Center(
+              child: Transform.rotate(
+            angle: 0.3,
+            child: const PostHogUnmaskWidget(
+                child: SizedBox(width: 100, height: 100)),
+          )),
+        )));
+    expect(
+        _masks().any((e) => _rect(e).contains(const Offset(100, 100))), isTrue);
+  });
+
+  testWidgets('unmasking does not remove an overlapping sibling mask',
+      (tester) async {
+    await _setup();
+    await _pump(
+        tester,
+        const PostHogMaskWidget(
+            child: Stack(children: [
+          PostHogUnmaskWidget(child: SizedBox(width: 100, height: 100)),
+          PostHogMaskWidget(child: SizedBox(width: 40, height: 40)),
+        ])));
+    expect(
+        _masks().any((e) => _rect(e).contains(const Offset(20, 20))), isTrue);
+    expect(
+        _masks().any((e) => _rect(e).contains(const Offset(80, 80))), isFalse);
+  });
+
+  for (final hint in [
+    AutofillHints.email,
+    AutofillHints.telephoneNumber,
+    AutofillHints.username,
+    AutofillHints.name,
+    AutofillHints.fullStreetAddress,
+    AutofillHints.birthday,
+    AutofillHints.gender,
+    AutofillHints.creditCardName
+  ]) {
+    testWidgets('personal hint $hint stays masked inside unmask',
+        (tester) async {
+      await _setup(maskAllTexts: false, maskAllImages: false);
+      await _pump(
+          tester,
+          PostHogUnmaskWidget(
+              child: Column(children: [
+            const Text('public label'),
+            TextField(autofillHints: [hint]),
+            TextFormField(autofillHints: [hint]),
+            CupertinoTextField(autofillHints: [hint]),
+          ])));
+      expect(_isMasked(tester.getRect(find.text('public label'))), isFalse);
+      for (final element in find.byType(EditableText).evaluate()) {
+        expect(
+            _isMasked(tester.getRect(find.byWidget(element.widget))), isTrue);
+      }
+    });
+  }
+
   testWidgets('updates masking when an unmask wrapper is added or removed',
       (tester) async {
     await _setup();
@@ -346,9 +510,9 @@ void main() {
       (tester) async {
     await _setup(maskAllTexts: false, maskAllImages: false);
     for (final hints in [
-      [AutofillHints.username],
-      [AutofillHints.username, AutofillHints.oneTimeCode],
-      [AutofillHints.username],
+      ['custom-search'],
+      ['custom-search', AutofillHints.oneTimeCode],
+      ['custom-search'],
     ]) {
       await _pump(
           tester, PostHogUnmaskWidget(child: TextField(autofillHints: hints)));
@@ -365,17 +529,19 @@ void main() {
       addTearDown(controller.dispose);
       await _pump(
           tester,
-          PostHogUnmaskWidget(
+          PostHogMaskWidget(
               child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Safe error message',
-                  style: TextStyle(
-                      color: Colors.red, backgroundColor: Colors.yellow)),
-              TextField(
-                  controller: controller,
-                  autofillHints: const [AutofillHints.creditCardNumber]),
-              const PostHogMaskWidget(child: Text('private label')),
+              const PostHogUnmaskWidget(
+                  child: Text('Safe error message',
+                      style: TextStyle(
+                          color: Colors.red, backgroundColor: Colors.yellow))),
+              PostHogUnmaskWidget(
+                  child: TextField(
+                      controller: controller,
+                      autofillHints: const [AutofillHints.creditCardNumber])),
+              const Text('private label'),
             ],
           )));
       final boundary = PostHogMaskController
@@ -437,8 +603,7 @@ void main() {
   testWidgets('ordinary inputs remain visible when global text masking is off',
       (tester) async {
     await _setup(maskAllTexts: false, maskAllImages: false);
-    await _pump(
-        tester, const TextField(autofillHints: [AutofillHints.username]));
+    await _pump(tester, const TextField());
     expect(_masks(), isEmpty);
   });
 }

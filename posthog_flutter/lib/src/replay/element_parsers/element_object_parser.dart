@@ -4,12 +4,14 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/render_editable_parser.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/unmask_element_parser.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/mask/sensitive_text_input.dart';
 
 class ElementObjectParser {
   final ElementParser _elementParser = ElementParser();
   final RenderEditableParser _renderEditableParser = RenderEditableParser();
+  final UnmaskElementParser _unmaskParser = UnmaskElementParser();
 
   ElementData? relateRenderObject(
     ElementData activeElementData,
@@ -17,8 +19,17 @@ class ElementObjectParser {
     bool unmask = false,
     bool sensitiveText = false,
   }) {
+    if (element.widget is PostHogUnmaskWidget) {
+      final elementData = _unmaskParser.relate(element);
+      if (elementData != null) {
+        elementData.isUnmask = true;
+        activeElementData.addChildren(elementData);
+        return elementData;
+      }
+    }
+
     final isSensitiveText = isSensitiveTextInput(element.widget);
-    if (element.widget is PostHogMaskWidget || isSensitiveText) {
+    if ((!unmask && element.widget is PostHogMaskWidget) || isSensitiveText) {
       final elementData = _elementParser.relate(element);
 
       if (elementData != null) {

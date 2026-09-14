@@ -694,11 +694,13 @@ class PostHogSessionReplayConfig {
   /// Default: true. Wrap known-safe Flutter content in `PostHogUnmaskWidget`
   /// to reveal it without disabling masking globally.
   ///
-  /// Sensitive Flutter inputs stay masked regardless of this flag or unmask
-  /// widgets: `obscureText`, `TextInputType.visiblePassword`, and autofill hints
-  /// for passwords, new passwords, credit card numbers/security codes,
-  /// expiration dates (including day/month/year), and one-time codes.
-  /// Explicit `PostHogMaskWidget` masks also always apply.
+  /// Sensitive Flutter inputs stay masked regardless of this flag, explicit
+  /// masks, or unmask widgets. This includes `obscureText`, password, email,
+  /// phone, name, address and URL keyboard types, and standard Flutter autofill
+  /// hints for identity, contact, address, authentication, and payment data.
+  /// Inputs without these signals are not automatically classified as
+  /// sensitive. Annotate them appropriately or keep global masking enabled.
+  /// `PostHogUnmaskWidget` overrides global and explicit masks for other content.
   ///
   /// Flutter web requires canvas masking to be enabled by mounting a
   /// `PostHogMaskWidget` or `PostHogUnmaskWidget` inside `PostHogWidget`, or by
@@ -713,7 +715,7 @@ class PostHogSessionReplayConfig {
 
   /// Enable masking of all images.
   /// Default: true. `PostHogUnmaskWidget` can reveal known-safe Flutter images;
-  /// explicit `PostHogMaskWidget` masks still take precedence. Flutter web
+  /// it overrides explicit masks within the same subtree too. Flutter web
   /// requires canvas masking to be enabled as described in [maskAllTexts].
   var maskAllImages = true;
 

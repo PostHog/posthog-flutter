@@ -7,6 +7,9 @@ import 'canvas_mask_registration_io.dart'
 ///
 /// Wrap sensitive UI with [PostHogMaskWidget] to hide that area in captured
 /// screenshots, regardless of the global session replay masking settings.
+/// `PostHogUnmaskWidget` overrides this mask in either nesting order, except
+/// for sensitive text inputs. See that widget's documentation for geometry
+/// limits when revealing part of an enclosing mask.
 ///
 /// **Flutter web:** the canvas is masked by posthog-js rather than by this
 /// plugin, so the first [PostHogMaskWidget] or `PostHogUnmaskWidget` to mount

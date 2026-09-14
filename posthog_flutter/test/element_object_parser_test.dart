@@ -76,12 +76,14 @@ void main() {
       home: RepaintBoundary(
         key: PostHogMaskController.instance.containerKey,
         child: const Scaffold(
-            body: PostHogUnmaskWidget(
-                child: Column(children: [
-          TextField(obscureText: true),
-          CupertinoTextField(autofillHints: [AutofillHints.oneTimeCode]),
+            body: Column(children: [
+          PostHogUnmaskWidget(
+              child: Column(children: [
+            TextField(obscureText: true),
+            CupertinoTextField(autofillHints: [AutofillHints.oneTimeCode]),
+          ])),
           PostHogMaskWidget(child: Text('explicit mask')),
-        ]))),
+        ])),
       ),
     ));
     final elements = PostHogMaskController.instance
@@ -93,6 +95,7 @@ void main() {
     expect(inputs.map((e) => e.widget.runtimeType).toSet(),
         containsAll([TextField, CupertinoTextField, EditableText]));
     expect(inputs.every((e) => e.isSensitiveText), isTrue);
+    expect(elements.where((e) => e.widget is PostHogMaskWidget), isNotEmpty);
     expect(
         elements
             .where((e) => e.widget is PostHogMaskWidget)

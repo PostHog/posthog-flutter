@@ -905,20 +905,22 @@ void main() {
   });
 
   testWidgets(
-      'canvas regions honor unmasking without revealing sensitive inputs',
+      'canvas unmask regions override explicit masks but keep sensitive inputs',
       (tester) async {
     await tester.pumpWidget(const PostHogWidget(
       child: MaterialApp(
           home: Scaffold(
-              body: Column(children: [
+              body: PostHogMaskWidget(
+                  child: Column(children: [
         Text('private sibling'),
         PostHogUnmaskWidget(
             child: Column(children: [
           Text('safe label'),
           TextField(autofillHints: [AutofillHints.creditCardNumber]),
-          PostHogMaskWidget(child: Text('explicitly private')),
+          TextField(autofillHints: [AutofillHints.email]),
+          PostHogMaskWidget(child: Text('nested explicit mask')),
         ])),
-      ]))),
+      ])))),
     ));
     final flutterView = web.document.createElement('flutter-view');
     flutterView.setAttribute('style', 'position: fixed; left: 0; top: 0');
@@ -947,10 +949,16 @@ void main() {
           regions.any((rect) =>
               rect.contains(tester.getCenter(find.text('safe label')))),
           isFalse);
+      expect(
+          regions.any((rect) => rect
+              .contains(tester.getCenter(find.text('nested explicit mask')))),
+          isFalse);
       for (final finder in [
         find.text('private sibling'),
-        find.byType(EditableText),
-        find.text('explicitly private')
+        ...find
+            .byType(EditableText)
+            .evaluate()
+            .map((e) => find.byWidget(e.widget)),
       ]) {
         expect(regions.any((rect) => rect.contains(tester.getCenter(finder))),
             isTrue);

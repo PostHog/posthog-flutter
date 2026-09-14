@@ -11,10 +11,16 @@ import 'canvas_mask_registration_io.dart'
 /// PostHogUnmaskWidget(child: Text('Try again'))
 /// ```
 ///
-/// Only wrap content known to be safe. Explicit `PostHogMaskWidget` masks and
-/// sensitive text inputs always take precedence, regardless of nesting order.
-/// This does not erase masks from ancestors or overlapping widgets, reveal
-/// native platform views, or change masking on captured native screens.
+/// Only wrap content known to be safe. This overrides global masking and
+/// `PostHogMaskWidget` in either nesting order, but sensitive text inputs always
+/// remain masked. Masks on overlapping sibling widgets are not removed.
+///
+/// For an enclosing mask, only the visible rectangular unmask region is
+/// excluded. If its transform relative to that mask is not axis-aligned, or a
+/// non-rectangular/custom clip prevents a safe exclusion, the enclosing mask is
+/// retained. Web masks use conservative bounds and can cover the edges of an
+/// unmasked region. Native platform views and captured native screens are
+/// unaffected.
 ///
 /// On Flutter web, mounting either this widget or `PostHogMaskWidget` enables
 /// canvas masking and restarts an in-flight recording once to protect the
