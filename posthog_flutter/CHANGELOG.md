@@ -1,5 +1,11 @@
 ## Next
 
+## 5.42.1
+
+### Patch Changes
+
+- 660270b: Fix `$push_notification_opened` being lost on Android when a notification tap reaches the app before `Posthog().setup()` runs.
+
 ## 5.42.0
 
 ### Minor Changes
