@@ -25,6 +25,7 @@
       "sessionReplay": true,
       "dataMode": "any",
       "sessionReplayConfig": {
+        "captureTouches": true,
         "maskAllImages": false,
         "maskAllTexts": true,
         "throttleDelayMs": 1000,

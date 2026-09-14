@@ -1,5 +1,23 @@
 ## Next
 
+## 5.41.1
+
+### Patch Changes
+
+- 696ab7f: Warn when PostHogWidget mounts before Posthog().setup() on mobile, explaining that session replay requires setup before mounting or remounting the widget after setup.
+
+## 5.41.0
+
+### Minor Changes
+
+- dddc307: Add `sessionReplayConfig.captureTouches` to disable replay touch coordinates during SDK initialization on Android and iOS while keeping masked screenshots. This protects keypad entry whose values can be reconstructed from tap positions. Requires posthog-android 3.64.0 and posthog-ios 3.74.0. Runtime changes are not supported.
+
+## 5.40.1
+
+### Patch Changes
+
+- 3ce8592: Fix session replay masking only the first line of an auto-growing text field (`maxLines: null` or `expands: true`); the mask now covers the field's full height.
+
 ## 5.40.0
 
 ### Minor Changes
