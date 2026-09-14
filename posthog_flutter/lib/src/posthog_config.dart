@@ -691,6 +691,12 @@ class PostHogSessionReplayConfig {
   /// expiration dates (including day/month/year), and one-time codes.
   /// Explicit `PostHogMaskWidget` masks also always apply.
   ///
+  /// Flutter web requires canvas masking to be enabled by mounting a
+  /// `PostHogMaskWidget` or `PostHogUnmaskWidget` inside `PostHogWidget`, or by
+  /// declaring `session_recording.canvasCapture.maskRegionsFn` in `posthog.init`.
+  /// Declare it as `() => null` to skip frames before Flutter installs its mask
+  /// provider. Canvas recording must be enabled separately.
+  ///
   /// With [captureNativeScreens] enabled, setting this false also unmasks text
   /// on captured native screens, including native input fields (passwords,
   /// card numbers) you may not have built.
@@ -698,7 +704,8 @@ class PostHogSessionReplayConfig {
 
   /// Enable masking of all images.
   /// Default: true. `PostHogUnmaskWidget` can reveal known-safe Flutter images;
-  /// explicit `PostHogMaskWidget` masks still take precedence.
+  /// explicit `PostHogMaskWidget` masks still take precedence. Flutter web
+  /// requires canvas masking to be enabled as described in [maskAllTexts].
   var maskAllImages = true;
 
   /// Deprecated setter that forwards assigned values to [throttleDelay].

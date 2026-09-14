@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -67,6 +68,36 @@ void main() {
     expect(types(elements!), isNot(contains('Text')));
     expect(types(elements), isNot(contains('RichText')));
     expect(types(elements), contains('RawImage'));
+  });
+
+  testWidgets('records sensitivity on widget-level mask data', (tester) async {
+    await setupPosthog(maskAllTexts: false, maskAllImages: false);
+    await tester.pumpWidget(MaterialApp(
+      home: RepaintBoundary(
+        key: PostHogMaskController.instance.containerKey,
+        child: const Scaffold(
+            body: PostHogUnmaskWidget(
+                child: Column(children: [
+          TextField(obscureText: true),
+          CupertinoTextField(autofillHints: [AutofillHints.oneTimeCode]),
+          PostHogMaskWidget(child: Text('explicit mask')),
+        ]))),
+      ),
+    ));
+    final elements = PostHogMaskController.instance
+        .getMaskElements(includeAllWidgets: false)!;
+    final inputs = elements.where((e) =>
+        e.widget is TextField ||
+        e.widget is CupertinoTextField ||
+        e.widget is EditableText);
+    expect(inputs.map((e) => e.widget.runtimeType).toSet(),
+        containsAll([TextField, CupertinoTextField, EditableText]));
+    expect(inputs.every((e) => e.isSensitiveText), isTrue);
+    expect(
+        elements
+            .where((e) => e.widget is PostHogMaskWidget)
+            .every((e) => !e.isSensitiveText),
+        isTrue);
   });
 
   testWidgets('maskAllTexts=true still masks Text', (tester) async {

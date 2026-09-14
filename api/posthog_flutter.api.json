@@ -5323,7 +5323,7 @@
                 "name": "PostHogUnmaskWidget",
                 "relativePath": "lib/src/replay/mask/posthog_unmask_widget.dart",
                 "superTypeNames": [
-                    "StatelessWidget",
+                    "StatefulWidget",
                     "Widget",
                     "DiagnosticableTree",
                     "Object",

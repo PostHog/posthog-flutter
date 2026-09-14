@@ -17,11 +17,12 @@ class ElementObjectParser {
     bool unmask = false,
     bool sensitiveText = false,
   }) {
-    if (element.widget is PostHogMaskWidget ||
-        isSensitiveTextInput(element.widget)) {
+    final isSensitiveText = isSensitiveTextInput(element.widget);
+    if (element.widget is PostHogMaskWidget || isSensitiveText) {
       final elementData = _elementParser.relate(element);
 
       if (elementData != null) {
+        elementData.isSensitiveText = isSensitiveText;
         activeElementData.addChildren(elementData);
         return elementData;
       }
