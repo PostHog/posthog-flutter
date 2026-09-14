@@ -35,6 +35,19 @@ class _ValuePainter extends CustomPainter {
   bool shouldRepaint(covariant _ValuePainter oldDelegate) => false;
 }
 
+class _SensitiveScrollbarPainter extends ScrollbarPainter {
+  _SensitiveScrollbarPainter()
+      : super(
+          color: Colors.black,
+          textDirection: TextDirection.ltr,
+          fadeoutOpacityAnimation: const AlwaysStoppedAnimation(1),
+        );
+
+  @override
+  void paint(Canvas canvas, Size size) =>
+      const _ValuePainter().paint(canvas, size);
+}
+
 void main() {
   const paintKey = ValueKey('sensitive-paint');
   final controller = PostHogMaskController.instance;
@@ -110,6 +123,165 @@ void main() {
       renderObject.paintBounds,
     );
   }
+
+  Future<replay.ImageInfo?> captureFrame(WidgetTester tester) async {
+    const channel = MethodChannel('posthog_flutter');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'getSessionReplayState') {
+        return {'isActive': true, 'sessionId': 'custom-paint-session'};
+      }
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final capturer = replay.ScreenshotCapturer(Posthog().config!);
+    addTearDown(capturer.cancel);
+    var completed = false;
+    final capture = capturer.captureScreenshot().whenComplete(() {
+      completed = true;
+    });
+    await settleUntil(tester, () => completed);
+    expect(completed, isTrue);
+    return capture;
+  }
+
+  Future<void> pumpScrollable(
+    WidgetTester tester, {
+    required TargetPlatform platform,
+    bool explicitScrollbar = false,
+    List<Widget> children = const [SizedBox(height: 2000)],
+  }) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    final list = ListView(controller: scrollController, children: children);
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: controller.containerKey,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(platform: platform),
+          home: Scaffold(
+            appBar: AppBar(title: const Text('Title')),
+            body: explicitScrollbar
+                ? Scrollbar(controller: scrollController, child: list)
+                : list,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  for (final platform in [
+    TargetPlatform.android,
+    TargetPlatform.macOS,
+    TargetPlatform.linux,
+    TargetPlatform.windows,
+  ]) {
+    testWidgets('does not mask the automatic scrollbar viewport on $platform',
+        (tester) async {
+      await setup(texts: false, images: false, customPaint: true);
+      await pumpScrollable(tester, platform: platform);
+      expect(maskRects(), isEmpty);
+    });
+  }
+
+  testWidgets('walks sensitive children of an explicit desktop scrollbar',
+      (tester) async {
+    await setup(images: false, customPaint: true);
+    await pumpScrollable(
+      tester,
+      platform: TargetPlatform.macOS,
+      explicitScrollbar: true,
+      children: [const Text('secret'), painted(), const SizedBox(height: 2000)],
+    );
+    final rects = maskRects();
+    expect(rects, isNot(contains(boundsOf(tester, find.byType(ListView)))));
+    expect(rects, contains(boundsOf(tester, find.text('secret'))));
+    expect(rects, contains(boundsOf(tester, find.byKey(paintKey))));
+  });
+
+  testWidgets('does not exempt subclasses of ScrollbarPainter', (tester) async {
+    await setup(texts: false, images: false, customPaint: true);
+    final painter = _SensitiveScrollbarPainter();
+    addTearDown(painter.dispose);
+    await pumpTree(
+        tester,
+        CustomPaint(
+          key: paintKey,
+          size: const Size(200, 40),
+          foregroundPainter: painter,
+        ));
+    expect(maskRects(), contains(boundsOf(tester, find.byKey(paintKey))));
+  });
+
+  testWidgets('still masks a background painter beside a scrollbar painter',
+      (tester) async {
+    await setup(texts: false, images: false, customPaint: true);
+    final scrollbar = ScrollbarPainter(
+      color: Colors.black,
+      textDirection: TextDirection.ltr,
+      fadeoutOpacityAnimation: const AlwaysStoppedAnimation(1),
+    );
+    addTearDown(scrollbar.dispose);
+    await pumpTree(
+        tester,
+        CustomPaint(
+          key: paintKey,
+          size: const Size(200, 40),
+          painter: const _ValuePainter(),
+          foregroundPainter: scrollbar,
+        ));
+    expect(maskRects(), contains(boundsOf(tester, find.byKey(paintKey))));
+  });
+
+  for (final foreground in [false, true]) {
+    for (final enabled in [false, true]) {
+      testWidgets('unsized painter foreground=$foreground masking=$enabled',
+          (tester) async {
+        await setup(texts: false, images: false, customPaint: enabled);
+        await pumpTree(
+            tester,
+            CustomPaint(
+              key: paintKey,
+              painter: foreground ? null : const _ValuePainter(),
+              foregroundPainter: foreground ? const _ValuePainter() : null,
+            ));
+        expect(tester.getSize(find.byKey(paintKey)), Size.zero);
+        final elements = controller.getMaskElements(includeAllWidgets: enabled);
+        expect(elements, enabled ? isNull : isEmpty);
+      });
+    }
+  }
+
+  testWidgets('native capture drops an unsized painter that draws visible text',
+      (tester) async {
+    await setup(texts: false, images: false, customPaint: true);
+    await pumpTree(
+        tester, CustomPaint(key: paintKey, painter: const _ValuePainter()));
+    final boundary = controller.containerKey.currentContext!.findRenderObject()
+        as RenderRepaintBoundary;
+    final origin = boundsOf(tester, find.byKey(paintKey)).topLeft;
+    await tester.runAsync(() async {
+      final image = await boundary.toImage();
+      try {
+        final data =
+            (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+        var ink = 0;
+        for (var y = origin.dy.ceil(); y < origin.dy + 20; y++) {
+          for (var x = 0; x < 160; x++) {
+            if (data.getUint32((y * image.width + x) * 4) == 0x000000ff) ink++;
+          }
+        }
+        expect(ink, greaterThan(0),
+            reason: 'The zero-sized painter still draws text');
+      } finally {
+        image.dispose();
+      }
+    });
+    expect(await captureFrame(tester), isNull);
+  }, skip: kIsWeb);
 
   test('custom-paint masking is disabled by default', () {
     expect(PostHogSessionReplayConfig().maskCustomPaint, isFalse);
@@ -238,25 +410,7 @@ void main() {
     await setup(texts: false, images: false, customPaint: true);
     await pumpTree(tester, painted());
 
-    const channel = MethodChannel('posthog_flutter');
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'getSessionReplayState') {
-        return {'isActive': true, 'sessionId': 'custom-paint-session'};
-      }
-      return null;
-    });
-    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
-    final capturer = replay.ScreenshotCapturer(Posthog().config!);
-    addTearDown(capturer.cancel);
-    var completed = false;
-    final capture = capturer.captureScreenshot().whenComplete(() {
-      completed = true;
-    });
-    await settleUntil(tester, () => completed);
-    expect(completed, isTrue);
-    final captured = await capture;
+    final captured = await captureFrame(tester);
     expect(captured, isNotNull);
 
     final paintRect = boundsOf(tester, find.byKey(paintKey));

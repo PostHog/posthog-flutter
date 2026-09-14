@@ -114,55 +114,61 @@ void main() {
     return sessionRecording as JSObject;
   }
 
-  testWidgets('emits custom-paint regions when other masking flags are off',
-      (tester) async {
-    installPosthogStub();
-    final config = PostHogConfig('phc_test');
-    config.sessionReplayConfig
-      ..maskAllTexts = false
-      ..maskAllImages = false
-      ..maskCustomPaint = true;
-    WebCanvasMaskProvider(config).register();
+  for (final unsized in [false, true]) {
+    testWidgets('custom-paint regions fail closed for unsized=$unsized',
+        (tester) async {
+      installPosthogStub();
+      final config = PostHogConfig('phc_test');
+      config.sessionReplayConfig
+        ..maskAllTexts = false
+        ..maskAllImages = false
+        ..maskCustomPaint = true;
+      WebCanvasMaskProvider(config).register();
 
-    await tester.pumpWidget(
-      PostHogWidget(
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: CustomPaint(
-            size: const Size(100, 40),
-            painter: BannerPainter(
-              message: 'sensitive',
-              layoutDirection: TextDirection.ltr,
-              textDirection: TextDirection.ltr,
-              location: BannerLocation.topStart,
+      await tester.pumpWidget(
+        PostHogWidget(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: CustomPaint(
+              size: unsized ? Size.zero : const Size(100, 40),
+              painter: BannerPainter(
+                message: 'sensitive',
+                layoutDirection: TextDirection.ltr,
+                textDirection: TextDirection.ltr,
+                location: BannerLocation.topStart,
+              ),
             ),
           ),
         ),
-      ),
-    );
-
-    final flutterView = web.document.createElement('flutter-view');
-    final canvas = web.document.createElement('canvas');
-    flutterView.appendChild(canvas);
-    web.document.body!.appendChild(flutterView);
-    WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
-    try {
-      final regionsFn = capturedSessionRecording()
-          .getProperty<JSObject>('canvasCapture'.toJS)
-          .getProperty<JSFunction>('maskRegionsFn'.toJS);
-      final regions =
-          regionsFn.callAsFunction(null, canvas) as JSArray<JSObject>;
-      expect(regions.toDart, isNotEmpty);
-      expect(
-        regions.toDart.any((region) =>
-            region.getProperty<JSNumber>('width'.toJS).toDartDouble >= 100 &&
-            region.getProperty<JSNumber>('height'.toJS).toDartDouble >= 40),
-        isTrue,
       );
-    } finally {
-      flutterView.remove();
-    }
-  });
+
+      final flutterView = web.document.createElement('flutter-view');
+      final canvas = web.document.createElement('canvas');
+      flutterView.appendChild(canvas);
+      web.document.body!.appendChild(flutterView);
+      WebCanvasMaskProvider.debugOwnViewHostOverride = flutterView;
+      try {
+        final regionsFn = capturedSessionRecording()
+            .getProperty<JSObject>('canvasCapture'.toJS)
+            .getProperty<JSFunction>('maskRegionsFn'.toJS);
+        final result = regionsFn.callAsFunction(null, canvas);
+        if (unsized) {
+          expect(result, isNull);
+          return;
+        }
+        final regions = result as JSArray<JSObject>;
+        expect(regions.toDart, isNotEmpty);
+        expect(
+          regions.toDart.any((region) =>
+              region.getProperty<JSNumber>('width'.toJS).toDartDouble >= 100 &&
+              region.getProperty<JSNumber>('height'.toJS).toDartDouble >= 40),
+          isTrue,
+        );
+      } finally {
+        flutterView.remove();
+      }
+    });
+  }
 
   test('warns when only custom-paint masking is requested without a provider',
       () {

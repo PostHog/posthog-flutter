@@ -69,11 +69,21 @@ class ElementObjectParser {
     if (renderObject is RenderCustomPaint &&
         (renderObject.painter != null ||
             renderObject.foregroundPainter != null)) {
+      // Only exempt the framework painter itself; subclasses can paint content.
+      if (renderObject.painter == null &&
+          renderObject.foregroundPainter.runtimeType == ScrollbarPainter) {
+        return null;
+      }
       // Canvas commands cannot be inspected for sensitive text or images.
       final parser = PostHogMaskController.instance
           .parsers[ElementParsersConst.getRuntimeType<RenderCustomPaint>()];
-      final elementData = parser?.relate(element);
-      if (elementData != null) {
+      if (parser != null) {
+        final elementData = parser.relate(element);
+        if (elementData == null) {
+          // A zero-sized painter can paint outside its ancestors, so guessing
+          // an ancestor's bounds is unsafe. The caller drops the frame.
+          throw StateError('Cannot determine CustomPaint mask bounds.');
+        }
         activeElementData.addChildren(elementData);
         return elementData;
       }

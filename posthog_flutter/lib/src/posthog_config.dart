@@ -714,9 +714,14 @@ class PostHogSessionReplayConfig {
   ///
   /// This is independent of [maskAllTexts] and [maskAllImages]. Canvas contents
   /// cannot be inspected for individual text or images, so enabling this also
-  /// masks custom-painted decorations in Flutter widgets. Disable MaterialApp's
-  /// debugShowCheckedModeBanner when using this option: its full-window
-  /// CustomPaint otherwise masks the entire screen.
+  /// masks custom-painted decorations in Flutter widgets, including TabBar,
+  /// checkboxes, switches, and progress indicators. Framework scrollbar-only
+  /// painters are excluded, but their children are still checked for masks.
+  /// Disable MaterialApp's debugShowCheckedModeBanner when using this option:
+  /// its full-window CustomPaint otherwise masks the entire screen.
+  ///
+  /// Frames containing a painter whose bounds cannot be determined, such as a
+  /// zero-sized CustomPaint, are skipped rather than sent with a missing mask.
   var maskCustomPaint = false;
 
   /// Deprecated setter that forwards assigned values to [throttleDelay].
