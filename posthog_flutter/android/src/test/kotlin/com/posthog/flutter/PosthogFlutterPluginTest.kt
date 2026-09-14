@@ -453,12 +453,14 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onNewIntent_trayTap_isRememberedForSetupToReplay() {
+    fun onNewIntent_trayTap_isCapturedAndRememberedForSetupToReplay() {
         val plugin = PosthogFlutterPlugin()
         val listener = attachActivity(plugin)
+        val captured = recordCaptures(plugin)
         val intent = trayIntent("m1")
 
         assertFalse(listener.onNewIntent(intent))
+        assertEquals(listOf<Intent?>(intent), captured)
         assertSame(intent, plugin.pendingPushIntent)
     }
 
@@ -497,14 +499,43 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun launchIntentReplay_consumesTheRememberedTapOnce() {
+    fun launchIntentReplay_capturesTheRememberedTapOverTheActivityIntent() {
         val plugin = PosthogFlutterPlugin()
-        val listener = attachActivity(plugin)
-        listener.onNewIntent(trayIntent("m1"))
+        val listener = attachActivity(plugin, activityWithIntent(trayIntent("stale-launch")))
+        val captured = recordCaptures(plugin)
+        val tap = trayIntent("m1")
+        listener.onNewIntent(tap)
 
         plugin.capturePushNotificationOpenedFromLaunchIntent()
 
+        assertSame(tap, captured.last())
         assertNull(plugin.pendingPushIntent)
+    }
+
+    @Test
+    fun launchIntentReplay_withoutRememberedTap_capturesTheActivityIntent() {
+        val plugin = PosthogFlutterPlugin()
+        val launch = trayIntent("launch")
+        attachActivity(plugin, activityWithIntent(launch))
+        val captured = recordCaptures(plugin)
+
+        plugin.capturePushNotificationOpenedFromLaunchIntent()
+
+        assertEquals(listOf<Intent?>(launch), captured)
+    }
+
+    @Test
+    fun launchIntentReplay_replaysTheRememberedTapOnlyOnce() {
+        val plugin = PosthogFlutterPlugin()
+        val launch = trayIntent("launch")
+        val listener = attachActivity(plugin, activityWithIntent(launch))
+        val captured = recordCaptures(plugin)
+        listener.onNewIntent(trayIntent("m1"))
+
+        plugin.capturePushNotificationOpenedFromLaunchIntent()
+        plugin.capturePushNotificationOpenedFromLaunchIntent()
+
+        assertSame(launch, captured.last())
     }
 
     @Test
@@ -523,9 +554,22 @@ internal class PosthogFlutterPluginTest {
             Mockito.`when`(it.getStringExtra("google.message_id")).thenReturn(messageId)
         }
 
-    private fun attachActivity(plugin: PosthogFlutterPlugin): PluginRegistry.NewIntentListener {
+    private fun activityWithIntent(intent: Intent): Activity =
+        Mockito.mock(Activity::class.java).also {
+            Mockito.`when`(it.intent).thenReturn(intent)
+        }
+
+    private fun recordCaptures(plugin: PosthogFlutterPlugin): List<Intent?> =
+        mutableListOf<Intent?>().also { captured ->
+            plugin.capturePushNotificationOpened = { captured += it }
+        }
+
+    private fun attachActivity(
+        plugin: PosthogFlutterPlugin,
+        activity: Activity = Mockito.mock(Activity::class.java),
+    ): PluginRegistry.NewIntentListener {
         val binding = Mockito.mock(ActivityPluginBinding::class.java)
-        Mockito.`when`(binding.activity).thenReturn(Mockito.mock(Activity::class.java))
+        Mockito.`when`(binding.activity).thenReturn(activity)
         plugin.onAttachedToActivity(binding)
         val captor = ArgumentCaptor.forClass(PluginRegistry.NewIntentListener::class.java)
         Mockito.verify(binding).addOnNewIntentListener(captor.capture())

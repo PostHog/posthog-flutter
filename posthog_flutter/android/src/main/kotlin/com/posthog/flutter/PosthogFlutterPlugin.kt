@@ -810,6 +810,11 @@ class PosthogFlutterPlugin :
     @VisibleForTesting
     internal var pendingPushIntent: Intent? = null
 
+    // Indirection so tests can observe the call: the SDK entry point lives on a companion object,
+    // which Mockito cannot stand in for.
+    @VisibleForTesting
+    internal var capturePushNotificationOpened: (Intent?) -> Unit = { PostHogAndroid.capturePushNotificationOpened(it) }
+
     /**
      * The SDK reads a notification tap from the launch Activity's intent when that Activity is
      * created, which is long before Dart reaches `Posthog().setup()` — by then `onCreate`, `onStart`
@@ -829,7 +834,7 @@ class PosthogFlutterPlugin :
     internal fun capturePushNotificationOpenedFromLaunchIntent() {
         val intent = pendingPushIntent ?: activity?.intent
         pendingPushIntent = null
-        PostHogAndroid.capturePushNotificationOpened(intent)
+        capturePushNotificationOpened(intent)
     }
 
     /**
@@ -840,7 +845,7 @@ class PosthogFlutterPlugin :
     private val newIntentListener =
         PluginRegistry.NewIntentListener { intent ->
             rememberPushIntent(intent)
-            PostHogAndroid.capturePushNotificationOpened(intent)
+            capturePushNotificationOpened(intent)
             false
         }
 
