@@ -4,6 +4,7 @@ import 'logs/posthog_log_record.dart';
 import 'posthog.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'replay/mask/posthog_text_mask.dart';
 import 'util/logging.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
@@ -740,6 +741,46 @@ class PostHogSessionReplayConfig {
   /// Frames containing a painter whose bounds cannot be determined, such as a
   /// zero-sized CustomPaint, are skipped rather than sent with a missing mask.
   var maskCustomPaint = false;
+
+  /// Decides, per text node, what to mask — instead of all-or-nothing.
+  ///
+  /// When set, every plain `Text`, `RichText`, and non-sensitive text input is
+  /// masked according to the [PostHogTextMask] the policy returns for its
+  /// rendered string, and [maskAllTexts] no longer applies to those nodes.
+  /// Ranges are masked at glyph precision, so a policy can hide an amount
+  /// while the label next to it stays readable:
+  ///
+  /// ```dart
+  /// // Mask numbers only: "Balance ₦2,450,000.00" keeps "Balance" visible.
+  /// config.sessionReplayConfig.textMaskPolicy =
+  ///     PostHogTextMaskPolicies.digits();
+  ///
+  /// // Mask everything except a known-safe pattern.
+  /// config.sessionReplayConfig.textMaskPolicy =
+  ///     PostHogTextMaskPolicies.reveal(RegExp(r'^(Continue|Cancel)$'));
+  ///
+  /// // Or decide per node.
+  /// config.sessionReplayConfig.textMaskPolicy = (text) =>
+  ///     safeStrings.contains(text)
+  ///         ? const PostHogTextMask.none()
+  ///         : const PostHogTextMask.all();
+  /// ```
+  ///
+  /// Precedence, highest first: sensitive inputs (`obscureText`, password,
+  /// card, and other sensitive autofill hints) are always fully masked;
+  /// `PostHogMaskWidget` masks and `PostHogUnmaskWidget` reveals its subtree
+  /// without consulting the policy; then the policy decides; [maskAllTexts]
+  /// only applies to text nodes when no policy is set.
+  ///
+  /// The policy runs on the UI thread for every captured text node; keep it
+  /// fast. It fails closed: throwing, or returning a range outside the text,
+  /// masks the whole node. It applies to the Flutter widget tree only — text
+  /// on captured native screens still follows [maskAllTexts], and
+  /// custom-painted text still needs [maskCustomPaint]. Can be changed at
+  /// runtime; the next frame uses the new policy.
+  ///
+  /// Default: null.
+  PostHogTextMaskPolicy? textMaskPolicy;
 
   /// Deprecated setter that forwards assigned values to [throttleDelay].
   ///
