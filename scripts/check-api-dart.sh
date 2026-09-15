@@ -43,6 +43,8 @@ dart run dart_apitool:main extract \
   --output "$RAW_API" \
   --force-use-flutter
 
+dart run "$ROOT_DIR/scripts/annotate-api-dart.dart" "$RAW_API" "$ROOT_DIR/posthog_flutter"
+
 python3 - "$RAW_API" "$GENERATED_API" <<'PY'
 import json
 import sys

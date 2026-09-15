@@ -2721,7 +2721,7 @@
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
-                        "isExperimental": false,
+                        "isExperimental": true,
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
@@ -2732,7 +2732,7 @@
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
-                        "isExperimental": false,
+                        "isExperimental": true,
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
