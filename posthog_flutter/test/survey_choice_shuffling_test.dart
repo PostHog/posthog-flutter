@@ -24,9 +24,6 @@ void main() {
             tester, isMultipleChoice, hasOpenChoice, shouldShuffle));
   }
 
-  testWidgets('choice-count updates preserve order and Other input',
-      verifyChoiceCountUpdates);
-
   for (final choices in [
     <String>[],
     ['Other'],
@@ -124,45 +121,4 @@ Future<void> verifyChoiceSubmission(WidgetTester tester, bool isMultipleChoice,
   ]);
   expect(find.text('Next'), findsOneWidget);
   expect(visibleOrder(), ['Done']);
-}
-
-Future<void> verifyChoiceCountUpdates(WidgetTester tester) async {
-  Future<void> render(List<String> choices) => tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-            body: ChoiceQuestionWidget(
-          question: 'Pick one',
-          description: null,
-          choices: choices,
-          appearance: SurveyAppearance.fromPostHog(null),
-          hasOpenChoice: true,
-          shuffleOptions: true,
-          onSubmit: (_) {},
-        )),
-      ));
-  List<String> visibleOrder() => tester
-      .widgetList<SurveyChoiceButton>(find.byType(SurveyChoiceButton))
-      .map((button) => button.label)
-      .toList();
-  await render(['A', 'B', 'Other']);
-  expect(visibleOrder(), ['B', 'A', 'Other']);
-  await tester.tap(find.text('Other:'));
-  await tester.pumpAndSettle();
-  await tester.enterText(find.byType(TextFormField), 'Custom answer');
-  await render(['A', 'B', 'C', 'Other']);
-  await tester.pumpAndSettle();
-  expect(visibleOrder(), ['B', 'A', 'C', 'Other']);
-  expect(find.text('Custom answer'), findsOneWidget);
-  expect(
-      tester
-          .widgetList<SurveyChoiceButton>(find.byType(SurveyChoiceButton))
-          .last
-          .isSelected,
-      isTrue);
-  await render(['A', 'Other']);
-  await tester.pumpAndSettle();
-  expect(visibleOrder(), ['A', 'Other']);
-  expect(find.text('Custom answer'), findsOneWidget);
-  await render([]);
-  await tester.pumpAndSettle();
-  expect(visibleOrder(), isEmpty);
 }

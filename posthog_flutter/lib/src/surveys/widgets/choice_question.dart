@@ -41,7 +41,7 @@ class ChoiceQuestionWidget extends StatefulWidget {
 
 class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
   Set<String> _selectedChoices = {};
-  late List<int> _displayOrder = _createDisplayOrder();
+  late final List<int> _displayOrder = _createDisplayOrder();
 
   List<int> _createDisplayOrder() {
     final indices = List.generate(widget.choices.length, (index) => index);
@@ -59,28 +59,6 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
       ...(unchanged ? shuffled.reversed : shuffled),
       if (openChoice != null) openChoice,
     ];
-  }
-
-  @override
-  void didUpdateWidget(covariant ChoiceQuestionWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.choices.length == widget.choices.length &&
-        oldWidget.hasOpenChoice == widget.hasOpenChoice) return;
-    final regularCount = widget.choices.length -
-        (widget.hasOpenChoice && widget.choices.isNotEmpty ? 1 : 0);
-    final retained = _displayOrder
-        .where((index) =>
-            index < regularCount &&
-            (!oldWidget.hasOpenChoice || index != oldWidget.choices.length - 1))
-        .toList();
-    _displayOrder = [
-      ...retained,
-      for (var index = 0; index < regularCount; index++)
-        if (!retained.contains(index)) index,
-      if (widget.hasOpenChoice && widget.choices.isNotEmpty)
-        widget.choices.length - 1,
-    ];
-    _selectedChoices.removeWhere((choice) => !widget.choices.contains(choice));
   }
 
   String _openChoiceInput = '';
