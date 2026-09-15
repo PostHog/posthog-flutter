@@ -8,6 +8,7 @@ import 'package:posthog_flutter_example/error_example.dart';
 
 import 'exception_steps_screen.dart';
 import 'masking_tests_screen.dart';
+import 'text_mask_policy_screen.dart';
 import 'platform_view_spill_screen.dart';
 import 'platform_views_screen.dart';
 import 'survey_nested_navigator_screen.dart';
@@ -185,6 +186,20 @@ class InitialScreenState extends State<InitialScreen> {
                     );
                   },
                   child: const Text('Masking Tests'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TextMaskPolicyScreen(),
+                        settings: const RouteSettings(name: 'text_mask_policy'),
+                      ),
+                    );
+                  },
+                  child: const Text('Text Mask Policy (Replay)'),
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton(

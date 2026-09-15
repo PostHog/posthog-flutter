@@ -13,3 +13,4 @@ export 'src/posthog_widget.dart';
 export 'src/replay/mask/posthog_mask_widget.dart';
 export 'src/replay/mask/posthog_unmask_widget.dart';
 export 'src/replay/mask/posthog_platform_view.dart';
+export 'src/replay/mask/posthog_text_mask.dart';

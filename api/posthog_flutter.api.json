@@ -2689,6 +2689,17 @@
                         "entryPoints": [],
                         "isDeprecated": false,
                         "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "textMaskPolicy",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogTextMask Function(String)?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
                         "isReadable": false,
                         "isStatic": false,
                         "isWriteable": true,
@@ -5489,6 +5500,346 @@
                     "Object"
                 ],
                 "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "all",
+                        "parameters": [],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMask",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "none",
+                        "parameters": [],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMask",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "only",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "ranges",
+                                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                                "typeName": "Iterable<TextRange>"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMask",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "except",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "ranges",
+                                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                                "typeName": "Iterable<TextRange>"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMask",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogTextMask",
+                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMaskAll",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogTextMaskAll",
+                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                "superTypeNames": [
+                    "PostHogTextMask",
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMaskNone",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogTextMaskNone",
+                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                "superTypeNames": [
+                    "PostHogTextMask",
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "ranges",
+                                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                                "typeName": "Iterable<TextRange>"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMaskOnly",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ranges",
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "typeName": "Iterable<TextRange>"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogTextMaskOnly",
+                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                "superTypeNames": [
+                    "PostHogTextMask",
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "ranges",
+                                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                                "typeName": "Iterable<TextRange>"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMaskExcept",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "ranges",
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "typeName": "Iterable<TextRange>"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogTextMaskExcept",
+                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                "superTypeNames": [
+                    "PostHogTextMask",
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": true,
+                        "name": "digits",
+                        "parameters": [],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMask Function(String)",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": true,
+                        "name": "redact",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "pattern",
+                                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                                "typeName": "RegExp"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMask Function(String)",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": true,
+                        "name": "reveal",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "pattern",
+                                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                                "typeName": "RegExp"
+                            }
+                        ],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMask Function(String)",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [],
+                        "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                        "returnTypeName": "PostHogTextMaskPolicies",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogTextMaskPolicies",
+                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
             }
         ],
         "iosPlatformConstraints": null,
@@ -5567,6 +5918,16 @@
                 "isExperimental": false,
                 "name": "PostHogRouteFilter",
                 "relativePath": "lib/src/posthog_observer.dart"
+            },
+            {
+                "aliasedTypeName": "PostHogTextMask Function(String)",
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "name": "PostHogTextMaskPolicy",
+                "relativePath": "lib/src/replay/mask/posthog_text_mask.dart"
             }
         ]
     },
