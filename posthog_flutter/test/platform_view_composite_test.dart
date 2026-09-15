@@ -34,14 +34,18 @@ Future<ui.Image> _composite(
   ui.Image crop,
   Matrix4 transform,
   Rect viewRect,
-  Rect visibleRect,
-) {
+  Rect visibleRect, {
+  double pixelRatio = 1.0,
+}) {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
   canvas.drawRect(
       const Rect.fromLTWH(0, 0, 100, 200), Paint()..color = _background);
-  compositeRevealedImage(canvas, crop, transform, viewRect, visibleRect);
-  return recorder.endRecording().toImage(100, 200);
+  compositeRevealedImage(canvas, crop, transform, viewRect, visibleRect,
+      pixelRatio: pixelRatio);
+  return recorder
+      .endRecording()
+      .toImage((100 * pixelRatio).ceil(), (200 * pixelRatio).ceil());
 }
 
 Future<Color> _pixel(ui.Image image, int x, int y) async {
@@ -146,6 +150,63 @@ void main() {
     expect(await _pixel(image, 15, 95), _background);
     expect(await _pixel(image, 85, 95), _background);
   });
+
+  for (final scale in [0.5, 0.333, 0.1]) {
+    test('scaled $scale native crops retain orientation and clipping',
+        () async {
+      final crop = await _screenCrop(100, 200);
+      final image = await _composite(
+        crop,
+        quarterTurn,
+        const Rect.fromLTWH(0, 0, 200, 100),
+        const Rect.fromLTWH(0, 0, 60, 100),
+        pixelRatio: scale,
+      );
+      try {
+        expect(await _pixel(image, (25 * scale).floor(), (20 * scale).floor()),
+            _topLeft);
+        expect(await _pixel(image, (75 * scale).floor(), (20 * scale).floor()),
+            _topRight);
+        expect(await _pixel(image, (25 * scale).floor(), (150 * scale).floor()),
+            _background);
+      } finally {
+        image.dispose();
+        crop.dispose();
+      }
+    });
+
+    test('scaled $scale diagonal clips do not reveal their hull corners',
+        () async {
+      final crop = await _screenCrop(100, 200);
+      final image = await _composite(
+        crop,
+        Matrix4.identity()
+          ..translateByDouble(50.0, 20.0, 0.0, 1.0)
+          ..rotateZ(pi / 4),
+        const Rect.fromLTWH(0, 0, 60, 60),
+        const Rect.fromLTWH(0, 0, 60, 60),
+        pixelRatio: scale,
+      );
+      try {
+        expect(await _pixel(image, (40 * scale).floor(), (50 * scale).floor()),
+            _topLeft);
+        for (final point in [
+          const Offset(15, 30),
+          const Offset(85, 30),
+          const Offset(15, 95),
+          const Offset(85, 95),
+        ]) {
+          expect(
+              await _pixel(image, (point.dx * scale).floor(),
+                  (point.dy * scale).floor()),
+              _background);
+        }
+      } finally {
+        image.dispose();
+        crop.dispose();
+      }
+    });
+  }
 
   test('a singular transform paints nothing rather than throwing', () async {
     final image = await _composite(

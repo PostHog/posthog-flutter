@@ -2725,6 +2725,39 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "screenshotScale",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "double"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "screenshotCompressionQuality",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": true,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "screenshotColorMode",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogScreenshotColorMode"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "maskAllPlatformViews",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
@@ -2759,6 +2792,58 @@
                 "name": "PostHogSessionReplayConfig",
                 "relativePath": "lib/src/posthog_config.dart",
                 "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "argb8888",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogScreenshotColorMode"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "rgb565",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogScreenshotColorMode"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "values",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "List<PostHogScreenshotColorMode>"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": true,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogScreenshotColorMode",
+                "relativePath": "lib/src/posthog_config.dart",
+                "superTypeNames": [
+                    "Enum",
                     "Object"
                 ],
                 "typeParameterNames": []

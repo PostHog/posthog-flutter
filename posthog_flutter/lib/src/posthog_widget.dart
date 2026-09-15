@@ -320,6 +320,8 @@ class PostHogWidgetState extends State<PostHogWidget> {
       id: imageInfo.id,
       x: imageInfo.x,
       y: imageInfo.y,
+      width: imageInfo.width,
+      height: imageInfo.height,
     );
     // Also guards the commit below: a validity flip means a boundary handler
     // already re-armed, and committing now would clobber it.

@@ -31,6 +31,7 @@ import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
 import com.posthog.android.replay.PostHogInternalReplayApi
 import com.posthog.android.replay.PostHogReplayIntegration
+import com.posthog.android.replay.PostHogScreenshotColorMode
 import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -623,6 +624,17 @@ class PosthogFlutterPlugin :
                     }
                     this.sessionReplayConfig.verifyScreenshotMaskAlignment =
                         replayConfig["verifyScreenshotMaskAlignment"] as? Boolean ?: false
+                    (replayConfig["screenshotScale"] as? Number)?.let {
+                        this.sessionReplayConfig.screenshotScale = it.toFloat()
+                    }
+                    (replayConfig["screenshotCompressionQuality"] as? Number)?.let {
+                        this.sessionReplayConfig.screenshotCompressionQuality = it.toInt()
+                    }
+                    this.sessionReplayConfig.screenshotColorMode =
+                        when (replayConfig["screenshotColorMode"]) {
+                            "rgb565" -> PostHogScreenshotColorMode.RGB_565
+                            else -> PostHogScreenshotColorMode.ARGB_8888
+                        }
                     if (sessionReplay) {
                         val captureNativeScreens =
                             replayConfig["captureNativeScreens"] as? Boolean ?: false
@@ -1263,10 +1275,14 @@ class PosthogFlutterPlugin :
             val id = call.argument<Int>("id") ?: 1
             val x = call.argument<Int>("x") ?: 0
             val y = call.argument<Int>("y") ?: 0
+            val width = call.argument<Int>("width")
+            val height = call.argument<Int>("height")
             if (imageBytes != null) {
                 val timestampMs = replayTimeMillis()
+                val replayConfig = postHogConfig?.sessionReplayConfig
+                val quality = replayConfig?.screenshotCompressionQuality ?: DEFAULT_SCREENSHOT_COMPRESSION_QUALITY
                 submitSnapshotWork(result) {
-                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs)
+                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)
                 }
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)

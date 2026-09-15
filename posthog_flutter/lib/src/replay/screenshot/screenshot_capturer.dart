@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show VoidCallback, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show VoidCallback, visibleForTesting, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart' show Element, WidgetsBinding;
@@ -218,17 +219,13 @@ class ScreenshotCapturer {
     }
   }
 
-  double _getPixelRatio({
-    int? width,
-    int? height,
-    required double srcWidth,
-    required double srcHeight,
-  }) {
-    if (width == null || height == null || srcWidth <= 0 || srcHeight <= 0) {
-      return 1.0;
-    }
-    return min(width / srcWidth, height / srcHeight);
-  }
+  double get _screenshotScale => defaultTargetPlatform == TargetPlatform.android
+      ? effectiveConfig.sessionReplayConfig.screenshotScale
+      : 1.0;
+
+  int _imageDimension(double dimension, double scale) => scale == 1.0
+      ? dimension.toInt()
+      : max(1, (dimension.toInt() * scale).ceil());
 
   Future<Uint8List?> _getImageBytes(
     ui.Image img, {
@@ -429,7 +426,13 @@ class ScreenshotCapturer {
     }
     try {
       compositeRevealedImage(
-          canvas, nativeImage, transform, viewRect.rect, view.visibleRect);
+        canvas,
+        nativeImage,
+        transform,
+        viewRect.rect,
+        view.visibleRect,
+        pixelRatio: pixelRatio,
+      );
     } finally {
       nativeImage.dispose();
     }
@@ -549,17 +552,20 @@ class ScreenshotCapturer {
     final srcHeight = renderObject.size.height;
     final width = srcWidth.toInt();
     final height = srcHeight.toInt();
+    final scale = _screenshotScale;
+    final imageWidth = _imageDimension(srcWidth, scale);
+    final imageHeight = _imageDimension(srcHeight, scale);
 
     final recorder = ui.PictureRecorder();
     Canvas(recorder).drawRect(
-      Rect.fromLTWH(0, 0, srcWidth, srcHeight),
+      Rect.fromLTWH(0, 0, imageWidth.toDouble(), imageHeight.toDouble()),
       Paint()..color = const Color(0xFF000000),
     );
     final picture = recorder.endRecording();
 
     ui.Image placeholderImage;
     try {
-      placeholderImage = await picture.toImage(width, height);
+      placeholderImage = await picture.toImage(imageWidth, imageHeight);
     } finally {
       picture.dispose();
     }
@@ -637,10 +643,9 @@ class ScreenshotCapturer {
     try {
       final srcWidth = renderObject.size.width;
       final srcHeight = renderObject.size.height;
-      final pixelRatio = _getPixelRatio(
-        srcWidth: srcWidth,
-        srcHeight: srcHeight,
-      );
+      final pixelRatio = _screenshotScale;
+      final imageWidth = _imageDimension(srcWidth, pixelRatio);
+      final imageHeight = _imageDimension(srcHeight, pixelRatio);
 
       final replayConfig = effectiveConfig.sessionReplayConfig;
       final maskAllContent = replayConfig.masksAnyContent;
@@ -819,10 +824,7 @@ class ScreenshotCapturer {
         }
 
         try {
-          finalImage = await currentPicture.toImage(
-            srcWidth.toInt(),
-            srcHeight.toInt(),
-          );
+          finalImage = await currentPicture.toImage(imageWidth, imageHeight);
 
           final currentFinalImage = finalImage;
           if (_cancelled) {
@@ -1012,12 +1014,14 @@ void compositeRevealedImage(
   ui.Image image,
   Matrix4 transform,
   Rect viewRect,
-  Rect visibleRect,
-) {
+  Rect visibleRect, {
+  double pixelRatio = 1.0,
+}) {
   final toDevice = Matrix4.tryInvert(transform);
   if (toDevice == null) return;
   canvas.save();
   try {
+    canvas.scale(pixelRatio);
     // The clip is set in the view's own space so a rotated or skewed edge
     // stays exact; its device-space hull would let native pixels past it. An
     // antialiased edge would blend them a hairline past it too. visibleRect is
