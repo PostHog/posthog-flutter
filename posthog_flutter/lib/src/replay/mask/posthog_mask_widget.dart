@@ -7,9 +7,13 @@ import 'canvas_mask_registration_io.dart'
 ///
 /// Wrap sensitive UI with [PostHogMaskWidget] to hide that area in captured
 /// screenshots, regardless of the global session replay masking settings.
+/// `PostHogUnmaskWidget` overrides this mask in either nesting order, except
+/// for sensitive text inputs. See that widget's documentation for geometry
+/// limits when revealing part of an enclosing mask.
 ///
 /// **Flutter web:** the canvas is masked by posthog-js rather than by this
-/// plugin, so the first [PostHogMaskWidget] to mount turns canvas masking on —
+/// plugin, so the first [PostHogMaskWidget] or `PostHogUnmaskWidget` to mount
+/// turns canvas masking on —
 /// which restarts an in-flight recording once, because masking also excludes
 /// the Flutter semantics DOM tree via `blockSelector`, and posthog-js only
 /// reads that when recording starts. Canvas recording itself must be enabled
@@ -21,7 +25,7 @@ import 'canvas_mask_registration_io.dart'
 /// canvasCapture: { maskRegionsFn: () => null } }`
 /// in your `posthog.init` call — until this plugin takes over, those frames are
 /// skipped instead of recorded. Your app must be wrapped in `PostHogWidget`,
-/// and every [PostHogMaskWidget] must sit inside it — otherwise canvas frames
+/// and every mask/unmask widget must sit inside it — otherwise canvas frames
 /// are skipped instead of recorded unmasked, until the mask widget is moved
 /// inside `PostHogWidget` or removed. iOS and Android need no setup either
 /// way.

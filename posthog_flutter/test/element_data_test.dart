@@ -4,12 +4,16 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 
-ElementData _node(String type, {List<ElementData>? children, Widget? widget}) {
+ElementData _node(String type,
+    {List<ElementData>? children,
+    Widget? widget,
+    bool isSensitiveText = false}) {
   return ElementData(
     rect: const Rect.fromLTWH(0, 0, 10, 10),
     type: type,
     children: children,
     widget: widget,
+    isSensitiveText: isSensitiveText,
   );
 }
 
@@ -84,6 +88,7 @@ void main() {
               children: [
                 _node('TextField',
                     widget: const TextField(obscureText: true),
+                    isSensitiveText: true,
                     children: [
                       _node('Text', widget: const Text('visible')),
                     ]),

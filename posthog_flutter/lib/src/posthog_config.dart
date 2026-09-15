@@ -691,7 +691,22 @@ class PostHogSessionReplayConfig {
   var captureTouches = true;
 
   /// Enable masking of all text and text input fields.
-  /// Default: true.
+  /// Default: true. Wrap known-safe Flutter content in `PostHogUnmaskWidget`
+  /// to reveal it without disabling masking globally.
+  ///
+  /// Sensitive Flutter inputs stay masked regardless of this flag, explicit
+  /// masks, or unmask widgets. This includes `obscureText`, password, email,
+  /// phone, name, address and URL keyboard types, and standard Flutter autofill
+  /// hints for identity, contact, address, authentication, and payment data.
+  /// Inputs without these signals are not automatically classified as
+  /// sensitive. Annotate them appropriately or keep global masking enabled.
+  /// `PostHogUnmaskWidget` overrides global and explicit masks for other content.
+  ///
+  /// Flutter web requires canvas masking to be enabled by mounting a
+  /// `PostHogMaskWidget` or `PostHogUnmaskWidget` inside `PostHogWidget`, or by
+  /// declaring `session_recording.canvasCapture.maskRegionsFn` in `posthog.init`.
+  /// Declare it as `() => null` to skip frames before Flutter installs its mask
+  /// provider. Canvas recording must be enabled separately.
   ///
   /// Does not mask text drawn by CustomPainter. Enable [maskCustomPaint] or
   /// wrap sensitive custom-painted widgets in PostHogMaskWidget to mask them.
@@ -702,7 +717,9 @@ class PostHogSessionReplayConfig {
   var maskAllTexts = true;
 
   /// Enable masking of all images.
-  /// Default: true.
+  /// Default: true. `PostHogUnmaskWidget` can reveal known-safe Flutter images;
+  /// it overrides explicit masks within the same subtree too. Flutter web
+  /// requires canvas masking to be enabled as described in [maskAllTexts].
   ///
   /// Does not mask images drawn by CustomPainter. Enable [maskCustomPaint] or
   /// wrap sensitive custom-painted widgets in PostHogMaskWidget to mask them.

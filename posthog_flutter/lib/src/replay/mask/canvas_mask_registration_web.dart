@@ -5,7 +5,7 @@ import '../../util/logging.dart';
 import '../web/web_canvas_mask_provider.dart';
 import 'posthog_mask_controller.dart';
 
-/// A mounted `PostHogMaskWidget` is an explicit request for masking, so it
+/// A mounted `PostHogMaskWidget` or `PostHogUnmaskWidget` requests masking, so it
 /// opts the app into canvas masking even when `posthog.init` never declared
 /// `maskRegionsFn`.
 ///
@@ -18,7 +18,7 @@ void notifyMaskWidgetMounted(BuildContext context) {
     try {
       if (!_isInTrackedTree(context)) {
         printIfDebug(
-          'PostHog: this PostHogMaskWidget is outside the PostHogWidget tree '
+          'PostHog: this mask/unmask widget is outside the PostHogWidget tree '
           'PostHog tracks, so masking could never cover it — it does not '
           'enable web canvas masking.',
         );
