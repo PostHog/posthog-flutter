@@ -503,7 +503,9 @@ class ScreenshotCapturer {
     final renderObject = context?.findRenderObject() as RenderRepaintBoundary?;
     if (renderObject == null ||
         !renderObject.hasSize ||
-        !renderObject.size.isValidSize) {
+        !renderObject.size.isValidSize ||
+        renderObject.size.width < 1 ||
+        renderObject.size.height < 1) {
       return null;
     }
 

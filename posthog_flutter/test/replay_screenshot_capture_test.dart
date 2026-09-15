@@ -41,40 +41,46 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  Widget captureTree(Size size) => Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox.fromSize(
+          size: size,
+          child: PostHogWidget(
+            child: Stack(
+              textDirection: TextDirection.ltr,
+              fit: StackFit.expand,
+              children: const [
+                ColoredBox(color: Color(0xFF00FF00)),
+                Positioned(
+                  left: 11,
+                  top: 9,
+                  width: 23,
+                  height: 21,
+                  child: PostHogMaskWidget(
+                    child: ColoredBox(color: Color(0xFFFF00FF)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
   Future<PostHogConfig> mount(WidgetTester tester, double scale,
-      {Size size = const Size(101, 99)}) async {
+      {Size size = const Size(101, 99), bool waitForSnapshot = true}) async {
     final config = PostHogConfig('test_project_token')
       ..sessionReplay = true
       ..sessionReplayConfig.maskAllTexts = false
       ..sessionReplayConfig.maskAllImages = false
       ..sessionReplayConfig.screenshotScale = scale;
     await Posthog().setup(config);
-    await tester.pumpWidget(Align(
-      alignment: Alignment.topLeft,
-      child: SizedBox.fromSize(
-        size: size,
-        child: PostHogWidget(
-          child: Stack(
-            textDirection: TextDirection.ltr,
-            fit: StackFit.expand,
-            children: const [
-              ColoredBox(color: Color(0xFF00FF00)),
-              Positioned(
-                left: 11,
-                top: 9,
-                width: 23,
-                height: 21,
-                child: PostHogMaskWidget(
-                  child: ColoredBox(color: Color(0xFFFF00FF)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ));
-    await settleUntil(
-        tester, () => calls.any((call) => call.method == 'sendFullSnapshot'));
+    await tester.pumpWidget(captureTree(size));
+    if (waitForSnapshot) {
+      await settleUntil(
+          tester, () => calls.any((call) => call.method == 'sendFullSnapshot'));
+    } else {
+      await settleCapture(tester);
+    }
     return config;
   }
 
@@ -185,6 +191,50 @@ void main() {
     image.dispose();
     await unmount(tester);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  for (final scale in [1.0, 0.5]) {
+    for (final size in [const Size(0.5, 10), const Size(10, 0.5)]) {
+      testWidgets(
+          'subpixel root $size skips capture and recovers at scale $scale',
+          (tester) async {
+        final config =
+            await mount(tester, scale, size: size, waitForSnapshot: false);
+        expect(calls.where((call) => call.method == 'getSessionReplayState'),
+            isNotEmpty);
+        expect(calls.where((call) => call.method == 'sendMetaEvent'), isEmpty);
+        expect(
+            calls.where((call) => call.method == 'sendFullSnapshot'), isEmpty);
+
+        final capturer = ScreenshotCapturer(config);
+        expect(
+            await tester.runAsync(capturer.buildOcclusionPlaceholder), isNull);
+
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpWidget(captureTree(const Size(1, 1)));
+        await settleUntil(tester,
+            () => calls.any((call) => call.method == 'sendFullSnapshot'));
+        final meta = calls.firstWhere((call) => call.method == 'sendMetaEvent');
+        final full =
+            calls.firstWhere((call) => call.method == 'sendFullSnapshot');
+        expect(calls.indexOf(meta), lessThan(calls.indexOf(full)));
+        expect((meta.arguments as Map)['width'], 1);
+        expect((meta.arguments as Map)['height'], 1);
+        final args = full.arguments as Map;
+        expect(args['width'], 1);
+        expect(args['height'], 1);
+        final image = await decode(tester, args['imageBytes'] as Uint8List);
+        expect(image.width, 1);
+        expect(image.height, 1);
+        image.dispose();
+
+        final placeholder =
+            (await tester.runAsync(capturer.buildOcclusionPlaceholder))!;
+        expect(placeholder.width, 1);
+        expect(placeholder.height, 1);
+        await unmount(tester);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+    }
+  }
 
   testWidgets(
       'Android screenshot scale leaves iOS capture resolution unchanged',
