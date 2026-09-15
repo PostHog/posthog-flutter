@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/survey_appearance.dart';
@@ -19,6 +20,7 @@ class ChoiceQuestionWidget extends StatefulWidget {
     this.hasOpenChoice = false,
     required this.onSubmit,
     this.isMultipleChoice = false,
+    this.shuffleOptions = false,
   });
 
   final String question;
@@ -31,6 +33,7 @@ class ChoiceQuestionWidget extends StatefulWidget {
   final bool hasOpenChoice;
   final ValueChanged<dynamic> onSubmit;
   final bool isMultipleChoice;
+  final bool shuffleOptions;
 
   @override
   State<ChoiceQuestionWidget> createState() => _ChoiceQuestionWidgetState();
@@ -38,6 +41,26 @@ class ChoiceQuestionWidget extends StatefulWidget {
 
 class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
   Set<String> _selectedChoices = {};
+  late final List<int> _displayOrder = _createDisplayOrder();
+
+  List<int> _createDisplayOrder() {
+    final indices = List.generate(widget.choices.length, (index) => index);
+    if (!widget.shuffleOptions) return indices;
+    final openChoice = widget.hasOpenChoice && indices.isNotEmpty
+        ? indices.removeLast()
+        : null;
+    final shuffled = List<int>.of(indices)..shuffle();
+    // Match web/RN: force a changed order when randomness leaves labels unchanged.
+    final unchanged = listEquals(
+      shuffled.map((index) => widget.choices[index]).toList(),
+      indices.map((index) => widget.choices[index]).toList(),
+    );
+    return [
+      ...(unchanged ? shuffled.reversed : shuffled),
+      if (openChoice != null) openChoice,
+    ];
+  }
+
   String _openChoiceInput = '';
   final TextEditingController _openChoiceController = TextEditingController();
 
@@ -121,7 +144,8 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ...widget.choices.map((choice) {
+                ..._displayOrder.map((index) {
+                  final choice = widget.choices[index];
                   final isSelected = _selectedChoices.contains(choice);
                   final isOpenChoice = _isOpenChoice(choice);
 
