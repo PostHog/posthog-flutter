@@ -10,6 +10,8 @@ class NativeCommunicator {
     required int id,
     required int x,
     required int y,
+    int? width,
+    int? height,
   }) async {
     try {
       await _channel.invokeMethod('sendFullSnapshot', {
@@ -17,6 +19,8 @@ class NativeCommunicator {
         'id': id,
         'x': x,
         'y': y,
+        if (width != null) 'width': width,
+        if (height != null) 'height': height,
       });
     } catch (e) {
       printIfDebug('Error sending full snapshot to native: $e');

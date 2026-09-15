@@ -4,6 +4,9 @@ publish_to: none
 environment:
   sdk: '>=3.6.0 <4.0.0'
 
+dev_dependencies:
+  analyzer: ^10.2.0
+
 workspace:
   - posthog_flutter
   - example
