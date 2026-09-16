@@ -512,5 +512,73 @@ void main() {
         rectMoreOrLessEquals(glyphs(p, text, '1,000'), epsilon: 0.5),
       );
     });
+
+    testWidgets(
+        'a range that splits a base character from its combining mark '
+        'masks the whole node', (tester) async {
+      // U+20E3 COMBINING ENCLOSING KEYCAP fuses onto the digit before it
+      // (this is the "keycap" emoji sequence, e.g. 1️⃣). digits() selects
+      // just the '1', a range that ends inside that fused glyph cluster.
+      await setupPosthog(policy: PostHogTextMaskPolicies.digits());
+      const text = 'Code 1⃣';
+      await pump(tester, const Text(text));
+
+      final p = paragraph(tester, 'Code');
+      final whole = MatrixUtils.transformRect(
+          p.getTransformTo(container()), p.paintBounds);
+      final rects = masks();
+      expect(
+        covered(rects, whole),
+        isTrue,
+        reason: 'a range Flutter cannot lay out on its own must fail closed, '
+            'not ship the glyph unmasked',
+      );
+    });
+
+    testWidgets(
+        'all masks a RichText but not a PostHogUnmaskWidget nested in a '
+        'WidgetSpan', (tester) async {
+      await setupPosthog(policy: (_) => const PostHogTextMask.all());
+      await pump(
+        tester,
+        Text.rich(
+          TextSpan(
+            style: const TextStyle(color: _textColor),
+            children: [
+              const TextSpan(text: 'before '),
+              WidgetSpan(
+                child: PostHogUnmaskWidget(
+                  child: Text(
+                    'reference 4471',
+                    style: const TextStyle(color: _textColor),
+                  ),
+                ),
+              ),
+              const TextSpan(text: ' after'),
+            ],
+          ),
+        ),
+      );
+
+      final outer = paragraph(tester, 'before');
+      final outerText = outer.text.toPlainText(includeSemanticsLabels: false);
+      final revealed = paragraph(tester, 'reference 4471');
+      final rects = masks();
+
+      expect(
+        touched(
+          rects,
+          glyphs(revealed, 'reference 4471', 'reference 4471'),
+        ),
+        isFalse,
+        reason: 'the nested PostHogUnmaskWidget must stay uncovered',
+      );
+      // touched, not covered: the WidgetSpan's own line height differs
+      // slightly from the outer paragraph's, so the carved hole and a
+      // max-height query of the surrounding text don't share an exact
+      // boundary. What matters here is precedence, not pixel-exact bounds.
+      expect(touched(rects, glyphs(outer, outerText, 'before')), isTrue);
+      expect(touched(rects, glyphs(outer, outerText, 'after')), isTrue);
+    });
   });
 }

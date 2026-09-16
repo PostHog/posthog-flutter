@@ -95,6 +95,18 @@ class TextMaskPolicyParser {
         );
         return [whole];
       }
+      if (lineBoxes.isEmpty) {
+        // A validated, non-collapsed range with no boxes means Flutter
+        // couldn't lay it out on its own — e.g. it splits a base character
+        // from a combining mark it's fused to on screen. Trusting "no boxes"
+        // as "nothing to mask" would ship that glyph unmasked, so treat it
+        // the same as a layout failure instead.
+        printIfDebug(
+          '[PostHog] textMaskPolicy range produced no boxes (it may split '
+          'a grapheme cluster), masking the whole node instead.',
+        );
+        return [whole];
+      }
       for (final box in lineBoxes) {
         final rect = box.toRect().intersect(whole);
         if (!rect.isEmpty) boxes.add(rect);

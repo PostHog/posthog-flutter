@@ -124,8 +124,14 @@ class ElementObjectParser {
           for (final mask in masks) {
             activeElementData.addChildren(mask);
           }
-          // A text node has no maskable descendants; keep the current parent.
-          return null;
+          // A RichText can carry a PostHogMaskWidget/PostHogUnmaskWidget of
+          // its own inside a WidgetSpan. When the policy produced exactly
+          // one rect for this node, descend into it so that structure
+          // attaches as its descendant and subtractUnmaskRects can see it.
+          // More than one rect has no single box for it to nest under, but
+          // none is needed: a WidgetSpan is its own inline slot and can't
+          // overlap a sibling text glyph run.
+          return masks.length == 1 ? masks.single : null;
         }
       }
 
