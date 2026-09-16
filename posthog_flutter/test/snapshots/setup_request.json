@@ -32,6 +32,9 @@
         "maskAllPlatformViews": true,
         "captureNativeScreens": false,
         "verifyScreenshotMaskAlignment": false,
+        "screenshotScale": 1.0,
+        "screenshotCompressionQuality": 30,
+        "screenshotColorMode": "argb8888",
         "sampleRate": 0.25
       },
       "errorTrackingConfig": {

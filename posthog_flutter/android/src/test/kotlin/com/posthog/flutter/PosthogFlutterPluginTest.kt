@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.BadParcelableException
 import com.google.firebase.FirebaseApp
+import com.posthog.android.replay.PostHogScreenshotColorMode
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
@@ -169,6 +170,66 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
 
         assertTrue(assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig.verifyScreenshotMaskAlignment)
+    }
+
+    @Test
+    fun setup_screenshotControls_preserveDefaults() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        try {
+            plugin.onMethodCall(
+                MethodCall(
+                    "setup",
+                    mapOf(
+                        "projectToken" to "test-token",
+                        "sessionReplay" to true,
+                        "sessionReplayConfig" to emptyMap<String, Any>(),
+                    ),
+                ),
+                Mockito.mock(MethodChannel.Result::class.java),
+            )
+
+            val replay = assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig
+            assertEquals(1f, replay.screenshotScale)
+            assertEquals(30, replay.screenshotCompressionQuality)
+            assertEquals(PostHogScreenshotColorMode.ARGB_8888, replay.screenshotColorMode)
+        } finally {
+            plugin.onDetachedFromEngine(binding)
+        }
+    }
+
+    @Test
+    fun setup_screenshotControls_forwardValuesAndNativeClamping() {
+        for ((scale, quality) in listOf(0.333 to 75, 0.0 to -1, 2.0 to 101)) {
+            val plugin = PosthogFlutterPlugin()
+            val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+            try {
+                plugin.onMethodCall(
+                    MethodCall(
+                        "setup",
+                        mapOf(
+                            "projectToken" to "test-token",
+                            "sessionReplay" to true,
+                            "sessionReplayConfig" to
+                                mapOf(
+                                    "captureNativeScreens" to true,
+                                    "screenshotScale" to scale,
+                                    "screenshotCompressionQuality" to quality,
+                                    "screenshotColorMode" to "rgb565",
+                                ),
+                        ),
+                    ),
+                    Mockito.mock(MethodChannel.Result::class.java),
+                )
+
+                val replay = assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig
+                assertEquals(scale.toFloat().coerceIn(0.1f, 1f), replay.screenshotScale)
+                assertEquals(quality.coerceIn(0, 100), replay.screenshotCompressionQuality)
+                assertEquals(PostHogScreenshotColorMode.RGB_565, replay.screenshotColorMode)
+            } finally {
+                plugin.onDetachedFromEngine(binding)
+            }
+        }
     }
 
     @Test

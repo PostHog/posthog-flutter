@@ -9,6 +9,8 @@ import com.posthog.internal.replay.RRStyle
 import com.posthog.internal.replay.RRWireframe
 import com.posthog.internal.replay.capture
 
+internal const val DEFAULT_SCREENSHOT_COMPRESSION_QUALITY = 30
+
 class SnapshotSender(
     private val currentTimeMillis: () -> Long = { System.currentTimeMillis() },
 ) {
@@ -18,31 +20,45 @@ class SnapshotSender(
         x: Int,
         y: Int,
         timestampMs: Long = currentTimeMillis(),
+        width: Int? = null,
+        height: Int? = null,
+        quality: Int = DEFAULT_SCREENSHOT_COMPRESSION_QUALITY,
     ) {
-        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-        val base64String = bitmap.base64()
+        listOf(buildFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)).capture()
+    }
 
-        val wireframe =
-            RRWireframe(
-                id = id,
-                x = x,
-                y = y,
-                width = bitmap.width,
-                height = bitmap.height,
-                type = "screenshot",
-                base64 = base64String,
-                style = RRStyle(),
-            )
-
-        val snapshotEvent =
-            RRFullSnapshotEvent(
+    internal fun buildFullSnapshot(
+        imageBytes: ByteArray,
+        id: Int,
+        x: Int,
+        y: Int,
+        timestampMs: Long = currentTimeMillis(),
+        width: Int? = null,
+        height: Int? = null,
+        quality: Int = DEFAULT_SCREENSHOT_COMPRESSION_QUALITY,
+    ): RRFullSnapshotEvent {
+        val bitmap = requireNotNull(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
+        try {
+            val wireframe =
+                RRWireframe(
+                    id = id,
+                    x = x,
+                    y = y,
+                    width = width ?: bitmap.width,
+                    height = height ?: bitmap.height,
+                    type = "screenshot",
+                    base64 = bitmap.base64(quality = quality),
+                    style = RRStyle(),
+                )
+            return RRFullSnapshotEvent(
                 listOf(wireframe),
                 initialOffsetTop = 0,
                 initialOffsetLeft = 0,
                 timestamp = timestampMs,
             )
-
-        listOf(snapshotEvent).capture()
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     fun sendMetaEvent(
