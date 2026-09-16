@@ -1,5 +1,11 @@
 ## Next
 
+## 5.44.0
+
+### Minor Changes
+
+- 0552616: Add experimental Android session replay screenshot controls: `screenshotScale` and `screenshotCompressionQuality` for Flutter and native captures, and `screenshotColorMode` for native captures. Scale Flutter captures, masks, and embedded native views together while preserving logical playback dimensions and JPEG encoding.
+
 ## 5.43.1
 
 ### Patch Changes
