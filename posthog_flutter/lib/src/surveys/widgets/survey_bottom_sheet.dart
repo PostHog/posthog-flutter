@@ -155,6 +155,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           description: choiceQuestion.description,
           descriptionContentType: choiceQuestion.descriptionContentType,
           choices: choiceQuestion.choices,
+          shuffleOptions: choiceQuestion.shuffleOptions,
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           buttonText: choiceQuestion.buttonText,
           optional: choiceQuestion.optional,
