@@ -1,6 +1,7 @@
 import 'dart:math' show sqrt;
 
 import 'package:flutter/material.dart';
+
 import 'posthog_display_survey_appearance.dart';
 
 /// Appearance configuration for survey widgets
@@ -29,6 +30,7 @@ class SurveyAppearance {
     this.borderColor = const Color(0xFFBDBDBD),
     this.inputBackgroundColor = Colors.white,
     this.inputTextColor = Colors.black,
+    this.inputPlaceholder,
     this.inputPlaceholderColor = const Color(0xFF757575),
     this.choiceButtonBorderColor = Colors.black,
     this.choiceButtonTextColor = Colors.black,
@@ -56,6 +58,7 @@ class SurveyAppearance {
   final Color borderColor;
   final Color inputBackgroundColor;
   final Color inputTextColor;
+  final String? inputPlaceholder;
   final Color inputPlaceholderColor;
   final Color choiceButtonBorderColor;
   final Color choiceButtonTextColor;
@@ -86,6 +89,7 @@ class SurveyAppearance {
     // Input text color: use override if provided, otherwise auto-contrast from input background
     final inputTextColor = _colorFromHex(appearance?.inputTextColor) ??
         _getContrastingTextColor(inputBackgroundColor);
+    final inputPlaceholder = appearance?.placeholder;
 
     return SurveyAppearance(
       backgroundColor: backgroundColor,
@@ -117,6 +121,8 @@ class SurveyAppearance {
           _colorFromHex(appearance?.borderColor) ?? const Color(0xFFBDBDBD),
       inputBackgroundColor: inputBackgroundColor,
       inputTextColor: inputTextColor,
+      inputPlaceholder:
+          inputPlaceholder?.isNotEmpty == true ? inputPlaceholder : null,
       inputPlaceholderColor: inputTextColor.withAlpha(153),
       choiceButtonBorderColor: primaryTextColor,
       choiceButtonTextColor: primaryTextColor,

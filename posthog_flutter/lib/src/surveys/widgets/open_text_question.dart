@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/survey_appearance.dart';
 import '../models/posthog_display_survey_text_content_type.dart';
 import 'question_header.dart';
@@ -76,7 +77,7 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
                   minLines: 2,
                   textAlignVertical: TextAlignVertical.top,
                   decoration: InputDecoration(
-                    hintText: 'Start typing...',
+                    hintText: widget.appearance.inputPlaceholder,
                     hintStyle: TextStyle(
                       color: widget.appearance.inputPlaceholderColor,
                     ),
