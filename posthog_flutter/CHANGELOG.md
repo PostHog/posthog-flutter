@@ -1,5 +1,11 @@
 ## Next
 
+## 5.44.1
+
+### Patch Changes
+
+- 5f92452: Honor shuffleOptions in Flutter surveys while keeping Other last and choice order stable while answering.
+
 ## 5.44.0
 
 ### Minor Changes
