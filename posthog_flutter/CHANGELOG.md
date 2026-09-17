@@ -1,5 +1,11 @@
 ## Next
 
+## 5.44.2
+
+### Patch Changes
+
+- 2e343e6: Respect configured open-text survey placeholders and leave unset placeholders empty.
+
 ## 5.44.1
 
 ### Patch Changes
