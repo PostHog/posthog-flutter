@@ -12,6 +12,7 @@ class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
     required this.isMultipleChoice,
     this.hasOpenChoice = false,
     this.shuffleOptions = false,
+    this.skipSubmitButton = false,
     super.description,
     super.descriptionContentType,
     super.optional,
@@ -22,6 +23,7 @@ class PostHogDisplayChoiceQuestion extends PostHogDisplaySurveyQuestion {
               : PostHogSurveyQuestionType.singleChoice,
         );
 
+  final bool skipSubmitButton;
   final List<String> choices;
   final bool isMultipleChoice;
   final bool hasOpenChoice;

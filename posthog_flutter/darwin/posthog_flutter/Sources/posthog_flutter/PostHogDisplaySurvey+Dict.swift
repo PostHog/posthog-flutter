@@ -31,6 +31,7 @@
                         questionDict["link"] = linkQuestion.link
                     case let ratingQuestion as PostHogDisplayRatingQuestion:
                         questionDict["type"] = "rating"
+                        questionDict["skipSubmitButton"] = ratingQuestion.skipSubmitButton
                         questionDict["ratingType"] = ratingQuestion.ratingType.rawValue
                         questionDict["scaleLowerBound"] = ratingQuestion.scaleLowerBound
                         questionDict["scaleUpperBound"] = ratingQuestion.scaleUpperBound
@@ -38,6 +39,7 @@
                         questionDict["upperBoundLabel"] = ratingQuestion.upperBoundLabel
                     case let choiceQuestion as PostHogDisplayChoiceQuestion:
                         questionDict["type"] = choiceQuestion.isMultipleChoice ? "multiple_choice" : "single_choice"
+                        questionDict["skipSubmitButton"] = choiceQuestion.skipSubmitButton
                         questionDict["choices"] = choiceQuestion.choices
                         questionDict["hasOpenChoice"] = choiceQuestion.hasOpenChoice
                         questionDict["shuffleOptions"] = choiceQuestion.shuffleOptions

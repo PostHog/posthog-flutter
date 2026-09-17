@@ -21,6 +21,7 @@ class ChoiceQuestionWidget extends StatefulWidget {
     required this.onSubmit,
     this.isMultipleChoice = false,
     this.shuffleOptions = false,
+    this.skipSubmitButton = false,
   });
 
   final String question;
@@ -34,6 +35,7 @@ class ChoiceQuestionWidget extends StatefulWidget {
   final ValueChanged<dynamic> onSubmit;
   final bool isMultipleChoice;
   final bool shuffleOptions;
+  final bool skipSubmitButton;
 
   @override
   State<ChoiceQuestionWidget> createState() => _ChoiceQuestionWidgetState();
@@ -69,6 +71,11 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
       _openChoiceInput = value;
     });
   }
+
+  bool get _shouldAutoSubmit =>
+      widget.skipSubmitButton &&
+      !widget.isMultipleChoice &&
+      !widget.hasOpenChoice;
 
   bool get _canSubmit {
     if (widget.optional) return true;
@@ -155,6 +162,11 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
                       label: choice,
                       isSelected: isSelected,
                       onTap: () {
+                        if (_shouldAutoSubmit) {
+                          setState(() => _selectedChoices = {choice});
+                          _onSubmit();
+                          return;
+                        }
                         setState(() {
                           if (widget.isMultipleChoice) {
                             if (_selectedChoices.contains(choice)) {
@@ -183,13 +195,15 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        // Fixed submit button
-        SurveyButton(
-          onPressed: _canSubmit ? _onSubmit : null,
-          text: widget.buttonText ?? widget.appearance.submitButtonText,
-          appearance: widget.appearance,
-        ),
+        if (!_shouldAutoSubmit) ...[
+          const SizedBox(height: 16),
+          // Fixed submit button
+          SurveyButton(
+            onPressed: _canSubmit ? _onSubmit : null,
+            text: widget.buttonText ?? widget.appearance.submitButtonText,
+            appearance: widget.appearance,
+          ),
+        ],
       ],
     );
   }
