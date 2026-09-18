@@ -619,5 +619,91 @@ void main() {
       expect(touched(rects, boldRect), isFalse);
       expect(covered(rects, plainRect), isTrue);
     });
+
+    testWidgets(
+        'except still respects a PostHogUnmaskWidget nested in a WidgetSpan',
+        (tester) async {
+      // Unlike `only`, `except`'s rects are the complement of the whole node
+      // — full-width bands regardless of how many there are — so they reach
+      // across a WidgetSpan's inline slot even when there's more than one.
+      await setupPosthog(
+          policy: PostHogTextMaskPolicies.reveal(RegExp('before')));
+      await pump(
+        tester,
+        Text.rich(
+          TextSpan(
+            style: const TextStyle(color: _textColor),
+            children: [
+              const TextSpan(text: 'before '),
+              WidgetSpan(
+                child: PostHogUnmaskWidget(
+                  child: Text(
+                    'reference 4471',
+                    style: const TextStyle(color: _textColor),
+                  ),
+                ),
+              ),
+              const TextSpan(text: ' after'),
+            ],
+          ),
+        ),
+      );
+
+      final revealed = paragraph(tester, 'reference 4471');
+      final rects = masks();
+      expect(
+        touched(
+          rects,
+          glyphs(revealed, 'reference 4471', 'reference 4471'),
+        ),
+        isFalse,
+        reason: 'the nested PostHogUnmaskWidget must stay uncovered even '
+            'when the policy is except, not just all()',
+      );
+    });
+
+    testWidgets(
+        'a range iterable that throws while iterating masks the whole node',
+        (tester) async {
+      // The policy call itself can't throw here — the exception only fires
+      // once something actually pulls an element from the lazy iterable.
+      await setupPosthog(
+        policy: (text, _) => PostHogTextMask.only(
+          text.split(' ').map((w) => throw StateError('boom')),
+        ),
+      );
+      await pump(tester, const Text('short'));
+
+      final p = paragraph(tester, 'short');
+      final whole = MatrixUtils.transformRect(
+          p.getTransformTo(container()), p.paintBounds);
+      expect(covered(masks(), whole), isTrue);
+    });
+
+    testWidgets(
+        'a text input policy receives the real EditableText, not an unusable internal widget',
+        (tester) async {
+      // obscureText/a password hint would hit the sensitive-input floor and
+      // never reach the policy at all — readOnly doesn't, so this is the
+      // property to check without accidentally testing the wrong precedence
+      // layer. The point is just that a real, public EditableText comes
+      // through, with its actual field values, not Flutter's private
+      // `_Editable` that owns the RenderEditable and exposes nothing.
+      Widget? seen;
+      await setupPosthog(
+        policy: (text, widget) {
+          seen = widget;
+          return const PostHogTextMask.all();
+        },
+      );
+      final controller = TextEditingController(text: 'Room 402');
+      addTearDown(controller.dispose);
+      await pump(tester, TextField(controller: controller, readOnly: true));
+      masks(); // triggers the walk; the policy only runs once something asks
+
+      expect(seen, isA<EditableText>());
+      expect((seen as EditableText).readOnly, isTrue);
+      expect((seen as EditableText).obscureText, isFalse);
+    });
   });
 }

@@ -31,15 +31,30 @@ class TextMaskPolicyParser {
     final RenderBox renderObject;
     final String text;
     final ElementGeometry? geometry;
+    final Widget policyWidget;
+    var hasWidgetSpan = false;
     switch (element.renderObject) {
       case final RenderParagraph paragraph:
         renderObject = paragraph;
         text = paragraph.text.toPlainText(includeSemanticsLabels: false);
         geometry = _paragraphParser.buildElementData(element);
+        // Text builds RichText directly, so element.widget already is the
+        // widget doing the rendering — and it's public and useful either way
+        // (its own style, its InlineSpan) whether an app wrote Text or
+        // RichText itself.
+        policyWidget = element.widget;
+        hasWidgetSpan = _containsWidgetSpan(paragraph.text);
       case final RenderEditable editable:
         renderObject = editable;
         text = editable.text?.toPlainText(includeSemanticsLabels: false) ?? '';
         geometry = _editableParser.buildElementData(element);
+        // Unlike RichText, the widget that actually owns a RenderEditable is
+        // Flutter's private `_Editable` — a type this package can't even
+        // name, let alone anything an app's policy could usefully inspect.
+        // Its own EditableText ancestor is what carries the properties a
+        // policy would actually want (obscureText, readOnly, ...), so find
+        // that instead of handing back something nobody can use.
+        policyWidget = _nearestEditableText(element) ?? element.widget;
       default:
         return null;
     }
@@ -47,23 +62,71 @@ class TextMaskPolicyParser {
 
     final PostHogTextMask decision;
     try {
-      decision = policy(text, element.widget);
+      decision = policy(text, policyWidget);
     } catch (e) {
       printIfDebug(
           '[PostHog] textMaskPolicy threw, masking the whole node: $e');
-      return _rects(element, geometry, [geometry.rect]);
+      return _rects(policyWidget, geometry, [geometry.rect]);
     }
 
     final whole = geometry.rect;
-    final rects = switch (decision) {
-      PostHogTextMaskAll() => [whole],
-      PostHogTextMaskNone() => const <Rect>[],
-      PostHogTextMaskOnly(:final ranges) =>
-        _rangeRects(ranges, false, text, renderObject, whole),
-      PostHogTextMaskExcept(:final ranges) =>
-        _rangeRects(ranges, true, text, renderObject, whole),
-    };
-    return _rects(element, geometry, rects);
+    List<Rect> rects;
+    try {
+      rects = switch (decision) {
+        PostHogTextMaskAll() => [whole],
+        PostHogTextMaskNone() => const <Rect>[],
+        PostHogTextMaskOnly(:final ranges) =>
+          _rangeRects(ranges, false, text, renderObject, whole),
+        PostHogTextMaskExcept(:final ranges) =>
+          _rangeRects(ranges, true, text, renderObject, whole),
+      };
+    } catch (e) {
+      // `ranges` is caller-supplied and can be lazy (the shipped presets
+      // themselves return a `.map()`), so a range that throws when it's
+      // actually evaluated — not when the policy returns it — must fail
+      // closed too, the same as a policy that throws outright.
+      printIfDebug('[PostHog] textMaskPolicy\'s ranges threw while iterating, '
+          'masking the whole node: $e');
+      return _rects(policyWidget, geometry, [whole]);
+    }
+    if (hasWidgetSpan && rects.length != 1) {
+      // A WidgetSpan can carry its own PostHogMaskWidget/PostHogUnmaskWidget,
+      // and `except`'s rects in particular are the complement of the whole
+      // node — full-width bands that, unlike a single glyph-range match,
+      // reach across the WidgetSpan's inline slot regardless of how many of
+      // them there are. With more than one rect there's no single box for
+      // nested structure to attach beneath (see the caller), so fail closed
+      // to the one case that already works instead of risking exactly the
+      // WidgetSpan precedence bug this exists to prevent.
+      rects = [whole];
+    }
+    return _rects(policyWidget, geometry, rects);
+  }
+
+  bool _containsWidgetSpan(InlineSpan span) {
+    if (span is WidgetSpan) return true;
+    if (span is TextSpan) {
+      for (final child in span.children ?? const <InlineSpan>[]) {
+        if (_containsWidgetSpan(child)) return true;
+      }
+    }
+    return false;
+  }
+
+  /// The nearest [EditableText] above [element], or null if none is found —
+  /// which shouldn't happen for a real [RenderEditable], but this is replay
+  /// code, so it fails soft rather than crashing capture.
+  EditableText? _nearestEditableText(Element element) {
+    EditableText? found;
+    element.visitAncestorElements((ancestor) {
+      final widget = ancestor.widget;
+      if (widget is EditableText) {
+        found = widget;
+        return false;
+      }
+      return true;
+    });
+    return found;
   }
 
   List<Rect> _rangeRects(
@@ -157,16 +220,16 @@ class TextMaskPolicyParser {
   }
 
   List<ElementData> _rects(
-    Element element,
+    Widget policyWidget,
     ElementGeometry geometry,
     List<Rect> rects,
   ) {
     return [
       for (final rect in rects)
         ElementData(
-          type: element.widget.runtimeType.toString(),
+          type: policyWidget.runtimeType.toString(),
           rect: rect,
-          widget: element.widget,
+          widget: policyWidget,
           transform: geometry.transform,
         ),
     ];
