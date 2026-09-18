@@ -48,7 +48,7 @@ class _TextMaskPolicyScreenState extends State<TextMaskPolicyScreen> {
       _Policy.reveal => PostHogTextMaskPolicies.reveal(
         RegExp(r'\b(Total balance|Send money|Recent|VISA|EXP|NGN)\b'),
       ),
-      _Policy.custom => (text) => PostHogTextMask.only([
+      _Policy.custom => (text, widget) => PostHogTextMask.only([
         for (final m in _email$.allMatches(text))
           TextRange(start: m.start, end: m.end),
         for (final m in _digits$.allMatches(text))

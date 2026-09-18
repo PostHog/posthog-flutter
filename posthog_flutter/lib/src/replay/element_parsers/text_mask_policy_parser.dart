@@ -16,8 +16,8 @@ import 'package:posthog_flutter/src/util/logging.dart';
 /// Handles the render object a plain `Text` or `RichText` produces
 /// ([RenderParagraph]) and the one a text input produces ([RenderEditable]).
 /// The policy sees the node's rendered string with semantics labels excluded,
-/// so its character offsets line up with the laid-out text. A range that
-/// wraps yields one rect per line.
+/// so its character offsets line up with the laid-out text, plus the widget
+/// itself. A range that wraps yields one rect per line.
 ///
 /// Fails closed: a policy that throws, or returns a range outside the text,
 /// masks the whole node.
@@ -47,7 +47,7 @@ class TextMaskPolicyParser {
 
     final PostHogTextMask decision;
     try {
-      decision = policy(text);
+      decision = policy(text, element.widget);
     } catch (e) {
       printIfDebug(
           '[PostHog] textMaskPolicy threw, masking the whole node: $e');

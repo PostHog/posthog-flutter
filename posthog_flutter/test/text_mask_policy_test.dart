@@ -15,6 +15,9 @@ import 'posthog_flutter_platform_interface_fake.dart';
 const _textColor = Color(0xFF1A237E);
 const _black = Color(0xFF000000);
 
+/// A policy only cares about this when it says so; these tests don't.
+const _anyWidget = SizedBox.shrink();
+
 Future<Color> _pixel(ui.Image image, int x, int y) async {
   final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
   final bytes = data!.buffer.asUint8List();
@@ -35,7 +38,7 @@ void main() {
   group('PostHogTextMaskPolicies', () {
     test('digits masks a formatted amount as one run', () {
       const text = 'Balance ₦2,450,000.00 available';
-      final mask = PostHogTextMaskPolicies.digits()(text);
+      final mask = PostHogTextMaskPolicies.digits()(text, _anyWidget);
       expect(mask, isA<PostHogTextMaskOnly>());
       expect(_substrings(text, mask), ['2,450,000.00']);
     });
@@ -43,7 +46,7 @@ void main() {
     test('digits masks a spaced card number as one run', () {
       const text = 'Card 4111 1111 1111 1111';
       expect(
-        _substrings(text, PostHogTextMaskPolicies.digits()(text)),
+        _substrings(text, PostHogTextMaskPolicies.digits()(text, _anyWidget)),
         ['4111 1111 1111 1111'],
       );
     });
@@ -51,14 +54,14 @@ void main() {
     test('digits masks separate numbers separately', () {
       const text = 'Order 2 of 5, ships 12 Sep';
       expect(
-        _substrings(text, PostHogTextMaskPolicies.digits()(text)),
+        _substrings(text, PostHogTextMaskPolicies.digits()(text, _anyWidget)),
         ['2', '5', '12'],
       );
     });
 
     test('digits masks nothing in text without digits', () {
       const text = 'Send money';
-      final mask = PostHogTextMaskPolicies.digits()(text);
+      final mask = PostHogTextMaskPolicies.digits()(text, _anyWidget);
       expect(mask, isA<PostHogTextMaskOnly>());
       expect(_substrings(text, mask), isEmpty);
     });
@@ -67,14 +70,15 @@ void main() {
       const text = 'Sent to ada@example.com and bob@example.org';
       final policy =
           PostHogTextMaskPolicies.redact(RegExp(r'[\w.+-]+@[\w-]+\.[\w.-]+'));
-      final mask = policy(text);
+      final mask = policy(text, _anyWidget);
       expect(mask, isA<PostHogTextMaskOnly>());
       expect(_substrings(text, mask), ['ada@example.com', 'bob@example.org']);
     });
 
     test('reveal keeps only the matches visible', () {
       const text = 'Total NGN 5,000';
-      final mask = PostHogTextMaskPolicies.reveal(RegExp('NGN'))(text);
+      final mask =
+          PostHogTextMaskPolicies.reveal(RegExp('NGN'))(text, _anyWidget);
       expect(mask, isA<PostHogTextMaskExcept>());
       expect(_substrings(text, mask), ['NGN']);
     });
@@ -276,7 +280,7 @@ void main() {
     testWidgets('a sensitive input is still masked in full', (tester) async {
       // A policy that would reveal everything must lose to the sensitivity
       // floor, which masks the input as whole blocks rather than per glyph.
-      await setupPosthog(policy: (_) => const PostHogTextMask.none());
+      await setupPosthog(policy: (_, __) => const PostHogTextMask.none());
       final controller = TextEditingController(text: '1234');
       addTearDown(controller.dispose);
       await pump(tester, TextField(controller: controller, obscureText: true));
@@ -325,7 +329,7 @@ void main() {
 
     testWidgets('PostHogMaskWidget still masks a node the policy would reveal',
         (tester) async {
-      await setupPosthog(policy: (_) => const PostHogTextMask.none());
+      await setupPosthog(policy: (_, __) => const PostHogTextMask.none());
       await pump(
         tester,
         const Column(children: [
@@ -350,7 +354,7 @@ void main() {
         (tester) async {
       await setupPosthog(
         maskAllTexts: true,
-        policy: (_) => const PostHogTextMask.none(),
+        policy: (_, __) => const PostHogTextMask.none(),
       );
       await pump(tester, const Text('not masked'));
       expect(masks(), isEmpty);
@@ -360,7 +364,7 @@ void main() {
         (tester) async {
       await setupPosthog(
         maskAllTexts: true,
-        policy: (_) => const PostHogTextMask.all(),
+        policy: (_, __) => const PostHogTextMask.all(),
       );
       await pump(tester, const Text('secret'));
 
@@ -422,7 +426,7 @@ void main() {
     });
 
     testWidgets('a policy that throws masks the whole node', (tester) async {
-      await setupPosthog(policy: (_) => throw StateError('boom'));
+      await setupPosthog(policy: (_, __) => throw StateError('boom'));
       await pump(tester, const Text('Balance 1,000'));
 
       final p = paragraph(tester, 'Balance');
@@ -441,7 +445,7 @@ void main() {
     testWidgets('a range outside the text masks the whole node',
         (tester) async {
       await setupPosthog(
-        policy: (_) =>
+        policy: (_, __) =>
             PostHogTextMask.only(const [TextRange(start: 0, end: 999)]),
       );
       await pump(tester, const Text('short'));
@@ -538,7 +542,7 @@ void main() {
     testWidgets(
         'all masks a RichText but not a PostHogUnmaskWidget nested in a '
         'WidgetSpan', (tester) async {
-      await setupPosthog(policy: (_) => const PostHogTextMask.all());
+      await setupPosthog(policy: (_, __) => const PostHogTextMask.all());
       await pump(
         tester,
         Text.rich(
@@ -579,6 +583,41 @@ void main() {
       // boundary. What matters here is precedence, not pixel-exact bounds.
       expect(touched(rects, glyphs(outer, outerText, 'before')), isTrue);
       expect(touched(rects, glyphs(outer, outerText, 'after')), isTrue);
+    });
+
+    testWidgets('the policy can decide from the widget, not just the text',
+        (tester) async {
+      // Two nodes with an identical string; only the widget the policy sees
+      // (the RenderParagraph's own RichText, with its style) tells them
+      // apart, so this can't pass by matching the text alone.
+      await setupPosthog(
+        policy: (_, widget) => widget is RichText &&
+                widget.text.style?.fontWeight == FontWeight.bold
+            ? const PostHogTextMask.none()
+            : const PostHogTextMask.all(),
+      );
+      await pump(
+        tester,
+        const Column(children: [
+          Text('4411 5000', style: TextStyle(fontWeight: FontWeight.bold)),
+          Text('4411 5000'),
+        ]),
+      );
+
+      final paragraphs =
+          tester.allRenderObjects.whereType<RenderParagraph>().toSet();
+      final bold = paragraphs
+          .firstWhere((p) => p.text.style?.fontWeight == FontWeight.bold);
+      final plain = paragraphs
+          .firstWhere((p) => p.text.style?.fontWeight != FontWeight.bold);
+      final boldRect = MatrixUtils.transformRect(
+          bold.getTransformTo(container()), bold.paintBounds);
+      final plainRect = MatrixUtils.transformRect(
+          plain.getTransformTo(container()), plain.paintBounds);
+      final rects = masks();
+
+      expect(touched(rects, boldRect), isFalse);
+      expect(covered(rects, plainRect), isTrue);
     });
   });
 }
