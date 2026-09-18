@@ -86,8 +86,10 @@ class SurveyChoiceButton extends StatelessWidget {
                         label,
                         style: TextStyle(
                           color: isSelected
-                              ? Colors.black
-                              : Colors.black.withValues(alpha: 0.5),
+                              ? appearance.choiceButtonTextColor
+                              : appearance.choiceButtonTextColor.withValues(
+                                  alpha: 0.5,
+                                ),
                           fontWeight: isSelected ? FontWeight.bold : null,
                         ),
                       ),
