@@ -1,5 +1,7 @@
 import 'dart:ui' show TextRange;
 
+import 'package:flutter/widgets.dart' show Widget;
+
 /// What session replay masks inside one text node.
 ///
 /// A [PostHogTextMaskPolicy] returns one of these for every plain `Text`,
@@ -59,12 +61,20 @@ final class PostHogTextMaskExcept extends PostHogTextMask {
   final Iterable<TextRange> ranges;
 }
 
-/// Decides what to mask in a text node, given its rendered string.
+/// Decides what to mask in a text node, given its rendered string and the
+/// widget that produced it.
 ///
-/// Set one on `PostHogSessionReplayConfig.textMaskPolicy`. It is called on the
-/// UI thread for every captured text node, so keep it fast and free of side
-/// effects. Throwing masks the whole node.
-typedef PostHogTextMaskPolicy = PostHogTextMask Function(String text);
+/// Set one on `PostHogSessionReplayConfig.textMaskPolicy`. [widget] is the
+/// `RichText` or `EditableText` that actually produced the render object —
+/// not the outer `Text`/`TextField` an app writes, which Flutter composes
+/// away — so inspect its style, its `InlineSpan`, or (for inputs)
+/// properties like `obscureText` and `readOnly` to decide by more than the
+/// string. It is called on the UI thread for every captured text node, so
+/// keep it fast and free of side effects. Throwing masks the whole node.
+typedef PostHogTextMaskPolicy = PostHogTextMask Function(
+  String text,
+  Widget widget,
+);
 
 /// Ready-made [PostHogTextMaskPolicy] implementations.
 abstract final class PostHogTextMaskPolicies {
@@ -83,7 +93,7 @@ abstract final class PostHogTextMaskPolicies {
   /// PostHogTextMaskPolicies.redact(RegExp(r'[\w.+-]+@[\w-]+\.[\w.-]+'))
   /// ```
   static PostHogTextMaskPolicy redact(RegExp pattern) =>
-      (text) => PostHogTextMask.only(_matches(pattern, text));
+      (text, widget) => PostHogTextMask.only(_matches(pattern, text));
 
   /// Masks the whole node except the matches of [pattern].
   ///
@@ -92,7 +102,7 @@ abstract final class PostHogTextMaskPolicies {
   /// PostHogTextMaskPolicies.reveal(RegExp(r'\b(NGN|USD|GBP)\b'))
   /// ```
   static PostHogTextMaskPolicy reveal(RegExp pattern) =>
-      (text) => PostHogTextMask.except(_matches(pattern, text));
+      (text, widget) => PostHogTextMask.except(_matches(pattern, text));
 
   static final RegExp _digitRun = RegExp(r'\d[\d.,\- ]*\d|\d');
 

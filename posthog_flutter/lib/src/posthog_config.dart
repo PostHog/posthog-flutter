@@ -759,12 +759,22 @@ class PostHogSessionReplayConfig {
   /// config.sessionReplayConfig.textMaskPolicy =
   ///     PostHogTextMaskPolicies.reveal(RegExp(r'^(Continue|Cancel)$'));
   ///
-  /// // Or decide per node.
-  /// config.sessionReplayConfig.textMaskPolicy = (text) =>
-  ///     safeStrings.contains(text)
+  /// // Or decide per node, using its text, its widget, or both — here, two
+  /// // nodes with the same string are told apart by style.
+  /// config.sessionReplayConfig.textMaskPolicy = (text, widget) =>
+  ///     widget is RichText && widget.text.style?.fontWeight == FontWeight.bold
   ///         ? const PostHogTextMask.none()
   ///         : const PostHogTextMask.all();
   /// ```
+  ///
+  /// [widget] is whichever widget actually produced the render object being
+  /// captured — `RichText` for `Text` and `RichText` alike, `EditableText`
+  /// for text inputs. It is not the outer `Text`/`TextField` an app writes:
+  /// `Text` is a thin wrapper over `RichText`, and there is no reliable way
+  /// to recover it across Flutter's internal composition. Reach for its
+  /// style, its `InlineSpan`, or (for inputs) properties like `obscureText`
+  /// and `readOnly` — not its `key`, which will be the framework's, not the
+  /// app's.
   ///
   /// Precedence, highest first: sensitive inputs (`obscureText`, password,
   /// card, and other sensitive autofill hints) are always fully masked;

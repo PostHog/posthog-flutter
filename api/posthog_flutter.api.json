@@ -2694,7 +2694,7 @@
                         "isWriteable": true,
                         "name": "textMaskPolicy",
                         "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "PostHogTextMask Function(String)?"
+                        "typeName": "PostHogTextMask Function(String, Widget)?"
                     },
                     {
                         "entryPoints": [],
@@ -5768,7 +5768,7 @@
                         "name": "digits",
                         "parameters": [],
                         "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
-                        "returnTypeName": "PostHogTextMask Function(String)",
+                        "returnTypeName": "PostHogTextMask Function(String, Widget)",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -5790,7 +5790,7 @@
                             }
                         ],
                         "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
-                        "returnTypeName": "PostHogTextMask Function(String)",
+                        "returnTypeName": "PostHogTextMask Function(String, Widget)",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -5812,7 +5812,7 @@
                             }
                         ],
                         "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
-                        "returnTypeName": "PostHogTextMask Function(String)",
+                        "returnTypeName": "PostHogTextMask Function(String, Widget)",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -5920,7 +5920,7 @@
                 "relativePath": "lib/src/posthog_observer.dart"
             },
             {
-                "aliasedTypeName": "PostHogTextMask Function(String)",
+                "aliasedTypeName": "PostHogTextMask Function(String, Widget)",
                 "entryPoints": [
                     "posthog_flutter.dart"
                 ],
