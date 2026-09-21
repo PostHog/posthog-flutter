@@ -14,12 +14,14 @@ class PostHogDisplayRatingQuestion extends PostHogDisplaySurveyQuestion {
     required this.scaleUpperBound,
     required this.lowerBoundLabel,
     required this.upperBoundLabel,
+    this.skipSubmitButton = false,
     super.description,
     super.descriptionContentType,
     super.optional,
     super.buttonText,
   }) : super(type: PostHogSurveyQuestionType.rating);
 
+  final bool skipSubmitButton;
   final PostHogDisplaySurveyRatingType ratingType;
   final int scaleLowerBound;
   final int scaleUpperBound;

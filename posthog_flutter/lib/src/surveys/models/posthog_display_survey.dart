@@ -45,6 +45,7 @@ class PostHogDisplaySurvey {
           return PostHogDisplayRatingQuestion(
             id: id,
             question: question,
+            skipSubmitButton: q['skipSubmitButton'] as bool? ?? false,
             ratingType: PostHogDisplaySurveyRatingType.fromInt(
               q['ratingType'] as int,
             ),
@@ -63,6 +64,7 @@ class PostHogDisplaySurvey {
             id: id,
             question: question,
             choices: (q['choices'] as List).cast<String>(),
+            skipSubmitButton: q['skipSubmitButton'] as bool? ?? false,
             isMultipleChoice: type == 'multiple_choice',
             hasOpenChoice: q['hasOpenChoice'] as bool,
             shuffleOptions: q['shuffleOptions'] as bool,
