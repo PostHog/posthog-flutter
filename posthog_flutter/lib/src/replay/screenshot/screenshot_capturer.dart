@@ -109,6 +109,8 @@ class ScreenshotCapturer {
   // freezing the replay until the pixels next change.
   int? _pendingImageBytesHash;
   int? _pendingCompositedBytesHash;
+  // A declined view is retried every tick, so each decline logs once per session.
+  final _loggedDeclines = <String>{};
 
   /// The replay session the tracked snapshot state belongs to, read from native
   /// on every capture tick. Null until the first read, and after a forced reset.
@@ -158,6 +160,7 @@ class ScreenshotCapturer {
     _lastTargetStatus = null;
     _pendingImageBytesHash = null;
     _pendingCompositedBytesHash = null;
+    _loggedDeclines.clear();
   }
 
   /// Whether [imageInfo] still belongs to the session the capturer is tracking
@@ -415,13 +418,23 @@ class ScreenshotCapturer {
       type: viewRect.type,
       transform: transform,
     );
-    if (bytes == null) {
+    void maskInstead(String reason) {
+      final hint = defaultTargetPlatform == TargetPlatform.iOS
+          ? ' On iOS only WKWebView-backed platform views can be captured.'
+          : '';
+      final message =
+          '$reason a platform view at ${viewRect.rect}; masked it instead.$hint';
+      if (_loggedDeclines.add(message)) printIfDebug(message);
       _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
+    }
+
+    if (bytes == null) {
+      maskInstead('Native side declined to capture');
       return;
     }
     final nativeImage = await _decodeRawPixels(bytes, nativeW, nativeH);
     if (nativeImage == null) {
-      _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
+      maskInstead('Failed to decode the native capture of');
       return;
     }
     try {
