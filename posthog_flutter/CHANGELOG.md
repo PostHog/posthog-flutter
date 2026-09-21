@@ -1,5 +1,11 @@
 ## Next
 
+## 5.45.0
+
+### Minor Changes
+
+- 7f660c8: Support automatic submission for survey ratings and single-choice questions without an open choice when skipSubmitButton is enabled. Requires PostHog iOS 3.77.0 and Android 3.66.4 or newer.
+
 ## 5.44.4
 
 ### Patch Changes
