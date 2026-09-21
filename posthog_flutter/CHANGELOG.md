@@ -1,5 +1,11 @@
 ## Next
 
+## 5.44.3
+
+### Patch Changes
+
+- 8a27e44: Render multiple-choice option labels in the survey text color so they stay readable on dark backgrounds.
+
 ## 5.44.2
 
 ### Patch Changes
