@@ -225,13 +225,18 @@ void main() {
     canvas.drawRect(
         const Rect.fromLTWH(0, 0, 100, 200), Paint()..color = _background);
     final logs = <String>[];
+    final capturer = ScreenshotCapturer(PostHogConfig('test'));
+    Future<void> maskFailedCapture() => capturer.debugMaskFailedCapture(
+          canvas,
+          const Rect.fromLTWH(0, 0, 100, 200),
+          const Rect.fromLTWH(0, 0, 100, 100),
+          Matrix4.identity(),
+        );
     await runZoned(
-      () => ScreenshotCapturer(PostHogConfig('test')).debugMaskFailedCapture(
-        canvas,
-        const Rect.fromLTWH(0, 0, 100, 200),
-        const Rect.fromLTWH(0, 0, 100, 100),
-        Matrix4.identity(),
-      ),
+      () async {
+        await maskFailedCapture();
+        await maskFailedCapture();
+      },
       zoneSpecification: ZoneSpecification(
         print: (_, __, ___, line) => logs.add(line),
       ),
@@ -239,6 +244,7 @@ void main() {
     final image = await recorder.endRecording().toImage(100, 200);
     expect(await _pixel(image, 50, 50), const Color(0xFF000000));
     expect(await _pixel(image, 50, 150), _background);
-    expect(logs.where((l) => l.contains('declined to capture')), hasLength(1));
+    expect(logs.where((l) => l.contains('declined to capture')), hasLength(1),
+        reason: 'a view declined on every tick should log once');
   });
 }
