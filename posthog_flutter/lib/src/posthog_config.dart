@@ -835,9 +835,9 @@ class PostHogSessionReplayConfig {
   /// previews (e.g. the `camera` plugin) — prefer per-view
   /// [PostHogPlatformView] opt-ins over the global opt-out.
   ///
-  /// **iOS note:** setting this false only reveals [WKWebView]-backed views;
-  /// maps, camera previews and other native views stay masked. See
-  /// [PostHogPlatformViewPrivacy.capture].
+  /// **iOS note:** among `UiKitView`s, setting this false only reveals
+  /// [WKWebView]-backed ones; maps, ARKit and other native views stay masked.
+  /// See [PostHogPlatformViewPrivacy.capture].
   ///
   /// Applies only to native views embedded in the Flutter layout. For native
   /// screens presented over the whole app, see [captureNativeScreens].
