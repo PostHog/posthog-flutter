@@ -425,6 +425,80 @@ void main() {
       expect(masked, _black);
     });
 
+    testWidgets('a range that splits a grapheme cluster masks the whole node',
+        (tester) async {
+      // digits() selects `12`, but the `2` is fused to a combining keycap:
+      // Flutter lays out a box for the `1` and nothing for the rest, so the
+      // combined `2` would stay readable if its non-empty box list were
+      // trusted.
+      await setupPosthog(policy: PostHogTextMaskPolicies.digits());
+      const text = 'Code 12⃣';
+      await pump(
+        tester,
+        const Text(
+          text,
+          style: TextStyle(fontSize: 24, height: 1, color: _textColor),
+        ),
+      );
+
+      final p = paragraph(tester, 'Code');
+      final rects = masks();
+      expect(rects, hasLength(1));
+      expect(
+        rects.single,
+        rectMoreOrLessEquals(
+          MatrixUtils.transformRect(
+              p.getTransformTo(container()), p.paintBounds),
+          epsilon: 0.5,
+        ),
+      );
+      expect(covered(rects, glyphs(p, text, '2⃣')), isTrue);
+    });
+
+    testWidgets('text shadows fall back to masking the whole node',
+        (tester) async {
+      // Selection boxes bound glyphs, not the shadow painted 100px away, so
+      // glyph-level masking would leave a readable copy of the digits.
+      await setupPosthog(policy: PostHogTextMaskPolicies.digits());
+      const text = 'Code 123';
+      const shadowGreen = Color(0xFF00FF00);
+      await pump(
+        tester,
+        const Text(
+          text,
+          style: TextStyle(
+            fontSize: 24,
+            height: 1,
+            color: _textColor,
+            shadows: [Shadow(color: shadowGreen, offset: Offset(100, 0))],
+          ),
+        ),
+      );
+
+      final p = paragraph(tester, 'Code');
+      final digits = glyphs(p, text, '123');
+      final shadowAt = digits.center.translate(100, 0);
+      final boundary = container() as RenderRepaintBoundary;
+      final elements = maskElements();
+      final shadowPixel = (await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: 1);
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder);
+        canvas.drawImage(image, Offset.zero, Paint());
+        ImageMaskPainter().drawMaskedImage(canvas, elements, 1);
+        final maskedImage =
+            await recorder.endRecording().toImage(image.width, image.height);
+        final colour =
+            await _pixel(maskedImage, shadowAt.dx.round(), shadowAt.dy.round());
+        image.dispose();
+        maskedImage.dispose();
+        return colour;
+      }))!;
+      expect(shadowPixel, isNot(shadowGreen),
+          reason: 'the digits\' shadow is still readable');
+      expect(shadowPixel, _black);
+    });
+
     testWidgets('a policy that throws masks the whole node', (tester) async {
       await setupPosthog(policy: (_, __) => throw StateError('boom'));
       await pump(tester, const Text('Balance 1,000'));

@@ -783,11 +783,27 @@ class PostHogSessionReplayConfig {
   /// only applies to text nodes when no policy is set.
   ///
   /// The policy runs on the UI thread for every captured text node; keep it
-  /// fast. It fails closed: throwing, or returning a range outside the text,
-  /// masks the whole node. It applies to the Flutter widget tree only — text
-  /// on captured native screens still follows [maskAllTexts], and
-  /// custom-painted text still needs [maskCustomPaint]. Can be changed at
-  /// runtime; the next frame uses the new policy.
+  /// fast. It applies to the Flutter widget tree only — text on captured
+  /// native screens still follows [maskAllTexts], and custom-painted text
+  /// still needs [maskCustomPaint]. Can be changed at runtime; the next
+  /// frame uses the new policy.
+  ///
+  /// It fails closed. Where glyph-precise rects can't be trusted to cover
+  /// everything the decision asked to hide, the whole node is masked
+  /// instead:
+  ///
+  ///  * the policy throws, or its ranges throw while being read;
+  ///  * a range falls outside the text, or cuts into a grapheme cluster —
+  ///    Flutter lays out no box for the severed half, so it would otherwise
+  ///    stay readable;
+  ///  * the node's style paints `shadows`, which selection boxes don't
+  ///    bound, so a masked glyph could leave a readable copy of itself
+  ///    wherever its shadow lands;
+  ///  * the node is a paragraph containing a `WidgetSpan` and the decision
+  ///    yields anything other than exactly one rect — including
+  ///    `PostHogTextMask.none()` and `PostHogTextMask.only([])`. A
+  ///    `PostHogUnmaskWidget` nested in that paragraph still reveals its
+  ///    own subtree.
   ///
   /// Default: null.
   PostHogTextMaskPolicy? textMaskPolicy;

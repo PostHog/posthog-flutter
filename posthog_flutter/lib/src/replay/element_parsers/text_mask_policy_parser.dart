@@ -19,8 +19,10 @@ import 'package:posthog_flutter/src/util/logging.dart';
 /// so its character offsets line up with the laid-out text, plus the widget
 /// itself. A range that wraps yields one rect per line.
 ///
-/// Fails closed: a policy that throws, or returns a range outside the text,
-/// masks the whole node.
+/// Fails closed: a policy that throws, returns a range outside the text or
+/// one that splits a grapheme cluster, or targets a node whose glyph boxes
+/// can't bound what it paints, masks the whole node. See
+/// `PostHogSessionReplayConfig.textMaskPolicy` for the full list.
 class TextMaskPolicyParser {
   final ElementParser _paragraphParser = ElementParser();
   final RenderEditableParser _editableParser = RenderEditableParser();
@@ -33,6 +35,7 @@ class TextMaskPolicyParser {
     final ElementGeometry? geometry;
     final Widget policyWidget;
     var hasWidgetSpan = false;
+    var hasShadows = false;
     switch (element.renderObject) {
       case final RenderParagraph paragraph:
         renderObject = paragraph;
@@ -44,10 +47,14 @@ class TextMaskPolicyParser {
         // RichText itself.
         policyWidget = element.widget;
         hasWidgetSpan = _containsWidgetSpan(paragraph.text);
+        hasShadows = _containsShadow(paragraph.text);
       case final RenderEditable editable:
         renderObject = editable;
         text = editable.text?.toPlainText(includeSemanticsLabels: false) ?? '';
         geometry = _editableParser.buildElementData(element);
+        final span = editable.text;
+        hasShadows = span != null && _containsShadow(span);
+
         // Unlike RichText, the widget that actually owns a RenderEditable is
         // Flutter's private `_Editable` — a type this package can't even
         // name, let alone anything an app's policy could usefully inspect.
@@ -100,7 +107,32 @@ class TextMaskPolicyParser {
       // WidgetSpan precedence bug this exists to prevent.
       rects = [whole];
     }
+    if (hasShadows && rects.isNotEmpty && _isGlyphLevel(decision)) {
+      // Selection boxes bound glyphs, not the shadows TextStyle paints
+      // outside them, so masking a digit can leave a readable copy of it
+      // sitting wherever its shadow lands. Growing the rects wouldn't fix
+      // `except`, where the escaping shadow belongs to text outside the
+      // revealed window, so mask the whole node in both cases.
+      rects = [whole];
+    }
     return _rects(policyWidget, geometry, rects);
+  }
+
+  // `all` and `none` already cover the whole node or none of it; only the
+  // ranged decisions produce rects that bound individual glyphs.
+  bool _isGlyphLevel(PostHogTextMask decision) =>
+      decision is PostHogTextMaskOnly || decision is PostHogTextMaskExcept;
+
+  bool _containsShadow(InlineSpan root) {
+    var found = false;
+    root.visitChildren((span) {
+      if (span.style?.shadows?.isNotEmpty ?? false) {
+        found = true;
+        return false;
+      }
+      return true;
+    });
+    return found;
   }
 
   bool _containsWidgetSpan(InlineSpan span) {
@@ -137,6 +169,7 @@ class TextMaskPolicyParser {
     Rect whole,
   ) {
     final boxes = <Rect>[];
+    Set<int>? boundaries;
     for (final range in ranges) {
       if (range.start < 0 ||
           range.end > text.length ||
@@ -145,6 +178,19 @@ class TextMaskPolicyParser {
         printIfDebug(
           '[PostHog] textMaskPolicy returned a range outside the text, '
           'masking the whole node instead.',
+        );
+        return [whole];
+      }
+      final graphemes = boundaries ??= _graphemeBoundaries(text);
+      if (!graphemes.contains(range.start) || !graphemes.contains(range.end)) {
+        // A range that cuts into a grapheme cluster lays out as a box for the
+        // part before the cut and nothing for the rest: `digits()` over
+        // `Code 12⃣` selects `12`, gets back only the box for the `1`,
+        // and leaves the combined `2⃣` readable. The box list isn't
+        // empty, so the check below can't catch it.
+        printIfDebug(
+          '[PostHog] textMaskPolicy returned a range that splits a grapheme '
+          'cluster, masking the whole node instead.',
         );
         return [whole];
       }
@@ -181,6 +227,17 @@ class TextMaskPolicyParser {
       parts = parts.expand((part) => subtractRect(part, box)).toList();
     }
     return parts;
+  }
+
+  /// Every offset in [text] that starts or ends a grapheme cluster.
+  Set<int> _graphemeBoundaries(String text) {
+    final offsets = <int>{0};
+    var at = 0;
+    for (final cluster in text.characters) {
+      at += cluster.length;
+      offsets.add(at);
+    }
+    return offsets;
   }
 
   // Full line height rather than tight glyph bounds, so an `except` decision
