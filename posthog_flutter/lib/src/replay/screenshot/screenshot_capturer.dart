@@ -415,13 +415,22 @@ class ScreenshotCapturer {
       type: viewRect.type,
       transform: transform,
     );
-    if (bytes == null) {
+    void maskInstead(String reason) {
+      final hint = defaultTargetPlatform == TargetPlatform.iOS
+          ? ' On iOS only WKWebView-backed platform views can be captured.'
+          : '';
+      printIfDebug(
+          '$reason a platform view at ${viewRect.rect}; masked it instead.$hint');
       _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
+    }
+
+    if (bytes == null) {
+      maskInstead('Native side declined to capture');
       return;
     }
     final nativeImage = await _decodeRawPixels(bytes, nativeW, nativeH);
     if (nativeImage == null) {
-      _imageMaskPainter.drawMaskedImage(canvas, [fallbackMask], pixelRatio);
+      maskInstead('Failed to decode the native capture of');
       return;
     }
     try {
