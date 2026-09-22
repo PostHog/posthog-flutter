@@ -4,6 +4,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/render_editable_parser.dart';
+import 'package:posthog_flutter/src/replay/element_parsers/text_mask_policy_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/unmask_element_parser.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_parsers_const.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
@@ -13,6 +14,7 @@ class ElementObjectParser {
   final ElementParser _elementParser = ElementParser();
   final RenderEditableParser _renderEditableParser = RenderEditableParser();
   final UnmaskElementParser _unmaskParser = UnmaskElementParser();
+  final TextMaskPolicyParser _textMaskPolicyParser = TextMaskPolicyParser();
 
   ElementData? relateRenderObject(
     ElementData activeElementData,
@@ -55,9 +57,12 @@ class ElementObjectParser {
 
     if (unmask) return null;
 
-    if (element.widget is Text) {
-      final config = Posthog().config?.sessionReplayConfig;
-      final maskAllTexts = config?.maskAllTexts ?? true;
+    final replayConfig = Posthog().config?.sessionReplayConfig;
+    final textMaskPolicy = replayConfig?.textMaskPolicy;
+
+    // With a policy set, the owning render object element below decides.
+    if (element.widget is Text && textMaskPolicy == null) {
+      final maskAllTexts = replayConfig?.maskAllTexts ?? true;
 
       if (maskAllTexts) {
         final elementData = _elementParser.relate(element);
@@ -113,6 +118,23 @@ class ElementObjectParser {
 
     if (element.renderObject is RenderParagraph ||
         element.renderObject is RenderEditable) {
+      if (textMaskPolicy != null) {
+        final masks = _textMaskPolicyParser.relate(element, textMaskPolicy);
+        if (masks != null) {
+          for (final mask in masks) {
+            activeElementData.addChildren(mask);
+          }
+          // A RichText can carry a PostHogMaskWidget/PostHogUnmaskWidget of
+          // its own inside a WidgetSpan. When the policy produced exactly
+          // one rect for this node, descend into it so that structure
+          // attaches as its descendant and subtractUnmaskRects can see it.
+          // More than one rect has no single box for it to nest under, but
+          // none is needed: a WidgetSpan is its own inline slot and can't
+          // overlap a sibling text glyph run.
+          return masks.length == 1 ? masks.single : null;
+        }
+      }
+
       final dataType = element.renderObject.runtimeType.toString();
 
       final parser = PostHogMaskController.instance.parsers[dataType];

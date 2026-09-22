@@ -46,7 +46,7 @@ List<ElementData> subtractUnmaskRects(
       ..multiply(region.transform ?? Matrix4.identity());
     final hole = axisAlignedUnmaskRect(region.rect, relative);
     if (hole == null || hole.isEmpty) continue;
-    parts = parts.expand((part) => _subtract(part, hole)).toList();
+    parts = parts.expand((part) => subtractRect(part, hole)).toList();
   }
   if (parts.length == 1 && parts.single == mask.rect) return [mask];
   return parts
@@ -59,7 +59,8 @@ List<ElementData> subtractUnmaskRects(
       .toList();
 }
 
-Iterable<Rect> _subtract(Rect mask, Rect hole) {
+/// The parts of [mask] left after cutting [hole] out of it.
+Iterable<Rect> subtractRect(Rect mask, Rect hole) {
   final cut = mask.intersect(hole);
   if (cut.isEmpty) return [mask];
   return [
