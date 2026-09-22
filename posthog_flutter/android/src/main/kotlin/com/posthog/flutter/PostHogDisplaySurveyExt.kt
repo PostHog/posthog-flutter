@@ -14,6 +14,7 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
         mutableMapOf<String, Any?>(
             "id" to id,
             "name" to name,
+            "initialQuestionIndex" to initialQuestionIndex,
             "questions" to
                 questions.map { question: PostHogDisplaySurveyQuestion ->
                     val questionMap =

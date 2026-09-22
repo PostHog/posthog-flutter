@@ -146,7 +146,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       (survey) async {
         // onShown
         try {
-          await _methodChannel.invokeMethod('surveyAction', {'type': 'shown'});
+          await _methodChannel.invokeMethod('surveyAction', {
+            'type': 'shown',
+            'presentationId': survey.presentationId,
+          });
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(shown): $exception');
         }
@@ -159,13 +162,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         try {
           final result = await _methodChannel.invokeMethod('surveyAction', {
             'type': 'response',
+            'presentationId': survey.presentationId,
             'index': index,
             'response': response,
-          }) as Map;
-          nextIndex = (result['nextIndex'] as num).toInt();
-          isSurveyCompleted = result['isSurveyCompleted'] as bool;
+          }) as Map?;
+          if (result == null) {
+            SurveyService().hideSurvey(survey: survey);
+          } else {
+            nextIndex = (result['nextIndex'] as num).toInt();
+            isSurveyCompleted = result['isSurveyCompleted'] as bool;
+          }
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(response): $exception');
+          if (exception.code == 'SurveyInvalidated') {
+            SurveyService().hideSurvey(survey: survey);
+          }
         }
 
         final nextQuestion = PostHogSurveyNextQuestion(
@@ -177,7 +188,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       (survey) async {
         // onClose
         try {
-          await _methodChannel.invokeMethod('surveyAction', {'type': 'closed'});
+          await _methodChannel.invokeMethod('surveyAction', {
+            'type': 'closed',
+            'presentationId': survey.presentationId,
+          });
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(closed): $exception');
         }

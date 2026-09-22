@@ -9,6 +9,7 @@
             var dict: [String: Any] = [
                 "id": id,
                 "name": name,
+                "initialQuestionIndex": initialQuestionIndex,
                 "questions": questions.map { question -> [String: Any] in
                     var questionDict: [String: Any] = [
                         "question": question.question,

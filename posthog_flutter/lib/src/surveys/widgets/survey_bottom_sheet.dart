@@ -40,18 +40,18 @@ class SurveyBottomSheet extends StatefulWidget {
 }
 
 class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
-  int _currentIndex = 0;
+  late int _currentIndex = widget.survey.initialQuestionIndex;
   bool _isCompleted = false;
   bool _isSubmitting = false;
   // Advancing past the intro is a pure UI transition: no response is recorded
   // and no survey event is sent. The X button keeps closing the survey.
   // The intro has no default header, so an intro with no copy at all is
   // skipped instead of drawing an empty sheet with a lone button.
-  late bool _showingIntroScreen =
+  late bool _showingIntroScreen = widget.survey.initialQuestionIndex == 0 &&
       (widget.survey.appearance?.displayIntroScreen ?? false) &&
-          ((widget.survey.appearance?.introScreenHeader?.isNotEmpty ?? false) ||
-              (widget.survey.appearance?.introScreenDescription?.isNotEmpty ??
-                  false));
+      ((widget.survey.appearance?.introScreenHeader?.isNotEmpty ?? false) ||
+          (widget.survey.appearance?.introScreenDescription?.isNotEmpty ??
+              false));
 
   @override
   void initState() {
@@ -95,17 +95,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           description: currentQuestion.description,
           descriptionContentType: currentQuestion.descriptionContentType,
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
-          onSubmit: (response) async {
-            final nextQuestion = await widget.onResponse(
-              widget.survey,
-              _currentIndex,
-              response,
-            );
-            setState(() {
-              _currentIndex = nextQuestion.questionIndex;
-              _isCompleted = nextQuestion.isSurveyCompleted;
-            });
-          },
+          onSubmit: _submitResponse,
         );
       case PostHogSurveyQuestionType.link:
         final linkQuestion = currentQuestion as PostHogDisplayLinkQuestion;
@@ -125,6 +115,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
               true, // Boolean response for link questions
             );
 
+            if (!mounted) return;
+
             // Open the URL if provided
             final link = linkQuestion.link;
             if (link.isNotEmpty) {
@@ -132,6 +124,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
             }
 
             // Update state
+            if (!mounted) return;
             setState(() {
               _currentIndex = nextQuestion.questionIndex;
               _isCompleted = nextQuestion.isSurveyCompleted;

@@ -13,15 +13,20 @@ import com.posthog.surveys.PostHogDisplaySurvey
 import com.posthog.surveys.PostHogDisplaySurveyQuestion
 import com.posthog.surveys.PostHogNextSurveyQuestion
 import com.posthog.surveys.PostHogSurveyResponse
-import com.posthog.surveys.PostHogSurveysDelegate
+import com.posthog.surveys.PostHogSurveysResumeAwareDelegate
 import io.flutter.plugin.common.MethodChannel
+import java.util.UUID
 
 /**
  * Separate surveys delegate to avoid class loading issues in the main plugin
  */
 class PostHogFlutterSurveysDelegate(
     private val channel: MethodChannel,
-) : PostHogSurveysDelegate {
+) : PostHogSurveysResumeAwareDelegate {
+    override val supportsSurveyResume: Boolean = true
+
+    @Volatile
+    private var presentationId: String? = null
     private var currentSurvey: PostHogDisplaySurvey? = null
     private var onSurveyShownCallback: OnPostHogSurveyShown? = null
     private var onSurveyResponseCallback: OnPostHogSurveyResponse? = null
@@ -33,20 +38,28 @@ class PostHogFlutterSurveysDelegate(
         onSurveyResponse: OnPostHogSurveyResponse,
         onSurveyClosed: OnPostHogSurveyClosed,
     ) {
+        val presentation = UUID.randomUUID().toString()
+        presentationId = presentation
         currentSurvey = survey
         onSurveyShownCallback = onSurveyShown
         onSurveyResponseCallback = onSurveyResponse
         onSurveyClosedCallback = onSurveyClosed
 
         // Convert survey to map and send to Flutter
-        invokeFlutterMethod("showSurvey", survey.toMap())
+        Handler(Looper.getMainLooper()).post {
+            if (presentationId == presentation) {
+                channel.invokeMethod("showSurvey", survey.toMap() + ("presentationId" to presentation))
+            }
+        }
     }
 
     override fun cleanupSurveys() {
+        presentationId = null
         currentSurvey = null
         onSurveyShownCallback = null
         onSurveyResponseCallback = null
         onSurveyClosedCallback = null
+        invokeFlutterMethod("hideSurveys")
     }
 
     fun handleSurveyAction(
@@ -55,8 +68,8 @@ class PostHogFlutterSurveysDelegate(
         result: MethodChannel.Result,
     ) {
         val survey = currentSurvey
-        if (survey == null) {
-            result.error("InvalidArguments", "No active survey", null)
+        if (survey == null || presentationId == null || payload?.get("presentationId") != presentationId) {
+            result.error("SurveyInvalidated", "Survey presentation is no longer active", null)
             return
         }
 
@@ -69,7 +82,7 @@ class PostHogFlutterSurveysDelegate(
                 val index = payload?.get("index") as? Int
                 val responsePayload = payload?.get("response")
 
-                if (index != null && responsePayload != null && index < survey.questions.size) {
+                if (index != null && index in survey.questions.indices) {
                     val question = survey.questions[index]
 
                     // Create PostHogSurveyResponse based on question type
@@ -127,6 +140,7 @@ class PostHogFlutterSurveysDelegate(
             "closed" -> {
                 onSurveyClosedCallback?.invoke(survey)
                 // Clear the callbacks after survey is closed
+                presentationId = null
                 currentSurvey = null
                 onSurveyShownCallback = null
                 onSurveyResponseCallback = null

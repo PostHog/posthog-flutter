@@ -432,6 +432,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         PostHogSDK.shared.setup(config)
     }
 
+    private var surveyPresentationId: String?
     private var currentSurvey: PostHogDisplaySurvey?
     private var onSurveyShownCallback: OnPostHogSurveyShown?
     private var onSurveyResponseCallback: OnPostHogSurveyResponse?
@@ -567,6 +568,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     // MARK: - PostHogSurveysDelegate
 
     extension PosthogFlutterPlugin: PostHogSurveysDelegate {
+        public var supportsSurveyResume: Bool { true }
+
         public func renderSurvey(
             _ survey: PostHogDisplaySurvey,
             onSurveyShown: @escaping OnPostHogSurveyShown,
@@ -574,6 +577,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             onSurveyClosed: @escaping OnPostHogSurveyClosed
         ) {
             // Store the callbacks and survey for later use
+            let presentation = UUID().uuidString
+            surveyPresentationId = presentation
             currentSurvey = survey
             onSurveyShownCallback = onSurveyShown
             onSurveyResponseCallback = onSurveyResponse
@@ -581,11 +586,17 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
             // We don't need to handle the result here
             // All responses will come through the surveyResponse method
-            invokeFlutterMethod("showSurvey", arguments: survey.toDict())
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.surveyPresentationId == presentation else { return }
+                var arguments = survey.toDict()
+                arguments["presentationId"] = presentation
+                self.channel?.invokeMethod("showSurvey", arguments: arguments)
+            }
         }
 
         public func cleanupSurveys() {
             // Reset all survey-related state when the survey feature is stopped
+            surveyPresentationId = nil
             currentSurvey = nil
             onSurveyShownCallback = nil
             onSurveyResponseCallback = nil
@@ -596,11 +607,18 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         }
 
         private func handleSurveyAction(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-            guard let survey = currentSurvey,
-                  let args = call.arguments as? [String: Any],
+            guard let args = call.arguments as? [String: Any],
                   let type = args["type"] as? String
             else {
                 result(FlutterError(code: "InvalidArguments", message: "Invalid survey action arguments", details: nil))
+                return
+            }
+
+            guard let survey = currentSurvey,
+                  let presentation = surveyPresentationId,
+                  args["presentationId"] as? String == presentation
+            else {
+                result(FlutterError(code: "SurveyInvalidated", message: "Survey presentation is no longer active", details: nil))
                 return
             }
 
@@ -609,7 +627,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 onSurveyShownCallback?(survey)
             case "response":
                 if let index = args["index"] as? Int,
-                   index < survey.questions.count
+                   index >= 0, index < survey.questions.count
                 {
                     let question = survey.questions[index]
                     let responsePayload = args["response"]
@@ -658,6 +676,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             case "closed":
                 onSurveyClosedCallback?(survey)
                 // Clear the callbacks after survey is closed
+                surveyPresentationId = nil
                 currentSurvey = nil
                 onSurveyShownCallback = nil
                 onSurveyResponseCallback = nil
