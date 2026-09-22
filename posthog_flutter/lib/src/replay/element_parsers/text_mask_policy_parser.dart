@@ -123,16 +123,15 @@ class TextMaskPolicyParser {
   bool _isGlyphLevel(PostHogTextMask decision) =>
       decision is PostHogTextMaskOnly || decision is PostHogTextMaskExcept;
 
-  bool _containsShadow(InlineSpan root) {
-    var found = false;
-    root.visitChildren((span) {
-      if (span.style?.shadows?.isNotEmpty ?? false) {
-        found = true;
-        return false;
+  bool _containsShadow(InlineSpan span) {
+    if (span.style?.shadows?.isNotEmpty ?? false) return true;
+    // visitChildren skips textless spans whose styles their children inherit.
+    if (span is TextSpan) {
+      for (final child in span.children ?? const <InlineSpan>[]) {
+        if (_containsShadow(child)) return true;
       }
-      return true;
-    });
-    return found;
+    }
+    return false;
   }
 
   bool _containsWidgetSpan(InlineSpan span) {

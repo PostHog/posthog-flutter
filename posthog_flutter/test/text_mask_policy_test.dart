@@ -455,49 +455,76 @@ void main() {
       expect(covered(rects, glyphs(p, text, '2⃣')), isTrue);
     });
 
-    testWidgets('text shadows fall back to masking the whole node',
-        (tester) async {
-      // Selection boxes bound glyphs, not the shadow painted 100px away, so
-      // glyph-level masking would leave a readable copy of the digits.
-      await setupPosthog(policy: PostHogTextMaskPolicies.digits());
-      const text = 'Code 123';
-      const shadowGreen = Color(0xFF00FF00);
-      await pump(
+    for (final shadowSource in ['text', 'root span', 'nested span']) {
+      testWidgets('$shadowSource shadows fall back to masking the whole node', (
         tester,
-        const Text(
-          text,
-          style: TextStyle(
-            fontSize: 24,
-            height: 1,
-            color: _textColor,
-            shadows: [Shadow(color: shadowGreen, offset: Offset(100, 0))],
-          ),
-        ),
-      );
+      ) async {
+        // Selection boxes bound glyphs, not the shadow painted 100px away, so
+        // glyph-level masking would leave a readable copy of the digits.
+        await setupPosthog(policy: PostHogTextMaskPolicies.digits());
+        const text = 'Code 123';
+        const shadowGreen = Color(0xFF00FF00);
+        const shadowStyle = TextStyle(
+          fontSize: 24,
+          height: 1,
+          color: _textColor,
+          shadows: [Shadow(color: shadowGreen, offset: Offset(100, 0))],
+        );
+        final widget = switch (shadowSource) {
+          'text' => const Text(text, style: shadowStyle),
+          'root span' => const Text.rich(
+              TextSpan(children: [TextSpan(text: text)]),
+              style: shadowStyle,
+            ),
+          _ => const Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    style: shadowStyle,
+                    children: [TextSpan(text: text)],
+                  ),
+                ],
+              ),
+            ),
+        };
+        await pump(tester, widget);
 
-      final p = paragraph(tester, 'Code');
-      final digits = glyphs(p, text, '123');
-      final shadowAt = digits.center.translate(100, 0);
-      final boundary = container() as RenderRepaintBoundary;
-      final elements = maskElements();
-      final shadowPixel = (await tester.runAsync(() async {
-        final image = await boundary.toImage(pixelRatio: 1);
-        final recorder = ui.PictureRecorder();
-        final canvas = Canvas(recorder);
-        canvas.drawImage(image, Offset.zero, Paint());
-        ImageMaskPainter().drawMaskedImage(canvas, elements, 1);
-        final maskedImage =
-            await recorder.endRecording().toImage(image.width, image.height);
-        final colour =
-            await _pixel(maskedImage, shadowAt.dx.round(), shadowAt.dy.round());
-        image.dispose();
-        maskedImage.dispose();
-        return colour;
-      }))!;
-      expect(shadowPixel, isNot(shadowGreen),
-          reason: 'the digits\' shadow is still readable');
-      expect(shadowPixel, _black);
-    });
+        final p = paragraph(tester, 'Code');
+        final digits = glyphs(p, text, '123');
+        final shadowAt = digits.center.translate(100, 0);
+        final boundary = container() as RenderRepaintBoundary;
+        final elements = maskElements();
+        final shadowPixel = (await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 1);
+          expect(
+            await _pixel(image, shadowAt.dx.round(), shadowAt.dy.round()),
+            shadowGreen,
+          );
+          final recorder = ui.PictureRecorder();
+          final canvas = Canvas(recorder);
+          canvas.drawImage(image, Offset.zero, Paint());
+          ImageMaskPainter().drawMaskedImage(canvas, elements, 1);
+          final maskedImage = await recorder.endRecording().toImage(
+                image.width,
+                image.height,
+              );
+          final colour = await _pixel(
+            maskedImage,
+            shadowAt.dx.round(),
+            shadowAt.dy.round(),
+          );
+          image.dispose();
+          maskedImage.dispose();
+          return colour;
+        }))!;
+        expect(
+          shadowPixel,
+          isNot(shadowGreen),
+          reason: 'the digits\' shadow is still readable',
+        );
+        expect(shadowPixel, _black);
+      });
+    }
 
     testWidgets('a policy that throws masks the whole node', (tester) async {
       await setupPosthog(policy: (_, __) => throw StateError('boom'));
