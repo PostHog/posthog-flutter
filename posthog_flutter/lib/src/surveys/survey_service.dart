@@ -24,6 +24,7 @@ class SurveyService {
   bool _isDismissingSurvey = false;
   bool _dismissSurveyWhenReady = false;
   Route<dynamic>? _currentSurveyRoute;
+  PostHogDisplaySurvey? _currentSurvey;
   Completer<void>? _programmaticDismissal;
 
   /// Shows a survey using the PosthogObserver context
@@ -65,6 +66,7 @@ class SurveyService {
     BuildContext context,
   ) async {
     _isShowingSurvey = true;
+    _currentSurvey = survey;
     final programmaticDismissal = Completer<void>();
     _programmaticDismissal = programmaticDismissal;
     try {
@@ -104,6 +106,7 @@ class SurveyService {
     } finally {
       if (_programmaticDismissal == programmaticDismissal) {
         _isShowingSurvey = false;
+        _currentSurvey = null;
         _isDismissingSurvey = false;
         _dismissSurveyWhenReady = false;
         _currentSurveyRoute = null;
@@ -146,7 +149,8 @@ class SurveyService {
   }
 
   /// Hides any active survey
-  void hideSurvey() {
+  void hideSurvey({PostHogDisplaySurvey? survey}) {
+    if (survey != null && !identical(survey, _currentSurvey)) return;
     if (!_isShowingSurvey || _isDismissingSurvey) {
       return;
     }

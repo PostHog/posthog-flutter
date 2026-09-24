@@ -143,6 +143,8 @@ class PostHogDisplaySurvey {
     return PostHogDisplaySurvey(
       id: dict['id'] as String,
       name: dict['name'] as String,
+      initialQuestionIndex: dict['initialQuestionIndex'] as int? ?? 0,
+      presentationId: dict['presentationId'] as String?,
       questions: questions,
       appearance: appearance,
       startDate: startDate,
@@ -154,6 +156,8 @@ class PostHogDisplaySurvey {
     required this.id,
     required this.name,
     required this.questions,
+    this.initialQuestionIndex = 0,
+    this.presentationId,
     this.appearance,
     this.startDate,
     this.endDate,
@@ -161,6 +165,8 @@ class PostHogDisplaySurvey {
 
   final String id;
   final String name;
+  final int initialQuestionIndex;
+  final String? presentationId;
   final List<PostHogDisplaySurveyQuestion> questions;
   final PostHogDisplaySurveyAppearance? appearance;
   final DateTime? startDate;

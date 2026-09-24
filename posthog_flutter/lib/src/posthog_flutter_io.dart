@@ -146,38 +146,44 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       (survey) async {
         // onShown
         try {
-          await _methodChannel.invokeMethod('surveyAction', {'type': 'shown'});
+          await _methodChannel.invokeMethod('surveyAction', {
+            'type': 'shown',
+            'presentationId': survey.presentationId,
+          });
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(shown): $exception');
         }
       },
       (survey, index, response) async {
         // onResponse
-        int nextIndex = index;
-        bool isSurveyCompleted = false;
-
         try {
           final result = await _methodChannel.invokeMethod('surveyAction', {
             'type': 'response',
+            'presentationId': survey.presentationId,
             'index': index,
             'response': response,
-          }) as Map;
-          nextIndex = (result['nextIndex'] as num).toInt();
-          isSurveyCompleted = result['isSurveyCompleted'] as bool;
+          }) as Map?;
+          if (result == null) return null;
+          return PostHogSurveyNextQuestion(
+            questionIndex: (result['nextIndex'] as num).toInt(),
+            isSurveyCompleted: result['isSurveyCompleted'] as bool,
+          );
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(response): $exception');
+          if (exception.code == 'SurveyInvalidated') {
+            SurveyService().hideSurvey(survey: survey);
+          }
         }
 
-        final nextQuestion = PostHogSurveyNextQuestion(
-          questionIndex: nextIndex,
-          isSurveyCompleted: isSurveyCompleted,
-        );
-        return nextQuestion;
+        return null;
       },
       (survey) async {
         // onClose
         try {
-          await _methodChannel.invokeMethod('surveyAction', {'type': 'closed'});
+          await _methodChannel.invokeMethod('surveyAction', {
+            'type': 'closed',
+            'presentationId': survey.presentationId,
+          });
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(closed): $exception');
         }
