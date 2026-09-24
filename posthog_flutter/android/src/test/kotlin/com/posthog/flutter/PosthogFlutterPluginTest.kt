@@ -173,6 +173,25 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun setup_throttleDelayMs_forwardsToNativeReplayConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        val call =
+            MethodCall(
+                "setup",
+                mapOf(
+                    "projectToken" to "test-token",
+                    "sessionReplay" to true,
+                    "sessionReplayConfig" to mapOf("throttleDelayMs" to 2500),
+                ),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        assertEquals(2500L, assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig.throttleDelayMs)
+    }
+
+    @Test
     fun setup_screenshotControls_preserveDefaults() {
         val plugin = PosthogFlutterPlugin()
         val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))

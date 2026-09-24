@@ -261,6 +261,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 if let sampleRate = sessionReplayConfigMap["sampleRate"] as? NSNumber {
                     config.sessionReplayConfig.sampleRate = sampleRate
                 }
+                if let throttleDelayMs = sessionReplayConfigMap["throttleDelayMs"] as? NSNumber {
+                    config.sessionReplayConfig.throttleDelay = throttleDelayMs.doubleValue / 1000
+                }
                 let captureNativeScreens =
                     sessionReplayConfigMap["captureNativeScreens"] as? Bool ?? false
                 // Unconditional: only bridged captures read these, so a runtime

@@ -622,6 +622,9 @@ class PosthogFlutterPlugin :
                     replayConfig.getIfNotNull<Double>("sampleRate") {
                         this.sessionReplayConfig.sampleRate = it
                     }
+                    (replayConfig["throttleDelayMs"] as? Number)?.let {
+                        this.sessionReplayConfig.throttleDelayMs = it.toLong()
+                    }
                     this.sessionReplayConfig.verifyScreenshotMaskAlignment =
                         replayConfig["verifyScreenshotMaskAlignment"] as? Boolean ?: false
                     (replayConfig["screenshotScale"] as? Number)?.let {
