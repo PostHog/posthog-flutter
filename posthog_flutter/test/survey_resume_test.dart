@@ -12,10 +12,12 @@ import 'package:posthog_flutter/src/surveys/widgets/survey_bottom_sheet.dart';
 void main() {
   const channel = MethodChannel('posthog_flutter');
   final actions = <Map<dynamic, dynamic>>[];
+  final openedLinks = <String>[];
+  Completer<void>? openingLink;
   late PosthogFlutterIO platform;
   Future<Object?> Function(Map<dynamic, dynamic>)? respond;
 
-  Map<String, Object?> survey({int? initialIndex}) => {
+  Map<String, Object?> survey({int? initialIndex, bool link = false}) => {
         'id': 'survey-1',
         'name': 'Feedback',
         'presentationId': 'attempt-2',
@@ -24,7 +26,8 @@ void main() {
           for (var index = 0; index < 3; index++)
             {
               'id': 'question-$index',
-              'type': 'open',
+              'type': link && index == 2 ? 'link' : 'open',
+              if (link && index == 2) 'link': 'https://example.com/feedback',
               'question': 'Question $index',
               'isOptional': false,
             },
@@ -50,9 +53,16 @@ void main() {
     platform = PosthogFlutterIO();
     PosthogFlutterPlatformInterface.instance = platform;
     actions.clear();
+    openedLinks.clear();
+    openingLink = null;
     respond = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'openUrl') {
+        openedLinks.add(call.arguments as String);
+        await openingLink?.future;
+        return null;
+      }
       if (call.method != 'surveyAction') return null;
       final args = call.arguments as Map;
       actions.add(args);
@@ -120,7 +130,7 @@ void main() {
   testWidgets(
       'an invalidated native response hides without dismissing progress',
       (tester) async {
-    respond = (_) async => null;
+    respond = (_) async => throw PlatformException(code: 'SurveyInvalidated');
     await mount(tester);
     final shown = platform.showSurvey(survey(initialIndex: 2));
     await tester.pumpAndSettle();
@@ -154,6 +164,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(actions.map((action) => action['type']), ['shown', 'response']);
   });
+
   testWidgets('a stale reply cannot hide a new survey presentation',
       (tester) async {
     final response = Completer<Object?>();
@@ -184,4 +195,64 @@ void main() {
     await tester.pumpAndSettle();
     await next;
   });
+
+  testWidgets('rapid link taps submit and open the URL only once',
+      (tester) async {
+    final response = Completer<Object?>();
+    openingLink = Completer<void>();
+    respond = (_) => response.future;
+    await mount(tester);
+    final shown = platform.showSurvey(survey(initialIndex: 2, link: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit'));
+    await tester.tap(find.text('Submit'));
+    expect(actions.where((action) => action['type'] == 'response').length, 1);
+    expect(actions.last['response'], true);
+    expect(openedLinks, isEmpty);
+
+    response.complete({'nextIndex': 2, 'isSurveyCompleted': true});
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit'), warnIfMissed: false);
+    expect(actions.where((action) => action['type'] == 'response').length, 1);
+    expect(openedLinks, ['https://example.com/feedback']);
+    openingLink!.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Thanks'), findsOneWidget);
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+    await shown;
+    expect(actions.last['type'], 'closed');
+  });
+
+  for (final link in [false, true]) {
+    testWidgets('a refused answer stays open and can be retried (link=$link)',
+        (tester) async {
+      respond = (_) async => null;
+      await mount(tester);
+      final shown = platform.showSurvey(survey(initialIndex: 2, link: link));
+      await tester.pumpAndSettle();
+      if (!link) {
+        await tester.enterText(find.byType(TextField), 'Keep my answer');
+        await tester.pump();
+      }
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+      expect(find.text('Question 2'), findsOneWidget);
+      expect(find.text('Thanks'), findsNothing);
+      if (!link) expect(find.text('Keep my answer'), findsOneWidget);
+      expect(openedLinks, isEmpty);
+      expect(actions.map((action) => action['type']), ['shown', 'response']);
+
+      respond = null;
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+      expect(find.text('Thanks'), findsOneWidget);
+      expect(openedLinks, link ? ['https://example.com/feedback'] : isEmpty);
+      await tester.tap(find.byType(IconButton));
+      await tester.pumpAndSettle();
+      await shown;
+      expect(actions.map((action) => action['type']),
+          ['shown', 'response', 'response', 'closed']);
+    });
+  }
 }

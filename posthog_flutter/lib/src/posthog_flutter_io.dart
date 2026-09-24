@@ -156,9 +156,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       },
       (survey, index, response) async {
         // onResponse
-        int nextIndex = index;
-        bool isSurveyCompleted = false;
-
         try {
           final result = await _methodChannel.invokeMethod('surveyAction', {
             'type': 'response',
@@ -166,12 +163,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
             'index': index,
             'response': response,
           }) as Map?;
-          if (result == null) {
-            SurveyService().hideSurvey(survey: survey);
-          } else {
-            nextIndex = (result['nextIndex'] as num).toInt();
-            isSurveyCompleted = result['isSurveyCompleted'] as bool;
-          }
+          if (result == null) return null;
+          return PostHogSurveyNextQuestion(
+            questionIndex: (result['nextIndex'] as num).toInt(),
+            isSurveyCompleted: result['isSurveyCompleted'] as bool,
+          );
         } on PlatformException catch (exception) {
           printIfDebug('Exception on surveyAction(response): $exception');
           if (exception.code == 'SurveyInvalidated') {
@@ -179,11 +175,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           }
         }
 
-        final nextQuestion = PostHogSurveyNextQuestion(
-          questionIndex: nextIndex,
-          isSurveyCompleted: isSurveyCompleted,
-        );
-        return nextQuestion;
+        return null;
       },
       (survey) async {
         // onClose

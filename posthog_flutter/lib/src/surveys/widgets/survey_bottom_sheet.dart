@@ -64,7 +64,7 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
     Navigator.of(context).pop();
   }
 
-  Future<void> _submitResponse(Object? response) async {
+  Future<void> _submitResponse(Object? response, {String? link}) async {
     if (_isSubmitting || _isCompleted) return;
     setState(() => _isSubmitting = true);
     try {
@@ -73,6 +73,14 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
         _currentIndex,
         response,
       );
+      if (!mounted || nextQuestion == null) return;
+
+      // Open the URL if provided
+      if (link != null && link.isNotEmpty) {
+        await PosthogFlutterPlatformInterface.instance.openUrl(link);
+      }
+
+      // Update state
       if (!mounted) return;
       setState(() {
         _currentIndex = nextQuestion.questionIndex;
@@ -107,29 +115,11 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
           buttonText: linkQuestion.buttonText,
           link: linkQuestion.link,
-          onPressed: () async {
-            // Send survey response (true for link questions)
-            final nextQuestion = await widget.onResponse(
-              widget.survey,
-              _currentIndex,
-              true, // Boolean response for link questions
-            );
-
-            if (!mounted) return;
-
-            // Open the URL if provided
-            final link = linkQuestion.link;
-            if (link.isNotEmpty) {
-              await PosthogFlutterPlatformInterface.instance.openUrl(link);
-            }
-
-            // Update state
-            if (!mounted) return;
-            setState(() {
-              _currentIndex = nextQuestion.questionIndex;
-              _isCompleted = nextQuestion.isSurveyCompleted;
-            });
-          },
+          // Send survey response (true for link questions)
+          onPressed: () => _submitResponse(
+            true, // Boolean response for link questions
+            link: linkQuestion.link,
+          ),
         );
       case PostHogSurveyQuestionType.rating:
         final ratingQuestion = currentQuestion as PostHogDisplayRatingQuestion;

@@ -4,7 +4,7 @@ import 'posthog_display_survey.dart';
 typedef OnSurveyShown = void Function(PostHogDisplaySurvey survey);
 
 /// Called when a user responds to a survey question
-typedef OnSurveyResponse = Future<PostHogSurveyNextQuestion> Function(
+typedef OnSurveyResponse = Future<PostHogSurveyNextQuestion?> Function(
   PostHogDisplaySurvey survey,
   int questionIndex,
   Object? response,
