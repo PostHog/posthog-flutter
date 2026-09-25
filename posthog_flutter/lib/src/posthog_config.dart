@@ -183,6 +183,10 @@ class PostHogConfig {
   /// Set this to [PostHogCompression.none] when something between the app and
   /// PostHog, e.g. a managed network or work profile, alters the gzip body.
   ///
+  /// **Flutter web:** not applied. The web SDK hooks onto an already-initialized
+  /// posthog-js instance, so set `disable_compression: true` in your
+  /// `posthog.init({...})` call instead to match [PostHogCompression.none].
+  ///
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
 
