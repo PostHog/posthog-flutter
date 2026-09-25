@@ -1,5 +1,11 @@
 ## Next
 
+## 5.49.0
+
+### Minor Changes
+
+- fbe5397: Add the `compression` config (`PostHogCompression.gzip` / `none`) so an app can send request bodies uncompressed, e.g. when a managed network or work profile alters the compressed body in transit.
+
 ## 5.48.0
 
 ### Minor Changes
