@@ -181,8 +181,7 @@ class PostHogConfig {
   /// Controls how request bodies are compressed before being sent to PostHog.
   ///
   /// Set this to [PostHogCompression.none] when something between the app and
-  /// PostHog alters the compressed body, e.g. on a managed network or work
-  /// profile, which makes the server reject the request.
+  /// PostHog, e.g. a managed network or work profile, alters the gzip body.
   ///
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
