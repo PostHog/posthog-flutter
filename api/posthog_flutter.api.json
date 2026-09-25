@@ -2323,6 +2323,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "compression",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogCompression"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "sessionReplay",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
@@ -2603,6 +2614,58 @@
                 "isRequired": false,
                 "isSealed": false,
                 "name": "PostHogPersonProfiles",
+                "relativePath": "lib/src/posthog_config.dart",
+                "superTypeNames": [
+                    "Enum",
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "gzip",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogCompression"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "none",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogCompression"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": true,
+                        "isWriteable": false,
+                        "name": "values",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "List<PostHogCompression>"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogCompression",
                 "relativePath": "lib/src/posthog_config.dart",
                 "superTypeNames": [
                     "Enum",

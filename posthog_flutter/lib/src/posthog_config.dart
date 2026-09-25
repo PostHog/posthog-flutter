@@ -55,6 +55,16 @@ enum PostHogPersonProfiles {
   identifiedOnly,
 }
 
+/// Controls how the SDK compresses request bodies before sending them to the
+/// PostHog API.
+enum PostHogCompression {
+  /// Gzip request bodies.
+  gzip,
+
+  /// Send request bodies uncompressed.
+  none,
+}
+
 /// Controls which network connection types can be used for sending data.
 ///
 /// This setting is currently applied only on Apple platforms.
@@ -167,6 +177,15 @@ class PostHogConfig {
   ///
   /// Defaults to [PostHogPersonProfiles.identifiedOnly].
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
+
+  /// Controls how request bodies are compressed before being sent to PostHog.
+  ///
+  /// Set this to [PostHogCompression.none] when something between the app and
+  /// PostHog alters the compressed body, e.g. on a managed network or work
+  /// profile, which makes the server reject the request.
+  ///
+  /// Defaults to [PostHogCompression.gzip].
+  var compression = PostHogCompression.gzip;
 
   /// Whether mobile session replay is enabled for Android and iOS.
   ///
@@ -404,6 +423,7 @@ class PostHogConfig {
       'optOut': optOut,
       'surveys': surveys,
       'personProfiles': personProfiles.name,
+      'compression': compression.name,
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
       'sessionReplayConfig': sessionReplayConfig.toMap(),

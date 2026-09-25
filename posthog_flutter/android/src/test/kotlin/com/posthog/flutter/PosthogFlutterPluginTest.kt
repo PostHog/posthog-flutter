@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.BadParcelableException
 import com.google.firebase.FirebaseApp
+import com.posthog.PostHogCompression
 import com.posthog.android.replay.PostHogScreenshotColorMode
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -189,6 +190,39 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
 
         assertEquals(2500L, assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig.throttleDelayMs)
+    }
+
+    @Test
+    fun setup_compression_defaultsToGzip() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        val call =
+            MethodCall(
+                "setup",
+                mapOf("projectToken" to "test-token"),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        assertEquals(PostHogCompression.GZIP, assertNotNull(plugin.lastBuiltConfig).compression)
+    }
+
+    @Test
+    fun setup_compression_none_forwardsToNativeConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        val call =
+            MethodCall(
+                "setup",
+                mapOf(
+                    "projectToken" to "test-token",
+                    "compression" to "none",
+                ),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        assertEquals(PostHogCompression.NONE, assertNotNull(plugin.lastBuiltConfig).compression)
     }
 
     @Test
