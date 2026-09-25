@@ -22,6 +22,7 @@
       "optOut": false,
       "surveys": true,
       "personProfiles": "always",
+      "compression": "gzip",
       "sessionReplay": true,
       "dataMode": "any",
       "sessionReplayConfig": {

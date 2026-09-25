@@ -221,6 +221,16 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 break
             }
         }
+        if let compression = posthogConfig["compression"] as? String {
+            switch compression {
+            case "gzip":
+                config.compression = .gzip
+            case "none":
+                config.compression = .none
+            default:
+                break
+            }
+        }
         if let dataMode = posthogConfig["dataMode"] as? String {
             switch dataMode {
             case "wifi":

@@ -24,6 +24,7 @@ import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
 import com.posthog.PostHogBootstrapConfig
+import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
 import com.posthog.PostHogOnFeatureFlags
 import com.posthog.android.PostHogAndroid
@@ -609,6 +610,12 @@ class PosthogFlutterPlugin :
                         "never" -> personProfiles = PersonProfiles.NEVER
                         "always" -> personProfiles = PersonProfiles.ALWAYS
                         "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
+                    }
+                }
+                posthogConfig.getIfNotNull<String>("compression") {
+                    when (it) {
+                        "gzip" -> compression = PostHogCompression.GZIP
+                        "none" -> compression = PostHogCompression.NONE
                     }
                 }
                 posthogConfig.getIfNotNull<Boolean>("sessionReplay") {

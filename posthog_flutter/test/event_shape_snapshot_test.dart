@@ -74,6 +74,22 @@ void main() {
     await _expectSnapshot('setup_request.json', calls);
   });
 
+  test('compression defaults to gzip and serializes none explicitly', () async {
+    expect(
+      PostHogConfig('snapshot_project_token').compression,
+      PostHogCompression.gzip,
+    );
+
+    final config = PostHogConfig('snapshot_project_token')
+      ..compression = PostHogCompression.none;
+
+    await Posthog().setup(config);
+
+    expect(calls.single.method, 'setup');
+    final arguments = calls.single.arguments as Map;
+    expect(arguments['compression'], 'none');
+  });
+
   test('snapshots event and identity channel shapes', () async {
     final config = PostHogConfig(
       'snapshot_project_token',
