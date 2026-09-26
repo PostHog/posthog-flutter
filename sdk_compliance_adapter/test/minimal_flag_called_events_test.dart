@@ -148,9 +148,8 @@ void main() {
     final gated = await harness.captureFeatureFlagCalled('plain-flag');
     expect(gated, isNot(contains(r'$feature/plain-flag')));
 
-    mockServer.flagsResponse = {
-      'featureFlags': {'plain-flag': true},
-    };
+    mockServer.flagsResponse = Map.of(mockServer.flagsResponse)
+      ..remove('minimalFlagCalledEvents');
 
     final ungated = await harness.captureFeatureFlagCalled('plain-flag');
     expect(ungated, contains(r'$feature/plain-flag'));

@@ -22,6 +22,7 @@ void main() {
 
   tearDown(() {
     fake.screenName = null;
+    PosthogObserver.clearCurrentContext();
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
   });
 
@@ -29,10 +30,12 @@ void main() {
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
   }) {
-    return PosthogObserver(
+    final observer = PosthogObserver(
       nameExtractor: nameExtractor,
       routeFilter: routeFilter,
     );
+    addTearDown(() => WidgetsBinding.instance.removeObserver(observer));
+    return observer;
   }
 
   test('returns current route name', () {
@@ -147,6 +150,21 @@ void main() {
     sut.didChangeAppLifecycleState(AppLifecycleState.resumed);
     sut.didPush(currentRoute, null);
     expect(fake.screenName, 'Current Route');
+  });
+
+  test('captures the previous route when popping in the foreground', () {
+    final sut = getSut();
+    sut.didPop(route(const RouteSettings(name: 'Current Route')),
+        route(const RouteSettings(name: 'Previous Route')));
+    expect(fake.screenName, 'Previous Route');
+  });
+
+  test('captures the new route when replacing in the foreground', () {
+    final sut = getSut();
+    sut.didReplace(
+        newRoute: route(const RouteSettings(name: 'New Route')),
+        oldRoute: route(const RouteSettings(name: 'Old Route')));
+    expect(fake.screenName, 'New Route');
   });
 
   test('does not capture screen events on didPop when app is paused', () {

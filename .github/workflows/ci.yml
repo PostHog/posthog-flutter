@@ -164,12 +164,17 @@ jobs:
         working-directory: ./posthog_flutter
         run: flutter test
 
+      - name: Test compliance adapter
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        working-directory: ./sdk_compliance_adapter
+        run: flutter test test/feature_flag_has_experiment_test.dart test/flags_retry_test.dart test/minimal_flag_called_events_test.dart test/timestamp_test.dart
+
       # Browser-only tests (`@TestOn('browser')`) are skipped by the VM run above.
       - name: Test (web)
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         timeout-minutes: 5
         working-directory: ./posthog_flutter
-        run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_widget_web_test.dart test/web_canvas_mask_provider_test.dart
+        run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_flutter_web_setup_test.dart test/posthog_widget_web_test.dart test/posthog_widget_test.dart test/web_canvas_mask_provider_test.dart
 
       # dart2js resolves the isolate-handler conditional import differently;
       # only a wasm compile exercises the dart2wasm selection this test guards.
@@ -259,6 +264,11 @@ jobs:
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./example
         run: ${{ matrix.build_command }}
+
+      - name: iOS plugin tests
+        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && matrix.target == 'ios' && matrix.package_manager == 'cocoapods' }}
+        working-directory: ./example/ios
+        run: xcodebuild test -workspace Runner.xcworkspace -scheme Runner -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:RunnerTests
 
   # Android build
   build-android:

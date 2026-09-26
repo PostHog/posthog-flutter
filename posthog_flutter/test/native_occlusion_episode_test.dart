@@ -99,8 +99,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  /// Lets the occlusion handler's real-async work (placeholder rasterization,
-  /// channel round-trips) run to completion.
+  /// Gives raster work a bounded opportunity to progress; callers must assert
+  /// the expected channel milestone rather than assume completion.
   Future<void> settleRealAsync(WidgetTester tester) async {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 300)),
@@ -255,7 +255,7 @@ void main() {
       recordedCalls.clear();
 
       pushOcclusion(occluded: true, episode: 1);
-      await settleRealAsync(tester);
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
 
       final methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, contains('sendMetaEvent'));
@@ -282,7 +282,8 @@ void main() {
       onSendMetaEvent = () => pushOcclusion(occluded: false, episode: 1);
 
       pushOcclusion(occluded: true, episode: 1);
-      await settleRealAsync(tester);
+      await settleUntil(tester, () => sent('sendMetaEvent'));
+      await tester.pump();
 
       final methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, contains('sendMetaEvent'));
@@ -313,10 +314,8 @@ void main() {
       };
 
       pushOcclusion(occluded: true, episode: 1);
-      // Two settles: episode 2's own placeholder build+send starts only after
-      // episode 1's send unwinds.
-      await settleRealAsync(tester);
-      await settleRealAsync(tester);
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
+      await tester.pump();
 
       final fulls =
           recordedCalls.where((c) => c.method == 'sendFullSnapshot').length;
@@ -327,17 +326,24 @@ void main() {
       await unmountAndFlush(tester);
     });
 
-    testWidgets('placeholder is dropped when its episode ends mid-build',
+    testWidgets(
+        'placeholder is not built when its episode ends during negotiation',
         (tester) async {
       await setupPosthog(replayConfig(captureNativeScreens: true));
       await pumpReplayWidget(tester);
       recordedCalls.clear();
 
-      // The start handler runs synchronously up to the placeholder's first
-      // await; ending the episode here makes the world it captured stale.
+      final negotiation = Completer<bool>();
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        recordedCalls.add(call);
+        if (call.method == 'enableNativeBridge') return negotiation.future;
+        return null;
+      });
       pushOcclusion(occluded: true, episode: 1);
+      expect(sent('enableNativeBridge'), isTrue);
       pushOcclusion(occluded: false, episode: 1);
-      await settleRealAsync(tester);
+      negotiation.complete(false);
+      await tester.pump();
 
       final methods = recordedCalls.map((c) => c.method).toList();
       expect(methods, isNot(contains('sendFullSnapshot')));
@@ -671,8 +677,8 @@ void main() {
     });
 
     testWidgets(
-        'resetSessionStateIfNeeded clears every tracked view, not just the '
-        'held one', (tester) async {
+        'resetSessionStateIfNeeded clears the tracked view and held status',
+        (tester) async {
       final config = replayConfig(captureNativeScreens: true);
       await setupPosthog(config);
       await pumpReplayWidget(tester);

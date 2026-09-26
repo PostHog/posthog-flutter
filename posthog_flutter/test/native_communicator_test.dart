@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/replay/native_communicator.dart';
@@ -19,6 +21,12 @@ void main() {
       final b = Uint8List.fromList([5, 6, 7, 8]);
       messenger.setMockMethodCallHandler(channel, (call) async {
         expect(call.method, 'captureNativeScreenshots');
+        expect(call.arguments, {
+          'views': [
+            {'x': 0, 'y': 0, 'width': 10, 'height': 10},
+            {'x': 10, 'y': 0, 'width': 10, 'height': 10},
+          ],
+        });
         return [a, b];
       });
 
@@ -52,6 +60,26 @@ void main() {
 
       expect(result, isEmpty);
       expect(called, isFalse);
+    });
+
+    testWidgets('times out stalled native captures after five seconds',
+        (tester) async {
+      final nativeReply = Completer<Object?>();
+      messenger.setMockMethodCallHandler(channel, (_) => nativeReply.future);
+      var finished = false;
+      final capture = NativeCommunicator().captureNativeScreenshots([
+        {'x': 0, 'y': 0, 'width': 10, 'height': 20},
+        {'x': 20, 'y': 0, 'width': 10, 'height': 20},
+      ]).then((value) {
+        finished = true;
+        return value;
+      });
+      await tester.pump(const Duration(milliseconds: 4999));
+      expect(finished, isFalse);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(await capture, [null, null]);
+      nativeReply.complete([Uint8List(1), Uint8List(1)]);
+      await tester.pump();
     });
 
     test('returns null-filled list when the channel throws', () async {

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/replay/element_parsers/element_data.dart';
@@ -38,13 +40,22 @@ void main() {
 
     expect(rects, hasLength(1));
     final rect = rects.single;
+    for (final corner in const [
+      Offset(0, 0),
+      Offset(10, 0),
+      Offset(0, 10),
+      Offset(10, 10),
+    ]) {
+      expect(
+          rect.contains(
+              MatrixUtils.transformPoint(Matrix4.rotationZ(0.5), corner)),
+          isTrue);
+    }
+    expect(rect.left, closeTo(-10 * math.sin(0.5) - 1, 1e-9));
+    expect(rect.top, -1);
+    expect(rect.right, closeTo(10 * math.cos(0.5) + 1, 1e-9));
     expect(
-        rect.contains(MatrixUtils.transformPoint(
-          Matrix4.rotationZ(0.5),
-          const Offset(10, 10),
-        )),
-        isTrue);
-    expect(rect.contains(const Offset(0, 0)), isTrue);
+        rect.bottom, closeTo(10 * (math.sin(0.5) + math.cos(0.5)) + 1, 1e-9));
   });
 
   test('drops empty and non-finite rects before outsetting', () {

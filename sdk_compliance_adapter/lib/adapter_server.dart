@@ -537,7 +537,8 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
         if (decoded is Map) {
           final flags = decoded['featureFlags'] ?? decoded['flags'];
           if (flags is Map && flags.containsKey(key)) {
-            value = flags[key];
+            final flag = flags[key];
+            value = flag is Map ? flag['variant'] ?? flag['enabled'] : flag;
           }
           hasExperiment = _flagHasExperiment(decoded['flags'], key);
           minimalFlagCalledEvents = decoded['minimalFlagCalledEvents'] == true;

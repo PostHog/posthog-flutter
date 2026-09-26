@@ -10,7 +10,7 @@ void main() {
     'capture converts a non-UTC override to the equivalent UTC instant',
     () async {
       expect(
-        await _captureTimestamp('2024-03-01T12:30:00-05:00'),
+        (await _captureTimestamp('2024-03-01T12:30:00-05:00')).timestamp,
         '2024-03-01T17:30:00.000Z',
       );
     },
@@ -18,18 +18,17 @@ void main() {
 
   test('capture replaces an invalid timestamp with the current UTC time',
       () async {
-    final beforeCapture = DateTime.now().toUtc();
-    final timestamp = DateTime.parse(await _captureTimestamp('invalid'));
+    final capture = await _captureTimestamp('invalid');
+    final timestamp = DateTime.parse(capture.timestamp);
 
     expect(timestamp.isUtc, isTrue);
-    expect(
-      timestamp.difference(beforeCapture).abs(),
-      lessThan(const Duration(seconds: 5)),
-    );
+    expect(timestamp.isBefore(capture.before), isFalse);
+    expect(timestamp.isAfter(capture.after), isFalse);
   });
 }
 
-Future<String> _captureTimestamp(String timestamp) async {
+Future<({String timestamp, DateTime before, DateTime after})> _captureTimestamp(
+    String timestamp) async {
   final uploadedBody = Completer<Map<String, Object?>>();
   final ingestion = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   addTearDown(() => ingestion.close(force: true));
@@ -56,17 +55,23 @@ Future<String> _captureTimestamp(String timestamp) async {
     'flush_at': 100,
     'flush_interval_ms': 60000,
   });
+  final before = DateTime.now().toUtc();
   await _post(client, port, '/capture', {
     'distinct_id': 'user-1',
     'event': 'order completed',
     'timestamp': timestamp,
   });
+  final after = DateTime.now().toUtc();
   await _post(client, port, '/flush', {});
 
   final body = await uploadedBody.future;
   final batch = body['batch'] as List<Object?>;
   final event = batch.single! as Map<String, Object?>;
-  return event['timestamp']! as String;
+  return (
+    timestamp: event['timestamp']! as String,
+    before: before,
+    after: after
+  );
 }
 
 Future<Map<String, Object?>> _post(
