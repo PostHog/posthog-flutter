@@ -235,4 +235,73 @@ void main() {
       expect(capturedMessage, 'Exception');
     });
   });
+
+  group('appVersionProperties', () {
+    test('maps the build name and number to the native property names', () {
+      expect(
+        appVersionProperties(buildName: '3.24.2', buildNumber: '183'),
+        {r'$app_version': '3.24.2', r'$app_build': '183'},
+      );
+    });
+
+    test('omits properties whose define is empty (Flutter < 3.47)', () {
+      expect(appVersionProperties(buildName: '', buildNumber: ''), isEmpty);
+      expect(
+        appVersionProperties(buildName: '1.0.0', buildNumber: ''),
+        {r'$app_version': '1.0.0'},
+      );
+    });
+  });
+
+  // capture and screen must carry the running build's version, like the
+  // native SDKs do, without overriding a value the caller set explicitly.
+  group('handleWebMethodCall app version', () {
+    final captured = <String, Map<Object?, Object?>>{};
+
+    setUp(() {
+      captured.clear();
+
+      final fake = JSObject();
+      fake.setProperty(
+        'capture'.toJS,
+        ((JSString event, JSAny? properties, JSAny? options) {
+          captured[event.toDart] =
+              properties!.dartify()! as Map<Object?, Object?>;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    Matcher containsAppVersion() => allOf(appVersionProperties()
+        .entries
+        .map((e) => containsPair(e.key, e.value))
+        .toList());
+
+    test('capture attaches the compile-time app version', () async {
+      await handleWebMethodCall(const MethodCall('capture', {
+        'eventName': 'checkout',
+        'properties': {'step': 1},
+      }));
+
+      expect(captured['checkout'], containsPair('step', 1));
+      expect(captured['checkout'], containsAppVersion());
+    });
+
+    test('screen attaches the compile-time app version', () async {
+      await handleWebMethodCall(const MethodCall('screen', {
+        'screenName': 'Home',
+      }));
+
+      expect(captured[r'$screen'], containsAppVersion());
+    });
+
+    test('keeps an app version the caller set explicitly', () async {
+      await handleWebMethodCall(const MethodCall('capture', {
+        'eventName': 'checkout',
+        'properties': {r'$app_version': 'custom'},
+      }));
+
+      expect(captured['checkout']![r'$app_version'], 'custom');
+    });
+  });
 }

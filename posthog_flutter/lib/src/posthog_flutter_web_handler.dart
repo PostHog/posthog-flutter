@@ -2,6 +2,7 @@
 
 import 'dart:js_interop';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
@@ -132,6 +133,35 @@ void _maybeOverrideSDKInfo() {
   }
 }
 
+// Flutter 3.47+ compiles the pubspec `version` into every build as these
+// defines (flutter/flutter#187935). They are empty on older Flutter versions.
+const _flutterBuildName = String.fromEnvironment('FLUTTER_BUILD_NAME');
+const _flutterBuildNumber = String.fromEnvironment('FLUTTER_BUILD_NUMBER');
+
+/// Returns the `$app_version` and `$app_build` properties the native SDKs
+/// attach to every event, omitting any that are empty.
+///
+/// posthog-js has no notion of an app version, and the server-hosted
+/// `version.json` describes the latest deploy rather than the bundle actually
+/// running, so the compile-time build name and number are the only reliable
+/// source on web.
+@visibleForTesting
+Map<String, String> appVersionProperties({
+  String buildName = _flutterBuildName,
+  String buildNumber = _flutterBuildNumber,
+}) {
+  return {
+    if (buildName.isNotEmpty) '\$app_version': buildName,
+    if (buildNumber.isNotEmpty) '\$app_build': buildNumber,
+  };
+}
+
+void _addAppVersionProperties(Map<String, dynamic> properties) {
+  appVersionProperties().forEach(
+    (key, value) => properties.putIfAbsent(key, () => value),
+  );
+}
+
 Map<String, String> _getLocationProperties() {
   try {
     final location = web.window.location;
@@ -203,6 +233,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
+      _addAppVersionProperties(properties);
       final userProperties = safeMapConversion(args['userProperties']);
       final userPropertiesSetOnce = safeMapConversion(
         args['userPropertiesSetOnce'],
@@ -229,6 +260,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
       properties.addAll(_getLocationProperties());
+      _addAppVersionProperties(properties);
 
       posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
       break;
@@ -426,6 +458,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
+      _addAppVersionProperties(properties);
 
       // Route through posthog-js's captureException so it attaches required
       // metadata and any buffered $exception_steps. posthog-js spreads the
