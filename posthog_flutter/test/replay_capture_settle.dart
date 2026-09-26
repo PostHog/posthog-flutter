@@ -6,9 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// [settleUntil] is the one to use when asserting that something *did* happen:
 /// it returns as soon as [done] is satisfied, so a slow machine costs latency
-/// rather than a failure. [settleCapture] drains a fixed budget instead, which
-/// is what negative assertions need — they have to be sure the pipeline was
-/// given every chance before concluding nothing was sent.
+/// rather than a failure. Callers must still assert the milestone afterwards.
+/// [settleCapture] advances a fixed budget, not a completion barrier.
 Future<void> settleUntil(
   WidgetTester tester,
   bool Function() done, {
@@ -24,9 +23,8 @@ Future<void> settleUntil(
 
 /// Drains the capture pipeline for a fixed budget.
 ///
-/// Only for negative assertions (`isNot(contains(...))`), where an early exit
-/// would make the assertion pass for the wrong reason — the capture simply not
-/// having finished. Raise the budget if a capture gains awaits.
+/// A negative assertion after this wait alone does not establish that an
+/// asynchronous capture completed. Prefer an explicit completion signal.
 Future<void> settleCapture(WidgetTester tester, {int rounds = 16}) async {
   for (var i = 0; i < rounds; i++) {
     await tester.pump(const Duration(milliseconds: 1));

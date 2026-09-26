@@ -6,11 +6,14 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
+import 'package:posthog_flutter/src/replay/web/web_canvas_mask_provider.dart';
 
 /// posthog-js is initialized by the host app on web, so options the plugin
 /// cannot forward must warn instead of silently doing nothing.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(WebCanvasMaskProvider.resetForTesting);
+  tearDown(WebCanvasMaskProvider.resetForTesting);
 
   Future<List<String>> setupCapturingLogs(PostHogConfig config) async {
     final logs = <String>[];

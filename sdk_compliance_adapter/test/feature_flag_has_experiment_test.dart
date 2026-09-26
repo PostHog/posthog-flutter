@@ -6,6 +6,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter_sdk_compliance_adapter/adapter_server.dart';
 
 void main() {
+  for (final (enabled, variant, expected) in <(bool, String?, Object)>[
+    (true, null, true),
+    (false, null, false),
+    (true, 'control', 'control'),
+  ]) {
+    test('v2-only flags return scalar value $expected', () async {
+      final server = await _MockPostHogServer.start({
+        'flags': {
+          'v2-flag': {
+            'key': 'v2-flag',
+            'enabled': enabled,
+            'variant': variant,
+            'metadata': {'has_experiment': false},
+          },
+        },
+      });
+      addTearDown(server.close);
+      final properties = await _captureFeatureFlagCalled(server,
+          key: 'v2-flag', expectedValue: expected);
+      expect(properties[r'$feature_flag_response'], expected);
+      expect(properties[r'$feature_flag_has_experiment'], false);
+    });
+  }
   test(
     r'$feature_flag_called includes $feature_flag_has_experiment from v2 metadata',
     () async {
@@ -85,6 +108,7 @@ void main() {
 Future<Map<String, Object?>> _captureFeatureFlagCalled(
   _MockPostHogServer mockServer, {
   required String key,
+  Object? expectedValue,
 }) async {
   final adapter = ComplianceAdapter();
   final adapterServer = await adapter.start(port: 0);
@@ -102,6 +126,7 @@ Future<Map<String, Object?>> _captureFeatureFlagCalled(
     'distinct_id': 'test-user',
   });
   expect(response['success'], isTrue);
+  if (expectedValue != null) expect(response['value'], expectedValue);
 
   await _postJson('$adapterBase/flush', {});
 

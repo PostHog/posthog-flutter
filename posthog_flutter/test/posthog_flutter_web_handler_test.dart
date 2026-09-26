@@ -148,11 +148,19 @@ void main() {
         () async {
       await PosthogFlutterWeb().addExceptionStep(
         'User tapped Checkout',
-        properties: {'screen': 'cart', 'count': 3},
+        properties: {
+          'screen': 'cart',
+          'count': 3,
+          'at': DateTime.utc(2026, 1, 2)
+        },
       );
 
       expect(capturedMessage, 'User tapped Checkout');
-      expect(capturedProperties.dartify(), {'screen': 'cart', 'count': 3});
+      expect(capturedProperties.dartify(), {
+        'screen': 'cart',
+        'count': 3,
+        'at': '2026-01-02 00:00:00.000Z',
+      });
     });
   });
 
@@ -272,10 +280,17 @@ void main() {
       globalContext.setProperty('posthog'.toJS, fake);
     });
 
-    Matcher containsAppVersion() => allOf(appVersionProperties()
-        .entries
-        .map((e) => containsPair(e.key, e.value))
-        .toList());
+    Matcher containsAppVersion() {
+      const name = String.fromEnvironment('FLUTTER_BUILD_NAME');
+      const number = String.fromEnvironment('FLUTTER_BUILD_NUMBER');
+      expect(name, isNotEmpty,
+          reason: 'Flutter must inject the package version');
+      return allOf(
+          containsPair(r'$app_version', name),
+          number.isEmpty
+              ? isNot(contains(r'$app_build'))
+              : containsPair(r'$app_build', number));
+    }
 
     test('capture attaches the compile-time app version', () async {
       await handleWebMethodCall(const MethodCall('capture', {
@@ -295,13 +310,31 @@ void main() {
       expect(captured[r'$screen'], containsAppVersion());
     });
 
+    test('captureException attaches the compile-time app version', () async {
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty(
+          'captureException'.toJS,
+          ((JSString message, JSAny? properties) {
+            captured['exception'] =
+                properties!.dartify()! as Map<Object?, Object?>;
+          }).toJS);
+      await handleWebMethodCall(const MethodCall('captureException', {
+        'properties': {r'$exception_level': 'error'},
+      }));
+      expect(captured['exception'], containsAppVersion());
+    });
+
     test('keeps an app version the caller set explicitly', () async {
       await handleWebMethodCall(const MethodCall('capture', {
         'eventName': 'checkout',
-        'properties': {r'$app_version': 'custom'},
+        'properties': {
+          r'$app_version': 'custom',
+          r'$app_build': 'custom-build'
+        },
       }));
 
       expect(captured['checkout']![r'$app_version'], 'custom');
+      expect(captured['checkout']![r'$app_build'], 'custom-build');
     });
   });
 }

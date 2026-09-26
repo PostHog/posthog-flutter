@@ -1,8 +1,8 @@
 import Flutter
+import PostHog
+@testable import posthog_flutter
 import UIKit
 import XCTest
-
-@testable import posthog_flutter
 
 // Unit tests of the Swift portion of this plugin's implementation.
 //
@@ -14,6 +14,18 @@ import XCTest
 
 class RunnerTests: XCTestCase {
     func testCaptureLogRoutesToCaptureLogAndSucceeds() {
+        var records: [PostHogLogRecord] = []
+        let config = PostHogConfig(projectToken: "log-channel-test", host: "http://127.0.0.1:1")
+        config.preloadFeatureFlags = false
+        config.captureApplicationLifecycleEvents = false
+        config.setBeforeSend { _ in nil }
+        config.logs.setBeforeSend { record in
+            records.append(record)
+            return nil
+        }
+        PostHogSDK.shared.close()
+        PostHogSDK.shared.setup(config)
+        defer { PostHogSDK.shared.close() }
         let plugin = PosthogFlutterPlugin()
 
         let arguments: [String: Any] = [
@@ -33,11 +45,23 @@ class RunnerTests: XCTestCase {
             resultValue = value
         }
 
-        // Routed through the public PostHogSDK.shared.captureLog (with W3C trace
-        // fields); the SDK is not set up in the test, so it no-ops and we still
-        // succeed with a nil result.
         XCTAssertTrue(resultCalled)
         XCTAssertNil(resultValue)
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.body, "checkout completed")
+        XCTAssertEqual(records.first?.level, .warn)
+        XCTAssertEqual(records.first?.attributes["order_id"] as? String, "ord_789")
+        XCTAssertEqual(records.first?.traceId, "4bf92f3577b34da6a3ce929d0e0e4736")
+        XCTAssertEqual(records.first?.spanId, "00f067aa0ba902b7")
+        XCTAssertEqual(records.first?.traceFlags, 1)
+
+        plugin.handle(FlutterMethodCall(methodName: "captureLog", arguments: ["body": "default", "traceFlags": 0])) { _ in }
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records.last?.body, "default")
+        XCTAssertEqual(records.last?.level, .info)
+        XCTAssertEqual(records.last?.traceFlags, 0)
+        XCTAssertNil(records.last?.traceId)
+        XCTAssertNil(records.last?.spanId)
     }
 
     func testCaptureLogMissingBodyReturnsError() {

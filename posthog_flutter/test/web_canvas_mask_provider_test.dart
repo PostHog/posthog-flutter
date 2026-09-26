@@ -1297,8 +1297,9 @@ void main() {
     expect(capturedConfig, isNull);
   });
 
-  test('applies config after posthog-js appears with no snippet stub at all',
-      () async {
+  testWidgets(
+      'applies config after posthog-js appears with no snippet stub at all',
+      (tester) async {
     web.window.setProperty('posthog'.toJS, null);
     capturedConfig = null;
 
@@ -1306,32 +1307,32 @@ void main() {
     expect(capturedConfig, isNull);
 
     installPosthogStub();
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-
+    await tester.pump(const Duration(milliseconds: 249));
+    expect(capturedConfig, isNull);
+    await tester.pump(const Duration(milliseconds: 1));
     expect(capturedConfig, isNotNull);
   });
 
-  test(
+  testWidgets(
       'applies config after array.js replaces the snippet stub with the real '
-      'instance', () async {
+      'instance', (tester) async {
     installPosthogStub(withConfig: false);
 
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
     expect(capturedConfig, isNull);
 
     installPosthogStub();
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-
+    await tester.pump(const Duration(milliseconds: 250));
     expect(capturedConfig, isNotNull);
   });
 
-  test(
+  testWidgets(
       'keeps retrying while posthog is present but uninitialized, then '
-      'applies once init declares the mask provider', () async {
+      'applies once init declares the mask provider', (tester) async {
     final stub = installPosthogStub(loaded: false, declaresMaskProvider: false);
 
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 250));
     // present-but-uninitialized must not be classified as not-opted-in
     expect(capturedConfig, isNull);
 
@@ -1343,11 +1344,12 @@ void main() {
         .setProperty('session_recording'.toJS, sessionRecording);
     stub.setProperty('__loaded'.toJS, true.toJS);
 
-    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    await tester.pump(const Duration(milliseconds: 500));
     expect(capturedConfig, isNotNull);
   });
 
-  test('an exception during one retry tick does not kill the chain', () async {
+  testWidgets('an exception during one retry tick does not kill the chain',
+      (tester) async {
     web.window.setProperty('posthog'.toJS, null);
     capturedConfig = null;
 
@@ -1366,12 +1368,16 @@ void main() {
       }).toJS,
     );
 
-    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(setConfigCalls, 1);
+    expect(capturedConfig, isNull);
+    await tester.pump(const Duration(milliseconds: 500));
     expect(setConfigCalls, 2);
     expect(capturedConfig, isNotNull);
   });
 
-  test("a second register cancels the predecessor's retry chain", () async {
+  testWidgets("a second register cancels the predecessor's retry chain",
+      (tester) async {
     web.window.setProperty('posthog'.toJS, null);
     capturedConfig = null;
 
@@ -1388,15 +1394,16 @@ void main() {
       }).toJS,
     );
 
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(seconds: 4));
     expect(setConfigCalls, 1);
     expect(stopRecordingCalls, 1);
     expect(capturedConfig, isNotNull);
   });
 
-  test('retries the full apply when the restart throws on first register',
-      () async {
+  testWidgets(
+      'retries the full apply when the restart throws on first register',
+      (tester) async {
     final stub = installPosthogStub(recordingStarted: true);
     var stopAttempts = 0;
     stub.setProperty(
@@ -1412,14 +1419,14 @@ void main() {
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
     expect(startRecordingCalls, 0);
 
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 250));
 
     expect(stopAttempts, 2);
     expect(startRecordingCalls, 1);
     expect(capturedConfig, isNotNull);
   });
 
-  test('backs off when the apply keeps throwing', () async {
+  testWidgets('backs off when the apply keeps throwing', (tester) async {
     final stub = installPosthogStub();
     var attempts = 0;
     void failingSetConfig(JSObject cfg) {
@@ -1431,15 +1438,19 @@ void main() {
 
     WebCanvasMaskProvider(PostHogConfig('phc_test')).register();
 
-    await Future<void>.delayed(const Duration(milliseconds: 2200));
-
-    // the doubling chain (250, 500, 1000, 2000ms) allows ~4 attempts in this
-    // window; fixed-250ms retries would reach ~9
-    expect(attempts, greaterThanOrEqualTo(3));
-    expect(attempts, lessThanOrEqualTo(5));
+    expect(attempts, 1);
+    var expected = 1;
+    for (final delay in [250, 500, 1000, 2000, 4000, 4000]) {
+      await tester.pump(Duration(milliseconds: delay - 1));
+      expect(attempts, expected);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(attempts, ++expected);
+    }
+    WebCanvasMaskProvider.resetForTesting();
   });
 
-  test('finishes the restart when stop succeeds but start throws', () async {
+  testWidgets('finishes the restart when stop succeeds but start throws',
+      (tester) async {
     final stub = installPosthogStub(recordingStarted: true);
     var startAttempts = 0;
     stub.setProperty(
@@ -1458,7 +1469,7 @@ void main() {
     expect(stopRecordingCalls, 1);
     expect(startAttempts, 1);
 
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 250));
 
     expect(startAttempts, 2);
     expect(stopRecordingCalls, 1);
