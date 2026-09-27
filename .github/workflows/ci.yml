@@ -267,6 +267,7 @@ jobs:
 
       - name: iOS plugin tests
         if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && matrix.target == 'ios' && matrix.package_manager == 'cocoapods' }}
+        timeout-minutes: 15
         working-directory: ./example/ios
         run: xcodebuild test -workspace Runner.xcworkspace -scheme Runner -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:RunnerTests
 
