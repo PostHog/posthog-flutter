@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.4
+
+### Patch Changes
+
+- 4d5268d: Retry a session replay snapshot on iOS when it fails to encode, instead of dropping it.
+
 ## 5.50.3
 
 ### Patch Changes
