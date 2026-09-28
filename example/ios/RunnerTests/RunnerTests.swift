@@ -54,4 +54,36 @@ class RunnerTests: XCTestCase {
         XCTAssertNotNil(error)
         XCTAssertEqual(error?.code, "PosthogFlutterException")
     }
+
+    func testSendFullSnapshotReportsUndecodableImageAsError() {
+        let reply = sendFullSnapshot(Data([0x00, 0x01, 0x02]))
+
+        let error = reply as? FlutterError
+        XCTAssertNotNil(error)
+        XCTAssertEqual(error?.code, "PosthogFlutterException")
+    }
+
+    func testSendFullSnapshotSucceedsForDecodableImage() {
+        let png = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).pngData { context in
+            UIColor.green.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        }
+
+        XCTAssertNil(sendFullSnapshot(png))
+    }
+
+    private func sendFullSnapshot(_ imageBytes: Data) -> Any? {
+        let call = FlutterMethodCall(
+            methodName: "sendFullSnapshot",
+            arguments: ["imageBytes": FlutterStandardTypedData(bytes: imageBytes), "id": 1, "x": 0, "y": 0]
+        )
+        let replied = expectation(description: "reply")
+        var reply: Any?
+        PosthogFlutterPlugin().handle(call) { value in
+            reply = value
+            replied.fulfill()
+        }
+        wait(for: [replied], timeout: 5)
+        return reply
+    }
 }
