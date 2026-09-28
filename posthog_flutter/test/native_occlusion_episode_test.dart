@@ -1145,4 +1145,113 @@ void main() {
       await unmountAndFlush(tester);
     });
   });
+
+  group('screen size change', () {
+    // Folding or unfolding a foldable, or rotating, resizes the same
+    // RepaintBoundary, so the view's status and meta latch survive the resize.
+    const landscape = Size(2400, 1800);
+    const portrait = Size(1800, 2400);
+
+    List<List<int>> metaSizes() => recordedCalls
+        .where((c) => c.method == 'sendMetaEvent')
+        .map((c) => [
+              (c.arguments as Map)['width'] as int,
+              (c.arguments as Map)['height'] as int,
+            ])
+        .toList();
+
+    Future<void> resizeAndRepaint(
+      WidgetTester tester,
+      Size physicalSize,
+      Color color,
+    ) async {
+      tester.view.physicalSize = physicalSize;
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(PostHogWidget(child: Container(color: color)));
+      final frames =
+          recordedCalls.where((c) => c.method == 'sendFullSnapshot').length;
+      await settleUntil(
+        tester,
+        () =>
+            recordedCalls.where((c) => c.method == 'sendFullSnapshot').length >
+            frames,
+      );
+    }
+
+    Future<void> deliverFirstFrame(WidgetTester tester) async {
+      sessionReplayActive = true;
+      tester.view.devicePixelRatio = 3.0;
+      tester.view.physicalSize = landscape;
+      addTearDown(tester.view.reset);
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
+      expect(metaSizes(), [
+        [800, 600]
+      ]);
+    }
+
+    testWidgets('re-sends meta only when the size changes', (tester) async {
+      await deliverFirstFrame(tester);
+
+      await resizeAndRepaint(tester, portrait, const Color(0xFF0000FF));
+      await resizeAndRepaint(tester, portrait, const Color(0xFFFF0000));
+      await resizeAndRepaint(tester, landscape, const Color(0xFF00FF00));
+
+      expect(
+        metaSizes(),
+        [
+          [800, 600],
+          [600, 800],
+          [800, 600],
+        ],
+        reason: 'one meta per size change, none for the same-size frame',
+      );
+      expect(
+        recordedCalls.where((c) => c.method == 'sendFullSnapshot').length,
+        4,
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('a failed meta send does not commit the new size',
+        (tester) async {
+      await deliverFirstFrame(tester);
+
+      onSendMetaEvent = () => throw PlatformException(code: 'unavailable');
+      tester.view.physicalSize = portrait;
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(
+        PostHogWidget(child: Container(color: const Color(0xFF0000FF))),
+      );
+      await settleUntil(tester, () => metaSizes().length == 2);
+      await settleCapture(tester);
+      expect(metaSizes().last, [600, 800]);
+      expect(
+        recordedCalls.where((c) => c.method == 'sendFullSnapshot').length,
+        1,
+        reason: 'the frame is dropped when its meta fails',
+      );
+
+      onSendMetaEvent = null;
+      await resizeAndRepaint(tester, portrait, const Color(0xFFFF0000));
+
+      expect(
+        metaSizes(),
+        [
+          [800, 600],
+          [600, 800],
+          [600, 800],
+        ],
+        reason: 'the next frame retries the meta the failed send dropped',
+      );
+      expect(
+        recordedCalls.where((c) => c.method == 'sendFullSnapshot').length,
+        2,
+      );
+
+      await unmountAndFlush(tester);
+    });
+  });
 }

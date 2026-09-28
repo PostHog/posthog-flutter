@@ -52,6 +52,11 @@ class ImageInfo {
 class ViewTreeSnapshotStatus {
   bool sentMetaEvent = false;
 
+  /// The size the last delivered meta event reported. A rotation or a fold
+  /// resizes the same view, and the player sizes the replay from the latest
+  /// meta event, so a new size needs a new one.
+  Size? metaEventSize;
+
   /// Hash of the last captured raw RGBA image bytes.
   /// We store only a hash instead of the full byte array to avoid
   /// holding ~8MB+ of raw pixel data in memory permanently.
@@ -109,6 +114,7 @@ class ScreenshotCapturer {
   // freezing the replay until the pixels next change.
   int? _pendingImageBytesHash;
   int? _pendingCompositedBytesHash;
+  Size? _pendingMetaEventSize;
   // A declined view is retried every tick, so each decline logs once per session.
   final _loggedDeclines = <String>{};
 
@@ -160,6 +166,7 @@ class ScreenshotCapturer {
     _lastTargetStatus = null;
     _pendingImageBytesHash = null;
     _pendingCompositedBytesHash = null;
+    _pendingMetaEventSize = null;
     _loggedDeclines.clear();
   }
 
@@ -219,6 +226,7 @@ class ScreenshotCapturer {
     }
     if (metaSent) {
       statusView.sentMetaEvent = true;
+      statusView.metaEventSize = _pendingMetaEventSize;
     }
   }
 
@@ -529,10 +537,17 @@ class ScreenshotCapturer {
     // must not commit on this frame's delivery.
     _pendingImageBytesHash = null;
     _pendingCompositedBytesHash = null;
+    // Truncated like the width and height the meta event reports.
+    final size = Size(
+      renderObject.size.width.truncateToDouble(),
+      renderObject.size.height.truncateToDouble(),
+    );
+    _pendingMetaEventSize = size;
     return (
       renderObject: renderObject,
       statusView: statusView,
-      shouldSendMetaEvent: !statusView.sentMetaEvent,
+      shouldSendMetaEvent:
+          !statusView.sentMetaEvent || statusView.metaEventSize != size,
       globalPosition: renderObject.localToGlobal(Offset.zero),
     );
   }
