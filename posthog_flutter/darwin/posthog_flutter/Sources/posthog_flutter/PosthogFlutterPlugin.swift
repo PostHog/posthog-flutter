@@ -1196,15 +1196,17 @@ extension PosthogFlutterPlugin {
                 }
 
                 dispatchQueue.async {
-                    guard let image = UIImage(data: imageBytes.data) else {
-                        // bad data but we cannot do this in the calling thread
-                        // otherwise we are doing slow operatios in the main thread
-                        return
-                    }
-
-                    guard let base64 = imageToBase64(image) else {
-                        // bad data but we cannot do this in the calling thread
-                        // otherwise we are doing slow operatios in the main thread
+                    // Reply only once the frame is captured: Dart marks a frame
+                    // delivered on success, and a delivered frame is not re-sent
+                    // while the pixels stay the same.
+                    guard let image = UIImage(data: imageBytes.data),
+                          let base64 = imageToBase64(image)
+                    else {
+                        DispatchQueue.main.async {
+                            result(FlutterError(code: "PosthogFlutterException",
+                                                message: "Could not encode the replay snapshot",
+                                                details: nil))
+                        }
                         return
                     }
 
@@ -1229,9 +1231,8 @@ extension PosthogFlutterPlugin {
                     snapshotsData.append(snapshotData)
 
                     PostHogSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
+                    DispatchQueue.main.async { result(nil) }
                 }
-
-                result(nil)
             } else {
                 _badArgumentError(result)
             }
