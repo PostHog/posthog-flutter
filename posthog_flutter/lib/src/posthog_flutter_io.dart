@@ -48,29 +48,16 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
-  }) async {
-    var event = PostHogEvent(
-      event: eventName,
-      properties: properties,
-      userProperties: userProperties,
-      userPropertiesSetOnce: userPropertiesSetOnce,
+  }) {
+    return applyBeforeSend(
+      _beforeSendCallbacks,
+      PostHogEvent(
+        event: eventName,
+        properties: properties,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+      ),
     );
-
-    if (_beforeSendCallbacks.isEmpty) return event;
-
-    for (final callback in _beforeSendCallbacks) {
-      try {
-        final result = await runBeforeSend<PostHogEvent>(callback, event);
-        if (result == null) return null;
-        event = result;
-      } catch (e) {
-        printIfDebug(
-          '[PostHog] Warning: beforeSend callback threw an exception; dropping event: $e',
-        );
-        return null;
-      }
-    }
-    return event;
   }
 
   /// Native plugin calls to Flutter
