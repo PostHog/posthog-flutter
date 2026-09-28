@@ -16,6 +16,22 @@ class ExtractedCaptureProperties {
   });
 }
 
+/// Copies a legacy `$set` / `$set_once` value into person properties.
+///
+/// `jsonDecode` produces `Map<String, dynamic>`, which is not a
+/// `Map<String, Object>`, so a typed `is` check drops the whole map.
+/// Null entries are omitted because person properties cannot store null.
+Map<String, Object> _personProperties(Object? value) {
+  if (value is! Map) return <String, Object>{};
+  final result = <String, Object>{};
+  value.forEach((key, entry) {
+    if (key is String && entry != null) {
+      result[key] = entry as Object;
+    }
+  });
+  return result;
+}
+
 /// Utility class for capture-related operations.
 class CaptureUtils {
   /// Extracts $set and $set_once from properties for backward compatibility,
@@ -38,16 +54,13 @@ class CaptureUtils {
     Map<String, Object>? legacyUserPropertiesSetOnce;
 
     if (propertiesCopy != null) {
-      if (propertiesCopy['\$set'] is Map<String, Object>) {
-        legacyUserProperties = Map<String, Object>.from(
-          propertiesCopy['\$set'] as Map,
-        );
+      if (propertiesCopy['\$set'] is Map) {
+        legacyUserProperties = _personProperties(propertiesCopy['\$set']);
         propertiesCopy.remove('\$set');
       }
-      if (propertiesCopy['\$set_once'] is Map<String, Object>) {
-        legacyUserPropertiesSetOnce = Map<String, Object>.from(
-          propertiesCopy['\$set_once'] as Map,
-        );
+      if (propertiesCopy['\$set_once'] is Map) {
+        legacyUserPropertiesSetOnce =
+            _personProperties(propertiesCopy['\$set_once']);
         propertiesCopy.remove('\$set_once');
       }
     }
