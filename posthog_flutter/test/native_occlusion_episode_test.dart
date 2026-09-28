@@ -1215,6 +1215,20 @@ void main() {
       await unmountAndFlush(tester);
     });
 
+    testWidgets('re-sends meta when a rotation keeps the same pixels',
+        (tester) async {
+      await deliverFirstFrame(tester);
+
+      await resizeAndRepaint(tester, portrait, const Color(0xFF00FF00));
+
+      expect(metaSizes(), [
+        [800, 600],
+        [600, 800],
+      ]);
+
+      await unmountAndFlush(tester);
+    });
+
     testWidgets('a failed meta send does not commit the new size',
         (tester) async {
       await deliverFirstFrame(tester);

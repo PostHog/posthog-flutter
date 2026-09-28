@@ -783,7 +783,11 @@ class ScreenshotCapturer {
         final hasCapturedViews = pvRects.captured.isNotEmpty;
         hasCapturedPlatformViews = hasCapturedViews;
 
-        if (!hasCapturedViews && preMaskHash == statusView.imageBytesHash) {
+        // A rotated uniform screen has the same bytes at a new size, and still
+        // needs its meta event.
+        if (!hasCapturedViews &&
+            !shouldSendMetaEvent &&
+            preMaskHash == statusView.imageBytesHash) {
           printIfDebug(
             'Snapshot is the same as the last one, nothing changed, do nothing.',
           );
