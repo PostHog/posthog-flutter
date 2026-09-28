@@ -5,7 +5,9 @@ import 'package:posthog_flutter/src/util/logging.dart';
 class NativeCommunicator {
   static const MethodChannel _channel = MethodChannel('posthog_flutter');
 
-  Future<void> sendFullSnapshot(
+  /// Returns false when the channel call fails. Callers must not treat a
+  /// failed send as delivered.
+  Future<bool> sendFullSnapshot(
     Uint8List imageBytes, {
     required int id,
     required int x,
@@ -22,12 +24,16 @@ class NativeCommunicator {
         if (width != null) 'width': width,
         if (height != null) 'height': height,
       });
+      return true;
     } catch (e) {
       printIfDebug('Error sending full snapshot to native: $e');
+      return false;
     }
   }
 
-  Future<void> sendMetaEvent({
+  /// Returns false when the channel call fails. Callers must not treat a
+  /// failed send as delivered.
+  Future<bool> sendMetaEvent({
     required int width,
     required int height,
     required String? screen,
@@ -38,8 +44,10 @@ class NativeCommunicator {
         'height': height,
         'screen': screen,
       });
+      return true;
     } catch (e) {
       printIfDebug('Error sending meta event to native: $e');
+      return false;
     }
   }
 
