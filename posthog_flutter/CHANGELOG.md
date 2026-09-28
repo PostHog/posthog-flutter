@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.3
+
+### Patch Changes
+
+- 2f164dd: Retry a session replay snapshot when the native channel call fails instead of marking it delivered.
+
 ## 5.50.2
 
 ### Patch Changes
