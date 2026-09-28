@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.2
+
+### Patch Changes
+
+- 06a40c2: Keep legacy `$set` and `$set_once` person properties when the nested map comes from JSON.
+
 ## 5.50.1
 
 ### Patch Changes
