@@ -235,7 +235,10 @@ class _RatingQuestionState extends State<RatingQuestion> {
               final rating = _rating;
               return SurveyButton(
                 onPressed: _canSubmit ? () => widget.onSubmit(rating) : null,
-                text: widget.buttonText ?? widget.appearance.submitButtonText,
+                text: surveyQuestionButtonLabel(
+                  widget.buttonText,
+                  widget.appearance.submitButtonText,
+                ),
                 appearance: widget.appearance,
                 enabled: _canSubmit,
               );

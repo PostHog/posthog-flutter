@@ -7,13 +7,15 @@ import 'package:posthog_flutter/src/surveys/widgets/survey_bottom_sheet.dart';
 
 Future<List<Object?>> pumpQuestion(
   WidgetTester tester,
-  Map<String, Object?> question,
-) async {
+  Map<String, Object?> question, {
+  Map<String, Object?>? appearance,
+}) async {
   final responses = <Object?>[];
   final survey = PostHogDisplaySurvey.fromDict({
     'id': 'optional-survey',
     'name': 'Optional',
     'questions': [question],
+    if (appearance != null) 'appearance': appearance,
   });
   await tester.pumpWidget(MaterialApp(
     home: Scaffold(
@@ -80,5 +82,47 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(responses, [null]);
+  });
+
+  testWidgets(
+      'open text falls back when the question label is missing or blank',
+      (tester) async {
+    for (final buttonText in <Object?>[null, '', '   ']) {
+      await pumpQuestion(tester, {
+        'type': 'open',
+        'question': 'Anything else?',
+        'isOptional': true,
+        if (buttonText != null) 'buttonText': buttonText,
+      });
+
+      expect(find.text('Submit'), findsOneWidget);
+    }
+
+    await pumpQuestion(
+      tester,
+      {
+        'type': 'open',
+        'question': 'Anything else?',
+        'isOptional': true,
+        'buttonText': '',
+      },
+      appearance: {'submitButtonText': 'Send'},
+    );
+
+    expect(find.text('Send'), findsOneWidget);
+    expect(find.text('Submit'), findsNothing);
+
+    await pumpQuestion(tester, {
+      'type': 'rating',
+      'question': 'How was it?',
+      'isOptional': true,
+      'buttonText': '',
+      'ratingType': 0,
+      'scaleLowerBound': 1,
+      'scaleUpperBound': 5,
+      'lowerBoundLabel': 'Low',
+      'upperBoundLabel': 'High',
+    });
+    expect(find.text('Submit'), findsOneWidget);
   });
 }

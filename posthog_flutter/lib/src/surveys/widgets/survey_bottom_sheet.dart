@@ -105,7 +105,10 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           description: currentQuestion.description,
           descriptionContentType: currentQuestion.descriptionContentType,
           appearance: appearance,
-          buttonText: currentQuestion.buttonText ?? appearance.submitButtonText,
+          buttonText: surveyQuestionButtonLabel(
+            currentQuestion.buttonText,
+            appearance.submitButtonText,
+          ),
           optional: currentQuestion.optional,
           onSubmit: _submitResponse,
         );

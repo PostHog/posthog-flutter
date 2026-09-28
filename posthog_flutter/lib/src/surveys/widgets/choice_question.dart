@@ -200,7 +200,10 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
           // Fixed submit button
           SurveyButton(
             onPressed: _canSubmit ? _onSubmit : null,
-            text: widget.buttonText ?? widget.appearance.submitButtonText,
+            text: surveyQuestionButtonLabel(
+              widget.buttonText,
+              widget.appearance.submitButtonText,
+            ),
             appearance: widget.appearance,
           ),
         ],
