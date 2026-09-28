@@ -384,9 +384,7 @@ class Posthog {
 
   /// Opts the current user out of data collection.
   ///
-  /// Stops Flutter session replay before the platform opt-out. Native
-  /// `stopSessionRecording` is a no-op once the SDK is already opted out, so
-  /// the stop has to happen first. Error autocapture is uninstalled as well.
+  /// Also stops session replay and uninstalls Flutter error autocapture.
   ///
   /// Returns a [Future] that completes when the opt-out request has been queued.
   Future<void> optOut() async {
@@ -394,6 +392,8 @@ class Posthog {
     _uninstallFlutterIntegrations();
     if (PostHogInternalEvents.sessionRecordingActive.value) {
       _restartSessionReplayOnEnable = true;
+      // Native stopSessionRecording is a no-op once the SDK is already opted
+      // out, so this has to run before the platform disable.
       await stopSessionRecording();
     }
 
@@ -402,10 +402,8 @@ class Posthog {
 
   /// Opts the current user back in to data collection.
   ///
-  /// Reinstalls Flutter error autocapture. If [optOut] stopped an active
-  /// session replay, this starts a new recording after the platform opt-in.
-  /// Starting first would no-op, because the native SDKs ignore
-  /// `startSessionRecording` while still opted out.
+  /// Reinstalls Flutter error autocapture. If [optOut] stopped session replay,
+  /// this starts a new recording.
   ///
   /// Returns a [Future] that completes when the opt-in request has been queued.
   Future<void> optIn() async {
@@ -418,6 +416,8 @@ class Posthog {
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
     if (restartReplay) {
+      // startSessionRecording is ignored while the SDK is still opted out, so
+      // the platform opt-in has to finish first.
       await startSessionRecording(resumeCurrent: false);
     }
   }
