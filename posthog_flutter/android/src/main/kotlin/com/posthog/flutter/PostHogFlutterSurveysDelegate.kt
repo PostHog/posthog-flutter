@@ -108,7 +108,7 @@ class PostHogFlutterSurveysDelegate(
                                     val selectedOptions = responsePayload as? List<*>
                                     val stringOptions = selectedOptions?.mapNotNull { it as? String }
                                     PostHogSurveyResponse.MultipleChoice(
-                                        stringOptions?.takeIf { it.isNotEmpty() }
+                                        stringOptions?.takeIf { it.isNotEmpty() },
                                     )
                                 } else {
                                     // Single choice: Flutter sends as a list with one element
