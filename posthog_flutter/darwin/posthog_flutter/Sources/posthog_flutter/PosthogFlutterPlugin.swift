@@ -664,8 +664,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                         var selectedOptions: [String]? = nil
 
                         if choiceQuestion.isMultipleChoice {
-                            // Multiple choice: accept array directly from Flutter
+                            // Multiple choice: accept array directly from Flutter.
+                            // An empty list is a skipped optional question, same as nil.
                             selectedOptions = responsePayload as? [String]
+                            if selectedOptions?.isEmpty == true {
+                                selectedOptions = nil
+                            }
                             surveyResponse = .multipleChoice(selectedOptions)
                         } else {
                             // Single choice: Flutter sends as a list with one element
