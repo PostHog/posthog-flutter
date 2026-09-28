@@ -37,7 +37,7 @@ class RatingQuestion extends StatefulWidget {
   final String? lowerBoundLabel;
   final String? upperBoundLabel;
   final SurveyAppearance appearance;
-  final void Function(int) onSubmit;
+  final void Function(int?) onSubmit;
 
   @override
   State<RatingQuestion> createState() => _RatingQuestionState();
@@ -234,10 +234,8 @@ class _RatingQuestionState extends State<RatingQuestion> {
             builder: (context) {
               final rating = _rating;
               return SurveyButton(
-                onPressed: _canSubmit && rating != null
-                    ? () => widget.onSubmit(rating)
-                    : null,
-                text: widget.buttonText ?? 'Submit',
+                onPressed: _canSubmit ? () => widget.onSubmit(rating) : null,
+                text: widget.buttonText ?? widget.appearance.submitButtonText,
                 appearance: widget.appearance,
                 enabled: _canSubmit,
               );

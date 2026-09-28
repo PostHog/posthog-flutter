@@ -97,12 +97,16 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
 
     switch (currentQuestion.type) {
       case PostHogSurveyQuestionType.openText:
+        final appearance =
+            SurveyAppearance.fromPostHog(widget.survey.appearance);
         return OpenTextQuestion(
           key: ValueKey('open_text_question_$_currentIndex'),
           question: currentQuestion.question,
           description: currentQuestion.description,
           descriptionContentType: currentQuestion.descriptionContentType,
-          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          appearance: appearance,
+          buttonText: currentQuestion.buttonText ?? appearance.submitButtonText,
+          optional: currentQuestion.optional,
           onSubmit: _submitResponse,
         );
       case PostHogSurveyQuestionType.link:
