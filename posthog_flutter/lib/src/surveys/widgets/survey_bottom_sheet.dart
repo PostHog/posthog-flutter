@@ -158,8 +158,8 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
           hasOpenChoice: choiceQuestion.hasOpenChoice,
           isMultipleChoice:
               currentQuestion.type == PostHogSurveyQuestionType.multipleChoice,
-          // Both single and multiple choice questions return List<String>
-          // Single choice will be a list with one element
+          // A selection is a List<String> (one entry for single choice).
+          // An empty optional skip is null.
           onSubmit: _submitResponse,
         );
     }
