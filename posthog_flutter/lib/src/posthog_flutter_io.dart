@@ -352,10 +352,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
-    // Add screenName as $screen_name property for beforeSend
+    // The screen name argument wins over a properties `$screen_name`.
+    // beforeSend still runs after this and can change the name.
     final propsWithScreenName = <String, Object>{
-      PostHogPropertyName.screenName: screenName,
       ...?properties,
+      PostHogPropertyName.screenName: screenName,
     };
 
     // Apply beforeSend callback - screen events are captured as $screen
