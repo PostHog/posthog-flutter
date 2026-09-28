@@ -39,6 +39,22 @@ void main() {
       expect(result.userPropertiesSetOnce, {'created_at': '2024-01-01'});
     });
 
+    test('extracts \$set when the nested map is Map<String, dynamic>', () {
+      final legacy = <String, dynamic>{'plan': 'pro', 'empty': null};
+      final legacyOnce = <String, dynamic>{'created': '2024-01-01'};
+      final result = CaptureUtils.extractUserProperties(
+        properties: <String, Object>{
+          'event_key': 'event_value',
+          '\$set': legacy,
+          '\$set_once': legacyOnce,
+        },
+      );
+
+      expect(result.properties, {'event_key': 'event_value'});
+      expect(result.userProperties, {'plan': 'pro'});
+      expect(result.userPropertiesSetOnce, {'created': '2024-01-01'});
+    });
+
     test('extracts \$set from properties for backward compatibility', () {
       final result = CaptureUtils.extractUserProperties(
         properties: {

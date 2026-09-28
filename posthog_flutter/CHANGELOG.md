@@ -1,5 +1,23 @@
 ## Next
 
+## 5.50.3
+
+### Patch Changes
+
+- 2f164dd: Retry a session replay snapshot when the native channel call fails instead of marking it delivered.
+
+## 5.50.2
+
+### Patch Changes
+
+- 06a40c2: Keep legacy `$set` and `$set_once` person properties when the nested map comes from JSON.
+
+## 5.50.1
+
+### Patch Changes
+
+- a71971e: Run `beforeSend` for `capture`, `screen`, and `captureException` on Flutter web.
+
 ## 5.50.0
 
 ### Minor Changes

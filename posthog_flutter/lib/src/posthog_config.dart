@@ -377,8 +377,8 @@ class PostHogConfig {
   /// **Note:**
   /// - Callbacks can be synchronous or asynchronous (via
   ///   `FutureOr<PostHogEvent?>`)
-  /// - Exceptions in a callback will skip that callback and continue with the
-  ///   next one in the list.
+  /// - If a callback throws, the event is dropped and later callbacks are not
+  ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
   List<BeforeSendCallback> beforeSend = [];

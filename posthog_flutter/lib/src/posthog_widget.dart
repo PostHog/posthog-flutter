@@ -305,24 +305,29 @@ class PostHogWidgetState extends State<PostHogWidget> {
       return false;
     }
     if (imageInfo.shouldSendMetaEvent) {
-      await _nativeCommunicator?.sendMetaEvent(
-        width: imageInfo.width,
-        height: imageInfo.height,
-        screen: Posthog().currentScreen,
-      );
-      if (_disposed || !isStillValid()) {
+      final metaSent = await _nativeCommunicator?.sendMetaEvent(
+            width: imageInfo.width,
+            height: imageInfo.height,
+            screen: Posthog().currentScreen,
+          ) ??
+          false;
+      if (_disposed || !isStillValid() || !metaSent) {
         return false;
       }
     }
 
-    await _nativeCommunicator?.sendFullSnapshot(
-      imageInfo.imageBytes,
-      id: imageInfo.id,
-      x: imageInfo.x,
-      y: imageInfo.y,
-      width: imageInfo.width,
-      height: imageInfo.height,
-    );
+    final snapshotSent = await _nativeCommunicator?.sendFullSnapshot(
+          imageInfo.imageBytes,
+          id: imageInfo.id,
+          x: imageInfo.x,
+          y: imageInfo.y,
+          width: imageInfo.width,
+          height: imageInfo.height,
+        ) ??
+        false;
+    if (!snapshotSent) {
+      return false;
+    }
     // Also guards the commit below: a validity flip means a boundary handler
     // already re-armed, and committing now would clobber it.
     if (_disposed || !isStillValid()) {
