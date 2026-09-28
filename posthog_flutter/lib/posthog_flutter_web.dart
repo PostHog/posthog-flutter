@@ -12,8 +12,11 @@ import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 import 'src/feature_flag_result.dart';
 import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
+import 'src/posthog_constants.dart';
+import 'src/posthog_event.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
+import 'src/utils/before_send.dart';
 import 'src/replay/web/web_canvas_mask_provider.dart';
 import 'src/utils/capture_utils.dart';
 
@@ -24,6 +27,40 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   /// Stored configuration for accessing inAppIncludes and other settings
   PostHogConfig? _config;
+
+  /// Copied at setup. Event beforeSend runs here, before posthog-js, the same
+  /// way [PosthogFlutterIO] runs it before the platform channel.
+  List<BeforeSendCallback> _beforeSendCallbacks = [];
+
+  Future<PostHogEvent?> _runBeforeSend(
+    String eventName,
+    Map<String, Object>? properties, {
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+  }) async {
+    var event = PostHogEvent(
+      event: eventName,
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+
+    if (_beforeSendCallbacks.isEmpty) return event;
+
+    for (final callback in _beforeSendCallbacks) {
+      try {
+        final result = await runBeforeSend<PostHogEvent>(callback, event);
+        if (result == null) return null;
+        event = result;
+      } catch (e) {
+        printIfDebug(
+          '[PostHog] Warning: beforeSend callback threw an exception; dropping event: $e',
+        );
+        return null;
+      }
+    }
+    return event;
+  }
 
   static void registerWith(Registrar registrar) {
     final channel = MethodChannel(
@@ -68,6 +105,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     final ph = posthog;
     _config = config;
+    _beforeSendCallbacks = config.beforeSend;
 
     // posthog-js is initialized by the host app, so a few config options never
     // reach it. Warn instead of silently ignoring them.
@@ -144,10 +182,21 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
-    final extracted = CaptureUtils.extractUserProperties(
-      properties: properties,
+    final processedEvent = await _runBeforeSend(
+      eventName,
+      properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+    if (processedEvent == null) {
+      printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
+      return;
+    }
+
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: processedEvent.properties,
+      userProperties: processedEvent.userProperties,
+      userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
     );
 
     final extractedProperties = extracted.properties;
@@ -167,7 +216,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     return handleWebMethodCall(
       MethodCall('capture', {
-        'eventName': eventName,
+        'eventName': processedEvent.event,
         if (normalizedProperties != null) 'properties': normalizedProperties,
         if (normalizedUserProperties != null)
           'userProperties': normalizedUserProperties,
@@ -207,10 +256,40 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String screenName,
     Map<String, Object>? properties,
   }) async {
+    // The screen name argument wins over a properties `$screen_name`.
+    // beforeSend still runs after this and can change the name.
+    final propsWithScreenName = <String, Object>{
+      ...?properties,
+      PostHogPropertyName.screenName: screenName,
+    };
+
+    final processedEvent = await _runBeforeSend(
+      PostHogEventName.screen,
+      propsWithScreenName,
+    );
+    if (processedEvent == null) {
+      printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
+      return;
+    }
+
+    if (processedEvent.event != PostHogEventName.screen) {
+      await capture(
+        eventName: processedEvent.event,
+        properties: processedEvent.properties?.cast<String, Object>(),
+      );
+      return;
+    }
+
+    final finalScreenName =
+        processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
+            screenName;
+    processedEvent.properties?.remove(PostHogPropertyName.screenName);
+    final remaining = processedEvent.properties;
+
     return handleWebMethodCall(
       MethodCall('screen', {
-        'screenName': screenName,
-        if (properties != null) 'properties': properties,
+        'screenName': finalScreenName,
+        if (remaining != null && remaining.isNotEmpty) 'properties': remaining,
       }),
     );
   }
@@ -423,8 +502,27 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-      final normalizedData = PropertyNormalizer.normalize(
+      final processedEvent = await _runBeforeSend(
+        PostHogEventName.exception,
         exceptionData.cast<String, Object>(),
+      );
+      if (processedEvent == null) {
+        printIfDebug(
+          '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
+        );
+        return;
+      }
+
+      if (processedEvent.event != PostHogEventName.exception) {
+        await capture(
+          eventName: processedEvent.event,
+          properties: processedEvent.properties?.cast<String, Object>(),
+        );
+        return;
+      }
+
+      final normalizedData = PropertyNormalizer.normalize(
+        processedEvent.properties?.cast<String, Object>() ?? <String, Object>{},
       );
 
       return await handleWebMethodCall(
