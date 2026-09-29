@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.7
+
+### Patch Changes
+
+- afc14aa: Let optional open-text and rating survey questions be skipped, and use the question's button label.
+
 ## 5.50.6
 
 ### Patch Changes
