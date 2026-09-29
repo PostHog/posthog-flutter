@@ -25,7 +25,7 @@ void main() {
       testWidgets(
           '${scale.key}-point emoji scale starting at $lower submits each value',
           (tester) async {
-        final responses = <int>[];
+        final responses = <int?>[];
         await tester.pumpWidget(MaterialApp(
             home: Scaffold(
                 body: RatingQuestion(
