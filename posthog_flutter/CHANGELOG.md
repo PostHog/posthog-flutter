@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.6
+
+### Patch Changes
+
+- 99075ad: Close a completed survey immediately when its appearance turns the thank-you screen off.
+
 ## 5.50.5
 
 ### Patch Changes
