@@ -221,6 +221,23 @@ void main() {
       );
     });
 
+    final windowsAndLinux = TargetPlatformVariant(
+      {TargetPlatform.windows, TargetPlatform.linux},
+    );
+    testWidgets('stays off the native replay channel on Windows and Linux',
+        (tester) async {
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      await tester.pump(const Duration(seconds: 2));
+
+      PostHogInternalEvents.sessionRecordingActive.value = false;
+      PostHogInternalEvents.sessionRecordingActive.value = true;
+      await tester.pump(const Duration(seconds: 2));
+      await unmountAndFlush(tester);
+
+      expect(recordedCalls, isEmpty);
+    }, variant: windowsAndLinux);
+
     testWidgets('resumes capture after recording is toggled off and on',
         (tester) async {
       await setupPosthog(replayConfig(captureNativeScreens: false));

@@ -1,0 +1,5 @@
+---
+"posthog_flutter": minor
+---
+
+Add Windows and Linux support, set up with the same `Posthog().setup(config)` as the other platforms. Event and screen capture, exception capture (including autocapture of Flutter and Dart errors, and exception steps), identify, alias, groups, super properties, feature flags, bootstrap, opt-out and application lifecycle events work on both. The app name, version and build number come from the pubspec as built by Flutter, and the SDK keeps its state in the user's application data directory (`%APPDATA%\posthog` on Windows, `$XDG_DATA_HOME/posthog` or `~/.local/share/posthog` on Linux). Events include `$timezone` when the SDK can determine a local IANA time zone; on Windows, this uses the system ICU data on a best-effort basis. Session replay, surveys, logs, push notifications and native crash capture are not supported on Windows and Linux.
