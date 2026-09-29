@@ -644,6 +644,36 @@ void main() {
       expect(server.batchRequests.single.eventNames, ['sign_in']);
       expect(getQueue(storage), isEmpty);
     });
+
+    test('retries a queued event after its file becomes readable again',
+        () async {
+      final dir = tempDirectory();
+      testClient(server,
+          config: testConfig(flushInterval: Duration.zero),
+          storage: FileStorage(dir.path))
+        ..capture('persisted')
+        ..close();
+      final queueFile = Directory('${dir.path}/posthog_queue')
+          .listSync()
+          .whereType<File>()
+          .single;
+      chmod('000', queueFile.path);
+      addTearDown(() => chmod('644', queueFile.path));
+
+      testClient(server,
+          config: testConfig(flushInterval: const Duration(milliseconds: 20)),
+          storage: FileStorage(dir.path));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(server.batchRequests, isEmpty);
+
+      chmod('644', queueFile.path);
+      await expectLater(
+        server.waitForEvent('persisted').timeout(
+              const Duration(seconds: 1),
+            ),
+        completes,
+      );
+    }, skip: chmodSkip);
   });
 
   group('PostHogCore.close', () {

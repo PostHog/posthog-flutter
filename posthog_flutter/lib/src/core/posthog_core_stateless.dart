@@ -498,7 +498,10 @@ abstract class PostHogCoreStateless {
       // Peeked again after every request, so events queued in the meantime
       // go out with the same flush.
       final batch = queue.peek(_maxBatchSize);
-      if (batch.isEmpty) break;
+      if (batch.isEmpty) {
+        if (queue.length > 0) _scheduleFlush();
+        break;
+      }
       final batchMessages = [for (final queued in batch) queued.event];
 
       final data = <String, Object?>{
@@ -563,8 +566,15 @@ abstract class PostHogCoreStateless {
     return retriable(
       () async {
         final ({int status, String body, Duration? retryAfter}) response;
+        final attempt = _FetchAttempt();
         try {
-          response = await _fetch(url, body).timeout(_requestTimeout);
+          response = await _fetch(url, body, attempt).timeout(
+            _requestTimeout,
+            onTimeout: () async {
+              await attempt.cancel();
+              throw attempt.timeout;
+            },
+          );
         } catch (e) {
           throw PostHogFetchNetworkError(e);
         }
@@ -607,8 +617,9 @@ abstract class PostHogCoreStateless {
   }
 
   Future<({int status, String body, Duration? retryAfter})> _fetch(
-      String url, String body) async {
+      String url, String body, _FetchAttempt attempt) async {
     final request = await _httpClient.postUrl(Uri.parse(url));
+    attempt.attachRequest(request);
     // A redirect is reported rather than followed, so a redirected batch is
     // not taken for delivered.
     request.followRedirects = false;
@@ -631,9 +642,7 @@ abstract class PostHogCoreStateless {
     request.add(payload);
 
     final response = await request.close();
-    final responseBody = await response
-        .transform(const Utf8Decoder(allowMalformed: true))
-        .join();
+    final responseBody = await attempt.readBody(response);
     return (
       status: response.statusCode,
       body: responseBody,
@@ -652,5 +661,59 @@ abstract class PostHogCoreStateless {
     _retryAfterTimer = null;
     _httpClient.close(force: true);
     storage.close();
+  }
+}
+
+class _FetchAttempt {
+  final timeout = TimeoutException('PostHog request timed out');
+
+  HttpClientRequest? _request;
+  StreamSubscription<String>? _responseSubscription;
+  Completer<String>? _responseBody;
+  bool _cancelled = false;
+
+  void attachRequest(HttpClientRequest request) {
+    _request = request;
+    if (_cancelled) {
+      request.abort(timeout);
+      throw timeout;
+    }
+  }
+
+  Future<String> readBody(HttpClientResponse response) {
+    final contents = StringBuffer();
+    final body = Completer<String>();
+    late final StreamSubscription<String> subscription;
+    subscription =
+        response.transform(const Utf8Decoder(allowMalformed: true)).listen(
+      contents.write,
+      onError: (Object error, StackTrace stackTrace) {
+        if (!body.isCompleted) body.completeError(error, stackTrace);
+      },
+      onDone: () {
+        if (!body.isCompleted) body.complete(contents.toString());
+      },
+      cancelOnError: true,
+    );
+    _responseSubscription = subscription;
+    _responseBody = body;
+    return body.future.whenComplete(() {
+      if (identical(_responseSubscription, subscription)) {
+        _responseSubscription = null;
+        _responseBody = null;
+      }
+    });
+  }
+
+  Future<void> cancel() async {
+    _cancelled = true;
+    final responseSubscription = _responseSubscription;
+    if (responseSubscription == null) {
+      _request?.abort(timeout);
+    } else {
+      await responseSubscription.cancel();
+    }
+    final body = _responseBody;
+    if (body != null && !body.isCompleted) body.completeError(timeout);
   }
 }
