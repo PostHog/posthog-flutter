@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/posthog_core_stateless.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
@@ -84,5 +86,152 @@ void main() {
               storage, r'$feature_flag_called')[r'$feature_flag_error'],
           'connection_error');
     });
+
+    test('aborts a request that becomes available after its timeout', () {
+      fakeAsync((async) {
+        final opened = Completer<HttpClientRequest>();
+        final http = _ControlledHttpClient((_) => opened.future);
+        late final client = HttpOverrides.runZoned(
+          () => testClient(server),
+          createHttpClient: (_) => http,
+        );
+        client.capture('evt');
+        client.flush().catchError((Object _) {});
+        async.flushMicrotasks();
+
+        async.elapse(const Duration(seconds: 10));
+        final request = _ControlledRequest();
+        opened.complete(request);
+        async.flushMicrotasks();
+
+        expect(request.abortCalls, 1);
+        expect(request.closeCalls, 0,
+            reason: 'a request opened after its deadline must not be sent');
+        client.close();
+        async.elapse(const Duration(seconds: 3));
+      });
+    });
+
+    test('cancels response body reading before retrying a timeout', () {
+      fakeAsync((async) {
+        var bodyCancellationStarted = false;
+        final bodyCancellationDone = Completer<void>();
+        final body = StreamController<List<int>>(
+          onCancel: () {
+            bodyCancellationStarted = true;
+            return bodyCancellationDone.future;
+          },
+        );
+        final request = _ControlledRequest(
+          response: _ControlledResponse(body.stream),
+        );
+        var openCalls = 0;
+        final http = _ControlledHttpClient((_) async {
+          openCalls++;
+          if (openCalls == 1) return request;
+          expect(bodyCancellationDone.isCompleted, isTrue,
+              reason: 'retry must wait until the old response is cancelled');
+          return _ControlledRequest();
+        });
+        late final client = HttpOverrides.runZoned(
+          () => testClient(server),
+          createHttpClient: (_) => http,
+        );
+        client.capture('evt');
+        client.flush().catchError((Object _) {});
+        async.flushMicrotasks();
+
+        async.elapse(const Duration(seconds: 10));
+        async.flushMicrotasks();
+
+        expect(bodyCancellationStarted, isTrue);
+        async.elapse(const Duration(seconds: 4));
+        async.flushMicrotasks();
+        expect(openCalls, 1,
+            reason: 'retry must not overlap response cancellation');
+
+        bodyCancellationDone.complete();
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 4));
+        async.flushMicrotasks();
+        expect(openCalls, 2);
+        client.close();
+      });
+    });
   });
+}
+
+class _ControlledHttpClient implements HttpClient {
+  _ControlledHttpClient(this.openRequest);
+
+  final Future<HttpClientRequest> Function(Uri uri) openRequest;
+
+  @override
+  Future<HttpClientRequest> postUrl(Uri url) => openRequest(url);
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ControlledRequest implements HttpClientRequest {
+  _ControlledRequest({HttpClientResponse? response})
+      : _response = response ?? _ControlledResponse(Stream.value(<int>[]));
+
+  final HttpClientResponse _response;
+  int abortCalls = 0;
+  int closeCalls = 0;
+
+  @override
+  final headers = _ControlledHeaders();
+
+  @override
+  bool followRedirects = true;
+
+  @override
+  int contentLength = -1;
+
+  @override
+  void add(List<int> data) {}
+
+  @override
+  void abort([Object? exception, StackTrace? stackTrace]) {
+    abortCalls++;
+  }
+
+  @override
+  Future<HttpClientResponse> close() async {
+    closeCalls++;
+    return _response;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ControlledResponse extends StreamView<List<int>>
+    implements HttpClientResponse {
+  _ControlledResponse(super.stream);
+
+  @override
+  int get statusCode => HttpStatus.ok;
+
+  @override
+  final headers = _ControlledHeaders();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ControlledHeaders implements HttpHeaders {
+  @override
+  void set(String name, Object value, {bool preserveHeaderCase = false}) {}
+
+  @override
+  String? value(String name) => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -250,6 +250,7 @@ class _InProcessRequest implements HttpClientRequest {
 
   final PostHogApiFake _api;
   final _body = <int>[];
+  final _aborted = Completer<PostHogResponse>();
 
   @override
   final Uri uri;
@@ -267,10 +268,21 @@ class _InProcessRequest implements HttpClientRequest {
   void add(List<int> data) => _body.addAll(data);
 
   @override
+  void abort([Object? exception, StackTrace? stackTrace]) {
+    if (!_aborted.isCompleted) {
+      _aborted.completeError(
+        exception ?? const HttpException('Request aborted'),
+        stackTrace,
+      );
+    }
+  }
+
+  @override
   Future<HttpClientResponse> close() async {
-    final response = await _api._answer(
-      PostHogRequest._decode(uri.path, headers.values, _body),
-    );
+    final response = await Future.any([
+      _api._answer(PostHogRequest._decode(uri.path, headers.values, _body)),
+      _aborted.future,
+    ]);
     if (response.isDropped) {
       throw const HttpException(
         'Connection closed before full header was received',
