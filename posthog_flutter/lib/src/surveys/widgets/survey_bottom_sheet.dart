@@ -82,6 +82,11 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
 
       // Update state
       if (!mounted) return;
+      if (nextQuestion.isSurveyCompleted &&
+          !widget.appearance.displayThankYouMessage) {
+        _handleClose();
+        return;
+      }
       setState(() {
         _currentIndex = nextQuestion.questionIndex;
         _isCompleted = nextQuestion.isSurveyCompleted;
