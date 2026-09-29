@@ -12,6 +12,10 @@ class DesktopStorage {
   ///
   /// The executable name identifies the app because it stays the same across
   /// releases; renaming the executable starts over with an empty state.
+  ///
+  /// If no application data directory is available, creates a private
+  /// temporary directory for this registration. State there is not reused by
+  /// later registrations.
   static String appDirectory(
     Map<String, String> environment, {
     required String executable,
@@ -29,12 +33,11 @@ class DesktopStorage {
       }
     }
     if (base == null || base.isEmpty) {
-      // FileStorage creates the directory itself; the fallback must stay
-      // scoped or it reopens the shared cross-project store.
-      base = Directory.systemTemp.path;
+      base = Directory.systemTemp.createTempSync('posthog_').path;
       printIfDebug(
           '[PostHog] No application data directory found; persisting events '
-          'under $base, which the OS may clear at any time.');
+          'in a temporary directory for this registration, which the OS may '
+          'clear at any time.');
     }
 
     final sep = Platform.pathSeparator;

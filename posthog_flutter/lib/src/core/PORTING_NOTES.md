@@ -68,6 +68,10 @@ Bootstrap persists, `getSessionId()` remains read-only, and disable does not del
 
 The Windows time zone is read during plugin registration through the system ICU from System32. A `TZ` value with an IANA name takes precedence. ICU is included with Windows; the combined icu.dll in use is available from Windows 10 1903. If the library is unavailable or the zone is unknown, the time zone is omitted and the SDK continues to run. This is best effort, with no custom Windows/IANA table or observer for system time zone changes. Sources: [Microsoft ICU](https://learn.microsoft.com/windows/win32/intl/international-components-for-unicode--icu-), [ICU Calendar API](https://unicode-org.github.io/icu-docs/apidoc/dev/icu4c/ucal_8h.html).
 
+Desktop storage uses the user's application data directory. A custom `XDG_DATA_HOME` or `APPDATA` must point to a directory for that user; access to ordinary files is controlled by operating system permissions and umask.
+
 Structured logs, session replay, surveys, push, and native crash hooks are not yet implemented on desktop. A shared Flutter method does not imply transport support on every platform. The shared facade runs beforeSend for logs, but desktop captureLog does not send entries.
+
+Desktop lifecycle is focus-based: Backgrounded and Opened match posthog-macos `ApplicationLifecyclePublisher`'s `applicationDidResignActive` and `applicationDidBecomeActive` notifications (e751c190, lines 97-110).
 
 The desktop adapter also retains three limitations of the current Flutter API on mobile. Consent and the active client are resolved after an asynchronous `beforeSend`, so enabling analytics or replacing the client while the callback is pending can change where the event is sent. Reading a flag while opted out consumes its exposure deduplication entry, as in the native mobile SDKs. Renaming a screen or exception event in `beforeSend` routes it through capture and runs the callback again, as in the Flutter IO adapter. These behaviors need a coordinated cross-platform change rather than a desktop-only contract.
