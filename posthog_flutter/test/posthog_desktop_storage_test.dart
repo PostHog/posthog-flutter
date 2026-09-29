@@ -51,14 +51,32 @@ void main() {
       );
     }, testOn: '!windows');
 
-    test('is in the temporary directory without an application data one', () {
-      expect(
-        DesktopStorage.appDirectory(
-          const {},
-          executable: '/opt/example/example_app',
-        ),
-        '${Directory.systemTemp.path}${sep}posthog${sep}example_app',
+    test('uses a unique private temporary directory without app data', () {
+      final first = DesktopStorage.appDirectory(
+        const {},
+        executable: '/opt/example/example_app',
       );
+      final second = DesktopStorage.appDirectory(
+        const {},
+        executable: '/opt/example/example_app',
+      );
+      final firstTemporaryDirectory = Directory(first).parent.parent;
+      final secondTemporaryDirectory = Directory(second).parent.parent;
+      addTearDown(() {
+        firstTemporaryDirectory.deleteSync(recursive: true);
+        secondTemporaryDirectory.deleteSync(recursive: true);
+      });
+
+      expect(firstTemporaryDirectory.existsSync(), isTrue);
+      expect(secondTemporaryDirectory.existsSync(), isTrue);
+      expect(
+          firstTemporaryDirectory.path, isNot(secondTemporaryDirectory.path));
+      expect(first, startsWith('${firstTemporaryDirectory.path}$sep'));
+      expect(second, startsWith('${secondTemporaryDirectory.path}$sep'));
+      if (!Platform.isWindows) {
+        expect(firstTemporaryDirectory.statSync().mode & 0x1ff, 0x1c0);
+        expect(secondTemporaryDirectory.statSync().mode & 0x1ff, 0x1c0);
+      }
     });
   });
 

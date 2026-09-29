@@ -6,9 +6,9 @@ import 'package:flutter/widgets.dart';
 import 'posthog_desktop_context.dart';
 import 'util/logging.dart';
 
-/// What the Windows and Linux implementation drives from the application
-/// lifecycle. A desktop app has no background state, so it counts as opened
-/// when it becomes active and as backgrounded when it resigns active:
+/// Lifecycle events and flushes for Windows and Linux. As in PostHog macOS,
+/// the app counts as opened when it becomes active and as backgrounded when
+/// it resigns active, even if its windows remain visible:
 ///
 /// - `Application Installed` / `Application Updated` when this launch's
 ///   version or build differs from the previous launch's;
