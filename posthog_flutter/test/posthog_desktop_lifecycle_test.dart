@@ -36,10 +36,11 @@ void main() {
     String? build = '100',
     bool captureEvents = true,
     bool withBinding = true,
+    bool withStorage = true,
   }) {
     final lifecycle = DesktopAppLifecycle(
       binding: withBinding ? WidgetsBinding.instance : null,
-      storageDirectory: storageDir.path,
+      storageDirectory: withStorage ? storageDir.path : null,
       version: version,
       build: build,
       captureEvents: captureEvents,
@@ -64,6 +65,18 @@ void main() {
 
   Map<String, Object>? propertiesOf(String event) =>
       captured.firstWhere((call) => call.event == event).properties;
+
+  test('without storage tracks activity without inferring an install',
+      () async {
+    createLifecycle(withStorage: false).start();
+    expect(captured, isEmpty);
+
+    await moveApp(AppLifecycleState.resumed);
+    await moveApp(AppLifecycleState.inactive);
+
+    expect(eventNames(), ['Application Opened', 'Application Backgrounded']);
+    expect(flushes, 1);
+  });
 
   group('install and update', () {
     test('the first launch captures Application Installed', () {

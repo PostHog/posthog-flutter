@@ -5,7 +5,7 @@ import 'logger.dart';
 import 'persistence.dart';
 import 'uuid.dart';
 
-/// File-based storage.
+/// Client state and queue storage, persistent unless created in memory.
 ///
 /// The persisted properties (identity, feature flags, consent, super
 /// properties) live in one JSON snapshot, `posthog_data.json`. Every queued
@@ -35,6 +35,12 @@ import 'uuid.dart';
 /// latest writes but never leaves a file half-written.
 class FileStorage {
   FileStorage(this._directory);
+
+  FileStorage.memory()
+      : _directory = '',
+        _cache = {},
+        _role = _Role.secondary,
+        _queue = FileEventQueue._memory();
 
   static const _dataFileName = 'posthog_data.json';
   static const _lockFileName = 'posthog.lock';
@@ -281,6 +287,13 @@ class FileEventQueue {
       {required bool includeExisting})
       : _loadedIds = includeExisting ? null : [];
 
+  FileEventQueue._memory()
+      : _directory = '',
+        _logger = _noLogger,
+        _loadedIds = [];
+
+  static CoreLogger? _noLogger() => null;
+
   static const _extension = '.json';
 
   final String _directory;
@@ -331,6 +344,10 @@ class FileEventQueue {
     final ids = _ids;
     final id = generateUuidV7();
     ids.add(id);
+    if (_directory.isEmpty) {
+      _unwritten[id] = event;
+      return;
+    }
     try {
       _writeAtomically(File(_pathOf(id)), jsonEncode(event));
     } catch (e) {
@@ -393,7 +410,9 @@ class FileEventQueue {
   }
 
   void _forget(String id) {
-    if (_unwritten.remove(id) == null) _delete(File(_pathOf(id)));
+    if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
+      _delete(File(_pathOf(id)));
+    }
   }
 
   void _delete(File file) {

@@ -32,7 +32,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// [appDirectory], whose build recorded [appInfo], and that runs in the
   /// IANA time zone [timezone].
   PosthogFlutterDesktop({
-    required String appDirectory,
+    required String? appDirectory,
     required DesktopAppInfo appInfo,
     required String? timezone,
   })  : _appDirectory = appDirectory,
@@ -40,7 +40,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         _timezone = timezone;
 
   /// See [DesktopStorage.appDirectory].
-  final String _appDirectory;
+  final String? _appDirectory;
 
   final DesktopAppInfo _appInfo;
 
@@ -115,13 +115,17 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   }
 
   void _startClient(PostHogConfig config) {
-    final storageDirectory =
-        DesktopStorage.projectDirectory(_appDirectory, config.projectToken);
+    final appDirectory = _appDirectory;
+    final storageDirectory = appDirectory == null
+        ? null
+        : DesktopStorage.projectDirectory(appDirectory, config.projectToken);
     final client = DesktopPostHog(
       config,
       staticContext: collectDesktopContext(_appInfo),
       timezone: _timezone,
-      storage: FileStorage(storageDirectory),
+      storage: storageDirectory == null
+          ? FileStorage.memory()
+          : FileStorage(storageDirectory),
     );
     _client = client;
     _featureFlagsUnsubscribe =

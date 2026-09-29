@@ -10,6 +10,26 @@ import 'test_client.dart';
 
 void main() {
   group('FileStorage', () {
+    test('memory storage keeps consent and queued events without disk IO', () {
+      IOOverrides.runZoned(() {
+        final storage = FileStorage.memory();
+        storage.setProperty(PostHogPersistedProperty.optedOut, true);
+        storage.queue.add({'event': 'captured'});
+
+        expect(storage.getProperty<bool>(PostHogPersistedProperty.optedOut),
+            isTrue);
+        final queued = storage.queue.peek(1).single;
+        expect(queued.event['event'], 'captured');
+        storage.queue.removeOldest(1);
+        storage.queue.remove([queued.id]);
+        expect(storage.queue.length, 0);
+        storage.close();
+      },
+          createFile: (_) => throw StateError('Unexpected file access'),
+          createDirectory: (_) =>
+              throw StateError('Unexpected directory access'));
+    });
+
     test('setting a property to null removes it from the persisted snapshot',
         () {
       final dir = Directory.systemTemp.createTempSync('posthog_storage_null');
