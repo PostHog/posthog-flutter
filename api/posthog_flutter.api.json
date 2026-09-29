@@ -70,6 +70,36 @@
         "interfaceDeclarations": [
             {
                 "entryPoints": [
+                    "posthog_flutter_dart.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": true,
+                        "name": "registerWith",
+                        "parameters": [],
+                        "relativePath": "lib/posthog_flutter_dart.dart",
+                        "returnTypeName": "void",
+                        "type": "method",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PosthogFlutterDart",
+                "relativePath": "lib/posthog_flutter_dart.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
                     "posthog_flutter_web.dart"
                 ],
                 "executableDeclarations": [
