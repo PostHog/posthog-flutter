@@ -49,6 +49,28 @@ void main() {
     ..flushInterval = const Duration(hours: 1)
     ..captureApplicationLifecycleEvents = false;
 
+  test('facade captures and honors consent without filesystem access',
+      () async {
+    PosthogFlutterPlatformInterface.instance = PosthogFlutterDesktop(
+      appDirectory: null,
+      appInfo: const DesktopAppInfo(name: 'memory_test'),
+      timezone: null,
+    );
+    await IOOverrides.runZoned(() async {
+      await Posthog().setup(config()..preloadFeatureFlags = false);
+      await Posthog().disable();
+      expect(await Posthog().isOptOut(), isTrue);
+      await Posthog().capture(eventName: 'blocked event');
+      await Posthog().enable();
+      await Posthog().capture(eventName: 'memory event');
+      await Posthog().flush();
+      expect(server.eventNames, ['memory event']);
+    },
+        createFile: (_) => throw StateError('Unexpected file access'),
+        createDirectory: (_) =>
+            throw StateError('Unexpected directory access'));
+  });
+
   test('facade sends a gzipped batch with envelope and event metadata',
       () async {
     await Posthog().setup(config(flushAt: 2)..preloadFeatureFlags = false);

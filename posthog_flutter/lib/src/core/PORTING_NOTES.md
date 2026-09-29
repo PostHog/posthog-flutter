@@ -70,6 +70,8 @@ The Windows time zone is read during plugin registration through the system ICU 
 
 Desktop storage uses the user's application data directory. A custom `XDG_DATA_HOME` or `APPDATA` must point to a directory for that user; access to ordinary files is controlled by operating system permissions and umask.
 
+Without an application data directory, desktop keeps state in memory until the SDK closes or the app exits. It does not create a temporary store. Opened and Backgrounded events still run, but no prior version is available to infer an install or update.
+
 Structured logs, session replay, surveys, push, and native crash hooks are not yet implemented on desktop. A shared Flutter method does not imply transport support on every platform. The shared facade runs beforeSend for logs, but desktop captureLog does not send entries.
 
 Desktop lifecycle is focus-based: Backgrounded and Opened match posthog-macos `ApplicationLifecyclePublisher`'s `applicationDidResignActive` and `applicationDidBecomeActive` notifications (e751c190, lines 97-110).

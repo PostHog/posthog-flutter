@@ -10,8 +10,8 @@ Specifically, the [Flutter docs](https://posthog.com/docs/libraries/flutter) det
 
 Windows and Linux support the core analytics SDK. Session replay, surveys,
 logs, push notifications, and native crash capture are not supported. If no
-user application data directory is available, desktop state uses a private
-temporary directory for that registration and is not reused on the next launch.
+user application data directory is available, desktop state stays in memory and is lost
+when the SDK closes or the app exits.
 
 ## Questions?
 

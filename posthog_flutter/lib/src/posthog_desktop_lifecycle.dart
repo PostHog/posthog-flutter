@@ -19,7 +19,7 @@ import 'util/logging.dart';
 class DesktopAppLifecycle {
   DesktopAppLifecycle({
     required WidgetsBinding? binding,
-    required String storageDirectory,
+    required String? storageDirectory,
     required String? version,
     required String? build,
     required bool captureEvents,
@@ -32,9 +32,11 @@ class DesktopAppLifecycle {
         _captureEvents = captureEvents,
         _capture = capture,
         _flush = flush,
-        _versionFile = File(
-          '$storageDirectory${Platform.pathSeparator}posthog_app_version.json',
-        ) {
+        _versionFile = storageDirectory == null
+            ? null
+            : File(
+                '$storageDirectory${Platform.pathSeparator}posthog_app_version.json',
+              ) {
     if (binding != null) {
       _listener = AppLifecycleListener(
         binding: binding,
@@ -54,7 +56,7 @@ class DesktopAppLifecycle {
 
   /// Holds the version and build of the latest launch. Kept apart from the
   /// SDK state so that reset() does not turn the next launch into an install.
-  final File _versionFile;
+  final File? _versionFile;
 
   AppLifecycleListener? _listener;
   bool _isStarted = false;
@@ -136,13 +138,15 @@ class DesktopAppLifecycle {
   /// Records this launch's version and build and returns the event reporting
   /// how they changed since the previous launch, if they did.
   ({String event, Map<String, Object> properties})? _recordAppVersion() {
+    final versionFile = _versionFile;
+    if (versionFile == null) return null;
     // Nothing to compare when the build recorded neither.
     if (_version == null && _build == null) return null;
 
     Map<String, Object?>? previous;
     try {
       previous =
-          jsonDecode(_versionFile.readAsStringSync()) as Map<String, Object?>;
+          jsonDecode(versionFile.readAsStringSync()) as Map<String, Object?>;
     } on PathNotFoundException {
       // The first launch with the SDK.
     } catch (e) {
@@ -182,15 +186,17 @@ class DesktopAppLifecycle {
   }
 
   void _writeAppVersion(String? version, String? build) {
+    final versionFile = _versionFile;
+    if (versionFile == null) return;
     try {
-      _versionFile.parent.createSync(recursive: true);
+      versionFile.parent.createSync(recursive: true);
       // Atomic replace: a crash mid-write must not lose the recorded version.
-      final tmp = File('${_versionFile.path}.tmp');
+      final tmp = File('${versionFile.path}.tmp');
       tmp.writeAsStringSync(
         jsonEncode({'version': version, 'build': build}),
         flush: true,
       );
-      tmp.renameSync(_versionFile.path);
+      tmp.renameSync(versionFile.path);
     } catch (e) {
       printIfDebug('[PostHog] Could not record the app version: $e');
     }
