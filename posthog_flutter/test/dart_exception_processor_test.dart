@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 
+Never throwOriginalError(String message) => throw StateError(message);
+
 void main() {
   group('DartExceptionProcessor', () {
     test('processes exception with correct properties', () {
@@ -110,11 +112,8 @@ void main() {
         (frame) =>
             frame['package'] == null &&
             (frame['abs_path']?.contains('dart:') == true),
-        orElse: () => <String, dynamic>{},
       );
-      if (dartFrame.isNotEmpty) {
-        expect(dartFrame['in_app'], isFalse);
-      }
+      expect(dartFrame['in_app'], isFalse);
     });
 
     test('handles inAppIncludes configuration correctly', () {
@@ -211,20 +210,9 @@ void main() {
       // Find any frame from test_package
       final testFrame = frames.firstWhere(
         (frame) => frame['package'] == 'test_package',
-        orElse: () => <String, dynamic>{},
       );
-
-      // If we found the frame, test precedence
-      if (testFrame.isNotEmpty) {
-        expect(
-          testFrame['in_app'],
-          isTrue,
-          reason: 'inAppIncludes should take precedence over inAppExcludes',
-        );
-      } else {
-        // Just verify that the configuration was processed without error
-        expect(frames, isA<List>());
-      }
+      expect(testFrame['in_app'], isTrue,
+          reason: 'inAppIncludes should take precedence over inAppExcludes');
     });
 
     test('processes exception types correctly', () {
@@ -308,7 +296,8 @@ void main() {
           result2['\$exception_list'] as List<Map<String, dynamic>>;
       final threadId2 = exceptionData2.first['thread_id'];
 
-      expect(threadId, equals(threadId2)); // Should be consistent
+      expect(threadId, isA<int>());
+      expect(threadId, equals(threadId2));
     });
 
     test('generates stack trace when none provided', () {
@@ -334,11 +323,11 @@ void main() {
 
     test('uses error.stackTrace when available', () {
       try {
-        throw StateError('Test error');
+        throwOriginalError('Test error');
       } catch (error) {
         final result = DartExceptionProcessor.processException(
           error: error,
-          // No stackTrace provided - should generate one from error.stackTrace
+          stackTraceProvider: () => throw StateError('must use original stack'),
         );
 
         final exceptionData =
@@ -347,7 +336,8 @@ void main() {
 
         // Should have a stack trace from the Error object
         expect(stackTraceData, isNotNull);
-        expect(stackTraceData['frames'], isA<List>());
+        expect(stackTraceData['frames'],
+            contains(containsPair('function', 'throwOriginalError')));
 
         // Should not be marked as synthetic since we did not generate a stack trace
         expect(exceptionData.first['mechanism']['synthetic'], isFalse);
@@ -595,7 +585,7 @@ void main() {
         late Error originalError;
 
         try {
-          throw StateError('Original error with stack trace');
+          throwOriginalError('Original error with stack trace');
         } catch (error) {
           originalError = error as Error;
         }
@@ -610,7 +600,7 @@ void main() {
         // Process without providing external stack trace - should use original error's stackTrace
         final result = DartExceptionProcessor.processException(
           error: postHogException,
-          // No stackTrace provided - should extract from original error
+          stackTraceProvider: () => throw StateError('must use original stack'),
         );
 
         final exceptionData =
@@ -627,11 +617,9 @@ void main() {
 
         // Should have stacktrace frames from the original error
         expect(exceptionData['stacktrace'], isNotNull);
-        expect(exceptionData['stacktrace']['frames'], isA<List>());
-        expect(
-          (exceptionData['stacktrace']['frames'] as List).isNotEmpty,
-          isTrue,
-        );
+        expect(exceptionData['stacktrace']['frames'],
+            contains(containsPair('function', 'throwOriginalError')));
+        expect(exceptionData['mechanism']['synthetic'], isFalse);
       },
     );
 

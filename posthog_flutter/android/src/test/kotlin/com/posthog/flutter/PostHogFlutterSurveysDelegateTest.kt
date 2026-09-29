@@ -153,11 +153,14 @@ class PostHogFlutterSurveysDelegateTest {
     fun dismissalAndResetClearSavedProgressAndRejectOldActions() {
         for (reset in listOf(false, true)) {
             events.clear()
+            messages.clear()
             val (sdk, delegate) = start(true)
             val displayed = shown()
             try {
                 delegate.action("shown", displayed)
-                delegate.action("response", displayed, response = "Saved answer")
+                val reply = delegate.action("response", displayed, response = "Saved answer")
+                Mockito.verify(reply).success(mapOf("nextIndex" to 1, "isSurveyCompleted" to false))
+                assertTrue((preferences.getValue(PostHogPreferences.SURVEY_PROGRESS) as Map<*, *>).isNotEmpty())
                 if (reset) sdk.reset() else delegate.action("closed", displayed)
                 shadowOf(Looper.getMainLooper()).idle()
                 assertTrue((preferences.getValue(PostHogPreferences.SURVEY_PROGRESS) as? Map<*, *>).isNullOrEmpty())

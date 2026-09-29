@@ -67,15 +67,13 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_sendMetaEvent_repliesAfterWorkDropsOnDetachRecoversOnReattach() {
+    fun onMethodCall_sendMetaEvent_acknowledgesDetachedWorkWithoutSynchronousAttachedReply() {
         val plugin = PosthogFlutterPlugin()
         val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
 
         val call = MethodCall("sendMetaEvent", mapOf("width" to 10, "height" to 20, "screen" to "Home"))
 
-        // Asserts only that no reply happens synchronously in the handler.
-        // Actual delivery after the worker runs is not observable here (the
-        // stubbed test looper drops posts) and is covered end to end.
+        // The stubbed looper drops posts; this case only checks submission.
         val whileAttached: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, whileAttached)
         Mockito.verify(whileAttached, Mockito.never()).success(null)
@@ -91,6 +89,7 @@ internal class PosthogFlutterPluginTest {
         val afterReattach: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, afterReattach)
         Mockito.verify(afterReattach, Mockito.never()).success(null)
+        plugin.onDetachedFromEngine(binding)
     }
 
     @Test
@@ -286,7 +285,7 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_captureLog_routesToCaptureLogAndSucceeds() {
+    fun onMethodCall_captureLog_acknowledgesValidArguments() {
         val plugin = PosthogFlutterPlugin()
 
         val arguments =
@@ -303,8 +302,6 @@ internal class PosthogFlutterPluginTest {
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
 
-        // Routed through the public PostHog.captureLog (with W3C trace fields);
-        // the SDK is not set up in the test, so it no-ops and we still succeed.
         Mockito.verify(mockResult).success(null)
     }
 
@@ -364,7 +361,14 @@ internal class PosthogFlutterPluginTest {
         val call =
             MethodCall(
                 "captureNativeScreenshots",
-                mapOf("views" to listOf(mapOf("x" to 0, "y" to 0, "width" to 0, "height" to 0))),
+                mapOf(
+                    "views" to
+                        listOf(
+                            mapOf("x" to 0, "y" to 0, "width" to 0, "height" to 10),
+                            mapOf("x" to 0, "y" to 0, "width" to 10, "height" to 0),
+                            mapOf("x" to 0, "y" to 0, "width" to 0, "height" to 0),
+                        ),
+                ),
             )
         val mockResult: MethodChannel.Result = Mockito.mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(call, mockResult)
@@ -372,8 +376,8 @@ internal class PosthogFlutterPluginTest {
         @Suppress("UNCHECKED_CAST")
         val captor = org.mockito.ArgumentCaptor.forClass(List::class.java) as org.mockito.ArgumentCaptor<List<ByteArray?>>
         Mockito.verify(mockResult).success(captor.capture())
-        assertEquals(1, captor.value.size)
-        assertNull(captor.value[0])
+        assertEquals(listOf(null, null, null), captor.value)
+        Mockito.verify(binding.activity, Mockito.never()).findViewById<android.view.View>(android.R.id.content)
     }
 
     @Test
@@ -487,7 +491,7 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_registerPushNotificationToken_noAppIdWithFirebase_resolvesProjectId() {
+    fun onMethodCall_registerPushNotificationToken_noAppIdWithFirebase_returnsSuccess() {
         val plugin = PosthogFlutterPlugin()
 
         // With the stub initialized, the reflective fallback resolves a project
@@ -533,7 +537,7 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun onMethodCall_capturePushNotificationOpened_dropsIosOnlySubtitle() {
+    fun onMethodCall_capturePushNotificationOpened_acceptsIosShapedArguments() {
         val plugin = PosthogFlutterPlugin()
 
         // subtitle has no Android counterpart; it must be ignored rather than

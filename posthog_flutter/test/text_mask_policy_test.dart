@@ -572,7 +572,17 @@ void main() {
 
       final p = paragraph(tester, '4111');
       final rects = masks();
-      expect(rects.length, greaterThanOrEqualTo(2));
+      final boxes = p.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 19),
+      );
+      expect(
+          boxes.map((box) => box.top).toSet().length, greaterThanOrEqualTo(2));
+      for (final box in boxes) {
+        final target = MatrixUtils.transformRect(
+            p.getTransformTo(container()), box.toRect());
+        expect(covered(rects, target), isTrue,
+            reason: 'every wrapped line must be masked: $target');
+      }
       final bounds = MatrixUtils.transformRect(
           p.getTransformTo(container()), p.paintBounds);
       for (final rect in rects) {
