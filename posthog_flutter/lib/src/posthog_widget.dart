@@ -305,6 +305,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       return false;
     }
     if (imageInfo.shouldSendMetaEvent) {
+      _screenshotCapturer?.rearmMetaEvent(imageInfo.id);
       final metaSent = await _nativeCommunicator?.sendMetaEvent(
             width: imageInfo.width,
             height: imageInfo.height,
