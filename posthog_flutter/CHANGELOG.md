@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.9
+
+### Patch Changes
+
+- 66c9257: Stop calling the deprecated `getFeatureFlagPayload` of the PostHog iOS SDK on iOS and macOS, which is removed in its next major version.
+
 ## 5.50.8
 
 ### Patch Changes
