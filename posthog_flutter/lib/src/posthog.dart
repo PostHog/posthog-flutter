@@ -43,6 +43,9 @@ class Posthog {
   /// To listen for feature flag load events, provide an `onFeatureFlags`
   /// callback in the [PostHogConfig].
   ///
+  /// Repeated setup reapplies Dart error-tracking hooks. Native settings still
+  /// require [close] before setup because the native SDKs ignore repeated setup.
+  ///
   /// Returns a [Future] that completes when platform setup has finished.
   ///
   /// **Example:**
@@ -83,7 +86,8 @@ class Posthog {
   }
 
   void _installFlutterIntegrations(PostHogConfig config) {
-    // Install exception autocapture if enabled
+    _uninstallFlutterIntegrations();
+
     if (config.errorTrackingConfig.captureFlutterErrors ||
         config.errorTrackingConfig.capturePlatformDispatcherErrors ||
         config.errorTrackingConfig.captureIsolateErrors) {
