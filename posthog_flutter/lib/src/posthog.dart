@@ -43,8 +43,9 @@ class Posthog {
   /// To listen for feature flag load events, provide an `onFeatureFlags`
   /// callback in the [PostHogConfig].
   ///
-  /// Repeated setup reapplies Dart error-tracking hooks. Native settings still
-  /// require [close] before setup because the native SDKs ignore repeated setup.
+  /// Repeated setup reapplies Dart-side settings such as the error-tracking
+  /// hooks. Most native settings still require [close] before setup because
+  /// the native SDKs ignore repeated setup.
   ///
   /// Returns a [Future] that completes when platform setup has finished.
   ///
