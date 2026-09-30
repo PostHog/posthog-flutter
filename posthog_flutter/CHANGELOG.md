@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.11
+
+### Patch Changes
+
+- 890e432: Parse survey question `id` from native payloads instead of using the question type.
+
 ## 5.50.10
 
 ### Patch Changes
