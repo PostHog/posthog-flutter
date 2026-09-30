@@ -18,6 +18,7 @@ class PostHogDisplaySurveyAppearance {
     this.inputBackground,
     this.inputTextColor,
     this.placeholder,
+    this.surveyPopupDelaySeconds,
     this.displayThankYouMessage = true,
     this.thankYouMessageHeader,
     this.thankYouMessageDescription,
@@ -43,6 +44,11 @@ class PostHogDisplaySurveyAppearance {
   final String? inputBackground;
   final String? inputTextColor;
   final String? placeholder;
+
+  /// Seconds to wait after the survey is triggered before it is shown.
+  ///
+  /// Null or a non-positive value shows the survey immediately.
+  final double? surveyPopupDelaySeconds;
   final bool displayThankYouMessage;
   final String? thankYouMessageHeader;
   final String? thankYouMessageDescription;
