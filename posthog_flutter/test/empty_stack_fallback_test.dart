@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
+import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'package:stack_trace/stack_trace.dart';
 
 Never _throwOriginalError() => throw StateError('original failure');
@@ -19,40 +20,51 @@ void main() {
     '#0 captureSite (package:my_app/capture.dart:10:1)',
   );
 
-  for (final entry in traces.entries) {
-    test('${entry.key} preserves the original Error stack', () {
-      late Error error;
-      try {
-        _throwOriginalError();
-      } catch (caught) {
-        error = caught as Error;
-      }
-      expect(error.stackTrace, isNotNull);
+  for (final wrapped in [false, true]) {
+    for (final entry in traces.entries) {
+      test(
+          '${wrapped ? 'wrapped' : 'unwrapped'} ${entry.key} preserves the original Error stack',
+          () {
+        late Error error;
+        try {
+          _throwOriginalError();
+        } catch (caught) {
+          error = caught as Error;
+        }
+        expect(error.stackTrace, isNotNull);
 
-      var generated = false;
-      // The test runner's Chain.capture zone appends frames to empty traces.
-      final result =
-          Zone.root.run(() => DartExceptionProcessor.processException(
-                error: error,
-                stackTrace: entry.value,
-                stackTraceProvider: () {
-                  generated = true;
-                  return captureStack;
-                },
-              ));
-      final exception =
-          (result['\$exception_list'] as List<Map<String, dynamic>>).first;
-      final stack = exception['stacktrace'] as Map<String, dynamic>?;
-      final frames = stack?['frames'] as List<Map<String, dynamic>>? ?? [];
+        var generated = false;
+        // The test runner's Chain.capture zone appends frames to empty traces.
+        final result =
+            Zone.root.run(() => DartExceptionProcessor.processException(
+                  error: wrapped
+                      ? PostHogException(
+                          source: error, mechanism: 'FlutterError')
+                      : error,
+                  stackTrace: entry.value,
+                  stackTraceProvider: () {
+                    generated = true;
+                    return captureStack;
+                  },
+                ));
+        final exception =
+            (result['\$exception_list'] as List<Map<String, dynamic>>).first;
+        final stack = exception['stacktrace'] as Map<String, dynamic>?;
+        final frames = stack?['frames'] as List<Map<String, dynamic>>? ?? [];
 
-      expect(
-        frames.map((frame) => frame['function']),
-        contains('_throwOriginalError'),
-        reason: 'generated=$generated; mechanism=${exception['mechanism']}',
-      );
-      expect(generated, isFalse);
-      expect(exception['mechanism'], containsPair('synthetic', false));
-    });
+        expect(
+          frames.map((frame) => frame['function']),
+          contains('_throwOriginalError'),
+          reason: 'generated=$generated; mechanism=${exception['mechanism']}',
+        );
+        expect(generated, isFalse);
+        expect(exception['type'], 'StateError');
+        expect(exception['mechanism'], containsPair('synthetic', false));
+        expect(exception['mechanism'], containsPair('handled', !wrapped));
+        expect(exception['mechanism'],
+            containsPair('type', wrapped ? 'FlutterError' : 'generic'));
+      });
+    }
   }
 
   for (final entry in traces.entries) {
