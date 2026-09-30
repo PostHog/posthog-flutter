@@ -115,6 +115,9 @@ class PostHogDisplaySurvey {
         inputBackground: a['inputBackground'] as String?,
         inputTextColor: a['inputTextColor'] as String?,
         placeholder: a['placeholder'] as String?,
+        surveyPopupDelaySeconds: a['surveyPopupDelaySeconds'] is num
+            ? (a['surveyPopupDelaySeconds'] as num).toDouble()
+            : null,
         displayThankYouMessage: a['displayThankYouMessage'] as bool? ?? true,
         thankYouMessageHeader: a['thankYouMessageHeader'] as String?,
         thankYouMessageDescription: a['thankYouMessageDescription'] as String?,
