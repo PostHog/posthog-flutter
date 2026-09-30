@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,31 @@ import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 import 'replay_capture_settle.dart';
+
+/// A platform view with no native side, so a capture composites it without a
+/// platform channel behind it.
+class _FakePlatformView extends LeafRenderObjectWidget {
+  const _FakePlatformView();
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      PlatformViewRenderBox(
+        controller: _FakeController(),
+        hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+        gestureRecognizers: const {},
+      );
+}
+
+class _FakeController extends PlatformViewController {
+  @override
+  int get viewId => 0;
+  @override
+  Future<void> clearFocus() async {}
+  @override
+  Future<void> dispatchPointerEvent(PointerEvent event) async {}
+  @override
+  Future<void> dispose() async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +55,7 @@ void main() {
   // Optional side effect run inside the sendMetaEvent handler, used to
   // simulate the world changing mid-send (between meta and full snapshot).
   void Function()? onSendMetaEvent;
+  void Function()? onSendFullSnapshot;
 
   void mockChannel() {
     messenger.setMockMethodCallHandler(channel, (call) async {
@@ -43,6 +70,9 @@ void main() {
           return enableNativeBridgeResult;
         case 'sendMetaEvent':
           onSendMetaEvent?.call();
+          return null;
+        case 'sendFullSnapshot':
+          onSendFullSnapshot?.call();
           return null;
         default:
           return null;
@@ -114,6 +144,7 @@ void main() {
     sessionReplayActive = false;
     sessionId = 'session-a';
     onSendMetaEvent = null;
+    onSendFullSnapshot = null;
     resetOcclusionState();
     mockChannel();
   });
@@ -1150,5 +1181,194 @@ void main() {
 
       await unmountAndFlush(tester);
     });
+  });
+
+  group('screen size change', () {
+    // Folding or unfolding a foldable, or rotating, resizes the same
+    // RepaintBoundary, so the view's status and meta latch survive the resize.
+    const landscape = Size(2400, 1800);
+    const portrait = Size(1800, 2400);
+
+    List<List<int>> metaSizes() => recordedCalls
+        .where((c) => c.method == 'sendMetaEvent')
+        .map((c) => [
+              (c.arguments as Map)['width'] as int,
+              (c.arguments as Map)['height'] as int,
+            ])
+        .toList();
+
+    Widget screen(Color color, {bool platformView = false}) => PostHogWidget(
+          child: Container(
+            color: color,
+            child: platformView
+                ? const Center(
+                    child: SizedBox.square(
+                      dimension: 100,
+                      child: _FakePlatformView(),
+                    ),
+                  )
+                : null,
+          ),
+        );
+
+    Future<void> resizeAndRepaint(
+      WidgetTester tester,
+      Size physicalSize,
+      Color color, {
+      bool platformView = false,
+    }) async {
+      tester.view.physicalSize = physicalSize;
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(screen(color, platformView: platformView));
+      final frames =
+          recordedCalls.where((c) => c.method == 'sendFullSnapshot').length;
+      await settleUntil(
+        tester,
+        () =>
+            recordedCalls.where((c) => c.method == 'sendFullSnapshot').length >
+            frames,
+      );
+    }
+
+    Future<void> deliverFirstFrame(
+      WidgetTester tester, {
+      bool platformView = false,
+    }) async {
+      sessionReplayActive = true;
+      tester.view.devicePixelRatio = 3.0;
+      tester.view.physicalSize = landscape;
+      addTearDown(tester.view.reset);
+      final config = replayConfig(captureNativeScreens: false);
+      config.sessionReplayConfig.maskAllPlatformViews = !platformView;
+      await setupPosthog(config);
+      await tester.pumpWidget(
+        screen(const Color(0xFF00FF00), platformView: platformView),
+      );
+      await settleUntil(tester, () => sent('sendFullSnapshot'));
+      expect(metaSizes(), [
+        [800, 600]
+      ]);
+    }
+
+    testWidgets('re-sends meta only when the size changes', (tester) async {
+      await deliverFirstFrame(tester);
+
+      await resizeAndRepaint(tester, portrait, const Color(0xFF0000FF));
+      await resizeAndRepaint(tester, portrait, const Color(0xFFFF0000));
+      await resizeAndRepaint(tester, landscape, const Color(0xFF00FF00));
+
+      expect(
+        metaSizes(),
+        [
+          [800, 600],
+          [600, 800],
+          [800, 600],
+        ],
+        reason: 'one meta per size change, none for the same-size frame',
+      );
+      expect(
+        recordedCalls.where((c) => c.method == 'sendFullSnapshot').length,
+        4,
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('re-sends meta when a rotation keeps the same pixels',
+        (tester) async {
+      await deliverFirstFrame(tester);
+
+      await resizeAndRepaint(tester, portrait, const Color(0xFF00FF00));
+
+      expect(metaSizes(), [
+        [800, 600],
+        [600, 800],
+      ]);
+
+      await unmountAndFlush(tester);
+    });
+
+    testWidgets('a failed meta send does not commit the new size',
+        (tester) async {
+      await deliverFirstFrame(tester);
+
+      onSendMetaEvent = () => throw PlatformException(code: 'unavailable');
+      tester.view.physicalSize = portrait;
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(
+        PostHogWidget(child: Container(color: const Color(0xFF0000FF))),
+      );
+      await settleUntil(tester, () => metaSizes().length == 2);
+      await settleCapture(tester);
+      expect(metaSizes().last, [600, 800]);
+      expect(
+        recordedCalls.where((c) => c.method == 'sendFullSnapshot').length,
+        1,
+        reason: 'the frame is dropped when its meta fails',
+      );
+
+      onSendMetaEvent = null;
+      await resizeAndRepaint(tester, portrait, const Color(0xFFFF0000));
+
+      expect(
+        metaSizes(),
+        [
+          [800, 600],
+          [600, 800],
+          [600, 800],
+        ],
+        reason: 'the next frame retries the meta the failed send dropped',
+      );
+      expect(
+        recordedCalls.where((c) => c.method == 'sendFullSnapshot').length,
+        2,
+      );
+
+      await unmountAndFlush(tester);
+    });
+
+    for (final platformView in [false, true]) {
+      for (final (label, color) in [
+        ('changed', const Color(0xFFFF0000)),
+        ('unchanged', const Color(0xFF00FF00)),
+      ]) {
+        testWidgets(
+            're-sends meta when returning to a size after a partial delivery '
+            'with $label pixels${platformView ? ' and a platform view' : ''}',
+            (tester) async {
+          await deliverFirstFrame(tester, platformView: platformView);
+
+          onSendFullSnapshot =
+              () => throw PlatformException(code: 'unavailable');
+          await resizeAndRepaint(
+            tester,
+            portrait,
+            const Color(0xFF0000FF),
+            platformView: platformView,
+          );
+          expect(metaSizes().last, [600, 800]);
+
+          onSendFullSnapshot = null;
+          await resizeAndRepaint(
+            tester,
+            landscape,
+            color,
+            platformView: platformView,
+          );
+
+          expect(
+            metaSizes().last,
+            [800, 600],
+            reason: 'the 600×800 meta was delivered without its frame',
+          );
+          final lastFrame = recordedCalls
+              .lastWhere((c) => c.method == 'sendFullSnapshot')
+              .arguments as Map;
+          expect([lastFrame['width'], lastFrame['height']], [800, 600]);
+
+          await unmountAndFlush(tester);
+        });
+      }
+    }
   });
 }
