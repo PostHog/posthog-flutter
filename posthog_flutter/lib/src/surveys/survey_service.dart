@@ -9,6 +9,17 @@ import 'models/survey_callbacks.dart';
 import 'models/survey_appearance.dart';
 import 'widgets/survey_bottom_sheet.dart';
 
+/// How long to wait before showing a survey.
+///
+/// [seconds] comes from the survey's `surveyPopupDelaySeconds`. Null, zero,
+/// and negative values show the survey immediately, matching iOS and Android.
+Duration surveyPopupDelay(double? seconds) {
+  if (seconds == null || seconds.isNaN || seconds.isInfinite || seconds <= 0) {
+    return Duration.zero;
+  }
+  return Duration(milliseconds: (seconds * 1000).round());
+}
+
 /// A service that manages displaying surveys
 ///
 /// This service uses the PosthogObserver to access the current navigation context
@@ -26,6 +37,11 @@ class SurveyService {
   Route<dynamic>? _currentSurveyRoute;
   PostHogDisplaySurvey? _currentSurvey;
   Completer<void>? _programmaticDismissal;
+  Timer? _popupDelayTimer;
+  Completer<void>? _popupDelayGate;
+  int _popupDelayGeneration = 0;
+  PostHogDisplaySurvey? _pendingSurvey;
+  OnSurveyClosed? _pendingOnClosed;
 
   /// Shows a survey using the PosthogObserver context
   Future<void> showSurvey(
@@ -37,6 +53,28 @@ class SurveyService {
     if (_isShowingSurvey) {
       printIfDebug('[PostHog] A survey is already being displayed');
       return;
+    }
+
+    // A survey still waiting out its delay has not been shown. Replacing it
+    // closes that presentation the same way the iOS surveys delegate does.
+    _cancelPendingSurvey();
+
+    final delay = surveyPopupDelay(survey.appearance?.surveyPopupDelaySeconds);
+    if (delay > Duration.zero) {
+      final generation = ++_popupDelayGeneration;
+      final gate = Completer<void>();
+      _popupDelayGate = gate;
+      _pendingSurvey = survey;
+      _pendingOnClosed = onClosed;
+      _popupDelayTimer = Timer(delay, () {
+        if (!gate.isCompleted) gate.complete();
+      });
+      await gate.future;
+      if (generation != _popupDelayGeneration) return;
+      _popupDelayTimer = null;
+      _popupDelayGate = null;
+      _pendingSurvey = null;
+      _pendingOnClosed = null;
     }
 
     // Use the PosthogObserver's context to show the survey
@@ -55,6 +93,7 @@ class SurveyService {
     printIfDebug(
       '[PostHog] Cannot show survey: No valid context found. To fix this make sure that you have installed PosthogObserver correctly in your app.',
     );
+    if (delay > Duration.zero) onClosed(survey);
   }
 
   /// Shows a survey using a navigator context
@@ -148,8 +187,29 @@ class SurveyService {
     route.navigator?.removeRoute(route);
   }
 
+  void _cancelPendingSurvey() {
+    final survey = _pendingSurvey;
+    final onClosed = _pendingOnClosed;
+    if (survey == null) return;
+
+    _popupDelayGeneration++;
+    _popupDelayTimer?.cancel();
+    _popupDelayTimer = null;
+    final gate = _popupDelayGate;
+    _popupDelayGate = null;
+    _pendingSurvey = null;
+    _pendingOnClosed = null;
+    if (gate != null && !gate.isCompleted) gate.complete();
+    onClosed?.call(survey);
+  }
+
   /// Hides any active survey
   void hideSurvey({PostHogDisplaySurvey? survey}) {
+    if (_pendingSurvey != null &&
+        (survey == null || identical(survey, _pendingSurvey))) {
+      _cancelPendingSurvey();
+      if (!_isShowingSurvey) return;
+    }
     if (survey != null && !identical(survey, _currentSurvey)) return;
     if (!_isShowingSurvey || _isDismissingSurvey) {
       return;
