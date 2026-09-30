@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.10
+
+### Patch Changes
+
+- 56293ae: Preserve chained error handlers after teardown and prevent duplicate exception captures when error tracking restarts.
+
 ## 5.50.9
 
 ### Patch Changes
