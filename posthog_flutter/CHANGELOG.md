@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.12
+
+### Patch Changes
+
+- cadba6d: Reapply Dart automatic error-capture hooks when setup is called again with changed flags.
+
 ## 5.50.11
 
 ### Patch Changes
