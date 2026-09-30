@@ -11,6 +11,9 @@ void main() {
       detector.hasCapturedPlatformViews = true;
 
       detector.start();
+      await tester.pump();
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      await tester.binding.delayed(const Duration(seconds: 1));
       expect(tester.binding.hasScheduledFrame, isTrue,
           reason: 'a static captured-view screen renders no frames on its '
               'own, so the detector must force them');
@@ -113,24 +116,24 @@ void main() {
 
     testWidgets('the forced-tick budget survives a stop()/start() pair',
         (tester) async {
-      // Posthog.close() arms the budget while the detector is stopped, and the
-      // setup() that follows is exactly what has to spend it: its own immediate
-      // sample can be spent while the platform is briefly not recording.
       final detector =
           ChangeDetector(() {}, interval: const Duration(seconds: 1));
 
       detector.start();
       await tester.pump();
 
-      detector.stop();
       detector.forceNextTicks(2);
+      detector.stop();
       detector.start();
       await tester.pump();
 
+      for (var i = 0; i < 2; i++) {
+        await tester.binding.delayed(const Duration(seconds: 1));
+        expect(tester.binding.hasScheduledFrame, isTrue);
+        await tester.pump();
+      }
       await tester.binding.delayed(const Duration(seconds: 1));
-      expect(tester.binding.hasScheduledFrame, isTrue,
-          reason: 'clearing the budget on stop() would make the restarted '
-              "recording depend on the statement order inside close()");
+      expect(tester.binding.hasScheduledFrame, isFalse);
 
       detector.stop();
       await tester.pump();

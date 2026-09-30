@@ -13,8 +13,18 @@ make checkFormatDart
 make analyzeDart
 make formatKotlin
 make formatSwift
-cd posthog_flutter && flutter test
+(cd posthog_flutter && flutter test)
+(cd posthog_flutter && flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_flutter_web_setup_test.dart test/posthog_widget_web_test.dart test/posthog_widget_test.dart test/web_canvas_mask_provider_test.dart)
+(cd posthog_flutter && flutter test --platform chrome --wasm test/posthog_isolate_error_handler_web_test.dart)
+(cd sdk_compliance_adapter && flutter test test/feature_flag_has_experiment_test.dart test/flags_retry_test.dart test/minimal_flag_called_events_test.dart test/timestamp_test.dart)
 ```
+
+The adapter's `test/adapter_server_test.dart` is the long-running compliance server,
+not a finite unit test. Use the explicit list above rather than an unfiltered
+`flutter test` in that package.
+
+Use `flutter test --coverage` in `posthog_flutter` to generate `coverage/lcov.info`.
+This measures Dart VM coverage, not browser or native code coverage.
 
 ## Build checks
 

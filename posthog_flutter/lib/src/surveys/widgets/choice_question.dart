@@ -106,9 +106,9 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
       }
     }
 
-    // Always submit a List<String>, even for single choice (will be a list with one element)
-    // This will be handled by native SDK code to send the correct response format upstream
-    widget.onSubmit(result);
+    // A selection is a list (one entry for single choice). An empty optional
+    // skip is null so native records no answer. An empty list is stored.
+    widget.onSubmit(result.isEmpty ? null : result);
   }
 
   @override
@@ -200,7 +200,10 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
           // Fixed submit button
           SurveyButton(
             onPressed: _canSubmit ? _onSubmit : null,
-            text: widget.buttonText ?? widget.appearance.submitButtonText,
+            text: surveyQuestionButtonLabel(
+              widget.buttonText,
+              widget.appearance.submitButtonText,
+            ),
             appearance: widget.appearance,
           ),
         ],

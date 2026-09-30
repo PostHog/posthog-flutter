@@ -260,6 +260,8 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     return featureFlagPayloads[key];
   }
 
+  PostHogFeatureFlagResult? featureFlagResult;
+
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
@@ -267,18 +269,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   }) async {
     getFeatureFlagResultCalls.add({'key': key, 'sendEvent': sendEvent});
 
-    if (!featureFlagValues.containsKey(key)) {
-      return null;
-    }
-    final value = featureFlagValues[key];
-    final payload = featureFlagPayloads[key];
-    final enabled = value != null && value != false;
-    final variant = (value is String) ? value : null;
-    return PostHogFeatureFlagResult(
-      key: key,
-      enabled: enabled,
-      variant: variant,
-      payload: payload,
-    );
+    return featureFlagResult;
   }
 }

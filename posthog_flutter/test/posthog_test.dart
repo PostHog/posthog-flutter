@@ -376,89 +376,27 @@ void main() {
     test('returns null for non-existent flag', () async {
       final result = await Posthog().getFeatureFlagResult('non-existent');
       expect(result, isNull);
+      expect(fakePlatformInterface.getFeatureFlagResultCalls, [
+        {'key': 'non-existent', 'sendEvent': true}
+      ]);
     });
 
-    test('returns correct result for boolean flag (true)', () async {
-      fakePlatformInterface.featureFlagValues['bool-flag'] = true;
-
-      final result = await Posthog().getFeatureFlagResult('bool-flag');
-
-      expect(result, isNotNull);
-      expect(result!.key, equals('bool-flag'));
-      expect(result.enabled, isTrue);
-      expect(result.variant, isNull);
-      expect(result.payload, isNull);
-    });
-
-    test('returns correct result for boolean flag (false)', () async {
-      fakePlatformInterface.featureFlagValues['disabled-flag'] = false;
-
-      final result = await Posthog().getFeatureFlagResult('disabled-flag');
-
-      expect(result, isNotNull);
-      expect(result!.key, equals('disabled-flag'));
-      expect(result.enabled, isFalse);
-      expect(result.variant, isNull);
-    });
-
-    test('returns correct result for multivariate flag', () async {
-      fakePlatformInterface.featureFlagValues['multi-flag'] = 'variant-a';
-
-      final result = await Posthog().getFeatureFlagResult('multi-flag');
-
-      expect(result, isNotNull);
-      expect(result!.key, equals('multi-flag'));
-      expect(result.enabled, isTrue);
-      expect(result.variant, equals('variant-a'));
-    });
-
-    test('includes payload when present', () async {
-      fakePlatformInterface.featureFlagValues['flag-with-payload'] = true;
-      fakePlatformInterface.featureFlagPayloads['flag-with-payload'] = {
-        'discount': 10,
-        'message': 'Welcome!',
-      };
-
-      final result = await Posthog().getFeatureFlagResult('flag-with-payload');
-
-      expect(result, isNotNull);
-      expect(result!.payload, isNotNull);
-      expect(result.payload, isA<Map>());
-      final payload = result.payload as Map;
-      expect(payload['discount'], equals(10));
-      expect(payload['message'], equals('Welcome!'));
-    });
-
-    test('multivariate flag with payload', () async {
-      fakePlatformInterface.featureFlagValues['multi-with-payload'] = 'control';
-      fakePlatformInterface.featureFlagPayloads['multi-with-payload'] = [
-        1,
-        2,
-        3,
-      ];
-
-      final result = await Posthog().getFeatureFlagResult('multi-with-payload');
-
-      expect(result, isNotNull);
-      expect(result!.enabled, isTrue);
-      expect(result.variant, equals('control'));
-      expect(result.payload, equals([1, 2, 3]));
-    });
-
-    test('returns result for flag with null value', () async {
-      // Flag exists but has null value - should return a result, not null
-      fakePlatformInterface.featureFlagValues['null-value-flag'] = null;
-
-      final result = await Posthog().getFeatureFlagResult('null-value-flag');
-
-      expect(result, isNotNull);
-      expect(result!.key, equals('null-value-flag'));
-      expect(result.enabled, isFalse);
+    test('returns the platform result unchanged', () async {
+      final expected = PostHogFeatureFlagResult(
+        key: 'variant-flag',
+        enabled: true,
+        variant: 'control',
+        payload: {'discount': 10},
+      );
+      fakePlatformInterface.featureFlagResult = expected;
+      expect(
+          await Posthog().getFeatureFlagResult('variant-flag'), same(expected));
+      expect(fakePlatformInterface.getFeatureFlagResultCalls, [
+        {'key': 'variant-flag', 'sendEvent': true}
+      ]);
     });
 
     test('passes sendEvent=true by default', () async {
-      fakePlatformInterface.featureFlagValues['test'] = true;
-
       await Posthog().getFeatureFlagResult('test');
 
       expect(
@@ -468,8 +406,6 @@ void main() {
     });
 
     test('passes sendEvent=false when specified', () async {
-      fakePlatformInterface.featureFlagValues['test'] = true;
-
       await Posthog().getFeatureFlagResult('test', sendEvent: false);
 
       expect(

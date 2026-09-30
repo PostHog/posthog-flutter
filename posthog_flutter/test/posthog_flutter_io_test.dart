@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
@@ -40,6 +42,44 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  group('PosthogFlutterIO getFeatureFlagResult', () {
+    for (final (enabled, variant, payload) in <(bool, String?, Object?)>[
+      (true, null, null),
+      (false, null, null),
+      (true, 'variant-a', null),
+      (true, null, {'discount': 10, 'message': 'Welcome!'}),
+      (true, 'control', [1, 2, 3]),
+    ]) {
+      test('decodes enabled=$enabled variant=$variant payload=$payload',
+          () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'getFeatureFlagResult');
+          expect(call.arguments, {'key': 'flag', 'sendEvent': false});
+          return {
+            'key': 'flag',
+            'enabled': enabled,
+            'variant': variant,
+            'payload': payload
+          };
+        });
+        final result = await posthogFlutterIO.getFeatureFlagResult(
+            key: 'flag', sendEvent: false);
+        expect(result, isNotNull);
+        expect(result!.key, 'flag');
+        expect(result.enabled, enabled);
+        expect(result.variant, variant);
+        expect(result.payload, payload);
+      });
+    }
+    test('preserves a missing native result', () async {
+      expect(
+          await posthogFlutterIO.getFeatureFlagResult(key: 'missing'), isNull);
+      expect(log.single.method, 'getFeatureFlagResult');
+      expect(log.single.arguments, {'key': 'missing', 'sendEvent': true});
+    });
   });
 
   group('PosthogFlutterIO onFeatureFlags via setup', () {
@@ -176,18 +216,18 @@ void main() {
       testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
 
-      // This should not throw - just silently do nothing
+      ByteData? reply;
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
           const MethodCall('onFeatureFlagsCallback', {}),
         ),
-        (ByteData? data) {},
+        (ByteData? data) => reply = data,
       );
 
-      // If we get here without exception, the test passes
-      expect(true, isTrue);
+      expect(reply, isNotNull);
+      expect(channel.codec.decodeEnvelope(reply!), isNull);
     });
   });
 
@@ -849,13 +889,13 @@ void main() {
     test(
       'multiple events with async beforeSend are captured out of order when capture is NOT awaited',
       () async {
+        final releaseFirst = Completer<void>();
         testConfig = PostHogConfig(
           'test_project_token',
           beforeSend: [
             (event) async {
-              // Add delay only for first event
               if (event.event == 'event_1') {
-                await Future.delayed(const Duration(milliseconds: 100));
+                await releaseFirst.future;
               }
               return event;
             },
@@ -863,13 +903,12 @@ void main() {
         );
         await posthogFlutterIO.setup(testConfig);
 
-        // Fire all events without awaiting - they run concurrently
-        posthogFlutterIO.capture(eventName: 'event_1');
-        posthogFlutterIO.capture(eventName: 'event_2');
-        posthogFlutterIO.capture(eventName: 'event_3');
-
-        // Wait for all to complete
-        await Future.delayed(const Duration(milliseconds: 200));
+        final first = posthogFlutterIO.capture(eventName: 'event_1');
+        await posthogFlutterIO.capture(eventName: 'event_2');
+        await posthogFlutterIO.capture(eventName: 'event_3');
+        expect(log.where((c) => c.method == 'capture'), hasLength(2));
+        releaseFirst.complete();
+        await first;
 
         final captureCalls = log.where((c) => c.method == 'capture').toList();
         expect(captureCalls.length, 3);
@@ -884,13 +923,12 @@ void main() {
           captureCalls[2].arguments as Map,
         );
 
-        // Verify events were NOT captured in original order (event_1 should not be first due to delay)
         final eventOrder = [
           event1Args['eventName'],
           event2Args['eventName'],
           event3Args['eventName'],
         ];
-        expect(eventOrder, isNot(['event_1', 'event_2', 'event_3']));
+        expect(eventOrder, ['event_2', 'event_3', 'event_1']);
       },
     );
   });

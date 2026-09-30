@@ -103,10 +103,13 @@ class PostHogFlutterSurveysDelegate(
                             is PostHogDisplayChoiceQuestion -> {
                                 // For single/multiple choice questions
                                 if (question.isMultipleChoice) {
-                                    // Multiple choice: accept array directly from Flutter
+                                    // Multiple choice: accept array directly from Flutter.
+                                    // Null and empty both mean the optional question was skipped.
                                     val selectedOptions = responsePayload as? List<*>
                                     val stringOptions = selectedOptions?.mapNotNull { it as? String }
-                                    PostHogSurveyResponse.MultipleChoice(stringOptions ?: emptyList())
+                                    PostHogSurveyResponse.MultipleChoice(
+                                        stringOptions?.takeIf { it.isNotEmpty() },
+                                    )
                                 } else {
                                     // Single choice: Flutter sends as a list with one element
                                     val selectedOptions = responsePayload as? List<*>

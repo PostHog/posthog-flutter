@@ -5,13 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/surveys/models/posthog_display_survey.dart';
 import 'package:posthog_flutter/src/surveys/models/survey_appearance.dart';
 import 'package:posthog_flutter/src/surveys/models/survey_callbacks.dart';
+import 'package:posthog_flutter/src/surveys/widgets/confirmation_message.dart';
 import 'package:posthog_flutter/src/surveys/widgets/survey_bottom_sheet.dart';
 
 void main() {
-  PostHogDisplaySurvey surveyWithIntro({
-    required bool displayIntroScreen,
-    String? header = 'Welcome!',
-    String? description = 'Two quick questions.',
+  PostHogDisplaySurvey openQuestionSurvey({
+    Map<String, Object?> appearance = const {},
   }) {
     return PostHogDisplaySurvey.fromDict({
       'id': 'survey-1',
@@ -23,14 +22,24 @@ void main() {
           'isOptional': false,
         },
       ],
-      'appearance': {
+      'appearance': appearance,
+    });
+  }
+
+  PostHogDisplaySurvey surveyWithIntro({
+    required bool displayIntroScreen,
+    String? header = 'Welcome!',
+    String? description = 'Two quick questions.',
+  }) {
+    return openQuestionSurvey(
+      appearance: {
         'displayIntroScreen': displayIntroScreen,
         if (header != null) 'introScreenHeader': header,
         if (description != null) 'introScreenDescription': description,
         'introScreenDescriptionContentType': 1,
         'introScreenButtonText': 'Get started',
       },
-    });
+    );
   }
 
   // Presents the sheet the same way SurveyService does in production.
@@ -119,6 +128,52 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(callbackLog, ['shown', 'closed']);
+    });
+  });
+
+  group('SurveyBottomSheet thank-you screen', () {
+    Future<List<String>> answerAndComplete(
+      WidgetTester tester,
+      bool displayThankYouMessage,
+    ) async {
+      final callbackLog = <String>[];
+      await pumpSurveySheet(
+        tester,
+        openQuestionSurvey(
+          appearance: {
+            'displayThankYouMessage': displayThankYouMessage,
+            'thankYouMessageHeader': 'Thanks so much',
+          },
+        ),
+        callbackLog,
+      );
+
+      await tester.enterText(find.byType(TextField), 'Faster checkout');
+      await tester.pump();
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+      return callbackLog;
+    }
+
+    testWidgets(
+        'shows the thank-you screen when displayThankYouMessage is true',
+        (tester) async {
+      final callbackLog = await answerAndComplete(tester, true);
+
+      expect(find.byType(ConfirmationMessage), findsOneWidget);
+      expect(find.text('Thanks so much'), findsOneWidget);
+      expect(callbackLog, ['shown', 'response:0']);
+    });
+
+    testWidgets(
+        'closes without a thank-you screen when displayThankYouMessage is false',
+        (tester) async {
+      final callbackLog = await answerAndComplete(tester, false);
+
+      expect(find.byType(ConfirmationMessage), findsNothing);
+      expect(find.text('Thanks so much'), findsNothing);
+      expect(find.text('Thank you for your feedback!'), findsNothing);
+      expect(callbackLog, ['shown', 'response:0', 'closed']);
     });
   });
 }

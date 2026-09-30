@@ -43,6 +43,43 @@ void main() {
     );
   }
 
+  for (final (status, retries) in [
+    (400, 1),
+    (401, 1),
+    (408, 1),
+    (429, 1),
+    (500, 1),
+    (503, 1),
+    (502, 0),
+    (504, 0),
+  ]) {
+    test('does not retry HTTP $status with max_retries=$retries', () async {
+      final flagsServer = await _FlagsServer.start([status, HttpStatus.ok]);
+      addTearDown(flagsServer.close);
+      final adapter = ComplianceAdapter();
+      final server = await adapter.start(port: 0);
+      addTearDown(adapter.close);
+      final base = 'http://127.0.0.1:${server.port}';
+      await _postJson('$base/init', {
+        'api_key': 'test-api-key',
+        'host': flagsServer.url,
+        'max_retries': retries,
+        'flush_interval_ms': 60000,
+      });
+      await expectLater(
+          _postJson('$base/get_feature_flag', {
+            'key': 'retry-flag',
+            'distinct_id': 'test-user',
+          }),
+          throwsA(isA<HttpException>()));
+      expect(flagsServer.flagsRequestCount, 1);
+      final state = await _getJson('$base/state');
+      expect(state['total_retries'], 0);
+      expect(
+          state['last_error'], 'Feature flag request failed with HTTP $status');
+    });
+  }
+
   test('propagates error after /flags retries are exhausted', () async {
     final flagsServer = await _FlagsServer.start([
       HttpStatus.badGateway,

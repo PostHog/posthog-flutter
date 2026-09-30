@@ -1,5 +1,24 @@
 ## Next
 
+## 5.50.7
+
+### Patch Changes
+
+- afc14aa: Let optional open-text and rating survey questions be skipped, and use the question's button label.
+
+## 5.50.6
+
+### Patch Changes
+
+- 99075ad: Close a completed survey immediately when its appearance turns the thank-you screen off.
+
+## 5.50.5
+
+### Patch Changes
+
+- 9b6fb05: Record a skipped optional multiple-choice survey question as no answer instead of an empty list.
+- 0ebaae9: Use the screen name argument when properties also contain `$screen_name`.
+
 ## 5.50.4
 
 ### Patch Changes

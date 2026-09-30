@@ -46,6 +46,29 @@ Rect _rect(ElementData element) => MatrixUtils.transformRect(
 
 bool _isMasked(Rect target) => _masks().any((e) => _rect(e).overlaps(target));
 
+void _expectSensitiveInputsCovered(WidgetTester tester, int count) {
+  final editables = find.byElementPredicate((element) =>
+      element is RenderObjectElement && element.renderObject is RenderEditable);
+  expect(editables, findsNWidgets(count));
+  final container = PostHogMaskController.instance.containerKey.currentContext!
+      .findRenderObject();
+  for (final element in editables.evaluate()) {
+    final editable = element.renderObject! as RenderEditable;
+    final target = MatrixUtils.transformRect(editable.getTransformTo(container),
+        Rect.fromLTWH(0, 0, editable.size.width, editable.preferredLineHeight));
+    expect(
+        _masks().any((mask) {
+          final rect = _rect(mask);
+          return rect.left <= target.left &&
+              rect.top <= target.top &&
+              rect.right >= target.right &&
+              rect.bottom >= target.bottom;
+        }),
+        isTrue,
+        reason: 'sensitive input must be fully masked: $target');
+  }
+}
+
 class _SafeLabel extends StatelessWidget {
   const _SafeLabel();
 
@@ -238,10 +261,7 @@ void main() {
             TextFormField(keyboardType: TextInputType.visiblePassword),
           ])));
       expect(_isMasked(tester.getRect(find.text('safe'))), isFalse);
-      for (final element in find.byType(EditableText).evaluate()) {
-        expect(
-            _isMasked(tester.getRect(find.byWidget(element.widget))), isTrue);
-      }
+      _expectSensitiveInputsCovered(tester, 3);
     });
   }
 
@@ -451,10 +471,7 @@ void main() {
             CupertinoTextField(autofillHints: [hint]),
           ])));
       expect(_isMasked(tester.getRect(find.text('public label'))), isFalse);
-      for (final element in find.byType(EditableText).evaluate()) {
-        expect(
-            _isMasked(tester.getRect(find.byWidget(element.widget))), isTrue);
-      }
+      _expectSensitiveInputsCovered(tester, 3);
     });
   }
 

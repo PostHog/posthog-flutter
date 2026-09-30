@@ -4,6 +4,20 @@ import 'package:flutter/material.dart';
 
 import 'posthog_display_survey_appearance.dart';
 
+/// Question [buttonText] of null or blank means [fallback].
+///
+/// The survey editor saves a cleared label as `""`, which is not null.
+/// A blank fallback uses `Submit`, the widget default.
+String surveyQuestionButtonLabel(String? buttonText, String fallback) {
+  if (buttonText != null && buttonText.trim().isNotEmpty) {
+    return buttonText;
+  }
+  if (fallback.trim().isNotEmpty) {
+    return fallback;
+  }
+  return 'Submit';
+}
+
 /// Appearance configuration for survey widgets
 @immutable
 class SurveyAppearance {

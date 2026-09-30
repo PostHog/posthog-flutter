@@ -38,13 +38,24 @@ void main() {
     }
   });
 
+  void expectOnlyInnerUnmasked(List<ElementData> parts) {
+    expect(parts, isNotEmpty);
+    for (var y = 0.5; y < 100; y++) {
+      for (var x = 0.5; x < 100; x++) {
+        final point = Offset(x, y);
+        expect(parts.any((part) => part.rect.contains(point)),
+            !inner.contains(point));
+      }
+    }
+  }
+
   test('uses the mask coordinate space under shared rotation and scaling', () {
     final transform = Matrix4.identity()
       ..rotateZ(math.pi / 4)
       ..multiply(Matrix4.diagonal3Values(2, 2, 1));
     final parts = subtractUnmaskRects(region(outer, transform: transform),
         [region(inner, transform: transform)]);
-    expect(parts.any((part) => part.rect.contains(inner.center)), isFalse);
+    expectOnlyInnerUnmasked(parts);
     expect(parts.every((part) => identical(part.transform, transform)), isTrue);
   });
 
@@ -54,7 +65,7 @@ void main() {
       ..multiply(Matrix4.diagonal3Values(-1, 1, 1));
     final parts = subtractUnmaskRects(region(outer),
         [region(const Rect.fromLTWH(0, 0, 40, 40), transform: transform)]);
-    expect(parts.any((part) => part.rect.contains(inner.center)), isFalse);
+    expectOnlyInnerUnmasked(parts);
   });
 
   test('never subtracts from a sensitive input mask', () {
