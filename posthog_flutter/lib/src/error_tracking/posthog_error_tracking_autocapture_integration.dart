@@ -132,7 +132,7 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     // Retained wrappers must keep their own delegate and stay inactive on restart.
     late final FlutterExceptionHandler handler;
     handler = (details) {
-      if (_isEnabled && identical(_flutterErrorHandler, handler)) {
+      if (identical(_flutterErrorHandler, handler)) {
         _posthogFlutterErrorHandler(details);
       }
       originalHandler?.call(details);
@@ -193,7 +193,7 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
     late final ErrorCallback handler;
     handler = (error, stackTrace) {
-      if (_isEnabled && identical(_platformErrorHandler, handler)) {
+      if (identical(_platformErrorHandler, handler)) {
         _posthogPlatformErrorHandler(error, stackTrace);
       }
       return originalHandler?.call(error, stackTrace) ?? false;

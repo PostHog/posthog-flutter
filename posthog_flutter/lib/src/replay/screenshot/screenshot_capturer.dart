@@ -52,6 +52,11 @@ class ImageInfo {
 class ViewTreeSnapshotStatus {
   bool sentMetaEvent = false;
 
+  /// The size the last delivered meta event reported. A rotation or a fold
+  /// resizes the same view, and the player sizes the replay from the latest
+  /// meta event, so a new size needs a new one.
+  Size? metaEventSize;
+
   /// Hash of the last captured raw RGBA image bytes.
   /// We store only a hash instead of the full byte array to avoid
   /// holding ~8MB+ of raw pixel data in memory permanently.
@@ -109,6 +114,7 @@ class ScreenshotCapturer {
   // freezing the replay until the pixels next change.
   int? _pendingImageBytesHash;
   int? _pendingCompositedBytesHash;
+  Size? _pendingMetaEventSize;
   // A declined view is retried every tick, so each decline logs once per session.
   final _loggedDeclines = <String>{};
 
@@ -160,6 +166,7 @@ class ScreenshotCapturer {
     _lastTargetStatus = null;
     _pendingImageBytesHash = null;
     _pendingCompositedBytesHash = null;
+    _pendingMetaEventSize = null;
     _loggedDeclines.clear();
   }
 
@@ -199,6 +206,16 @@ class ScreenshotCapturer {
     statusView.sentMetaEvent = false;
   }
 
+  /// Re-arms the meta latch for [viewId] before its meta event is sent. The
+  /// player takes its viewport from that meta even if the full snapshot after
+  /// it fails, so the latch stays open until [confirmDelivered] commits both.
+  void rearmMetaEvent(int viewId) {
+    if (viewId != _lastTargetViewId) {
+      return;
+    }
+    _lastTargetStatus?.sentMetaEvent = false;
+  }
+
   /// Commits delivery state for [viewId]: the pending dedup hashes, and the meta
   /// latch when [metaSent]. Only the sender calls this, after actual delivery —
   /// capture paths must not self-commit, or a dropped frame poisons dedup and
@@ -219,6 +236,7 @@ class ScreenshotCapturer {
     }
     if (metaSent) {
       statusView.sentMetaEvent = true;
+      statusView.metaEventSize = _pendingMetaEventSize;
     }
   }
 
@@ -529,10 +547,17 @@ class ScreenshotCapturer {
     // must not commit on this frame's delivery.
     _pendingImageBytesHash = null;
     _pendingCompositedBytesHash = null;
+    // Truncated like the width and height the meta event reports.
+    final size = Size(
+      renderObject.size.width.truncateToDouble(),
+      renderObject.size.height.truncateToDouble(),
+    );
+    _pendingMetaEventSize = size;
     return (
       renderObject: renderObject,
       statusView: statusView,
-      shouldSendMetaEvent: !statusView.sentMetaEvent,
+      shouldSendMetaEvent:
+          !statusView.sentMetaEvent || statusView.metaEventSize != size,
       globalPosition: renderObject.localToGlobal(Offset.zero),
     );
   }
@@ -768,7 +793,11 @@ class ScreenshotCapturer {
         final hasCapturedViews = pvRects.captured.isNotEmpty;
         hasCapturedPlatformViews = hasCapturedViews;
 
-        if (!hasCapturedViews && preMaskHash == statusView.imageBytesHash) {
+        // A rotated uniform screen has the same bytes at a new size, and still
+        // needs its meta event.
+        if (!hasCapturedViews &&
+            !shouldSendMetaEvent &&
+            preMaskHash == statusView.imageBytesHash) {
           printIfDebug(
             'Snapshot is the same as the last one, nothing changed, do nothing.',
           );
@@ -867,7 +896,8 @@ class ScreenshotCapturer {
 
             if (hasCapturedViews) {
               final compositedHash = _computeImageHash(pngBytes);
-              if (compositedHash == statusView.compositedBytesHash) {
+              if (!shouldSendMetaEvent &&
+                  compositedHash == statusView.compositedBytesHash) {
                 printIfDebug(
                   'Composited snapshot is the same as the last one, nothing changed, do nothing.',
                 );

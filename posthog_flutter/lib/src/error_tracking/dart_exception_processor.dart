@@ -43,20 +43,20 @@ class DartExceptionProcessor {
     StackTrace? effectiveStackTrace = stackTrace;
     bool isGeneratedStackTrace = false;
 
-    // If it's an Error, try to use its built-in stackTrace
-    if (currentError is Error) {
-      effectiveStackTrace ??= currentError.stackTrace;
+    // If no usable trace was supplied, try the error's own stackTrace
+    if (effectiveStackTrace == null ||
+        effectiveStackTrace.toString().trim().isEmpty) {
+      effectiveStackTrace = _extractOwnStackTrace(currentError);
     }
 
-    // If still null or empty, get current stack trace
-    if (effectiveStackTrace == null ||
-        effectiveStackTrace == StackTrace.empty) {
+    // If still null, get current stack trace
+    if (effectiveStackTrace == null) {
       effectiveStackTrace = stackTraceProvider?.call() ?? StackTrace.current;
       isGeneratedStackTrace = true; // Flag to remove top PostHog frames
     }
 
     // Check if we still have an empty stack trace
-    final hasValidStackTrace = effectiveStackTrace != StackTrace.empty;
+    final hasValidStackTrace = effectiveStackTrace.toString().trim().isNotEmpty;
 
     // Process primary exception
     final frames = hasValidStackTrace
@@ -268,7 +268,7 @@ class DartExceptionProcessor {
       stackTrace = error.stackTrace;
     }
 
-    if (stackTrace == null || stackTrace == StackTrace.empty) {
+    if (stackTrace == null || stackTrace.toString().trim().isEmpty) {
       return null;
     }
     return stackTrace;

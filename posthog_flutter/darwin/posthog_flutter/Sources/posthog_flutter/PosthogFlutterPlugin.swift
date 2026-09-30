@@ -1361,7 +1361,7 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String
         {
-            let value = PostHogSDK.shared.getFeatureFlagPayload(featureFlagKey)
+            let value = PostHogSDK.shared.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent: false)?.payload
             result(value)
         } else {
             _badArgumentError(result)

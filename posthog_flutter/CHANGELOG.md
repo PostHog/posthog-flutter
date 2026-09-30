@@ -1,5 +1,24 @@
 ## Next
 
+## 5.50.10
+
+### Patch Changes
+
+- 56293ae: Preserve chained error handlers after teardown and prevent duplicate exception captures when error tracking restarts.
+
+## 5.50.9
+
+### Patch Changes
+
+- 66c9257: Stop calling the deprecated `getFeatureFlagPayload` of the PostHog iOS SDK on iOS and macOS, which is removed in its next major version.
+
+## 5.50.8
+
+### Patch Changes
+
+- a5ce763: Correct in-app error tracking configuration examples to use bare Dart package names.
+- 2bd9632: Fix session replay keeping the original screen size after the app's window is resized, such as when it rotates or a foldable is folded or unfolded.
+
 ## 5.50.7
 
 ### Patch Changes
