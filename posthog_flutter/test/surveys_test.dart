@@ -133,6 +133,25 @@ void main() {
     );
   });
 
+  group('PostHogDisplaySurvey.fromDict question id', () {
+    test('uses the native question id, not the question type', () {
+      final survey = PostHogDisplaySurvey.fromDict({
+        'id': 'survey-1',
+        'name': 'Test survey',
+        'questions': [
+          {
+            'id': 'q-open-1',
+            'type': 'open',
+            'question': 'Feedback?',
+            'isOptional': false,
+          },
+        ],
+      });
+
+      expect(survey.questions.single.id, 'q-open-1');
+    });
+  });
+
   group('PostHogDisplaySurvey.fromDict link question', () {
     // (description, native link payload, expected parsed link)
     const cases = <(String, Object?, String)>[
