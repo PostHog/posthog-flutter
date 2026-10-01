@@ -27,6 +27,11 @@ class Posthog {
 
   PostHogConfig? _config;
 
+  /// Set when [disable] stops an in-progress Flutter replay. [enable] consumes
+  /// it so opt-in starts a new recording, and a replay the caller already
+  /// stopped is left stopped.
+  bool _restartSessionReplayOnEnable = false;
+
   /// Returns the singleton PostHog client instance.
   factory Posthog() {
     return _instance;
@@ -71,6 +76,7 @@ class Posthog {
     }
 
     _config = config; // Store the config
+    _restartSessionReplayOnEnable = false;
 
     // The mask controller singleton may predate this setup() (or a previous
     // setup() built it with different masking flags); without a refresh the
@@ -378,24 +384,42 @@ class Posthog {
 
   /// Disables data collection for the current user.
   ///
+  /// Also stops session replay and uninstalls Flutter error autocapture.
+  ///
   /// Returns a [Future] that completes when the opt-out request has been queued.
-  Future<void> disable() {
+  Future<void> disable() async {
     // Uninstall Flutter-specific integrations when disabling
     _uninstallFlutterIntegrations();
+    if (PostHogInternalEvents.sessionRecordingActive.value) {
+      _restartSessionReplayOnEnable = true;
+      // Native stopSessionRecording is a no-op once the SDK is already opted
+      // out, so this has to run before the platform disable.
+      await stopSessionRecording();
+    }
 
-    return _posthog.disable();
+    await _posthog.disable();
   }
 
   /// Enables data collection for the current user.
   ///
+  /// Reinstalls Flutter error autocapture. If [disable] stopped session replay,
+  /// this starts a new recording.
+  ///
   /// Returns a [Future] that completes when the opt-in request has been queued.
-  Future<void> enable() {
+  Future<void> enable() async {
     final config = _config;
     if (config != null) {
       _installFlutterIntegrations(config);
     }
 
-    return _posthog.enable();
+    await _posthog.enable();
+    final restartReplay = _restartSessionReplayOnEnable;
+    _restartSessionReplayOnEnable = false;
+    if (restartReplay) {
+      // startSessionRecording is ignored while the SDK is still opted out, so
+      // the platform opt-in has to finish first.
+      await startSessionRecording(resumeCurrent: false);
+    }
   }
 
   /// Returns whether the current user has opted out of data collection.
@@ -870,6 +894,7 @@ class Posthog {
   Future<void> close() {
     _config = null;
     _currentScreen = null;
+    _restartSessionReplayOnEnable = false;
     PostHogInternalEvents.sessionRecordingActive.value = false;
     // Forced rather than keyed on observing a new session id, because the
     // platforms disagree on whether close() rotates the session at all — the
