@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 
 import 'posthog.dart';
+import 'surveys/survey_service.dart';
 
 /// Extracts a PostHog screen name from Flutter [RouteSettings].
 ///
@@ -113,6 +114,7 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
     // don't clear current context if it's null
     if (context != null) {
       _currentContext = context;
+      SurveyService().onContextAvailable();
     }
   }
 
