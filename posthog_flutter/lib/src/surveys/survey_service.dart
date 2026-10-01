@@ -26,7 +26,7 @@ class SurveyService {
   Route<dynamic>? _currentSurveyRoute;
   PostHogDisplaySurvey? _currentSurvey;
   Completer<void>? _programmaticDismissal;
-  Completer<void>? _contextWait;
+  Completer<bool>? _contextWait;
 
   /// Shows a survey using the PosthogObserver context
   Future<void> showSurvey(
@@ -40,17 +40,19 @@ class SurveyService {
       return;
     }
 
-    if (PosthogObserver.currentContext == null) {
+    var context = PosthogObserver.currentContext;
+    if (context == null) {
       printIfDebug(
         '[PostHog] No valid context to show the survey yet, it will be shown on the next navigation. If it never shows, make sure that you have installed PosthogObserver correctly in your app.',
       );
       // The native SDK keeps this survey active until it is closed, and closing
       // it would record a dismissal for a survey the user never saw.
-      if (!await _waitForContext() || _isShowingSurvey) return;
+      do {
+        if (!await _waitForContext() || _isShowingSurvey) return;
+        context = PosthogObserver.currentContext;
+      } while (context == null);
     }
-
-    final context = PosthogObserver.currentContext;
-    if (context == null || !context.mounted) return;
+    if (!context.mounted) return;
 
     printIfDebug('[PostHog] Using PosthogObserver context for survey');
     return _showSurveyWithNavigator(
@@ -64,23 +66,22 @@ class SurveyService {
 
   /// Completes with true once [PosthogObserver] reports a context, or false
   /// when the wait was cancelled by [hideSurvey] or replaced by a newer survey.
-  Future<bool> _waitForContext() async {
-    final contextWait = Completer<void>();
-    final replaced = _contextWait;
+  Future<bool> _waitForContext() {
+    _endContextWait(show: false);
+    final contextWait = Completer<bool>();
     _contextWait = contextWait;
-    if (replaced != null && !replaced.isCompleted) replaced.complete();
-    await contextWait.future;
-    if (_contextWait != contextWait) return false;
+    return contextWait.future;
+  }
+
+  void _endContextWait({required bool show}) {
+    final contextWait = _contextWait;
     _contextWait = null;
-    return true;
+    contextWait?.complete(show);
   }
 
   /// Called by [PosthogObserver] when it has a context, so a survey that
   /// arrived before then can be shown.
-  void onContextAvailable() {
-    final contextWait = _contextWait;
-    if (contextWait != null && !contextWait.isCompleted) contextWait.complete();
-  }
+  void onContextAvailable() => _endContextWait(show: true);
 
   /// Shows a survey using a navigator context
   Future<void> _showSurveyWithNavigator(
@@ -175,13 +176,7 @@ class SurveyService {
 
   /// Hides any active survey
   void hideSurvey({PostHogDisplaySurvey? survey}) {
-    if (survey == null) {
-      final contextWait = _contextWait;
-      _contextWait = null;
-      if (contextWait != null && !contextWait.isCompleted) {
-        contextWait.complete();
-      }
-    }
+    if (survey == null) _endContextWait(show: false);
     if (survey != null && !identical(survey, _currentSurvey)) return;
     if (!_isShowingSurvey || _isDismissingSurvey) {
       return;
