@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.13
+
+### Patch Changes
+
+- b064e83: Show a survey that arrives before `PosthogObserver` has a context once the next navigation happens, instead of dropping it and blocking later surveys.
+
 ## 5.50.12
 
 ### Patch Changes
