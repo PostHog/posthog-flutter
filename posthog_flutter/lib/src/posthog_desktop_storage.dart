@@ -1,45 +1,30 @@
 import 'dart:io';
 
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+
 import 'util/logging.dart';
 
 /// Where the Windows and Linux implementation persists its state: queued
 /// events, identity, consent and cached feature flags.
 class DesktopStorage {
-  /// The directory of the app at [executable] in the user's application data
-  /// directory: `%APPDATA%\posthog\<executable name>` on Windows,
-  /// `$XDG_DATA_HOME/posthog/<executable name>` (or under
-  /// `~/.local/share`) on Linux, read from [environment].
-  ///
-  /// The executable name identifies the app because it stays the same across
-  /// releases; renaming the executable starts over with an empty state.
-  ///
-  /// Returns null when no application data directory is available. The
-  /// desktop client then keeps its state in memory until it closes.
-  static String? appDirectory(
-    Map<String, String> environment, {
-    required String executable,
-  }) {
-    String? base;
-    if (Platform.isWindows) {
-      base = environment['APPDATA'] ?? environment['LOCALAPPDATA'];
-    } else {
-      base = environment['XDG_DATA_HOME'];
-      if (base == null || base.isEmpty) {
-        final home = environment['HOME'];
-        if (home != null && home.isNotEmpty) {
-          base = '$home/.local/share';
-        }
+  /// The PostHog directory inside the platform's application support directory.
+  /// Returns null when directory lookup or creation fails, so the client can
+  /// keep its state in memory.
+  static Future<String?> appDirectory() async {
+    try {
+      final path =
+          await PathProviderPlatform.instance.getApplicationSupportPath();
+      if (path == null) {
+        printIfDebug('[PostHog] No application support directory found; '
+            'keeping state in memory only.');
+        return null;
       }
-    }
-    if (base == null || base.isEmpty) {
-      printIfDebug(
-          '[PostHog] No application data directory found; keeping state '
-          'in memory only.');
+      return '$path${Platform.pathSeparator}posthog';
+    } catch (e) {
+      printIfDebug('[PostHog] Application support directory unavailable; '
+          'keeping state in memory only: $e');
       return null;
     }
-
-    final sep = Platform.pathSeparator;
-    return '$base${sep}posthog$sep${_scope(_executableName(executable))}';
   }
 
   /// The directory of the project with [projectToken] in [appDirectory]: a
@@ -47,15 +32,6 @@ class DesktopStorage {
   /// projects.
   static String projectDirectory(String appDirectory, String projectToken) =>
       '$appDirectory${Platform.pathSeparator}${_scope(projectToken)}';
-
-  /// The file name of [executable] without the `.exe` extension of Windows
-  /// executables.
-  static String _executableName(String executable) {
-    final name = executable.split(RegExp(r'[/\\]')).last;
-    return name.toLowerCase().endsWith('.exe')
-        ? name.substring(0, name.length - '.exe'.length)
-        : name;
-  }
 
   static String _scope(String value) {
     final scope = value.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');

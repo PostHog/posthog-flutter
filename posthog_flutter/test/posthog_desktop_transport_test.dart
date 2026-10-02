@@ -27,7 +27,7 @@ void main() {
     server = await LocalPostHogServer.start();
     previousPlatform = PosthogFlutterPlatformInterface.instance;
     PosthogFlutterPlatformInterface.instance = PosthogFlutterDesktop(
-      appDirectory: appDirectory.path,
+      appDirectory: () async => appDirectory.path,
       appInfo: const DesktopAppInfo(
         name: 'transport_test',
         version: '1.2.3',
@@ -52,7 +52,7 @@ void main() {
   test('facade captures and honors consent without filesystem access',
       () async {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterDesktop(
-      appDirectory: null,
+      appDirectory: () async => null,
       appInfo: const DesktopAppInfo(name: 'memory_test'),
       timezone: null,
     );

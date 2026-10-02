@@ -26,11 +26,13 @@ void main() {
   /// that runs in [timezone].
   PosthogFlutterDesktop createPlatform({
     Directory? appDirectory,
+    Future<String?> Function()? resolveAppDirectory,
     DesktopAppInfo appInfo = const DesktopAppInfo(),
     String? timezone,
   }) {
+    final directory = appDirectory ?? createAppDirectory();
     final platform = PosthogFlutterDesktop(
-      appDirectory: (appDirectory ?? createAppDirectory()).path,
+      appDirectory: resolveAppDirectory ?? () async => directory.path,
       appInfo: appInfo,
       timezone: timezone,
     );
@@ -987,6 +989,153 @@ void main() {
   });
 
   group('PosthogFlutterDesktop.setup', () {
+    test('waits for storage before identify and capture', () async {
+      final server = await LocalPostHogServer.start();
+      final directory = createAppDirectory();
+      final release = Completer<String?>();
+      final platform =
+          createPlatform(resolveAppDirectory: () => release.future);
+      final setup = platform.setup(configFor(server));
+      final identify = platform.identify(userId: 'early-user');
+      final capture = platform.capture(eventName: 'early event');
+      var completed = false;
+      capture.then((_) => completed = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(completed, isFalse);
+      expect(server.events, isEmpty);
+
+      release.complete(directory.path);
+      await Future.wait([setup, identify, capture]);
+      final event = await server.waitForEvent('early event');
+      expect(event['distinct_id'], 'early-user');
+    });
+
+    test('disable during storage lookup applies before subsequent events',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final release = Completer<String?>();
+      final platform =
+          createPlatform(resolveAppDirectory: () => release.future);
+      final setup = platform.setup(configFor(server));
+      final disable = platform.disable();
+      final capture = platform.capture(eventName: 'disabled event');
+      release.complete(createAppDirectory().path);
+      await Future.wait([setup, disable, capture]);
+      expect(await platform.isOptOut(), isTrue);
+      await platform.enable();
+      await platform.capture(eventName: 'enabled event');
+      await server.waitForEvent('enabled event');
+      expect(server.eventNames, ['enabled event']);
+    });
+
+    test('an early capture respects the opt-out restored from disk', () async {
+      final server = await LocalPostHogServer.start();
+      final directory = createAppDirectory();
+      final previousLaunch = createPlatform(appDirectory: directory);
+      await previousLaunch.setup(configFor(server));
+      await previousLaunch.disable();
+      await previousLaunch.close();
+
+      final release = Completer<String?>();
+      final platform =
+          createPlatform(resolveAppDirectory: () => release.future);
+      final setup = platform.setup(configFor(server));
+      final capture = platform.capture(eventName: 'early event');
+      release.complete(directory.path);
+      await Future.wait([setup, capture]);
+      expect(await platform.isOptOut(), isTrue);
+      await platform.enable();
+      await platform.capture(eventName: 'enabled event');
+      await server.waitForEvent('enabled event');
+      expect(server.eventNames, ['enabled event']);
+    });
+
+    test('overlapping setup shares storage lookup and applies latest hooks',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final otherServer = await LocalPostHogServer.start();
+      final release = Completer<String?>();
+      var lookups = 0;
+      final platform = createPlatform(resolveAppDirectory: () {
+        lookups++;
+        return release.future;
+      });
+      final first = platform.setup(configFor(server));
+      final second =
+          platform.setup(configFor(otherServer, projectToken: 'other')
+            ..beforeSend = [
+              (event) => event..properties = {'hook': 'latest'}
+            ]);
+      release.complete(createAppDirectory().path);
+      await Future.wait([first, second]);
+      await platform.capture(eventName: 'event');
+      final event = await server.waitForEvent('event');
+      expect(_propertiesOf(event)['hook'], 'latest');
+      expect(otherServer.events, isEmpty);
+      expect(otherServer.flagsRequests, isEmpty);
+      expect(lookups, 1);
+    });
+
+    test('close cancels pending setup and waiting operations', () async {
+      final server = await LocalPostHogServer.start();
+      final directory = createAppDirectory();
+      final release = Completer<String?>();
+      final platform =
+          createPlatform(resolveAppDirectory: () => release.future);
+      final setup = platform.setup(configFor(server));
+      final capture = platform.capture(eventName: 'cancelled event');
+      await platform.close();
+      release.complete(directory.path);
+      await Future.wait([setup, capture]);
+      expect(await platform.getDistinctId(), isEmpty);
+      expect(directory.listSync(), isEmpty);
+      expect(server.events, isEmpty);
+      expect(server.flagsRequests, isEmpty);
+    });
+
+    test('a cancelled lookup cannot replace a new client', () async {
+      final server = await LocalPostHogServer.start();
+      final otherServer = await LocalPostHogServer.start();
+      final release = Completer<String?>();
+      final oldDirectory = createAppDirectory();
+      final nextDirectory = createAppDirectory();
+      var lookups = 0;
+      final platform = createPlatform(resolveAppDirectory: () {
+        return ++lookups == 1
+            ? release.future
+            : Future.value(nextDirectory.path);
+      });
+      final first = platform.setup(configFor(server));
+      final identify = platform.identify(userId: 'cancelled-user');
+      final capture = platform.capture(eventName: 'cancelled event');
+      await platform.close();
+      await platform.setup(configFor(otherServer, projectToken: 'other'));
+      final distinctId = await platform.getDistinctId();
+      release.complete(oldDirectory.path);
+      await Future.wait([first, identify, capture]);
+      expect(await platform.getDistinctId(), distinctId);
+      await platform.capture(eventName: 'new client event');
+      await otherServer.waitForEvent('new client event');
+      expect(otherServer.eventNames, ['new client event']);
+      expect(server.events, isEmpty);
+      expect(server.flagsRequests, isEmpty);
+      expect(oldDirectory.listSync(), isEmpty);
+    });
+
+    test('missing storage still creates a working memory-only client',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = createPlatform(resolveAppDirectory: () async => null);
+      await platform.setup(configFor(server));
+      await platform.identify(userId: 'memory-user');
+      await platform.capture(eventName: 'memory event');
+      final event = await server.waitForEvent('memory event');
+      expect(event['distinct_id'], 'memory-user');
+      await platform.close();
+      await platform.setup(configFor(server));
+      expect(await platform.getDistinctId(), isNot('memory-user'));
+    });
+
     test('calls made right after an unawaited setup reach the client',
         () async {
       final server = await LocalPostHogServer.start();
