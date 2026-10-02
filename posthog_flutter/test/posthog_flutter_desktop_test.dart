@@ -1280,6 +1280,62 @@ void main() {
       expect(server.eventNames, ['first client event', 'second client event']);
     });
 
+    test('a repeated close waits until the queue is sent', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server)..flushAt = 20);
+      await platform.capture(eventName: 'queued event');
+      final batch = Completer<PostHogResponse>();
+      server.respond = (_) => batch.future;
+
+      final firstClose = platform.close();
+      var repeatedCloseDone = false;
+      final repeatedClose =
+          platform.close().then((_) => repeatedCloseDone = true);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(repeatedCloseDone, isFalse);
+
+      batch.complete(const PostHogResponse(HttpStatus.ok));
+      await Future.wait([firstClose, repeatedClose]);
+    });
+
+    test(
+        'an event whose callbacks finish while close sends the queue reaches '
+        'the next client', () async {
+      final server = await LocalPostHogServer.start();
+      final releaseHook = Completer<void>();
+      final config = configFor(server)
+        ..flushAt = 20
+        ..beforeSend = [
+          (event) async {
+            if (event.event == 'slow event') await releaseHook.future;
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      await platform.capture(eventName: 'queued event');
+      final batch = Completer<PostHogResponse>();
+      final batchReceived = Completer<void>();
+      server.respond = (_) {
+        if (batchReceived.isCompleted) {
+          return const PostHogResponse(HttpStatus.ok);
+        }
+        batchReceived.complete();
+        return batch.future;
+      };
+
+      final slowCapture = platform.capture(eventName: 'slow event');
+      final close = platform.close();
+      final setup = platform.setup(config);
+      await batchReceived.future;
+      releaseHook.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      batch.complete(const PostHogResponse(HttpStatus.ok));
+      await Future.wait([slowCapture, close, setup]);
+      await platform.flush();
+
+      expect(server.eventNames, ['queued event', 'slow event']);
+    });
+
     test('close sends the queued events', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server)..flushAt = 20);
