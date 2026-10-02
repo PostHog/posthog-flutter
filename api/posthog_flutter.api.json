@@ -2941,7 +2941,7 @@
                     },
                     {
                         "entryPoints": [],
-                        "isDeprecated": false,
+                        "isDeprecated": true,
                         "isExperimental": false,
                         "isReadable": true,
                         "isStatic": true,
