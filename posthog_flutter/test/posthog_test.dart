@@ -166,10 +166,8 @@ void main() {
       config.host = ' \nhttps://eu.i.posthog.com/\t ';
 
       expect(config.projectToken, equals('test_project_token'));
-      expect(config.apiKey, equals('test_project_token'));
       expect(config.host, equals('https://eu.i.posthog.com/'));
       expect(config.toMap()['projectToken'], equals('test_project_token'));
-      expect(config.toMap()['apiKey'], equals('test_project_token'));
       expect(config.toMap()['host'], equals('https://eu.i.posthog.com/'));
     });
 

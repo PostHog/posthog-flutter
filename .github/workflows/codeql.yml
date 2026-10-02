@@ -45,7 +45,7 @@ jobs:
         if: matrix.language == 'swift'
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: '16.4'
+          xcode-version: '26.4'
 
       - name: Install dependencies (Swift)
         if: matrix.language == 'swift'

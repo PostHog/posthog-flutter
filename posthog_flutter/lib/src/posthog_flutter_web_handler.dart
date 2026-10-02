@@ -57,7 +57,6 @@ extension PostHogExtension on PostHog {
   // ignore: non_constant_identifier_names
   external bool has_opted_out_capturing();
   external JSAny? getFeatureFlag(JSAny key);
-  external JSAny? getFeatureFlagPayload(JSAny key);
   external JSAny? getFeatureFlagResult(JSAny key, [JSAny? options]);
   external void register(JSAny properties);
   external void unregister(JSAny key);
@@ -366,11 +365,6 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final key = args['key'] as String;
 
       final featureFlag = posthog?.getFeatureFlag(stringToJSAny(key));
-      return featureFlag?.dartify();
-    case 'getFeatureFlagPayload':
-      final key = args['key'] as String;
-
-      final featureFlag = posthog?.getFeatureFlagPayload(stringToJSAny(key));
       return featureFlag?.dartify();
     case 'getFeatureFlagResult':
       final key = args['key'] as String;

@@ -668,22 +668,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    if (!isSupportedPlatform()) {
-      return null;
-    }
-
-    try {
-      return await _methodChannel.invokeMethod('getFeatureFlagPayload', {
-        'key': key,
-      });
-    } on PlatformException catch (exception) {
-      printIfDebug('Exeption on getFeatureFlagPayload: $exception');
-      return null;
-    }
-  }
-
-  @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
     bool sendEvent = true,

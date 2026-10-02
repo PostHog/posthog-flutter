@@ -72,9 +72,6 @@ enum PostHogDataMode {
   /// Send data only on Wi-Fi connections.
   wifi,
 
-  /// Send data only on cellular connections.
-  cellular,
-
   /// Send data on any available connection.
   any,
 }
@@ -90,15 +87,7 @@ class PostHogConfig {
   ///
   /// You can find it at:
   /// https://us.posthog.com/settings/project-details#variables
-  ///
-  /// This field was formerly named [apiKey].
   final String projectToken;
-
-  /// Deprecated alias for [projectToken].
-  @Deprecated(
-    'Deprecated in favor of [projectToken]. This will be removed in the next major version.',
-  )
-  String get apiKey => projectToken;
 
   String _host = _defaultHost;
 
@@ -412,7 +401,6 @@ class PostHogConfig {
   Map<String, dynamic> toMap() {
     return {
       'projectToken': projectToken,
-      'apiKey': projectToken,
       'host': host,
       'flushAt': flushAt,
       'maxQueueSize': maxQueueSize,
@@ -845,17 +833,6 @@ class PostHogSessionReplayConfig {
   ///
   /// Default: null.
   PostHogTextMaskPolicy? textMaskPolicy;
-
-  /// Deprecated setter that forwards assigned values to [throttleDelay].
-  ///
-  /// Debouncer delay used to reduce the number of snapshots captured and reduce
-  /// performance impact. This is used for capturing the view as a screenshot.
-  /// The lower the number, the more snapshots will be captured but higher the
-  /// performance impact. Defaults to 1s.
-  @Deprecated('Deprecated in favor of [throttleDelay] from v4.8.0.')
-  set debouncerDelay(Duration debouncerDelay) {
-    throttleDelay = debouncerDelay;
-  }
 
   /// Throttling delay used to reduce the number of snapshots captured and reduce
   /// performance impact.
