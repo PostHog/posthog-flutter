@@ -32,10 +32,10 @@ typedef _ClientScope = ({String projectToken, String host});
 /// after close() are ignored, with a debug warning.
 class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// Creates the implementation for an app that keeps its state in
-  /// [appDirectory], whose build recorded [appInfo], and that runs in the
-  /// IANA time zone [timezone].
+  /// the directory resolved by [appDirectory], whose build recorded [appInfo],
+  /// and that runs in the IANA time zone [timezone].
   PosthogFlutterDesktop({
-    required String? appDirectory,
+    required Future<String?> Function() appDirectory,
     required DesktopAppInfo appInfo,
     required String? timezone,
   })  : _appDirectory = appDirectory,
@@ -43,7 +43,11 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         _timezone = timezone;
 
   /// See [DesktopStorage.appDirectory].
-  final String? _appDirectory;
+  final Future<String?> Function() _appDirectory;
+
+  Future<void>? _setupFuture;
+
+  int _setupGeneration = 0;
 
   final DesktopAppInfo _appInfo;
 
@@ -104,6 +108,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     FutureOr<T> Function(DesktopPostHog client) fn,
   ) async {
     try {
+      final setup = _setupFuture;
+      if (_client == null && setup != null) {
+        final generation = _setupGeneration;
+        await setup;
+        if (generation != _setupGeneration) return fallback;
+      }
       final client = _clientFor(op);
       return client == null ? fallback : await fn(client);
     } catch (e) {
@@ -113,29 +123,31 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> setup(PostHogConfig config) async {
-    try {
-      _setup(config);
-    } catch (e) {
-      printIfDebug('[PostHog] Exception on setup: $e');
-    }
-  }
-
-  void _setup(PostHogConfig config) {
+  Future<void> setup(PostHogConfig config) {
     // The Dart-side hooks follow every setup(), while a running client keeps
     // its configuration until close().
     _config = config;
-    if (_client != null) {
+    if (_client != null || _setupFuture != null) {
       printIfDebug('[PostHog] Setup called despite already being setup!');
-      return;
+      return _setupFuture ?? Future.value();
     }
-    // Created synchronously, so calls made right after an unawaited setup()
-    // already reach the client.
-    _startClient(config);
+    return _setupFuture = _setup(config, _setupGeneration);
   }
 
-  void _startClient(PostHogConfig config) {
-    final appDirectory = _appDirectory;
+  Future<void> _setup(PostHogConfig config, int generation) async {
+    try {
+      final appDirectory = await _appDirectory();
+      // A close() during directory lookup must not create another client.
+      if (generation != _setupGeneration) return;
+      _startClient(config, appDirectory);
+    } catch (e) {
+      printIfDebug('[PostHog] Exception on setup: $e');
+    } finally {
+      if (generation == _setupGeneration) _setupFuture = null;
+    }
+  }
+
+  void _startClient(PostHogConfig config, String? appDirectory) {
     final storageDirectory = appDirectory == null
         ? null
         : DesktopStorage.projectDirectory(appDirectory, config.projectToken);
@@ -501,19 +513,23 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       });
 
   @override
-  Future<void> close() => _guard('close', (client) {
-        _client = null;
-        _clientScope = null;
-        _exceptionSteps = null;
-        _appLifecycle?.dispose();
-        _appLifecycle = null;
-        _featureFlagsUnsubscribe?.call();
-        _featureFlagsUnsubscribe = null;
+  Future<void> close() {
+    _setupGeneration++;
+    _setupFuture = null;
+    return _guard('close', (client) {
+      _client = null;
+      _clientScope = null;
+      _exceptionSteps = null;
+      _appLifecycle?.dispose();
+      _appLifecycle = null;
+      _featureFlagsUnsubscribe?.call();
+      _featureFlagsUnsubscribe = null;
 
-        // Nothing is sent on close: queued events stay on disk and go out
-        // with the next client.
-        client.close();
-      });
+      // Nothing is sent on close: queued events stay on disk and go out
+      // with the next client.
+      client.close();
+    });
+  }
 
   @override
   Future<String?> getSessionId() =>

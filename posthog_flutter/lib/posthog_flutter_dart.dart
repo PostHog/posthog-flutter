@@ -16,10 +16,7 @@ class PosthogFlutterDart {
   static void registerWith() {
     final environment = Platform.environment;
     PosthogFlutterPlatformInterface.instance = PosthogFlutterDesktop(
-      appDirectory: DesktopStorage.appDirectory(
-        environment,
-        executable: Platform.resolvedExecutable,
-      ),
+      appDirectory: DesktopStorage.appDirectory,
       appInfo: DesktopAppInfo.fromPlatform(),
       timezone: DesktopTimeZone.read(environment),
     );
