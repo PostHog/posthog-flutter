@@ -26,6 +26,12 @@ existing state file, that client keeps state changes in memory and leaves the
 file untouched. A new client can try reading the file again. Corrupt file
 contents reset the state to defaults; the next state write replaces the file.
 
+`Posthog().close()` makes one attempt to send the queued events and waits for it
+for up to two seconds. Events it could not send stay on disk and go out with the
+next client, or are lost when state is kept in memory. Closing the app window
+does not call `close()`, but the SDK also sends the queue whenever the app
+becomes inactive.
+
 ## Questions?
 
 ### [Check out our community page.](https://posthog.com/posts)
