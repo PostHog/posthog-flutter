@@ -90,10 +90,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     String distinctId,
   ) {
     final client = _clientFor(op);
-    if (client == null ||
-        _clientScope != scope ||
+    if (client == null) return null;
+    if (_clientScope != scope ||
         client.optedOut ||
         client.getDistinctId() != distinctId) {
+      printIfDebug('[PostHog] $op dropped: the project, the user or the '
+          'consent changed while beforeSend was running.');
       return null;
     }
     return client;
@@ -248,12 +250,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final distinctId = client.getDistinctId();
         final exceptionSteps = _exceptionSteps;
 
-        final processed = await _runBeforeSend(
+        final hooked = _runBeforeSend(
           eventName,
           properties,
           userProperties: userProperties,
           userPropertiesSetOnce: userPropertiesSetOnce,
         );
+        final processed =
+            hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
           printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
           return;
@@ -278,13 +282,15 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final distinctId = client.getDistinctId();
         final exceptionSteps = _exceptionSteps;
 
-        final processed = await _runBeforeSend(
+        final hooked = _runBeforeSend(
           PostHogEventName.screen,
           <String, Object>{
             ...?properties,
             PostHogPropertyName.screenName: screenName,
           },
         );
+        final processed =
+            hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
           printIfDebug(
               '[PostHog] Screen event dropped by beforeSend: $screenName');
@@ -492,10 +498,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
         );
 
-        final processed = await _runBeforeSend(
+        final hooked = _runBeforeSend(
           PostHogEventName.exception,
           exceptionProps.cast<String, Object>(),
         );
+        final processed =
+            hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
           printIfDebug(
             '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
@@ -588,21 +596,26 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   ///
   /// Returns the possibly modified event, or null if any callback drops it
   /// or throws.
-  Future<PostHogEvent?> _runBeforeSend(
+  ///
+  /// Without callbacks the event is returned synchronously and the caller
+  /// must not await it: an identify(), reset() or opt-out made right after
+  /// an unawaited capture would otherwise run first, and the event would be
+  /// dropped as belonging to another user.
+  FutureOr<PostHogEvent?> _runBeforeSend(
     String eventName,
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
-  }) =>
-      applyBeforeSend(
-        _config?.beforeSend ?? const <BeforeSendCallback>[],
-        PostHogEvent(
-          event: eventName,
-          properties: properties,
-          userProperties: userProperties,
-          userPropertiesSetOnce: userPropertiesSetOnce,
-        ),
-      );
+  }) {
+    final event = PostHogEvent(
+      event: eventName,
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+    final callbacks = _config?.beforeSend ?? const <BeforeSendCallback>[];
+    return callbacks.isEmpty ? event : applyBeforeSend(callbacks, event);
+  }
 
   void _captureProcessed(
     DesktopPostHog client,
