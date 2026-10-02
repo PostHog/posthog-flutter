@@ -841,16 +841,6 @@ class Posthog {
   Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() =>
       _posthog.getAllFeatureFlags();
 
-  /// Returns the payload for the feature flag [key].
-  ///
-  /// Returns `null` when the flag does not exist, has no payload, or the payload
-  /// cannot be loaded.
-  @Deprecated(
-    'Use getFeatureFlagResult instead, which returns both value and payload.',
-  )
-  Future<Object?> getFeatureFlagPayload(String key) =>
-      _posthog.getFeatureFlagPayload(key: key);
-
   /// Captures a `$feature_view` event when the user sees the feature behind
   /// the feature flag [flag].
   ///
