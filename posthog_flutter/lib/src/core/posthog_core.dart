@@ -31,6 +31,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// The reload that waits for the /flags request in flight.
   Completer<void>? _pendingFlagsReload;
 
+  /// Changes when reset invalidates responses requested for the previous user.
+  int _featureFlagsGeneration = 0;
+
   final _session = PostHogSessionManager();
 
   /// See [registerForSession].
@@ -74,6 +77,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// the configured default; this client keeps the current consent decision.
   void reset() {
     wrap(() {
+      _featureFlagsGeneration++;
       _sessionProps.clear();
       _flagCallReported.clear();
       _cachedPersonProperties = null;
@@ -550,6 +554,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   Future<void> _doFlagsAsync() async {
     _loadingFlags = true;
+    final generation = _featureFlagsGeneration;
     try {
       final distinctId = getDistinctId();
       final groupsMap = _getGroups();
@@ -578,6 +583,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
             k, v is Map ? Map<String, Object?>.from(v) : <String, Object?>{})),
         extraPayload: extraProperties,
       );
+
+      if (generation != _featureFlagsGeneration) return;
 
       if (result is GetFlagsFailure) {
         final stored = _getStoredFlagDetails();
@@ -680,9 +687,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// Serves the enabled bootstrapped flags until the first complete `/flags`
   /// response. They replace any flags persisted by an earlier session.
   void _seedBootstrapFlags(PostHogBootstrapConfig bootstrap) {
+    final bootstrapFlags = bootstrap.featureFlags;
+    if (bootstrapFlags == null || bootstrapFlags.isEmpty) return;
+
     final flags = <String, PostHogFeatureFlagValue>{};
-    for (final MapEntry(:key, :value)
-        in (bootstrap.featureFlags ?? {}).entries) {
+    for (final MapEntry(:key, :value) in bootstrapFlags.entries) {
       // Only enabled flags are served: false and '' are dropped.
       if (value == true || (value is String && value.isNotEmpty)) {
         flags[key] = value;
@@ -693,7 +702,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
             value.runtimeType);
       }
     }
-    if (flags.isEmpty) return;
 
     final payloads = <String, Object?>{};
     final details = <String, PostHogFeatureFlagDetail>{};
@@ -763,8 +771,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
         true;
     final featureFlag = details?.flags[key];
     final flagValue = getFeatureFlagValue(featureFlag);
-    final shouldSendEvent =
-        sendEvent && !(_flagCallReported[key]?.contains(flagValue) ?? false);
+    final shouldSendEvent = sendEvent &&
+        !optedOut &&
+        !(_flagCallReported[key]?.contains(flagValue) ?? false);
 
     if (shouldSendEvent) {
       final errors = <String>[];

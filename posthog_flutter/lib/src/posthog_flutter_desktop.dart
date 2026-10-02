@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import 'core/file_storage.dart';
+import 'core/utils/utils.dart';
 import 'error_tracking/dart_exception_processor.dart';
 import 'feature_flag_result.dart';
 import 'logs/posthog_log_severity.dart';
@@ -20,6 +21,8 @@ import 'util/logging.dart';
 import 'utils/before_send.dart';
 import 'utils/capture_utils.dart';
 import 'utils/property_normalizer.dart';
+
+typedef _ClientScope = ({String projectToken, String host});
 
 /// The Windows and Linux implementation, built on the pure-Dart
 /// [DesktopPostHog] client.
@@ -48,6 +51,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
   DesktopPostHog? _client;
 
+  _ClientScope? _clientScope;
+
   /// The configuration of the latest setup(), read by the Dart-side hooks:
   /// beforeSend, onFeatureFlags and exception processing.
   PostHogConfig? _config;
@@ -66,6 +71,21 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     if (client == null) {
       printIfDebug('[PostHog] $op ignored: PostHog is not set up or was '
           'closed.');
+    }
+    return client;
+  }
+
+  DesktopPostHog? _clientForContinuation(
+    String op,
+    _ClientScope scope,
+    String distinctId,
+  ) {
+    final client = _clientFor(op);
+    if (client == null ||
+        _clientScope != scope ||
+        client.optedOut ||
+        client.getDistinctId() != distinctId) {
+      return null;
     }
     return client;
   }
@@ -128,6 +148,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           : FileStorage(storageDirectory),
     );
     _client = client;
+    _clientScope = (
+      projectToken: config.projectToken,
+      host: removeTrailingSlash(config.host),
+    );
     _featureFlagsUnsubscribe =
         client.onFeatureFlags(() => _config?.onFeatureFlags?.call());
 
@@ -198,8 +222,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) =>
-      _guard('capture', (_) async {
+      _guard('capture', (client) async {
+        if (client.optedOut) return;
         if (!_hasName(eventName)) return;
+        final scope = _clientScope;
+        if (scope == null) return;
+        final distinctId = client.getDistinctId();
 
         final processed = await _runBeforeSend(
           eventName,
@@ -211,24 +239,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
           return;
         }
-        // A callback may have renamed the event.
-        if (!_hasName(processed.event)) return;
 
-        // Resolved after the callbacks, which may be async: a client closed
-        // meanwhile must not write to the on-disk state again.
-        final client = _clientFor('capture');
-        if (client == null) return;
-        client.capture(
-          processed.event,
-          properties: _withExceptionSteps(
-            processed.event,
-            _mergeUserProps(
-              processed.properties,
-              processed.userProperties,
-              processed.userPropertiesSetOnce,
-            ),
-          ),
-        );
+        final current = _clientForContinuation('capture', scope, distinctId);
+        if (current == null) return;
+        _captureProcessed(current, processed);
       });
 
   @override
@@ -240,6 +254,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         // Opted out, nothing happens: no callback runs, and the screen does
         // not become the current one.
         if (client.optedOut) return;
+        final scope = _clientScope;
+        if (scope == null) return;
+        final distinctId = client.getDistinctId();
 
         final processed = await _runBeforeSend(
           PostHogEventName.screen,
@@ -254,13 +271,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        // A renamed event is no longer a screen view, so it is captured as a
-        // regular event.
+        final current = _clientForContinuation('screen', scope, distinctId);
+        if (current == null) return;
+
+        // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          await capture(
-            eventName: processed.event,
-            properties: processed.properties,
-          );
+          _captureProcessed(current, processed);
           return;
         }
 
@@ -274,19 +290,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        // Resolved again after the callbacks, as in capture().
-        final current = _clientFor('screen');
-        if (current == null) return;
         // Later events that set no `$screen_name` of their own carry this one.
         current.registerForSession(
             {PostHogPropertyName.screenName: finalScreenName});
-        current.capture(
-          PostHogEventName.screen,
-          properties: <String, Object?>{
-            ...?_normalize(processed.properties),
-            PostHogPropertyName.screenName: finalScreenName,
-          },
-        );
+        processed.properties = <String, Object>{
+          ...?processed.properties,
+          PostHogPropertyName.screenName: finalScreenName,
+        };
+        _captureProcessed(current, processed);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -445,7 +456,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     StackTrace? stackTrace,
     Map<String, Object>? properties,
   }) =>
-      _guard('captureException', (_) async {
+      _guard('captureException', (client) async {
+        if (client.optedOut) return;
+        final scope = _clientScope;
+        if (scope == null) return;
+        final distinctId = client.getDistinctId();
+
         final exceptionProps = DartExceptionProcessor.processException(
           error: error,
           stackTrace: stackTrace,
@@ -466,25 +482,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        // A renamed event is no longer an exception, so it is captured as a
-        // regular event.
-        if (processed.event != PostHogEventName.exception) {
-          await capture(
-            eventName: processed.event,
-            properties: processed.properties,
-          );
-          return;
-        }
-
-        final client = _clientFor('captureException');
-        if (client == null) return;
-        client.capture(
-          PostHogEventName.exception,
-          properties: _withExceptionSteps(
-            PostHogEventName.exception,
-            _normalize(processed.properties),
-          ),
-        );
+        final current =
+            _clientForContinuation('captureException', scope, distinctId);
+        if (current == null) return;
+        _captureProcessed(current, processed);
       });
 
   @override
@@ -502,6 +503,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   @override
   Future<void> close() => _guard('close', (client) {
         _client = null;
+        _clientScope = null;
         _exceptionSteps = null;
         _appLifecycle?.dispose();
         _appLifecycle = null;
@@ -552,30 +554,30 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
-  }) async {
-    var event = PostHogEvent(
-      event: eventName,
-      properties: properties,
-      userProperties: userProperties,
-      userPropertiesSetOnce: userPropertiesSetOnce,
-    );
+  }) =>
+      applyBeforeSend(
+        _config?.beforeSend ?? const <BeforeSendCallback>[],
+        PostHogEvent(
+          event: eventName,
+          properties: properties,
+          userProperties: userProperties,
+          userPropertiesSetOnce: userPropertiesSetOnce,
+        ),
+      );
 
-    final callbacks = _config?.beforeSend ?? const <BeforeSendCallback>[];
-    for (final callback in callbacks) {
-      try {
-        final result = await runBeforeSend<PostHogEvent>(callback, event);
-        if (result == null) return null;
-        event = result;
-      } catch (e) {
-        // A callback that fails may be the one scrubbing sensitive data, so
-        // neither the original nor a partially processed event is sent.
-        printIfDebug(
-          '[PostHog] Warning: beforeSend callback threw an exception; dropping event: $e',
-        );
-        return null;
-      }
-    }
-    return event;
+  void _captureProcessed(DesktopPostHog client, PostHogEvent event) {
+    if (!_hasName(event.event)) return;
+    client.capture(
+      event.event,
+      properties: _withExceptionSteps(
+        event.event,
+        _mergeUserProps(
+          event.properties,
+          event.userProperties,
+          event.userPropertiesSetOnce,
+        ),
+      ),
+    );
   }
 
   /// Whether [event] has a name; an event without one is dropped.
