@@ -240,6 +240,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final scope = _clientScope;
         if (scope == null) return;
         final distinctId = client.getDistinctId();
+        final exceptionSteps = _exceptionSteps;
 
         final processed = await _runBeforeSend(
           eventName,
@@ -254,7 +255,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         final current = _clientForContinuation('capture', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed);
+        _captureProcessed(current, processed, exceptionSteps);
       });
 
   @override
@@ -269,6 +270,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final scope = _clientScope;
         if (scope == null) return;
         final distinctId = client.getDistinctId();
+        final exceptionSteps = _exceptionSteps;
 
         final processed = await _runBeforeSend(
           PostHogEventName.screen,
@@ -288,7 +290,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          _captureProcessed(current, processed);
+          _captureProcessed(current, processed, exceptionSteps);
           return;
         }
 
@@ -309,7 +311,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           ...?processed.properties,
           PostHogPropertyName.screenName: finalScreenName,
         };
-        _captureProcessed(current, processed);
+        _captureProcessed(current, processed, exceptionSteps);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -473,6 +475,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final scope = _clientScope;
         if (scope == null) return;
         final distinctId = client.getDistinctId();
+        final exceptionSteps = _exceptionSteps;
 
         final exceptionProps = DartExceptionProcessor.processException(
           error: error,
@@ -497,7 +500,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final current =
             _clientForContinuation('captureException', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed);
+        _captureProcessed(current, processed, exceptionSteps);
       });
 
   @override
@@ -581,12 +584,17 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         ),
       );
 
-  void _captureProcessed(DesktopPostHog client, PostHogEvent event) {
+  void _captureProcessed(
+    DesktopPostHog client,
+    PostHogEvent event,
+    ExceptionStepsBuffer? exceptionSteps,
+  ) {
     if (!_hasName(event.event)) return;
     client.capture(
       event.event,
       properties: _withExceptionSteps(
         event.event,
+        exceptionSteps,
         _mergeUserProps(
           event.properties,
           event.userProperties,
@@ -603,13 +611,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return false;
   }
 
-  /// Adds the recorded exception steps to an `$exception` event that does not
-  /// set its own.
+  /// Uses the originating client's steps even when a same-scope restart
+  /// happened during beforeSend. Explicit event steps take precedence.
   Map<String, Object?>? _withExceptionSteps(
     String event,
+    ExceptionStepsBuffer? exceptionSteps,
     Map<String, Object?>? properties,
   ) {
-    final steps = _exceptionSteps?.steps;
+    final steps = exceptionSteps?.steps;
     if (event != PostHogEventName.exception || steps == null || steps.isEmpty) {
       return properties;
     }
