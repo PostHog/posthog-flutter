@@ -82,6 +82,11 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
 
       // Update state
       if (!mounted) return;
+      if (nextQuestion.isSurveyCompleted &&
+          !widget.appearance.displayThankYouMessage) {
+        _handleClose();
+        return;
+      }
       setState(() {
         _currentIndex = nextQuestion.questionIndex;
         _isCompleted = nextQuestion.isSurveyCompleted;
@@ -97,12 +102,19 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
 
     switch (currentQuestion.type) {
       case PostHogSurveyQuestionType.openText:
+        final appearance =
+            SurveyAppearance.fromPostHog(widget.survey.appearance);
         return OpenTextQuestion(
           key: ValueKey('open_text_question_$_currentIndex'),
           question: currentQuestion.question,
           description: currentQuestion.description,
           descriptionContentType: currentQuestion.descriptionContentType,
-          appearance: SurveyAppearance.fromPostHog(widget.survey.appearance),
+          appearance: appearance,
+          buttonText: surveyQuestionButtonLabel(
+            currentQuestion.buttonText,
+            appearance.submitButtonText,
+          ),
+          optional: currentQuestion.optional,
           onSubmit: _submitResponse,
         );
       case PostHogSurveyQuestionType.link:

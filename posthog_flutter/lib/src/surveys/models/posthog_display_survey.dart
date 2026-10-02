@@ -17,7 +17,7 @@ class PostHogDisplaySurvey {
   // Native platform model -> Dictionary -> Dart model
   factory PostHogDisplaySurvey.fromDict(Map<String, dynamic> dict) {
     final questions = (dict['questions'] as List).map((q) {
-      final id = q['type'] as String? ?? '';
+      final id = q['id'] as String? ?? '';
       final type = q['type'] as String;
       final question = q['question'] as String;
       final optional = q['isOptional'] as bool;
