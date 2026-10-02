@@ -190,10 +190,10 @@ class FileStorage {
 
     try {
       return jsonDecode(utf8.decode(bytes)) as Map<String, Object?>;
-    } catch (e) {
+    } catch (_) {
       // Corrupt content (torn write, foreign data) will not heal on retry,
       // so the store resets instead of staying degraded forever.
-      _resetLogger.warn('Resetting unreadable posthog store:', e);
+      _resetLogger.warn('Resetting corrupt PostHog store.');
       return {};
     }
   }

@@ -229,6 +229,22 @@ void main() {
     }, skip: chmodSkip);
 
     for (final debug in [true, false]) {
+      test('corrupt snapshot warnings omit stored values with debug: $debug',
+          () async {
+        final server = await LocalPostHogServer.start();
+        final dir = tempDirectory();
+        File('${dir.path}/posthog_data.json').writeAsStringSync(
+          '{"distinct_id":"private-user","props":{"email":"private@example.com"}',
+        );
+
+        final lines = printedLines(() => testClient(server,
+            config: testConfig(debug: debug), storage: FileStorage(dir.path)));
+
+        expect(lines.where((line) => line.contains('Resetting')), hasLength(1));
+        expect(lines.join('\n'), isNot(contains('private-user')));
+        expect(lines.join('\n'), isNot(contains('private@example.com')));
+      });
+
       test('a client with debug: $debug reports write failures accordingly',
           () async {
         final server = await LocalPostHogServer.start();
