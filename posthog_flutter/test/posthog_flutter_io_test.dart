@@ -112,14 +112,14 @@ void main() {
       },
     );
 
-    test('setup sends projectToken and deprecated apiKey alias', () async {
+    test('setup sends projectToken', () async {
       testConfig = PostHogConfig(' \n test_project_token\t ');
       await posthogFlutterIO.setup(testConfig);
 
       final call = log.firstWhere((c) => c.method == 'setup');
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args['projectToken'], equals('test_project_token'));
-      expect(args['apiKey'], equals('test_project_token'));
+      expect(args.containsKey('apiKey'), isFalse);
     });
 
     test(

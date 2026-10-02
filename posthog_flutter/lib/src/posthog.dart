@@ -779,16 +779,6 @@ class Posthog {
   }) =>
       _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
 
-  /// Returns the payload for the feature flag [key].
-  ///
-  /// Returns `null` when the flag does not exist, has no payload, or the payload
-  /// cannot be loaded.
-  @Deprecated(
-    'Use getFeatureFlagResult instead, which returns both value and payload.',
-  )
-  Future<Object?> getFeatureFlagPayload(String key) =>
-      _posthog.getFeatureFlagPayload(key: key);
-
   /// Flushes queued events immediately where supported by the platform.
   ///
   /// Returns a [Future] that completes when the flush request has finished.
