@@ -1422,6 +1422,34 @@ void main() {
       });
     }
 
+    final identityChanges =
+        <String, Future<void> Function(PosthogFlutterDesktop)>{
+      'identify': (platform) => platform.identify(userId: 'next-user'),
+      'reset': (platform) => platform.reset(),
+    };
+
+    for (final identityChange in identityChanges.entries) {
+      for (final entry in pendingCalls.entries) {
+        test(
+            '${entry.key} without hooks is sent before an unawaited '
+            '${identityChange.key}', () async {
+          final server = await LocalPostHogServer.start();
+          final platform = await setUpPlatform(configFor(server));
+          final distinctId = await platform.getDistinctId();
+
+          final call = entry.value.call(platform);
+          final change = identityChange.value(platform);
+          await Future.wait([call, change]);
+          await platform.capture(eventName: 'sentinel event');
+
+          await server.waitForEvent('sentinel event');
+          final event = server.events
+              .singleWhere((event) => event['event'] == entry.value.eventName);
+          expect(event['distinct_id'], distinctId);
+        });
+      }
+    }
+
     for (final identityChange in ['identify', 'reset']) {
       for (final entry in pendingCalls.entries) {
         test('${entry.key} pending in a hook does not cross $identityChange',
