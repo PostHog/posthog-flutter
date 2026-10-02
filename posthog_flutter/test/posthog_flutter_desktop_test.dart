@@ -732,6 +732,69 @@ void main() {
       expect(stepMessagesOf(sentinel), isNull);
     });
 
+    for (final call in ['capture', 'screen', 'captureException']) {
+      for (final enabled in [true, false]) {
+        test(
+            '$call keeps its original exception steps across close/setup '
+            '(initially enabled: $enabled)', () async {
+          final server = await LocalPostHogServer.start();
+          final entered = Completer<void>();
+          final release = Completer<void>();
+          final config = configFor(server)
+            ..errorTrackingConfig.exceptionSteps.enabled = enabled
+            ..beforeSend = [
+              (event) async {
+                entered.complete();
+                await release.future;
+                event.event = r'$exception';
+                return event;
+              },
+            ];
+          final platform = await setUpPlatform(config);
+          await platform.addExceptionStep('original client');
+
+          final pending = switch (call) {
+            'capture' => platform.capture(eventName: 'custom error'),
+            'screen' => platform.screen(screenName: 'Error'),
+            _ => platform.captureException(error: StateError('pending')),
+          };
+          await entered.future;
+          await platform.close();
+          await platform.setup(configFor(server));
+          await platform.addExceptionStep('replacement client');
+          release.complete();
+          await pending;
+
+          final event = await server.waitForEvent(r'$exception');
+          expect(stepMessagesOf(event), enabled ? ['original client'] : null);
+        });
+      }
+    }
+
+    test('includes steps recorded while the same client awaits beforeSend',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final platform = await setUpPlatform(configFor(server)
+        ..beforeSend = [
+          (event) async {
+            entered.complete();
+            await release.future;
+            return event;
+          },
+        ]);
+      await platform.addExceptionStep('before capture');
+      final pending = platform.captureException(error: StateError('pending'));
+      await entered.future;
+      await platform.addExceptionStep('during beforeSend');
+      release.complete();
+      await pending;
+
+      expect(stepMessagesOf(await server.waitForEvent(r'$exception')),
+          ['before capture', 'during beforeSend']);
+    });
+
     test('send their values as event properties send them', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
