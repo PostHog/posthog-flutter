@@ -95,7 +95,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
   // Feature flag test data
   final Map<String, Object?> featureFlagValues = {};
-  final Map<String, Object?> featureFlagPayloads = {};
 
   // Call tracking for getFeatureFlagResult
   final List<Map<String, dynamic>> getFeatureFlagResultCalls = [];
@@ -253,11 +252,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   @override
   Future<Object?> getFeatureFlag({required String key}) async {
     return featureFlagValues[key];
-  }
-
-  @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    return featureFlagPayloads[key];
   }
 
   PostHogFeatureFlagResult? featureFlagResult;
