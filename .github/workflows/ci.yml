@@ -174,7 +174,7 @@ jobs:
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         timeout-minutes: 5
         working-directory: ./posthog_flutter
-        run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_flutter_web_setup_test.dart test/posthog_widget_web_test.dart test/posthog_widget_test.dart test/web_before_send_test.dart test/web_canvas_mask_provider_test.dart
+        run: flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_flutter_web_setup_test.dart test/posthog_widget_web_test.dart test/posthog_widget_test.dart test/web_before_send_test.dart test/web_canvas_mask_provider_test.dart test/posthog_error_tracking_web_test.dart
 
       # dart2js resolves the isolate-handler conditional import differently;
       # only a wasm compile exercises the dart2wasm selection this test guards.
@@ -217,7 +217,12 @@ jobs:
       - name: Build Windows example
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./example
-        run: flutter build windows --release
+        run: flutter build windows --release --build-name=1.2.3 --build-number=456
+
+      - name: Test Windows version resource
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        working-directory: ./posthog_flutter
+        run: flutter test --dart-define=POSTHOG_TEST_EXECUTABLE=../example/build/windows/x64/runner/Release/posthog_flutter_example.exe test/posthog_windows_version_resource_test.dart
 
   test-build-linux:
     needs: detect-markdown-only

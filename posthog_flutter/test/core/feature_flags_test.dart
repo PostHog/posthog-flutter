@@ -119,6 +119,78 @@ void main() {
       expect(server.flagsRequests, hasLength(2));
     });
 
+    test('a successful response before reset stays discarded when reload fails',
+        () async {
+      final dir = tempDirectory();
+      final storage = FileStorage(dir.path);
+      final client = testClient(server, storage: storage);
+      final staleResponse = Completer<PostHogResponse>();
+      final resetResponse = Completer<PostHogResponse>();
+      var request = 0;
+      server.respond =
+          (_) => ++request == 1 ? staleResponse.future : resetResponse.future;
+      final announced = <Object?>[];
+      client.onFeatureFlags(() => announced.add(
+          client.getFeatureFlagResult('stale', sendEvent: false)?.enabled));
+
+      final inFlight = client.reloadFeatureFlagsAsync();
+      final oldRequest = await server.waitForFlagsRequest(0);
+      client.reset();
+      final anonymousId = client.getDistinctId();
+      final afterReset = client.reloadFeatureFlagsAsync();
+      staleResponse.complete(_flagsResponse(
+          {'stale': _flag('stale', payload: '{"secret":true}')}));
+
+      await inFlight;
+      final anonymousRequest = await server.waitForFlagsRequest(1);
+      expect(announced, isEmpty,
+          reason: 'the response for the reset identity must have no effects');
+      expect(client.getFeatureFlag('stale'), isNull);
+      expect(anonymousRequest['distinct_id'], anonymousId);
+      expect(anonymousRequest['distinct_id'], isNot(oldRequest['distinct_id']));
+
+      resetResponse
+          .complete(const PostHogResponse(HttpStatus.internalServerError));
+      await afterReset;
+
+      expect(announced, [null],
+          reason: 'only the failed reload after reset is announced');
+      expect(server.flagsRequests, hasLength(2));
+
+      client.close();
+      final reopened = testClient(server, storage: FileStorage(dir.path));
+
+      expect(reopened.getFeatureFlag('stale'), isNull);
+      expect(reopened.getFeatureFlagResult('stale', sendEvent: false)?.payload,
+          isNull);
+    });
+
+    test('a failed response started before reset has no effects', () async {
+      final storage = tempStorage();
+      final client = testClient(server, storage: storage);
+      final staleResponse = Completer<PostHogResponse>();
+      var request = 0;
+      server.respond = (_) => ++request == 1
+          ? staleResponse.future
+          : _flagsResponse({'fresh': _flag('fresh')});
+      final announced = <Object?>[];
+      client.onFeatureFlags(() => announced.add(
+          client.getFeatureFlagResult('fresh', sendEvent: false)?.enabled));
+
+      final inFlight = client.reloadFeatureFlagsAsync();
+      await server.waitForFlagsRequest(0);
+      client.reset();
+      final afterReset = client.reloadFeatureFlagsAsync();
+      staleResponse
+          .complete(const PostHogResponse(HttpStatus.internalServerError));
+
+      await Future.wait([inFlight, afterReset]);
+
+      expect(announced, [true]);
+      expect(_storedFlagDetails(storage).containsKey('requestError'), isFalse);
+      expect(server.flagsRequests, hasLength(2));
+    });
+
     test('a throwing onFeatureFlags callback does not stop the flags',
         () async {
       final client = testClient(server);
@@ -491,6 +563,22 @@ void main() {
       client.getFeatureFlag('beta-ui');
 
       expect(_flagCalledCount(storage), 2);
+    });
+
+    test('does not deduplicate an exposure suppressed while opted out',
+        () async {
+      await client.reloadFeatureFlagsAsync();
+      client.optOut();
+
+      expect(client.getFeatureFlag('beta-ui'), isTrue,
+          reason: 'local flag reads remain available while opted out');
+      expect(_flagCalledCount(storage), 0);
+
+      client.optIn();
+      expect(client.getFeatureFlag('beta-ui'), isTrue);
+      expect(client.getFeatureFlag('beta-ui'), isTrue);
+
+      expect(_flagCalledCount(storage), 1);
     });
 
     test('carries whether the flag is linked to an experiment', () async {

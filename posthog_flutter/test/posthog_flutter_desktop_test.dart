@@ -188,6 +188,32 @@ void main() {
       );
     });
 
+    test('does not admit a capture made while opted out', () async {
+      final server = await LocalPostHogServer.start();
+      final callbackEvents = <String>[];
+      final releaseHook = Completer<void>();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) async {
+            callbackEvents.add(event.event);
+            if (event.event == 'blocked capture') await releaseHook.future;
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.disable();
+      final blocked = platform.capture(eventName: 'blocked capture');
+      await platform.enable();
+      releaseHook.complete();
+      await blocked;
+      await platform.capture(eventName: 'sentinel event');
+
+      await server.waitForEvent('sentinel event');
+      expect(server.eventNames, ['sentinel event']);
+      expect(callbackEvents, ['sentinel event']);
+    });
+
     test(r'reports the time zone as $timezone and to /flags', () async {
       final server = await LocalPostHogServer.start();
       final platform = createPlatform(timezone: 'Europe/Berlin');
@@ -285,6 +311,57 @@ void main() {
           reason: 'no callback runs for a screen while opted out');
       expect(_propertiesOf(event), isNot(contains(r'$screen_name')),
           reason: 'the screen did not become the current one');
+    });
+
+    test('does not remember a screen when consent changes during its hook',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final hookStarted = Completer<void>();
+      final releaseHook = Completer<void>();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) async {
+            if (event.event == r'$screen') {
+              hookStarted.complete();
+              await releaseHook.future;
+            }
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      final screen = platform.screen(screenName: 'Blocked');
+      await hookStarted.future;
+      await platform.disable();
+      releaseHook.complete();
+      await screen;
+      await platform.enable();
+      await platform.capture(eventName: 'sentinel event');
+
+      final event = await server.waitForEvent('sentinel event');
+      expect(server.eventNames, ['sentinel event']);
+      expect(_propertiesOf(event), isNot(contains(r'$screen_name')));
+    });
+
+    test('runs the hook once when it renames a screen event', () async {
+      final server = await LocalPostHogServer.start();
+      var callbackCount = 0;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            callbackCount++;
+            event.event = 'renamed screen';
+            event.userProperties = {'source': 'screen hook'};
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.screen(screenName: 'Checkout');
+
+      final event = await server.waitForEvent('renamed screen');
+      expect(callbackCount, 1);
+      expect(_propertiesOf(event)[r'$set'], {'source': 'screen hook'});
     });
 
     test('keeps the screen name when a callback rebuilds the properties',
@@ -539,6 +616,53 @@ void main() {
       final stacktrace =
           Map<String, Object?>.from(exception['stacktrace']! as Map);
       expect(stacktrace['frames'], isNotEmpty);
+    });
+
+    test('does not admit an exception made while opted out', () async {
+      final server = await LocalPostHogServer.start();
+      final callbackEvents = <String>[];
+      final releaseHook = Completer<void>();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) async {
+            callbackEvents.add(event.event);
+            if (event.event == r'$exception') await releaseHook.future;
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.disable();
+      final blocked = platform.captureException(error: StateError('blocked'));
+      await platform.enable();
+      releaseHook.complete();
+      await blocked;
+      await platform.capture(eventName: 'sentinel event');
+
+      await server.waitForEvent('sentinel event');
+      expect(server.eventNames, ['sentinel event']);
+      expect(callbackEvents, ['sentinel event']);
+    });
+
+    test('runs the hook once when it renames an exception event', () async {
+      final server = await LocalPostHogServer.start();
+      var callbackCount = 0;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            callbackCount++;
+            event.event = 'renamed exception';
+            event.userProperties = {'source': 'exception hook'};
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.captureException(error: StateError('renamed'));
+
+      final event = await server.waitForEvent('renamed exception');
+      expect(callbackCount, 1);
+      expect(_propertiesOf(event)[r'$set'], {'source': 'exception hook'});
     });
   });
 
@@ -969,6 +1093,127 @@ void main() {
       await server.waitForEvent('sentinel event');
       expect(server.eventNames, ['slow event', 'sentinel event']);
     });
+
+    final pendingCalls = <String,
+        ({
+      String eventName,
+      Future<void> Function(PosthogFlutterDesktop) call,
+    })>{
+      'capture': (
+        eventName: 'pending capture',
+        call: (platform) => platform.capture(eventName: 'pending capture'),
+      ),
+      'screen': (
+        eventName: r'$screen',
+        call: (platform) => platform.screen(screenName: 'Pending'),
+      ),
+      'captureException': (
+        eventName: r'$exception',
+        call: (platform) =>
+            platform.captureException(error: StateError('pending')),
+      ),
+    };
+
+    for (final entry in pendingCalls.entries) {
+      test('${entry.key} pending in a hook does not cross project scope',
+          () async {
+        final server = await LocalPostHogServer.start();
+        final hookStarted = Completer<void>();
+        final releaseHook = Completer<void>();
+        final config = configFor(server)
+          ..beforeSend = [
+            (event) async {
+              hookStarted.complete();
+              await releaseHook.future;
+              return event;
+            },
+          ];
+        final platform = await setUpPlatform(config);
+
+        final pending = entry.value.call(platform);
+        await hookStarted.future;
+        await platform.close();
+        await platform.setup(
+          configFor(server, projectToken: 'next_project'),
+        );
+        releaseHook.complete();
+        await pending;
+        await platform.capture(eventName: 'sentinel event');
+
+        await server.waitForEvent('sentinel event');
+        expect(server.eventNames, ['sentinel event']);
+      });
+    }
+
+    for (final entry in pendingCalls.entries) {
+      test('${entry.key} pending in a hook does not cross host scope',
+          () async {
+        final firstServer = await LocalPostHogServer.start();
+        final nextServer = await LocalPostHogServer.start();
+        final hookStarted = Completer<void>();
+        final releaseHook = Completer<void>();
+        final config = configFor(firstServer)
+          ..beforeSend = [
+            (event) async {
+              hookStarted.complete();
+              await releaseHook.future;
+              return event;
+            },
+          ];
+        final platform = await setUpPlatform(config);
+
+        final pending = entry.value.call(platform);
+        await hookStarted.future;
+        await platform.close();
+        await platform.setup(configFor(nextServer));
+        releaseHook.complete();
+        await pending;
+        await platform.capture(eventName: 'sentinel event');
+
+        await nextServer.waitForEvent('sentinel event');
+        expect(firstServer.eventNames, isNot(contains(entry.value.eventName)));
+        expect(nextServer.eventNames, ['sentinel event']);
+      });
+    }
+
+    for (final identityChange in ['identify', 'reset']) {
+      for (final entry in pendingCalls.entries) {
+        test('${entry.key} pending in a hook does not cross $identityChange',
+            () async {
+          final server = await LocalPostHogServer.start();
+          final hookStarted = Completer<void>();
+          final releaseHook = Completer<void>();
+          final config = configFor(server)
+            ..beforeSend = [
+              (event) async {
+                if (event.event == entry.value.eventName) {
+                  hookStarted.complete();
+                  await releaseHook.future;
+                }
+                return event;
+              },
+            ];
+          final platform = await setUpPlatform(config);
+          final initialDistinctId = await platform.getDistinctId();
+
+          final pending = entry.value.call(platform);
+          await hookStarted.future;
+          if (identityChange == 'identify') {
+            await platform.identify(userId: 'identified_user');
+            expect(await platform.getDistinctId(), 'identified_user');
+          } else {
+            await platform.reset();
+            expect(await platform.getDistinctId(), isNot(initialDistinctId));
+          }
+          releaseHook.complete();
+          await pending;
+          await platform.capture(eventName: 'sentinel event');
+
+          await server.waitForEvent('sentinel event');
+          expect(server.eventNames, isNot(contains(entry.value.eventName)));
+        });
+      }
+    }
 
     test('isOptOut reports opted out after close', () async {
       final server = await LocalPostHogServer.start();

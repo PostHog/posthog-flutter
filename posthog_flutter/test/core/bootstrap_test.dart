@@ -165,6 +165,56 @@ void main() {
       expect(client.getFeatureFlag('other'), isNull);
     });
 
+    test('a supplied disabled-only snapshot clears stored flags', () async {
+      server.respond = (_) =>
+          _flagsResponse({'stale': _flag('stale', payload: '{"secret":true}')});
+      final (earlier, _) = launch();
+      await earlier.reloadFeatureFlagsAsync();
+      expect(
+        earlier.getFeatureFlagResult('stale', sendEvent: false)?.payload,
+        {'secret': true},
+      );
+      earlier.close();
+
+      final (client, storage) = launch(const PostHogBootstrapConfig(
+        featureFlags: {'disabled': false, 'empty': ''},
+        featureFlagPayloads: {'disabled': 'hidden'},
+      ));
+      final announced = Completer<void>();
+      client.onFeatureFlags(announced.complete);
+
+      await announced.future;
+
+      expect(client.getFeatureFlag('stale'), isNull);
+      expect(client.getFeatureFlag('disabled'), isNull);
+      expect(
+        client.getFeatureFlagResult('stale', sendEvent: false)?.payload,
+        isNull,
+      );
+      expect(
+        storage.getProperty<Map<String, Object?>>(
+          PostHogPersistedProperty.featureFlagDetails,
+        ),
+        {'flags': <String, Object?>{}},
+      );
+    });
+
+    for (final (description, bootstrap) in [
+      ('absent', const PostHogBootstrapConfig()),
+      ('empty', const PostHogBootstrapConfig(featureFlags: {})),
+    ]) {
+      test('an $description snapshot leaves stored flags unchanged', () async {
+        server.respond = (_) => _flagsResponse({'stored': _flag('stored')});
+        final (earlier, _) = launch();
+        await earlier.reloadFeatureFlagsAsync();
+        earlier.close();
+
+        final (client, _) = launch(bootstrap);
+
+        expect(client.getFeatureFlag('stored'), isTrue);
+      });
+    }
+
     test('are replaced by a complete flags response', () async {
       final (client, _) = launch(const PostHogBootstrapConfig(featureFlags: {
         'beta-ui': 'variant-a',
@@ -286,12 +336,20 @@ bool _isIdentified(FileStorage storage) =>
     storage.getProperty<String>(PostHogPersistedProperty.personMode) ==
     'identified';
 
-Map<String, Object?> _flag(String key,
-        {bool enabled = true, String? variant}) =>
+Map<String, Object?> _flag(
+  String key, {
+  bool enabled = true,
+  String? variant,
+  String? payload,
+}) =>
     {
       'key': key,
       'enabled': enabled,
       if (variant != null) 'variant': variant,
+      if (payload != null)
+        'metadata': {
+          'payload': payload,
+        },
     };
 
 PostHogResponse _flagsResponse(
