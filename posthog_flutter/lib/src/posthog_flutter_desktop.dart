@@ -55,6 +55,11 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
   DesktopPostHog? _client;
 
+  /// The close() of the previous client. It keeps the storage directory
+  /// locked while it sends the queue, so the next client waits for it:
+  /// a client that finds the directory locked keeps its state in memory.
+  Future<void> _previousClose = Future.value();
+
   _ClientScope? _clientScope;
 
   /// The configuration of the latest setup(), read by the Dart-side hooks:
@@ -137,6 +142,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   Future<void> _setup(PostHogConfig config, int generation) async {
     try {
       final appDirectory = await _appDirectory();
+      await _previousClose;
       // A close() during directory lookup must not create another client.
       if (generation != _setupGeneration) return;
       _startClient(config, appDirectory);
@@ -528,10 +534,24 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _featureFlagsUnsubscribe?.call();
       _featureFlagsUnsubscribe = null;
 
-      // Nothing is sent on close: queued events stay on disk and go out
-      // with the next client.
-      client.close();
+      return _previousClose = _closeClient(client);
     });
+  }
+
+  /// How long close() waits for the queue to be sent.
+  static const _closeFlushTimeout = Duration(seconds: 2);
+
+  /// Makes one bounded attempt to send the queue, then closes [client].
+  /// Events left unsent stay on disk for the next client, or are lost when
+  /// the storage is in memory. Nothing is sent while PostHog asked to wait
+  /// (Retry-After).
+  static Future<void> _closeClient(DesktopPostHog client) async {
+    try {
+      await client.flush().timeout(_closeFlushTimeout);
+    } catch (e) {
+      printIfDebug('[PostHog] Events left unsent on close: $e');
+    }
+    client.close();
   }
 
   @override

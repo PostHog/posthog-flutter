@@ -1271,8 +1271,6 @@ void main() {
       await platform.setup(configFor(server)..flushAt = 20);
       await platform.capture(eventName: 'first client event');
 
-      // The closed client leaves its queued event on disk, where the next
-      // client picks it up.
       final close = platform.close();
       final setup = platform.setup(configFor(server));
       final capture = platform.capture(eventName: 'second client event');
@@ -1280,6 +1278,42 @@ void main() {
 
       await server.waitForEvent('second client event');
       expect(server.eventNames, ['first client event', 'second client event']);
+    });
+
+    test('close sends the queued events', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server)..flushAt = 20);
+      await platform.capture(eventName: 'queued event');
+
+      await platform.close();
+
+      expect(server.eventNames, ['queued event']);
+    });
+
+    test(
+        'close gives up on a server that does not answer and leaves the '
+        'queue to the next client', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server)..flushAt = 20);
+      await platform.capture(eventName: 'queued event');
+      final unanswered = Completer<PostHogResponse>();
+      server.respond = (_) => unanswered.future;
+
+      final close = platform.close();
+      // Started before close completes: the next client must still find the
+      // queue on disk rather than keep its state in memory.
+      final setup = platform.setup(configFor(server));
+      await close;
+      server.respond = (_) => const PostHogResponse(HttpStatus.ok);
+      await setup;
+      await platform.capture(eventName: 'sentinel event');
+
+      await server.waitForEvent('sentinel event');
+      expect(server.eventNames, [
+        'queued event', // the request close gave up on
+        'queued event',
+        'sentinel event',
+      ]);
     });
 
     test('an event whose callbacks finish after close reaches the next client',
