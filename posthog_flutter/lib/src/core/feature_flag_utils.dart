@@ -26,6 +26,8 @@ PostHogFlagsResponse parseFlagsResponse(
   );
 }
 
+/// The v1 shape, without `flags`. PostHog answers `/flags/?v=2` with `flags`;
+/// this keeps servers that ignore `v=2` working, as the other PostHog SDKs do.
 Map<String, PostHogFeatureFlagDetail> _parseLegacyFlags(
   Map<String, Object?> response, {
   required void Function(String key, Object error) onMalformedFlag,
