@@ -61,6 +61,19 @@ void main() {
     });
   });
 
+  group('DesktopTimeZone.fromTimezoneFile', () {
+    test('reads the zone the file names', () {
+      expect(
+          DesktopTimeZone.fromTimezoneFile('Europe/Berlin\n'), 'Europe/Berlin');
+      expect(DesktopTimeZone.fromTimezoneFile(' Etc/UTC '), 'Etc/UTC');
+    });
+
+    test('reads no zone from an empty file or a POSIX rule', () {
+      expect(DesktopTimeZone.fromTimezoneFile(''), isNull);
+      expect(DesktopTimeZone.fromTimezoneFile('JST-9\n'), isNull);
+    });
+  });
+
   group('DesktopTimeZone.fromZoneInfoPath', () {
     test('reads the zone after the zoneinfo directory', () {
       expect(
