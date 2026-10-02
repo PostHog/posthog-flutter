@@ -21,9 +21,10 @@ application-ID directory does not exist.
 
 Await `Posthog().setup(config)` to finish initialization. If the application
 support directory is unavailable, desktop state stays in memory and is lost
-when the SDK closes or the app exits. If an existing state file cannot be read,
-that client keeps state changes in memory and leaves the file untouched. A new
-client can try reading the file again.
+when the SDK closes or the app exits. If an I/O error prevents reading an
+existing state file, that client keeps state changes in memory and leaves the
+file untouched. A new client can try reading the file again. Corrupt file
+contents reset the state to defaults; the next state write replaces the file.
 
 ## Questions?
 
