@@ -18,14 +18,32 @@ class DesktopTimeZone {
         return null;
       }
     }
+    return _readLinux();
+  }
+
+  /// `/etc/localtime` is usually a link into the zoneinfo directory. Where
+  /// it is a copy, as in many containers, Debian-based systems still name
+  /// the zone in `/etc/timezone`.
+  static String? _readLinux() {
     try {
-      return fromZoneInfoPath(
+      final zone = fromZoneInfoPath(
         File('/etc/localtime').resolveSymbolicLinksSync(),
       );
+      if (zone != null) return zone;
+    } on FileSystemException {
+      // No /etc/localtime: /etc/timezone may still name the zone.
+    }
+    try {
+      return fromTimezoneFile(File('/etc/timezone').readAsStringSync());
     } on FileSystemException {
       return null;
     }
   }
+
+  /// The zone named by the contents of an `/etc/timezone` file, such as
+  /// `Europe/Berlin` followed by a line break.
+  static String? fromTimezoneFile(String contents) =>
+      _zoneName(contents.trim());
 
   /// The zone a `TZ` value names: a zone name, optionally after a `:`, or
   /// the path of a file in a zoneinfo directory.
