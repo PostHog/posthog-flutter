@@ -248,7 +248,8 @@ void main() {
       }, skip: chmodSkip);
     }
 
-    test('writes while the disk is unreadable stay in memory, disk intact', () {
+    test('an unreadable snapshot keeps the instance in memory, disk intact',
+        () {
       final dir = Directory.systemTemp.createTempSync('posthog_storage_rd');
       final dataFile = '${dir.path}/posthog_data.json';
       addTearDown(() {
@@ -276,12 +277,19 @@ void main() {
       expect(lines, [contains('in memory only')]);
 
       chmod('644', dataFile);
-      expect(blind.isDegraded, isFalse,
-          reason: 'degradation describes the disk, not the instance: it '
-              'must lift as soon as the disk is readable again');
+      expect(blind.isDegraded, isTrue,
+          reason: 'mixing a snapshot whose contents were unknown with '
+              'runtime writes could restore stale identity and consent');
       expect(blind.getProperty<String>(PostHogPersistedProperty.distinctId),
-          'keep');
+          'in-memory');
       expect(blind.getProperty<String>(PostHogPersistedProperty.anonymousId),
+          isNull);
+
+      final reopened = FileStorage(dir.path);
+      addTearDown(reopened.close);
+      expect(reopened.getProperty<String>(PostHogPersistedProperty.distinctId),
+          'keep');
+      expect(reopened.getProperty<String>(PostHogPersistedProperty.anonymousId),
           'anon');
     }, skip: chmodSkip);
 
@@ -305,7 +313,13 @@ void main() {
           isNull);
 
       chmod('755', sub.path);
+      expect(blind.isDegraded, isTrue);
       expect(blind.getProperty<String>(PostHogPersistedProperty.distinctId),
+          isNull);
+
+      final reopened = FileStorage(sub.path);
+      addTearDown(reopened.close);
+      expect(reopened.getProperty<String>(PostHogPersistedProperty.distinctId),
           'keep');
     }, skip: chmodSkip);
   });

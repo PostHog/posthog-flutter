@@ -29,10 +29,12 @@ import 'uuid.dart';
 ///
 /// Storage never throws into the host app. While the snapshot cannot be
 /// read, the store reports [isDegraded] and keeps writes in memory only, so a
-/// transient failure never replaces good persisted data; once the file can
-/// be read again, its content wins. Files are replaced through a temporary
-/// file and a rename, without syncing them to disk: a crash can lose the
-/// latest writes but never leaves a file half-written.
+/// transient failure never replaces good persisted data. That instance stays
+/// in memory after a read failure because it cannot safely merge later runtime
+/// changes with a snapshot it never saw; a new instance retries the disk.
+/// Files are replaced through a temporary file and a rename, without syncing
+/// them to disk: a crash can lose the latest writes but never leaves a file
+/// half-written.
 class FileStorage {
   FileStorage(this._directory);
 
@@ -54,10 +56,10 @@ class FileStorage {
 
   final String _directory;
   Map<String, Object?>? _cache;
+  bool _readFailed = false;
 
-  /// Values set while the snapshot cannot be read. They are never written
-  /// over the file, whose content is unknown, and give way to it once it can
-  /// be read.
+  /// Values set after the snapshot could not be read. They are never written
+  /// over the file, whose content is unknown, and remain this instance's state.
   final Map<String, Object?> _unpersisted = {};
 
   // Losing the whole snapshot (ids, consent) matters enough to log outside
@@ -79,7 +81,7 @@ class FileStorage {
 
   String get _dataFilePath => _pathOf(_dataFileName);
 
-  /// Whether the snapshot is currently unreadable.
+  /// Whether this instance failed to read its snapshot.
   ///
   /// While degraded, persisted state (including consent) is unknown -
   /// consumers should treat it conservatively, e.g. consent checks fail
@@ -160,14 +162,15 @@ class FileStorage {
     _lock = null;
   }
 
-  /// Returns the store, or null while the disk is unreadable.
+  /// Returns the store, or null after this instance failed to read it.
   Map<String, Object?>? _readAll() {
     if (_cache != null) return _cache;
-    final snapshot = _cache = _readSnapshot();
-    if (snapshot != null && _unpersisted.isNotEmpty) {
-      logger?.warn('The PostHog storage file can be read again; values set '
-          'while it could not be read give way to the stored ones.');
-      _unpersisted.clear();
+    if (_readFailed) return null;
+    final snapshot = _readSnapshot();
+    if (snapshot == null) {
+      _readFailed = true;
+    } else {
+      _cache = snapshot;
     }
     return snapshot;
   }

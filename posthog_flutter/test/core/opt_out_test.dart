@@ -96,6 +96,13 @@ void main() {
           reason: 'with consent unknown, tracking without it would be worse '
               'than dropping events');
 
+      chmod('644', dataFile);
+      expect(storage.isDegraded, isTrue);
+      client.capture('after disk recovery');
+      expect(getQueue(storage), isEmpty,
+          reason: 'a recovered file cannot retroactively establish consent '
+              'for an instance that never read its snapshot');
+
       final lines = printedLines(() {
         client.optIn();
         client.capture('first');
@@ -107,7 +114,6 @@ void main() {
           reason: 'an explicit opt-in applies although it cannot be stored');
       expect(queuedMessage(storage, 1)['distinct_id'],
           queuedMessage(storage, 0)['distinct_id']);
-      chmod('644', dataFile);
       final stored = FileStorage(dir.path);
       expect(stored.getProperty<String>(PostHogPersistedProperty.anonymousId),
           'stored-anon');
@@ -134,6 +140,89 @@ void main() {
       expect(client.optedOut, isTrue,
           reason: 'the opt-out made while the file could not be read wins '
               'over the stored opt-in');
+    }, skip: chmodSkip);
+
+    test('identity set while storage is unreadable survives disk recovery', () {
+      final dir = Directory.systemTemp.createTempSync('posthog_identity');
+      final dataFile = '${dir.path}/posthog_data.json';
+      addTearDown(() {
+        chmod('644', dataFile);
+        dir.deleteSync(recursive: true);
+      });
+      FileStorage(dir.path)
+        ..setProperty(PostHogPersistedProperty.anonymousId, 'alice-anon')
+        ..setProperty(PostHogPersistedProperty.distinctId, 'alice')
+        ..setProperty(PostHogPersistedProperty.personMode, 'identified')
+        ..setProperty(PostHogPersistedProperty.optedOut, true)
+        ..close();
+      final originalSnapshot = File(dataFile).readAsStringSync();
+      chmod('000', dataFile);
+      final storage = FileStorage(dir.path);
+      final client = testClient(server, storage: storage);
+
+      expect(client.optedOut, isTrue);
+      client.optIn();
+      client.identify('bob');
+      expect(client.getDistinctId(), 'bob');
+
+      chmod('644', dataFile);
+      client.capture('after recovery');
+
+      expect(client.getDistinctId(), 'bob');
+      expect(client.optedOut, isFalse);
+      final recoveredEvent = getQueue(storage)
+          .singleWhere((message) => message['event'] == 'after recovery');
+      expect(recoveredEvent['distinct_id'], 'bob');
+      expect(File(dataFile).readAsStringSync(), originalSnapshot);
+
+      client.close();
+      final restarted = FileStorage(dir.path);
+      addTearDown(restarted.close);
+      expect(restarted.getProperty<String>(PostHogPersistedProperty.distinctId),
+          'alice');
+      expect(restarted.getProperty<String>(PostHogPersistedProperty.personMode),
+          'identified');
+      expect(restarted.getProperty<bool>(PostHogPersistedProperty.optedOut),
+          isTrue);
+    }, skip: chmodSkip);
+
+    test('reset while storage is unreadable stays cleared after recovery', () {
+      final dir = Directory.systemTemp.createTempSync('posthog_reset');
+      final dataFile = '${dir.path}/posthog_data.json';
+      addTearDown(() {
+        chmod('644', dataFile);
+        dir.deleteSync(recursive: true);
+      });
+      FileStorage(dir.path)
+        ..setProperty(PostHogPersistedProperty.anonymousId, 'alice-anon')
+        ..setProperty(PostHogPersistedProperty.distinctId, 'alice')
+        ..setProperty(PostHogPersistedProperty.personMode, 'identified')
+        ..setProperty(PostHogPersistedProperty.props, {'plan': 'old'})
+        ..setProperty(PostHogPersistedProperty.featureFlagDetails, {
+          'flags': {
+            'old-flag': {'key': 'old-flag', 'enabled': true},
+          },
+        })
+        ..close();
+      chmod('000', dataFile);
+      final storage = FileStorage(dir.path);
+      final client = testClient(server, storage: storage);
+
+      client.optIn();
+      client.reset();
+      final resetDistinctId = client.getDistinctId();
+      chmod('644', dataFile);
+
+      expect(client.getDistinctId(), resetDistinctId);
+      expect(client.getDistinctId(), isNot('alice'));
+      expect(
+          storage.getProperty<Map<String, Object?>>(
+              PostHogPersistedProperty.props),
+          isNull);
+      expect(
+          storage.getProperty<Map<String, Object?>>(
+              PostHogPersistedProperty.featureFlagDetails),
+          isNull);
     }, skip: chmodSkip);
   });
 
