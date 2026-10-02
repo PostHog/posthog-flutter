@@ -27,6 +27,9 @@ class PostHogWidget extends StatefulWidget {
 }
 
 /// State for [PostHogWidget].
+@Deprecated(
+  'Internal to [PostHogWidget] and will be made private in the next major version.',
+)
 class PostHogWidgetState extends State<PostHogWidget> {
   ChangeDetector? _changeDetector;
   ScreenshotCapturer? _screenshotCapturer;

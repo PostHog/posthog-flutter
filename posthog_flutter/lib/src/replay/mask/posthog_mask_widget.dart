@@ -41,6 +41,9 @@ class PostHogMaskWidget extends StatefulWidget {
 }
 
 /// State for [PostHogMaskWidget].
+@Deprecated(
+  'Internal to [PostHogMaskWidget] and will be made private in the next major version.',
+)
 class PostHogMaskWidgetState extends State<PostHogMaskWidget> {
   final GlobalKey _widgetKey = GlobalKey();
 
