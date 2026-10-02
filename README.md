@@ -15,12 +15,15 @@ Desktop state is stored under `posthog/<project token>` in the application
 support directory returned by Flutter's Windows/Linux `path_provider`
 implementations. Keep the application's storage identity stable across releases:
 Windows uses the company/product metadata, and Linux uses the application ID,
-with executable-name fallbacks
-when that metadata is unavailable.
+with executable-name fallbacks when that metadata is unavailable. On Linux,
+`path_provider` also reuses an existing executable-name directory if the
+application-ID directory does not exist.
 
 Await `Posthog().setup(config)` to finish initialization. If the application
 support directory is unavailable, desktop state stays in memory and is lost
-when the SDK closes or the app exits.
+when the SDK closes or the app exits. If an existing state file cannot be read,
+that client keeps state changes in memory and leaves the file untouched. A new
+client can try reading the file again.
 
 ## Questions?
 
