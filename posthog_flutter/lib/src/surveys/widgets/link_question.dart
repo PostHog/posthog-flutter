@@ -41,7 +41,10 @@ class LinkQuestion extends StatelessWidget {
         const SizedBox(height: 16),
         SurveyButton(
           onPressed: onPressed,
-          text: buttonText ?? appearance.submitButtonText,
+          text: surveyQuestionButtonLabel(
+            buttonText,
+            appearance.submitButtonText,
+          ),
           appearance: appearance,
         ),
       ],
