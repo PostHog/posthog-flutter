@@ -120,17 +120,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let projectToken = ((Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.PROJECT_TOKEN") as? String) ?? (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") as? String) ?? "")
+        let projectToken = (Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.PROJECT_TOKEN") as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.PROJECT_TOKEN") == nil,
-           Bundle.main.object(forInfoDictionaryKey: "com.posthog.posthog.API_KEY") != nil
-        {
-            print("[PostHog] com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!")
-        }
-
         if projectToken.isEmpty {
-            print("[PostHog] Either com.posthog.posthog.PROJECT_TOKEN or com.posthog.posthog.API_KEY must be provided!")
+            print("[PostHog] com.posthog.posthog.PROJECT_TOKEN must be provided!")
             return
         }
 
@@ -144,7 +138,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
         setupPostHog([
             "projectToken": projectToken,
-            "apiKey": projectToken,
             "host": host,
             "captureApplicationLifecycleEvents": captureApplicationLifecycleEvents,
             "debug": debug,
@@ -161,13 +154,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             print("[PostHog] Plugin instance not found!")
             return
         }
-        let projectToken = ((posthogConfig["projectToken"] as? String) ?? (posthogConfig["apiKey"] as? String) ?? "")
+        let projectToken = (posthogConfig["projectToken"] as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        if posthogConfig["projectToken"] == nil, posthogConfig["apiKey"] != nil {
-            print("[PostHog] apiKey is deprecated and will be removed in the next major version. Use projectToken instead!")
-        }
         if projectToken.isEmpty {
-            print("[PostHog] Either projectToken or apiKey must be provided!")
+            print("[PostHog] projectToken must be provided!")
             return
         }
 
@@ -235,7 +225,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             switch dataMode {
             case "wifi":
                 config.dataMode = .wifi
-            case "any", "cellular":
+            case "any":
                 config.dataMode = .any
             default:
                 break
@@ -290,13 +280,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
 
             // configure surveys
-            if #available(iOS 15.0, *) {
-                let surveys: Bool = posthogConfig["surveys"] as? Bool ?? false
-                config.surveys = surveys
-                if surveys {
-                    // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
-                    config.surveysConfig.surveysDelegate = instance
-                }
+            let surveys: Bool = posthogConfig["surveys"] as? Bool ?? false
+            config.surveys = surveys
+            if surveys {
+                // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
+                config.surveysConfig.surveysDelegate = instance
             }
         #endif
 
@@ -457,8 +445,6 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             getFeatureFlag(call, result: result)
         case "isFeatureEnabled":
             isFeatureEnabled(call, result: result)
-        case "getFeatureFlagPayload":
-            getFeatureFlagPayload(call, result: result)
         case "getFeatureFlagResult":
             getFeatureFlagResult(call, result: result)
         case "identify":
@@ -1346,20 +1332,6 @@ extension PosthogFlutterPlugin {
            let featureFlagKey = args["key"] as? String
         {
             let value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
-            result(value)
-        } else {
-            _badArgumentError(result)
-        }
-    }
-
-    private func getFeatureFlagPayload(
-        _ call: FlutterMethodCall,
-        result: @escaping FlutterResult
-    ) {
-        if let args = call.arguments as? [String: Any],
-           let featureFlagKey = args["key"] as? String
-        {
-            let value = PostHogSDK.shared.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent: false)?.payload
             result(value)
         } else {
             _badArgumentError(result)
