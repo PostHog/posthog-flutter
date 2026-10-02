@@ -653,7 +653,8 @@ abstract class PostHogCoreStateless {
 
   /// Closes the client without sending anything: stops the periodic flush,
   /// aborts the requests in flight, ignores later calls and releases the
-  /// storage. Queued events stay stored for the next client.
+  /// storage. Queued events stay on disk for the next client; an in-memory
+  /// storage loses them.
   void close() {
     _closed = true;
     _clearFlushTimer();

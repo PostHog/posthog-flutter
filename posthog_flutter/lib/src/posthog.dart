@@ -869,6 +869,11 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when platform resources have been closed.
   ///
+  /// **Windows/Linux:** first makes one attempt to send the queued events and
+  /// waits for it for up to two seconds. Events left unsent go out with the
+  /// next [setup], or are lost when the application support directory is
+  /// unavailable and state is kept in memory.
+  ///
   /// **Note:** After calling `close()`, surveys will not be rendered until the
   /// SDK is re-initialized and the next navigation event occurs.
   Future<void> close() {
