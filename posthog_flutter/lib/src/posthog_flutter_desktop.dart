@@ -256,9 +256,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           userProperties: userProperties,
           userPropertiesSetOnce: userPropertiesSetOnce,
         );
-        final processed = hooked is Future<PostHogEvent?>
-            ? await _afterCallbacks(hooked)
-            : hooked;
+        final processed =
+            hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
           printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
           return;
@@ -290,9 +289,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
             PostHogPropertyName.screenName: screenName,
           },
         );
-        final processed = hooked is Future<PostHogEvent?>
-            ? await _afterCallbacks(hooked)
-            : hooked;
+        final processed =
+            hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
           printIfDebug(
               '[PostHog] Screen event dropped by beforeSend: $screenName');
@@ -504,9 +502,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           PostHogEventName.exception,
           exceptionProps.cast<String, Object>(),
         );
-        final processed = hooked is Future<PostHogEvent?>
-            ? await _afterCallbacks(hooked)
-            : hooked;
+        final processed =
+            hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
           printIfDebug(
             '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
@@ -619,17 +616,20 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
     final callbacks = _config?.beforeSend ?? const <BeforeSendCallback>[];
-    return callbacks.isEmpty ? event : applyBeforeSend(callbacks, event);
+    return callbacks.isEmpty ? event : _applyCallbacks(callbacks, event);
   }
 
-  /// Awaits the beforeSend callbacks, then a setup() in progress: an event
+  /// Applies [callbacks], then waits for a setup() in progress: an event
   /// whose callbacks finish while the previous client is still closing
   /// goes to the next client rather than finding none.
-  Future<PostHogEvent?> _afterCallbacks(Future<PostHogEvent?> hooked) async {
-    final event = await hooked;
+  Future<PostHogEvent?> _applyCallbacks(
+    List<BeforeSendCallback> callbacks,
+    PostHogEvent event,
+  ) async {
+    final processed = await applyBeforeSend(callbacks, event);
     final setup = _setupFuture;
     if (_client == null && setup != null) await setup;
-    return event;
+    return processed;
   }
 
   void _captureProcessed(
