@@ -376,20 +376,20 @@ class Posthog {
     await _posthog.reset();
   }
 
-  /// Disables data collection for the current user.
+  /// Opts the current user out of data collection.
   ///
   /// Returns a [Future] that completes when the opt-out request has been queued.
-  Future<void> disable() {
-    // Uninstall Flutter-specific integrations when disabling
+  Future<void> optOut() {
+    // Uninstall Flutter-specific integrations when opting out
     _uninstallFlutterIntegrations();
 
     return _posthog.disable();
   }
 
-  /// Enables data collection for the current user.
+  /// Opts the current user back in to data collection.
   ///
   /// Returns a [Future] that completes when the opt-in request has been queued.
-  Future<void> enable() {
+  Future<void> optIn() {
     final config = _config;
     if (config != null) {
       _installFlutterIntegrations(config);

@@ -23,11 +23,11 @@ class PostHogWidget extends StatefulWidget {
   const PostHogWidget({super.key, required this.child});
 
   @override
-  PostHogWidgetState createState() => PostHogWidgetState();
+  State<PostHogWidget> createState() => _PostHogWidgetState();
 }
 
 /// State for [PostHogWidget].
-class PostHogWidgetState extends State<PostHogWidget> {
+class _PostHogWidgetState extends State<PostHogWidget> {
   ChangeDetector? _changeDetector;
   ScreenshotCapturer? _screenshotCapturer;
   NativeCommunicator? _nativeCommunicator;
@@ -41,9 +41,6 @@ class PostHogWidgetState extends State<PostHogWidget> {
   /// episode. Not the same as "occluded": with the bridge off, occlusion is
   /// ignored and Flutter capture keeps running.
   bool _suppressFlutterCapture = false;
-
-  @visibleForTesting
-  bool get debugFlutterCaptureSuppressed => _suppressFlutterCapture;
 
   void _setSuppressFlutterCapture(bool value) {
     _suppressFlutterCapture = value;
@@ -374,3 +371,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
     super.dispose();
   }
 }
+
+@visibleForTesting
+bool debugFlutterCaptureSuppressed(State<PostHogWidget> state) =>
+    (state as _PostHogWidgetState)._suppressFlutterCapture;

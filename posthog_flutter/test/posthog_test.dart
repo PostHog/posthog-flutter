@@ -133,7 +133,7 @@ void main() {
           expect(fakePlatformInterface.capturedExceptions.length, 1);
 
           fakePlatformInterface.capturedExceptions.clear();
-          await Posthog().disable();
+          await Posthog().optOut();
 
           FlutterError.reportError(
             FlutterErrorDetails(
@@ -143,7 +143,7 @@ void main() {
           );
           expect(fakePlatformInterface.capturedExceptions, isEmpty);
 
-          await Posthog().enable();
+          await Posthog().optIn();
 
           FlutterError.reportError(
             FlutterErrorDetails(
@@ -153,7 +153,7 @@ void main() {
           );
           expect(fakePlatformInterface.capturedExceptions.length, 1);
         } finally {
-          await Posthog().disable();
+          await Posthog().optOut();
           FlutterError.onError = originalFlutterErrorHandler;
         }
       },
