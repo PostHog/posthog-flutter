@@ -133,7 +133,7 @@ void main() {
           expect(fakePlatformInterface.capturedExceptions.length, 1);
 
           fakePlatformInterface.capturedExceptions.clear();
-          await Posthog().disable();
+          await Posthog().optOut();
 
           FlutterError.reportError(
             FlutterErrorDetails(
@@ -143,7 +143,7 @@ void main() {
           );
           expect(fakePlatformInterface.capturedExceptions, isEmpty);
 
-          await Posthog().enable();
+          await Posthog().optIn();
 
           FlutterError.reportError(
             FlutterErrorDetails(
@@ -153,7 +153,7 @@ void main() {
           );
           expect(fakePlatformInterface.capturedExceptions.length, 1);
         } finally {
-          await Posthog().disable();
+          await Posthog().optOut();
           FlutterError.onError = originalFlutterErrorHandler;
         }
       },
@@ -161,6 +161,16 @@ void main() {
   });
 
   group('PostHogConfig', () {
+    test('sendFeatureFlagEvents forwards to sendFeatureFlagEvent', () {
+      final config = PostHogConfig('test_project_token');
+
+      // ignore: deprecated_member_use_from_same_package
+      config.sendFeatureFlagEvents = false;
+
+      expect(config.sendFeatureFlagEvent, isFalse);
+      expect(config.toMap()['sendFeatureFlagEvents'], isFalse);
+    });
+
     test('trims whitespace-sensitive config values in config and toMap', () {
       final config = PostHogConfig(' \n test_project_token\t ');
       config.host = ' \nhttps://eu.i.posthog.com/\t ';
