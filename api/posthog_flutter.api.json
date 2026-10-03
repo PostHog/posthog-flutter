@@ -70,6 +70,36 @@
         "interfaceDeclarations": [
             {
                 "entryPoints": [
+                    "posthog_flutter_dart.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": true,
+                        "name": "registerWith",
+                        "parameters": [],
+                        "relativePath": "lib/posthog_flutter_dart.dart",
+                        "returnTypeName": "void",
+                        "type": "method",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PosthogFlutterDart",
+                "relativePath": "lib/posthog_flutter_dart.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
                     "posthog_flutter_web.dart"
                 ],
                 "executableDeclarations": [
@@ -5993,6 +6023,18 @@
         "iosPlatformConstraints": null,
         "minSdkVersion": "3.6.0",
         "packageDependencies": [
+            {
+                "packageName": "path_provider_linux",
+                "packageVersion": "^2.2.1"
+            },
+            {
+                "packageName": "path_provider_platform_interface",
+                "packageVersion": "^2.1.2"
+            },
+            {
+                "packageName": "path_provider_windows",
+                "packageVersion": "^2.3.0"
+            },
             {
                 "packageName": "plugin_platform_interface",
                 "packageVersion": "^2.0.2"

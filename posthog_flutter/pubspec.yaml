@@ -1,5 +1,5 @@
 name: posthog_flutter
-description: Flutter implementation of PostHog client for iOS, Android and Web
+description: Flutter implementation of PostHog client for iOS, Android, macOS, Windows, Linux and Web
 version: 5.50.13
 homepage: https://www.posthog.com
 repository: https://github.com/posthog/posthog-flutter
@@ -17,6 +17,10 @@ dependencies:
     sdk: flutter
   flutter_web_plugins:
     sdk: flutter
+  # Mobile SDKs own their storage; only the desktop implementations are needed.
+  path_provider_linux: ^2.2.1
+  path_provider_platform_interface: ^2.1.2
+  path_provider_windows: ^2.3.0
   plugin_platform_interface: ^2.0.2
   # plugin_platform_interface depends on meta anyway
   meta: ^1.3.0
@@ -25,6 +29,7 @@ dependencies:
 
 dev_dependencies:
   dart_apitool: ^0.23.2
+  fake_async: ^1.3.1
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
@@ -58,6 +63,12 @@ flutter:
       web:
         pluginClass: PosthogFlutterWeb
         fileName: posthog_flutter_web.dart
+      linux:
+        dartPluginClass: PosthogFlutterDart
+        dartFileName: posthog_flutter_dart.dart
+      windows:
+        dartPluginClass: PosthogFlutterDart
+        dartFileName: posthog_flutter_dart.dart
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:
