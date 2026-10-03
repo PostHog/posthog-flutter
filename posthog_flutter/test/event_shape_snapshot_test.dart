@@ -40,7 +40,7 @@ void main() {
       ..maxQueueSize = 800
       ..maxBatchSize = 25
       ..flushInterval = const Duration(seconds: 15)
-      ..sendFeatureFlagEvents = false
+      ..sendFeatureFlagEvent = false
       ..preloadFeatureFlags = false
       ..captureApplicationLifecycleEvents = false
       ..personProfiles = PostHogPersonProfiles.always

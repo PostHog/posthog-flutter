@@ -341,7 +341,7 @@ class InitialScreenState extends State<InitialScreen> {
                         backgroundColor: Colors.red,
                       ),
                       onPressed: () {
-                        _posthogFlutterPlugin.disable();
+                        _posthogFlutterPlugin.optOut();
                       },
                       child: const Text("Disable Capture"),
                     ),
@@ -350,7 +350,7 @@ class InitialScreenState extends State<InitialScreen> {
                         backgroundColor: Colors.green,
                       ),
                       onPressed: () {
-                        _posthogFlutterPlugin.enable();
+                        _posthogFlutterPlugin.optIn();
                       },
                       child: const Text("Enable Capture"),
                     ),
