@@ -398,18 +398,6 @@ class Posthog {
     return _posthog.enable();
   }
 
-  /// Opts the current user out of data collection.
-  @Deprecated(
-    'Use optOut() instead. This will be removed in the next major version.',
-  )
-  Future<void> disable() => optOut();
-
-  /// Opts the current user back in to data collection.
-  @Deprecated(
-    'Use optIn() instead. This will be removed in the next major version.',
-  )
-  Future<void> enable() => optIn();
-
   /// Returns whether the current user has opted out of data collection.
   Future<bool> isOptOut() => _posthog.isOptOut();
 
