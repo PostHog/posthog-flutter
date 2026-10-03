@@ -2191,6 +2191,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "sendFeatureFlagEvent",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "sendFeatureFlagEvents",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
@@ -4256,7 +4267,7 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "disable",
+                        "name": "optOut",
                         "parameters": [],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<void>",
@@ -4266,6 +4277,30 @@
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "optIn",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": true,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "disable",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": true,
                         "isExperimental": false,
                         "isStatic": false,
                         "name": "enable",
