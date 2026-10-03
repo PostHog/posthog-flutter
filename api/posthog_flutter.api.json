@@ -5337,7 +5337,7 @@
                         "typeName": "bool"
                     }
                 ],
-                "isDeprecated": false,
+                "isDeprecated": true,
                 "isExperimental": false,
                 "isRequired": false,
                 "isSealed": false,
@@ -5434,7 +5434,7 @@
                     }
                 ],
                 "fieldDeclarations": [],
-                "isDeprecated": false,
+                "isDeprecated": true,
                 "isExperimental": false,
                 "isRequired": false,
                 "isSealed": false,
