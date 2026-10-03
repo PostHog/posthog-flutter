@@ -224,6 +224,11 @@ jobs:
         working-directory: ./posthog_flutter
         run: flutter test --dart-define=POSTHOG_TEST_EXECUTABLE=../example/build/windows/x64/runner/Release/posthog_flutter_example.exe test/posthog_windows_version_resource_test.dart
 
+      - name: Integration test on Windows
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        working-directory: ./example
+        run: flutter test integration_test/desktop_test.dart -d windows
+
   test-build-linux:
     needs: detect-markdown-only
     name: Linux test and build
@@ -264,6 +269,11 @@ jobs:
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./example
         run: flutter build linux --release
+
+      - name: Integration test on Linux
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        working-directory: ./example
+        run: xvfb-run -a flutter test integration_test/desktop_test.dart -d linux
 
   publish-dry-run:
     needs: detect-markdown-only
