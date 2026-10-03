@@ -3,7 +3,6 @@
     "method": "setup",
     "arguments": {
       "projectToken": "snapshot_project_token",
-      "apiKey": "snapshot_project_token",
       "host": "https://eu.i.posthog.com",
       "flushAt": 12,
       "maxQueueSize": 800,

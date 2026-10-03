@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "posthog_flutter",
     platforms: [
-        .iOS("13.0"),
+        .iOS("15.0"),
         .macOS("10.15"),
     ],
     products: [
@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
-        .package(url: "https://github.com/PostHog/posthog-ios", "3.84.0" ..< "4.0.0"),
+        .package(url: "https://github.com/PostHog/posthog-ios", "4.0.0" ..< "5.0.0"),
     ],
     targets: [
         .target(
