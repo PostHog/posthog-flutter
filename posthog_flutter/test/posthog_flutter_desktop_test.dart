@@ -15,6 +15,9 @@ import 'posthog_api_fake.dart';
 // HttpClient with a stub that answers 400 to everything, and these tests
 // exercise the real HTTP path against a local server.
 void main() {
+  /// Create it before the platform that uses it: tear-downs run in reverse
+  /// order, and Windows cannot delete a directory whose lock file the
+  /// platform still holds open.
   Directory createAppDirectory() {
     final dir = Directory.systemTemp.createTempSync('posthog_flutter_desktop');
     addTearDown(() => dir.deleteSync(recursive: true));
@@ -1076,13 +1079,14 @@ void main() {
     test('disable during storage lookup applies before subsequent events',
         () async {
       final server = await LocalPostHogServer.start();
+      final directory = createAppDirectory();
       final release = Completer<String?>();
       final platform =
           createPlatform(resolveAppDirectory: () => release.future);
       final setup = platform.setup(configFor(server));
       final disable = platform.disable();
       final capture = platform.capture(eventName: 'disabled event');
-      release.complete(createAppDirectory().path);
+      release.complete(directory.path);
       await Future.wait([setup, disable, capture]);
       expect(await platform.isOptOut(), isTrue);
       await platform.enable();
@@ -1117,6 +1121,7 @@ void main() {
         () async {
       final server = await LocalPostHogServer.start();
       final otherServer = await LocalPostHogServer.start();
+      final directory = createAppDirectory();
       final release = Completer<String?>();
       var lookups = 0;
       final platform = createPlatform(resolveAppDirectory: () {
@@ -1129,7 +1134,7 @@ void main() {
             ..beforeSend = [
               (event) => event..properties = {'hook': 'latest'}
             ]);
-      release.complete(createAppDirectory().path);
+      release.complete(directory.path);
       await Future.wait([first, second]);
       await platform.capture(eventName: 'event');
       final event = await server.waitForEvent('event');
