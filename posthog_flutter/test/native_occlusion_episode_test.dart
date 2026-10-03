@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
+import 'package:posthog_flutter/src/posthog_widget.dart'
+    show debugFlutterCaptureSuppressed;
 import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
@@ -112,11 +114,11 @@ void main() {
     return config;
   }
 
-  Future<PostHogWidgetState> pumpReplayWidget(WidgetTester tester) async {
+  Future<State<PostHogWidget>> pumpReplayWidget(WidgetTester tester) async {
     await tester.pumpWidget(
       PostHogWidget(child: Container(color: const Color(0xFF00FF00))),
     );
-    return tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
+    return tester.state(find.byType(PostHogWidget));
   }
 
   /// Unmounts the replay widget (stopping its change detector) and flushes
@@ -489,7 +491,7 @@ void main() {
       await tester.pump();
 
       expect(
-        state.debugFlutterCaptureSuppressed,
+        debugFlutterCaptureSuppressed(state),
         isFalse,
         reason: 'bridge off means pre-bridge behavior: keep recording',
       );
@@ -504,11 +506,11 @@ void main() {
 
       pushOcclusion(occluded: true, episode: 1);
       await settleRealAsync(tester);
-      expect(state.debugFlutterCaptureSuppressed, isTrue);
+      expect(debugFlutterCaptureSuppressed(state), isTrue);
 
       pushOcclusion(occluded: false, episode: 1);
       await tester.pump();
-      expect(state.debugFlutterCaptureSuppressed, isFalse);
+      expect(debugFlutterCaptureSuppressed(state), isFalse);
 
       await unmountAndFlush(tester);
     });
@@ -564,14 +566,14 @@ void main() {
 
       pushOcclusion(occluded: true, episode: 1);
       await settleRealAsync(tester);
-      expect(state.debugFlutterCaptureSuppressed, isTrue,
+      expect(debugFlutterCaptureSuppressed(state), isTrue,
           reason: 'bridge accepted, native capture owns the episode');
       recordedCalls.clear();
 
       // Native discovered it cannot deliver and re-pushed with bridgeFailed.
       pushOcclusion(occluded: true, episode: 1, bridgeFailed: true);
       await settleRealAsync(tester);
-      expect(state.debugFlutterCaptureSuppressed, isTrue,
+      expect(debugFlutterCaptureSuppressed(state), isTrue,
           reason: 'the placeholder owns the episode now');
       expect(recordedCalls.map((c) => c.method), contains('sendFullSnapshot'));
 
@@ -589,7 +591,7 @@ void main() {
 
       pushOcclusion(occluded: true, episode: 1);
       await settleRealAsync(tester);
-      expect(state.debugFlutterCaptureSuppressed, isTrue,
+      expect(debugFlutterCaptureSuppressed(state), isTrue,
           reason: 'episode 1 was granted while the flag was on');
 
       config.sessionReplayConfig.captureNativeScreens = false;
@@ -597,7 +599,7 @@ void main() {
       pushOcclusion(occluded: true, episode: 2);
       await settleRealAsync(tester);
 
-      expect(state.debugFlutterCaptureSuppressed, isFalse,
+      expect(debugFlutterCaptureSuppressed(state), isFalse,
           reason: 'flag off: Flutter keeps recording the covered tree');
       expect(
         recordedCalls.map((c) => c.method),
@@ -631,7 +633,7 @@ void main() {
       );
       expect(enable.arguments, {'episode': 2},
           reason: 'the swapped cover gets its own grant');
-      expect(state.debugFlutterCaptureSuppressed, isTrue,
+      expect(debugFlutterCaptureSuppressed(state), isTrue,
           reason: 'no end event between episodes: suppression never lapses');
       expect(
         recordedCalls.map((c) => c.method),
