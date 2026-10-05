@@ -235,9 +235,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             switch dataMode {
             case "wifi":
                 config.dataMode = .wifi
-            case "cellular":
-                config.dataMode = .cellular
-            case "any":
+            case "any", "cellular":
                 config.dataMode = .any
             default:
                 break
