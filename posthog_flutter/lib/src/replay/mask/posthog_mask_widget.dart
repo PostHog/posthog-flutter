@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:meta/meta.dart';
 
 import 'canvas_mask_registration_io.dart'
     if (dart.library.js_interop) 'canvas_mask_registration_web.dart';
@@ -41,6 +42,7 @@ class PostHogMaskWidget extends StatefulWidget {
 }
 
 /// State for [PostHogMaskWidget].
+@internal
 class PostHogMaskWidgetState extends State<PostHogMaskWidget> {
   final GlobalKey _widgetKey = GlobalKey();
 

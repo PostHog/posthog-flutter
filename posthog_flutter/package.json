@@ -1,6 +1,6 @@
 {
   "name": "posthog_flutter",
-  "version": "5.50.14",
+  "version": "5.50.15",
   "private": true,
   "description": "PostHog Flutter SDK - version tracking for changesets"
 }
