@@ -11,10 +11,10 @@ flutter pub get
 make installLinters
 make checkFormatDart
 make analyzeDart
-make formatKotlin
-make formatSwift
+make checkFormatKotlin
+make checkFormatSwift
 (cd posthog_flutter && flutter test)
-(cd posthog_flutter && flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_flutter_web_setup_test.dart test/posthog_widget_web_test.dart test/posthog_widget_test.dart test/web_canvas_mask_provider_test.dart)
+(cd posthog_flutter && flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_flutter_web_setup_test.dart test/posthog_widget_web_test.dart test/posthog_widget_test.dart test/web_before_send_test.dart test/web_canvas_mask_provider_test.dart)
 (cd posthog_flutter && flutter test --platform chrome --wasm test/posthog_isolate_error_handler_web_test.dart)
 (cd sdk_compliance_adapter && flutter test test/feature_flag_has_experiment_test.dart test/flags_retry_test.dart test/minimal_flag_called_events_test.dart test/timestamp_test.dart)
 ```
