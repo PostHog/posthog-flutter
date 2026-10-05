@@ -1,5 +1,11 @@
 ## Next
 
+## 5.50.14
+
+### Patch Changes
+
+- e0a5f8f: Deprecate `PostHogDataMode.cellular`, which always behaved like `PostHogDataMode.any`; use `any` instead.
+
 ## 5.50.13
 
 ### Patch Changes

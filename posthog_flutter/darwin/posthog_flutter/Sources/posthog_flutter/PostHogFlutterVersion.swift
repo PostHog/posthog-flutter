@@ -8,4 +8,4 @@
 import Foundation
 
 // This property is internal only
-let postHogFlutterVersion = "5.50.13"
+let postHogFlutterVersion = "5.50.14"
