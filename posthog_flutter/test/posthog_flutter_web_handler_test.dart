@@ -324,12 +324,12 @@ void main() {
       expect(captured['exception'], containsAppVersion());
     });
 
-    test('capture and screen attach the compile-time Flutter version',
-        () async {
-      const flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
-      expect(flutterVersion, isNotEmpty,
-          reason: 'Flutter must inject its version');
+    const flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
 
+    test('capture and screen attach the compile-time Flutter version',
+        skip: flutterVersion.isEmpty
+            ? 'Flutter < 3.32 does not report its version'
+            : false, () async {
       await handleWebMethodCall(const MethodCall('capture', {
         'eventName': 'checkout',
       }));

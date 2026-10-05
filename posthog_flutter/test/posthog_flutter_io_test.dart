@@ -362,12 +362,13 @@ void main() {
     });
   });
 
-  group('PosthogFlutterIO \$flutter_version', () {
-    const flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
+  const flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
 
+  group('PosthogFlutterIO \$flutter_version',
+      skip: flutterVersion.isEmpty
+          ? 'Flutter < 3.32 does not report its version'
+          : false, () {
     setUp(() async {
-      expect(flutterVersion, isNotEmpty,
-          reason: 'Flutter must inject its version');
       await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
     });
 
