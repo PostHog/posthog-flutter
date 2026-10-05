@@ -72,7 +72,15 @@ enum PostHogDataMode {
   /// Send data only on Wi-Fi connections.
   wifi,
 
-  /// Send data only on cellular connections.
+  /// Send data on any available connection, same as [any].
+  ///
+  /// Despite its name, this never restricted sending to cellular connections.
+  /// It will be removed in the next major version.
+  ///
+  /// ```dart
+  /// config.dataMode = PostHogDataMode.any;
+  /// ```
+  @Deprecated('Behaves like `any`. Use `PostHogDataMode.any` instead.')
   cellular,
 
   /// Send data on any available connection.
