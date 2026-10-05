@@ -5,6 +5,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
+import 'package:meta/meta.dart';
 
 import 'replay/change_detector.dart';
 import 'replay/native_communicator.dart';
@@ -27,9 +28,7 @@ class PostHogWidget extends StatefulWidget {
 }
 
 /// State for [PostHogWidget].
-@Deprecated(
-  'Internal to [PostHogWidget] and will be made private in the next major version.',
-)
+@internal
 class PostHogWidgetState extends State<PostHogWidget> {
   ChangeDetector? _changeDetector;
   ScreenshotCapturer? _screenshotCapturer;

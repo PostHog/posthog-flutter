@@ -2,4 +2,4 @@
 "posthog_flutter": patch
 ---
 
-Deprecate `PostHogWidgetState` and `PostHogMaskWidgetState`, which are internal to `PostHogWidget` and `PostHogMaskWidget`
+Stop exporting `PostHogWidgetState` and `PostHogMaskWidgetState`, which are internal to `PostHogWidget` and `PostHogMaskWidget` and have no usable public members
