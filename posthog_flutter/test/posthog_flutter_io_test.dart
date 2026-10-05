@@ -415,6 +415,59 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO \$flutter_version and beforeSend',
+      skip: flutterVersion.isEmpty
+          ? 'Flutter < 3.32 does not report its version'
+          : false, () {
+    final seen = <String, Object?>{};
+
+    Future<void> setUpRemovingFlutterVersion() async {
+      seen.clear();
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            seen[event.event] = event.properties?[r'$flutter_version'];
+            event.properties?.remove(r'$flutter_version');
+            return event;
+          },
+        ],
+      ));
+    }
+
+    Map<String, dynamic> propertiesOf(String method) {
+      final call = log.lastWhere((c) => c.method == method);
+      return Map<String, dynamic>.from(
+        ((call.arguments as Map)['properties'] as Map?) ?? {},
+      );
+    }
+
+    test('capture: beforeSend sees and can remove it', () async {
+      await setUpRemovingFlutterVersion();
+      await posthogFlutterIO.capture(eventName: 'checkout');
+
+      expect(seen['checkout'], flutterVersion);
+      expect(propertiesOf('capture'), isNot(contains(r'$flutter_version')));
+    });
+
+    test('screen: beforeSend sees and can remove it', () async {
+      await setUpRemovingFlutterVersion();
+      await posthogFlutterIO.screen(screenName: 'Home');
+
+      expect(seen[r'$screen'], flutterVersion);
+      expect(propertiesOf('screen'), isNot(contains(r'$flutter_version')));
+    });
+
+    test('captureException: beforeSend sees and can remove it', () async {
+      await setUpRemovingFlutterVersion();
+      await posthogFlutterIO.captureException(error: StateError('boom'));
+
+      expect(seen[r'$exception'], flutterVersion);
+      expect(propertiesOf('captureException'),
+          isNot(contains(r'$flutter_version')));
+    });
+  });
+
   group('PosthogFlutterIO beforeSend callback', () {
     test(
       'capture sends event unchanged when no beforeSend registered',
@@ -473,8 +526,8 @@ void main() {
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['properties'],
-          {...flutterVersionProperties(), 'modified': true});
+      // beforeSend replaced the properties, so the SDK's $flutter_version is gone too.
+      expect(args['properties'], {'modified': true});
     });
 
     test('beforeSend can modify userProperties', () async {
@@ -655,7 +708,8 @@ void main() {
 
         expect(capturedEvent, isNotNull);
         expect(capturedEvent!.event, 'test_event');
-        expect(capturedEvent!.properties, {'prop': 'value'});
+        expect(capturedEvent!.properties,
+            {...flutterVersionProperties(), 'prop': 'value'});
         expect(capturedEvent!.userProperties, {'user_prop': 'user_value'});
         expect(capturedEvent!.userPropertiesSetOnce, {
           'set_once_prop': 'set_once_value',

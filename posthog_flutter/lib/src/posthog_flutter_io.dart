@@ -298,7 +298,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     // Apply beforeSend callback
     final processedEvent = await _runBeforeSend(
       eventName,
-      properties,
+      withFlutterVersion(properties),
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
@@ -316,7 +316,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
       );
 
-      final extractedProperties = withFlutterVersion(extracted.properties);
+      final extractedProperties = extracted.properties;
       final extractedUserProperties = extracted.userProperties;
       final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
 
@@ -363,7 +363,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     // Apply beforeSend callback - screen events are captured as $screen
     final processedEvent = await _runBeforeSend(
       PostHogEventName.screen,
-      propsWithScreenName,
+      withFlutterVersion(propsWithScreenName),
     );
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
@@ -387,9 +387,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
 
     try {
-      final eventProperties = withFlutterVersion(
-        processedEvent.properties?.cast<String, Object>(),
-      );
+      final eventProperties = processedEvent.properties?.cast<String, Object>();
       final normalizedProperties = eventProperties?.isNotEmpty == true
           ? PropertyNormalizer.normalize(eventProperties!)
           : null;
@@ -773,7 +771,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       // Apply beforeSend callback - exception events are captured as $exception
       final processedEvent = await _runBeforeSend(
         PostHogEventName.exception,
-        exceptionProps.cast<String, Object>(),
+        withFlutterVersion(exceptionProps.cast<String, Object>()),
       );
       if (processedEvent == null) {
         printIfDebug(
@@ -793,9 +791,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
       // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final eventProperties = withFlutterVersion(
-        processedEvent.properties?.cast<String, Object>(),
-      );
+      final eventProperties = processedEvent.properties?.cast<String, Object>();
       final normalizedData = eventProperties != null
           ? PropertyNormalizer.normalize(eventProperties)
           : <String, Object>{};
