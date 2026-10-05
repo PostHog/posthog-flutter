@@ -6,3 +6,4 @@
 - **Breaking:** remove `Posthog().getFeatureFlagPayload()` — use `getFeatureFlagResult(key, sendEvent: false)` and read `payload`
 - **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter — use `PostHogSessionReplayConfig.throttleDelay`
 - **Breaking:** remove `PostHogDataMode.cellular` — use `PostHogDataMode.any`, which it always behaved like
+- Declare Android `minSdkVersion` 23 to match `posthog-android`, which has required it since 3.39.0. Apps on minSdk 21 or 22 already could not build with this plugin, so nothing changes for them
