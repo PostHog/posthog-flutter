@@ -13,7 +13,7 @@
     "packageApi": {
         "androidPlatformConstraints": {
             "compileSdkVersion": null,
-            "minSdkVersion": 21,
+            "minSdkVersion": 23,
             "targetSdkVersion": null
         },
         "executableDeclarations": [
