@@ -104,9 +104,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     /// a later `FlutterEngine` registers — that setup() has already run, so use the plist key there.
     private static func prewarmPushNotificationOpenCapture() {
         guard plistCapturePushNotificationOpened else { return }
-        if #available(iOS 14.0, macOS 11.0, *) {
-            PostHogSDK.prewarmPushNotificationOpenCapture()
-        }
+        PostHogSDK.prewarmPushNotificationOpenCapture()
     }
 
     private static var plistCapturePushNotificationOpened: Bool {
