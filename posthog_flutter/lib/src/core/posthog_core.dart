@@ -432,8 +432,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// Associates the current user with a group for all later events, and
   /// sends a `$groupidentify` event with the optional [groupProperties].
   ///
-  /// The group properties also feed feature flag evaluation. Flags are
-  /// reloaded when the group key changes. A call with an empty [groupType]
+  /// The group properties also feed feature flag evaluation. When the group
+  /// key changes, the properties stored for the previous key are dropped and
+  /// flags are reloaded. A call with an empty [groupType]
   /// or [groupKey] is ignored.
   void group(
     String groupType,
@@ -449,6 +450,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (_ignoredWhileOptedOut('posthog.group')) return;
       if (!_requirePersonProcessing('posthog.group')) return;
 
+      if (_getGroups()[groupType] != groupKey) {
+        resetGroupPropertiesForFlags(groupType: groupType);
+      }
       // Stored before the group is registered, so the flags reload a new
       // group key triggers already evaluates with them.
       if (groupProperties != null && groupProperties.isNotEmpty) {

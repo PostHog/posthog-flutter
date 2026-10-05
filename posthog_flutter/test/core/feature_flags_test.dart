@@ -46,6 +46,31 @@ void main() {
       });
     });
 
+    test('a new group key drops the group properties of the previous key',
+        () async {
+      final client = testClient(server);
+
+      client.group('company', 'paid-company', groupProperties: {'plan': 'pro'});
+      client.group('company', 'free-company');
+      await client.reloadFeatureFlagsAsync();
+
+      final body = _flagsRequestBody(server);
+      expect(body['groups'], {'company': 'free-company'});
+      expect(body['group_properties'], isEmpty);
+    });
+
+    test('the same group key keeps its group properties', () async {
+      final client = testClient(server);
+
+      client.group('company', 'paid-company', groupProperties: {'plan': 'pro'});
+      client.group('company', 'paid-company');
+      await client.reloadFeatureFlagsAsync();
+
+      expect(_flagsRequestBody(server)['group_properties'], {
+        'company': {'plan': 'pro'},
+      });
+    });
+
     test('an empty response clears stale flags and the recorded error',
         () async {
       final storage = tempStorage();
