@@ -4,6 +4,7 @@
     "arguments": {
       "screenName": "Checkout",
       "properties": {
+        "$flutter_version": "<flutter-version>",
         "cart_size": 3,
         "route": {
           "source": "email"
@@ -17,6 +18,7 @@
     "arguments": {
       "eventName": "order completed",
       "properties": {
+        "$flutter_version": "<flutter-version>",
         "order_id": "ord_123",
         "total": 42.5,
         "items": [

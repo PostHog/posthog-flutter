@@ -19,6 +19,7 @@
     "arguments": {
       "timestamp": "<timestamp-ms>",
       "properties": {
+        "$flutter_version": "<flutter-version>",
         "$exception_level": "error",
         "$exception_list": [
           {
@@ -68,6 +69,7 @@
     "arguments": {
       "timestamp": "<timestamp-ms>",
       "properties": {
+        "$flutter_version": "<flutter-version>",
         "$exception_level": "error",
         "$exception_list": [
           {

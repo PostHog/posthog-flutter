@@ -261,13 +261,26 @@ void main() {
   });
 }
 
+// The Flutter version depends on the SDK running the tests.
+Object? _withFlutterVersionPlaceholder(Object? arguments) {
+  if (arguments is! Map || arguments['properties'] is! Map) return arguments;
+  final properties = Map<String, Object?>.from(arguments['properties'] as Map);
+  if (!properties.containsKey(r'$flutter_version')) return arguments;
+  expect(
+    properties[r'$flutter_version'],
+    const String.fromEnvironment('FLUTTER_VERSION'),
+  );
+  properties[r'$flutter_version'] = '<flutter-version>';
+  return {...arguments, 'properties': properties};
+}
+
 Future<void> _expectSnapshot(String name, List<MethodCall> calls) async {
   final snapshotFile = File('test/snapshots/$name');
   final actual = calls
       .map(
         (call) => <String, Object?>{
           'method': call.method,
-          'arguments': call.arguments,
+          'arguments': _withFlutterVersionPlaceholder(call.arguments),
         },
       )
       .toList();

@@ -324,6 +324,25 @@ void main() {
       expect(captured['exception'], containsAppVersion());
     });
 
+    test('capture and screen attach the compile-time Flutter version',
+        () async {
+      const flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
+      expect(flutterVersion, isNotEmpty,
+          reason: 'Flutter must inject its version');
+
+      await handleWebMethodCall(const MethodCall('capture', {
+        'eventName': 'checkout',
+      }));
+      await handleWebMethodCall(const MethodCall('screen', {
+        'screenName': 'Home',
+      }));
+
+      expect(captured['checkout'],
+          containsPair(r'$flutter_version', flutterVersion));
+      expect(captured[r'$screen'],
+          containsPair(r'$flutter_version', flutterVersion));
+    });
+
     test('keeps an app version the caller set explicitly', () async {
       await handleWebMethodCall(const MethodCall('capture', {
         'eventName': 'checkout',

@@ -12,6 +12,7 @@ import 'surveys/models/survey_callbacks.dart';
 import 'error_tracking/dart_exception_processor.dart';
 import 'utils/before_send.dart';
 import 'utils/capture_utils.dart';
+import 'utils/flutter_version.dart';
 import 'utils/property_normalizer.dart';
 
 import 'feature_flag_result.dart';
@@ -315,7 +316,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
       );
 
-      final extractedProperties = extracted.properties;
+      final extractedProperties = withFlutterVersion(extracted.properties);
       final extractedUserProperties = extracted.userProperties;
       final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
 
@@ -386,10 +387,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
 
     try {
-      final normalizedProperties = processedEvent.properties?.isNotEmpty == true
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>(),
-            )
+      final eventProperties = withFlutterVersion(
+        processedEvent.properties?.cast<String, Object>(),
+      );
+      final normalizedProperties = eventProperties?.isNotEmpty == true
+          ? PropertyNormalizer.normalize(eventProperties!)
           : null;
 
       await _methodChannel.invokeMethod('screen', {
@@ -791,10 +793,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
       // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final normalizedData = processedEvent.properties != null
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>(),
-            )
+      final eventProperties = withFlutterVersion(
+        processedEvent.properties?.cast<String, Object>(),
+      );
+      final normalizedData = eventProperties != null
+          ? PropertyNormalizer.normalize(eventProperties)
           : <String, Object>{};
 
       await _methodChannel.invokeMethod('captureException', {
