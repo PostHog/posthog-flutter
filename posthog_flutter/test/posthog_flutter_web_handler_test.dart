@@ -324,25 +324,6 @@ void main() {
       expect(captured['exception'], containsAppVersion());
     });
 
-    const flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
-
-    test('capture and screen attach the compile-time Flutter version',
-        skip: flutterVersion.isEmpty
-            ? 'Flutter < 3.32 does not report its version'
-            : false, () async {
-      await handleWebMethodCall(const MethodCall('capture', {
-        'eventName': 'checkout',
-      }));
-      await handleWebMethodCall(const MethodCall('screen', {
-        'screenName': 'Home',
-      }));
-
-      expect(captured['checkout'],
-          containsPair(r'$flutter_version', flutterVersion));
-      expect(captured[r'$screen'],
-          containsPair(r'$flutter_version', flutterVersion));
-    });
-
     test('keeps an app version the caller set explicitly', () async {
       await handleWebMethodCall(const MethodCall('capture', {
         'eventName': 'checkout',

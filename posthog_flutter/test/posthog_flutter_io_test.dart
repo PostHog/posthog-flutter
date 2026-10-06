@@ -466,6 +466,54 @@ void main() {
       expect(propertiesOf('captureException'),
           isNot(contains(r'$flutter_version')));
     });
+
+    // Renamed screen/exception events fall back to capture, which must not
+    // add the version back after beforeSend removed it.
+    Future<void> setUpRemoveAndRename() async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            if (event.event == r'$screen' || event.event == r'$exception') {
+              event.properties?.remove(r'$flutter_version');
+              event.event = 'redacted_event';
+            }
+            return event;
+          },
+        ],
+      ));
+    }
+
+    for (final callerValue in [null, 'caller']) {
+      final props = {if (callerValue != null) r'$flutter_version': callerValue};
+      final label = callerValue == null ? 'automatic' : 'caller-set';
+
+      test('screen renamed by beforeSend keeps the $label version removed',
+          () async {
+        await setUpRemoveAndRename();
+        await posthogFlutterIO.screen(screenName: 'Home', properties: props);
+
+        final captures = log.where((c) => c.method == 'capture').toList();
+        expect(captures, hasLength(1));
+        expect(
+            (captures.single.arguments as Map)['eventName'], 'redacted_event');
+        expect(propertiesOf('capture'), isNot(contains(r'$flutter_version')));
+      });
+
+      test(
+          'captureException renamed by beforeSend keeps the $label version removed',
+          () async {
+        await setUpRemoveAndRename();
+        await posthogFlutterIO.captureException(
+            error: StateError('boom'), properties: props);
+
+        final captures = log.where((c) => c.method == 'capture').toList();
+        expect(captures, hasLength(1));
+        expect(
+            (captures.single.arguments as Map)['eventName'], 'redacted_event');
+        expect(propertiesOf('capture'), isNot(contains(r'$flutter_version')));
+      });
+    }
   });
 
   group('PosthogFlutterIO beforeSend callback', () {

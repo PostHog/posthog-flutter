@@ -290,6 +290,22 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+  }) {
+    return _capture(
+      eventName: eventName,
+      properties: withFlutterVersion(properties),
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+  }
+
+  /// Captures [properties] as given. Callers add `$flutter_version` first;
+  /// renamed screen/exception events skip it so a beforeSend removal sticks.
+  Future<void> _capture({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
     if (!isSupportedPlatform()) {
       return;
@@ -298,7 +314,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     // Apply beforeSend callback
     final processedEvent = await _runBeforeSend(
       eventName,
-      withFlutterVersion(properties),
+      properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
@@ -372,7 +388,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     // If event name was changed, use regular capture() instead
     if (processedEvent.event != PostHogEventName.screen) {
-      await capture(
+      await _capture(
         eventName: processedEvent.event,
         properties: processedEvent.properties?.cast<String, Object>(),
       );
@@ -782,7 +798,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
       // If event name was changed, use capture() instead
       if (processedEvent.event != PostHogEventName.exception) {
-        await capture(
+        await _capture(
           eventName: processedEvent.event,
           properties: processedEvent.properties?.cast<String, Object>(),
         );

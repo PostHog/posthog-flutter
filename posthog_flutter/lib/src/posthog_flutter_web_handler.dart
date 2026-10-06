@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
-import 'package:posthog_flutter/src/utils/flutter_version.dart';
 
 import 'package:web/web.dart' as web;
 
@@ -157,12 +156,8 @@ Map<String, String> appVersionProperties({
   };
 }
 
-void _addBuildProperties(Map<String, dynamic> properties) {
-  final buildProperties = {
-    ...appVersionProperties(),
-    ...flutterVersionProperties(),
-  };
-  buildProperties.forEach(
+void _addAppVersionProperties(Map<String, dynamic> properties) {
+  appVersionProperties().forEach(
     (key, value) => properties.putIfAbsent(key, () => value),
   );
 }
@@ -238,7 +233,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
-      _addBuildProperties(properties);
+      _addAppVersionProperties(properties);
       final userProperties = safeMapConversion(args['userProperties']);
       final userPropertiesSetOnce = safeMapConversion(
         args['userPropertiesSetOnce'],
@@ -265,7 +260,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
       properties.addAll(_getLocationProperties());
-      _addBuildProperties(properties);
+      _addAppVersionProperties(properties);
 
       posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
       break;
@@ -463,7 +458,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
-      _addBuildProperties(properties);
+      _addAppVersionProperties(properties);
 
       // Route through posthog-js's captureException so it attaches required
       // metadata and any buffered $exception_steps. posthog-js spreads the
