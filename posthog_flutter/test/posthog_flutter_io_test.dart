@@ -401,13 +401,13 @@ void main() {
       );
     });
 
-    test('keeps a Flutter version the caller set explicitly', () async {
+    test('replaces a Flutter version the caller set', () async {
       await posthogFlutterIO.capture(
         eventName: 'checkout',
         properties: {r'$flutter_version': 'custom'},
       );
 
-      expect(propertiesOf('capture'), {r'$flutter_version': 'custom'});
+      expect(propertiesOf('capture'), {r'$flutter_version': flutterVersion});
     });
 
     test('omits the property when the build reports no Flutter version', () {

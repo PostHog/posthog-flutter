@@ -13,10 +13,10 @@ Map<String, String> flutterVersionProperties({
   };
 }
 
-/// Adds the `$flutter_version` property to [properties] without overriding a
-/// value the caller set explicitly.
+/// Adds the `$flutter_version` property to [properties], replacing any value
+/// the caller set. `beforeSend` runs afterwards and can still change it.
 Map<String, Object>? withFlutterVersion(Map<String, Object>? properties) {
   final versionProperties = flutterVersionProperties();
   if (versionProperties.isEmpty) return properties;
-  return {...versionProperties, ...?properties};
+  return {...?properties, ...versionProperties};
 }

@@ -124,14 +124,14 @@ void main() {
       }
     });
 
-    test('keeps a caller-set value', () async {
+    test('replaces a caller-set value', () async {
       final web = PosthogFlutterWeb();
       await web.setup(PostHogConfig('test_token'));
 
       await captureAll(web, {r'$flutter_version': 'custom'});
 
       for (final event in ['checkout', r'$screen', r'$exception']) {
-        expect(propertiesOf(event)[r'$flutter_version'], 'custom');
+        expect(propertiesOf(event)[r'$flutter_version'], flutterVersion);
       }
     });
 
