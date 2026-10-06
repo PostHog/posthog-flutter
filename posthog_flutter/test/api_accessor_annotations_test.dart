@@ -14,17 +14,31 @@ void main() {
                   'getterOnly',
                   'setterOnly',
                   'paired',
-                  'stable'
+                  'stable',
+                  'deprecatedGetter',
+                  'deprecatedSetter',
                 ])
-                  {'name': name, 'isExperimental': false},
-                {'name': 'plainField', 'isExperimental': true},
+                  {
+                    'name': name,
+                    'isExperimental': false,
+                    'isDeprecated': false
+                  },
+                {
+                  'name': 'plainField',
+                  'isExperimental': true,
+                  'isDeprecated': false
+                },
               ],
             },
             {
               'name': 'OtherConfig',
               'relativePath': 'lib/config.dart',
               'fieldDeclarations': [
-                {'name': 'paired', 'isExperimental': false},
+                {
+                  'name': 'paired',
+                  'isExperimental': false,
+                  'isDeprecated': false
+                },
               ],
             },
           ],
@@ -51,6 +65,15 @@ class Config {
 
   @experimental
   int plainField = 1;
+
+  @Deprecated('Use paired instead.')
+  int get deprecatedGetter => 1;
+  @Deprecated('Use paired instead.')
+  set deprecatedGetter(int value) {}
+
+  int get deprecatedSetter => 1;
+  @deprecated
+  set deprecatedSetter(int value) {}
 }
 
 class OtherConfig {
@@ -59,10 +82,10 @@ class OtherConfig {
 }
 ''';
 
-  test('experimental accessors are recorded as experimental properties', () {
+  test('accessor annotations are recorded on their properties', () {
     final api = snapshot();
     final reads = <String>[];
-    annotateExperimentalAccessors(api, (path) {
+    annotateAccessors(api, (path) {
       reads.add(path);
       return source;
     });
@@ -73,17 +96,22 @@ class OtherConfig {
     final fields = (interfaces.first['fieldDeclarations'] as List)
         .cast<Map<String, dynamic>>();
     expect(
-      {for (final field in fields) field['name']: field['isExperimental']},
       {
-        'getterOnly': true,
-        'setterOnly': true,
-        'paired': true,
-        'stable': false,
-        'plainField': true,
+        for (final field in fields)
+          field['name']: (field['isExperimental'], field['isDeprecated'])
+      },
+      {
+        'getterOnly': (true, false),
+        'setterOnly': (true, false),
+        'paired': (true, false),
+        'stable': (false, false),
+        'deprecatedGetter': (false, true),
+        'deprecatedSetter': (false, true),
+        'plainField': (true, false),
       },
     );
     expect(interfaces.last['fieldDeclarations'], [
-      {'name': 'paired', 'isExperimental': false},
+      {'name': 'paired', 'isExperimental': false, 'isDeprecated': false},
     ]);
     expect(reads, ['lib/config.dart']);
   });
@@ -91,8 +119,13 @@ class OtherConfig {
   test('removing accessor annotations leaves regenerated properties stable',
       () {
     final api = snapshot();
-    annotateExperimentalAccessors(
-        api, (_) => source.replaceAll('@experimental', ''));
+    annotateAccessors(
+      api,
+      (_) => source
+          .replaceAll('@experimental', '')
+          .replaceAll(RegExp(r"@Deprecated\('[^']*'\)"), '')
+          .replaceAll('@deprecated', ''),
+    );
 
     final packageApi = api['packageApi'] as Map<String, dynamic>;
     final interfaces = (packageApi['interfaceDeclarations'] as List)
@@ -100,9 +133,8 @@ class OtherConfig {
     final fields = (interfaces.first['fieldDeclarations'] as List)
         .cast<Map<String, dynamic>>();
     expect(
-      fields
-          .where((field) => field['name'] != 'plainField')
-          .every((field) => field['isExperimental'] == false),
+      fields.where((field) => field['name'] != 'plainField').every((field) =>
+          field['isExperimental'] == false && field['isDeprecated'] == false),
       isTrue,
     );
   });
