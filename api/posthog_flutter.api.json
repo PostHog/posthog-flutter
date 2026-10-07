@@ -927,7 +927,7 @@
                                 "isExperimental": false,
                                 "isNamed": true,
                                 "isRequired": false,
-                                "name": "sendEvent",
+                                "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "bool"
                             }
@@ -1888,7 +1888,7 @@
                                 "isExperimental": false,
                                 "isNamed": true,
                                 "isRequired": false,
-                                "name": "sendEvent",
+                                "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "bool"
                             }
@@ -4745,7 +4745,7 @@
                                 "isExperimental": false,
                                 "isNamed": true,
                                 "isRequired": false,
-                                "name": "sendEvent",
+                                "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "bool"
                             }
