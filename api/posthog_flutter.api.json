@@ -2197,17 +2197,6 @@
                     },
                     {
                         "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isReadable": true,
-                        "isStatic": false,
-                        "isWriteable": true,
-                        "name": "sendFeatureFlagEvents",
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "bool"
-                    },
-                    {
-                        "entryPoints": [],
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isReadable": true,
@@ -4280,30 +4269,6 @@
                         "isExperimental": false,
                         "isStatic": false,
                         "name": "optIn",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog.dart",
-                        "returnTypeName": "Future<void>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "disable",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog.dart",
-                        "returnTypeName": "Future<void>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "enable",
                         "parameters": [],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<void>",

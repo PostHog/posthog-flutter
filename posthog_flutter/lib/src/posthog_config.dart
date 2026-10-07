@@ -124,17 +124,6 @@ class PostHogConfig {
   /// Defaults to `true`.
   var sendFeatureFlagEvent = true;
 
-  /// Deprecated alias for [sendFeatureFlagEvent].
-  @Deprecated(
-    'Use sendFeatureFlagEvent instead. This will be removed in the next major version.',
-  )
-  bool get sendFeatureFlagEvents => sendFeatureFlagEvent;
-
-  @Deprecated(
-    'Use sendFeatureFlagEvent instead. This will be removed in the next major version.',
-  )
-  set sendFeatureFlagEvents(bool value) => sendFeatureFlagEvent = value;
-
   /// Whether feature flags are loaded when the SDK starts.
   ///
   /// Defaults to `true`, which means every SDK start issues a `/flags` request.
