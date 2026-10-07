@@ -66,7 +66,7 @@ void main() {
           };
         });
         final result = await posthogFlutterIO.getFeatureFlagResult(
-            key: 'flag', sendEvent: false);
+            key: 'flag', sendFeatureFlagEvent: false);
         expect(result, isNotNull);
         expect(result!.key, 'flag');
         expect(result.enabled, enabled);
