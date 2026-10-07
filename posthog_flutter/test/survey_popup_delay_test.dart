@@ -186,7 +186,7 @@ void main() {
     await shown;
 
     expect(find.byType(SurveyBottomSheet), findsNothing);
-    expect(closed, ['survey-1']);
+    expect(closed, isEmpty);
   });
 
   testWidgets('a later survey replaces one still waiting on its delay', (
@@ -197,7 +197,7 @@ void main() {
 
     final first = SurveyService().showSurvey(
       PostHogDisplaySurvey.fromDict({
-        ...survey(delaySeconds: 10),
+        ...survey(delaySeconds: 1),
         'id': 'first',
       }),
       (_) {},
@@ -208,7 +208,7 @@ void main() {
 
     final second = SurveyService().showSurvey(
       PostHogDisplaySurvey.fromDict({
-        ...survey(delaySeconds: 1),
+        ...survey(delaySeconds: 2),
         'id': 'second',
         'questions': [
           {
@@ -225,14 +225,17 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
+    expect(find.byType(SurveyBottomSheet), findsNothing);
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
 
     expect(find.text('Second'), findsOneWidget);
     expect(find.text('Welcome'), findsNothing);
-    expect(closed, ['first']);
+    expect(closed, isEmpty);
 
     SurveyService().hideSurvey();
     await tester.pumpAndSettle();
-    await tester.pump(const Duration(seconds: 10));
     await first;
     await second;
 

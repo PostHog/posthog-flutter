@@ -43,7 +43,6 @@ class SurveyService {
   Completer<bool>? _pendingShow;
   Timer? _popupDelayTimer;
   PostHogDisplaySurvey? _delayedSurvey;
-  OnSurveyClosed? _delayedOnClosed;
 
   /// Shows a survey using the PosthogObserver context
   Future<void> showSurvey(
@@ -57,13 +56,10 @@ class SurveyService {
       return;
     }
 
-    // A survey still waiting out its delay has not been shown. Replacing it
-    // closes that presentation the same way the iOS surveys delegate does.
     _cancelPopupDelay();
 
     final delay = surveyPopupDelay(survey.appearance?.surveyPopupDelaySeconds);
-    if (delay > Duration.zero &&
-        !await _waitForPopupDelay(survey, onClosed, delay)) {
+    if (delay > Duration.zero && !await _waitForPopupDelay(survey, delay)) {
       return;
     }
 
@@ -95,12 +91,10 @@ class SurveyService {
   /// was cancelled by [hideSurvey] or replaced by a newer survey.
   Future<bool> _waitForPopupDelay(
     PostHogDisplaySurvey survey,
-    OnSurveyClosed onClosed,
     Duration delay,
   ) {
     final wait = _startPendingShow();
     _delayedSurvey = survey;
-    _delayedOnClosed = onClosed;
     _popupDelayTimer = Timer(delay, () {
       _clearPopupDelay();
       _endPendingShow(show: true);
@@ -222,21 +216,19 @@ class SurveyService {
     route.navigator?.removeRoute(route);
   }
 
+  /// Drops a survey still waiting out its delay without calling onClosed:
+  /// the user never saw it, so it must not be marked seen or dismissed.
   void _cancelPopupDelay() {
-    final survey = _delayedSurvey;
-    final onClosed = _delayedOnClosed;
-    if (survey == null) return;
+    if (_delayedSurvey == null) return;
 
     _popupDelayTimer?.cancel();
     _clearPopupDelay();
     _endPendingShow(show: false);
-    onClosed?.call(survey);
   }
 
   void _clearPopupDelay() {
     _popupDelayTimer = null;
     _delayedSurvey = null;
-    _delayedOnClosed = null;
   }
 
   /// Hides any active survey
