@@ -383,7 +383,7 @@ class Posthog {
     // Uninstall Flutter-specific integrations when opting out
     _uninstallFlutterIntegrations();
 
-    return _posthog.disable();
+    return _posthog.optOut();
   }
 
   /// Opts the current user back in to data collection.
@@ -395,7 +395,7 @@ class Posthog {
       _installFlutterIntegrations(config);
     }
 
-    return _posthog.enable();
+    return _posthog.optIn();
   }
 
   /// Returns whether the current user has opted out of data collection.

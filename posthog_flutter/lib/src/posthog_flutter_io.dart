@@ -475,7 +475,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {
+  Future<void> optOut() async {
     if (!isSupportedPlatform()) {
       return;
     }
@@ -488,7 +488,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> enable() async {
+  Future<void> optIn() async {
     if (!isSupportedPlatform()) {
       return;
     }

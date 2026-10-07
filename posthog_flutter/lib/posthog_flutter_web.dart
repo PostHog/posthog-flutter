@@ -298,12 +298,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {
+  Future<void> optOut() async {
     return handleWebMethodCall(const MethodCall('disable'));
   }
 
   @override
-  Future<void> enable() async {
+  Future<void> optIn() async {
     return handleWebMethodCall(const MethodCall('enable'));
   }
 
