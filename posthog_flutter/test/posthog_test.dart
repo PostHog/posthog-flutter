@@ -214,16 +214,6 @@ void main() {
   });
 
   group('PostHogConfig', () {
-    test('sendFeatureFlagEvents forwards to sendFeatureFlagEvent', () {
-      final config = PostHogConfig('test_project_token');
-
-      // ignore: deprecated_member_use_from_same_package
-      config.sendFeatureFlagEvents = false;
-
-      expect(config.sendFeatureFlagEvent, isFalse);
-      expect(config.toMap()['sendFeatureFlagEvents'], isFalse);
-    });
-
     test('toMap forwards evaluationContexts only when set', () {
       final config = PostHogConfig('test_project_token');
       expect(config.toMap().containsKey('evaluationContexts'), isFalse);
