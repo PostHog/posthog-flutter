@@ -411,7 +411,7 @@ class Posthog {
       stopReplay = _posthog.stopSessionRecording();
     }
 
-    await Future.wait([if (stopReplay != null) stopReplay, _posthog.disable()]);
+    await Future.wait([if (stopReplay != null) stopReplay, _posthog.optOut()]);
   }
 
   /// Opts the current user back in to data collection.
@@ -426,7 +426,7 @@ class Posthog {
       _installFlutterIntegrations(config);
     }
 
-    await _posthog.enable();
+    await _posthog.optIn();
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
     if (restartReplay) {
