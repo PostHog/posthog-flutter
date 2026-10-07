@@ -670,7 +670,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool sendFeatureFlagEvent = true,
   }) async {
     if (!isSupportedPlatform()) {
       return null;
@@ -679,7 +679,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       final result = await _methodChannel.invokeMethod('getFeatureFlagResult', {
         'key': key,
-        'sendEvent': sendEvent,
+        'sendEvent': sendFeatureFlagEvent,
       });
 
       // Native returns: { key, enabled, variant, payload }
