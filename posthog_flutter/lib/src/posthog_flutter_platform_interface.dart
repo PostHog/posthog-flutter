@@ -225,7 +225,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
 
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool sendFeatureFlagEvent = true,
   }) {
     throw UnimplementedError(
       'getFeatureFlagResult() has not been implemented.',
