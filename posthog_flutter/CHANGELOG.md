@@ -1,5 +1,11 @@
 ## Next
 
+## 5.51.1
+
+### Patch Changes
+
+- 6ec313e: Stop Flutter session replay when `optOut()` opts the user out, and start a new recording on `optIn()` if a recording was actually stopped.
+
 ## 5.51.0
 
 ### Minor Changes
