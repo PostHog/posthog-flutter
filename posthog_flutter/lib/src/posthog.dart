@@ -390,14 +390,19 @@ class Posthog {
   Future<void> optOut() async {
     // Uninstall Flutter-specific integrations when opting out
     _uninstallFlutterIntegrations();
-    if (PostHogInternalEvents.sessionRecordingActive.value) {
+    Future<void>? stopReplay;
+    // Skipped on web: posthog-js drops replay while opted out, and restarting
+    // it on optIn would override a replay disabled in posthog.init.
+    if (!kIsWeb && PostHogInternalEvents.sessionRecordingActive.value) {
       _restartSessionReplayOnEnable = true;
+      PostHogInternalEvents.sessionRecordingActive.value = false;
       // Native stopSessionRecording is a no-op once the SDK is already opted
-      // out, so this has to run before the platform disable.
-      await stopSessionRecording();
+      // out, so it is sent first. Not awaited before disable, so a capture()
+      // right after an un-awaited optOut() still reaches native after it.
+      stopReplay = _posthog.stopSessionRecording();
     }
 
-    await _posthog.disable();
+    await Future.wait([if (stopReplay != null) stopReplay, _posthog.disable()]);
   }
 
   /// Opts the current user back in to data collection.
@@ -416,8 +421,8 @@ class Posthog {
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
     if (restartReplay) {
-      // startSessionRecording is ignored while the SDK is still opted out, so
-      // the platform opt-in has to finish first.
+      // On iOS, startSessionRecording is ignored while the SDK is still opted
+      // out, so the platform opt-in has to finish first.
       await startSessionRecording(resumeCurrent: false);
     }
   }

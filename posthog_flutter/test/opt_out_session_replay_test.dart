@@ -45,7 +45,7 @@ void main() {
       calls.map((c) => c.method).toList();
 
   testWidgets(
-      'disable stops Flutter replay, so a later frame is not snapshotted',
+      'optOut stops Flutter replay, so a later frame is not snapshotted',
       (tester) async {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterPlatformFake();
     await Posthog().setup(replayConfig());
@@ -73,7 +73,7 @@ void main() {
     expect(methodsOf(recordedCalls), isNot(contains('sendFullSnapshot')));
   });
 
-  test('disable stops replay before opting out, enable starts a new recording',
+  test('optOut stops replay before opting out, optIn starts a new recording',
       () async {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
     await Posthog().setup(replayConfig());
@@ -108,7 +108,26 @@ void main() {
     expect(PostHogInternalEvents.sessionRecordingActive.value, isTrue);
   });
 
-  test('disable does not stop replay when it was never started', () async {
+  test('capture after an un-awaited optOut reaches native after the opt-out',
+      () async {
+    PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
+    await Posthog().setup(replayConfig());
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      recordedCalls.add(call);
+      await Future<void>.delayed(Duration.zero);
+      return null;
+    });
+
+    recordedCalls.clear();
+    final optOut = Posthog().optOut();
+    await Posthog().capture(eventName: 'after_opt_out');
+    await optOut;
+
+    final methods = methodsOf(recordedCalls);
+    expect(methods.indexOf('disable'), lessThan(methods.indexOf('capture')));
+  });
+
+  test('optOut does not stop replay when it was never started', () async {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
     await Posthog().setup(PostHogConfig('test_project_token'));
 
