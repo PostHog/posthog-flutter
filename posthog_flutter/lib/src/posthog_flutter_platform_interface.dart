@@ -129,12 +129,12 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('reset() has not been implemented.');
   }
 
-  Future<void> disable() {
-    throw UnimplementedError('disable() has not been implemented.');
+  Future<void> optOut() {
+    throw UnimplementedError('optOut() has not been implemented.');
   }
 
-  Future<void> enable() {
-    throw UnimplementedError('enable() has not been implemented.');
+  Future<void> optIn() {
+    throw UnimplementedError('optIn() has not been implemented.');
   }
 
   Future<bool> isOptOut() {
