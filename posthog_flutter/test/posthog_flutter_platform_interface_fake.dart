@@ -228,10 +228,10 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {}
+  Future<void> optOut() async {}
 
   @override
-  Future<void> enable() async {}
+  Future<void> optIn() async {}
 
   @override
   Future<void> close() async {
