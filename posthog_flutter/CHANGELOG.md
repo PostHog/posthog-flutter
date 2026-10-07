@@ -1,5 +1,12 @@
 ## Next
 
+## 5.51.0
+
+### Minor Changes
+
+- 1d90e6e: - Add `Posthog().optIn()` and `Posthog().optOut()`, and deprecate `enable()` and `disable()`
+  - Add `PostHogConfig.sendFeatureFlagEvent`, and deprecate `sendFeatureFlagEvents`
+
 ## 5.50.15
 
 ### Patch Changes
