@@ -12,6 +12,7 @@ import 'surveys/models/survey_callbacks.dart';
 import 'error_tracking/dart_exception_processor.dart';
 import 'utils/before_send.dart';
 import 'utils/capture_utils.dart';
+import 'utils/channel_serialization.dart';
 import 'utils/property_normalizer.dart';
 
 import 'feature_flag_result.dart';
@@ -683,7 +684,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       });
 
       // Native returns: { key, enabled, variant, payload }
-      return PostHogFeatureFlagResult.fromMap(result, key);
+      return featureFlagResultFromMap(result, key);
     } on PlatformException catch (exception) {
       printIfDebug('Exception on getFeatureFlagResult: $exception');
       return null;
