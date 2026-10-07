@@ -7,6 +7,7 @@ import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
+import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -513,12 +514,12 @@ void main() {
     });
 
     test('fromMap returns null for null input', () {
-      final result = PostHogFeatureFlagResult.fromMap(null, 'fallback');
+      final result = featureFlagResultFromMap(null, 'fallback');
       expect(result, isNull);
     });
 
     test('fromMap returns null for non-Map input', () {
-      final result = PostHogFeatureFlagResult.fromMap('not a map', 'fallback');
+      final result = featureFlagResultFromMap('not a map', 'fallback');
       expect(result, isNull);
     });
 
@@ -530,7 +531,7 @@ void main() {
         'payload': {'data': 123},
       };
 
-      final result = PostHogFeatureFlagResult.fromMap(map, 'fallback');
+      final result = featureFlagResultFromMap(map, 'fallback');
 
       expect(result, isNotNull);
       expect(result!.key, equals('my-flag'));
@@ -542,7 +543,7 @@ void main() {
     test('fromMap uses fallback key when map key is null', () {
       final map = {'enabled': true, 'variant': null, 'payload': null};
 
-      final result = PostHogFeatureFlagResult.fromMap(map, 'fallback-key');
+      final result = featureFlagResultFromMap(map, 'fallback-key');
 
       expect(result, isNotNull);
       expect(result!.key, equals('fallback-key'));
@@ -551,7 +552,7 @@ void main() {
     test('fromMap defaults enabled to false when not in map', () {
       final map = <String, dynamic>{'key': 'my-flag'};
 
-      final result = PostHogFeatureFlagResult.fromMap(map, 'fallback');
+      final result = featureFlagResultFromMap(map, 'fallback');
 
       expect(result, isNotNull);
       expect(result!.enabled, isFalse);
