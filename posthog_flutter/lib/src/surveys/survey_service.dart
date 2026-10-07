@@ -13,10 +13,13 @@ import 'widgets/survey_bottom_sheet.dart';
 ///
 /// [seconds] comes from the survey's `surveyPopupDelaySeconds`. Null, zero,
 /// and negative values show the survey immediately, matching iOS and Android.
+/// Values above one day are capped at one day.
 Duration surveyPopupDelay(double? seconds) {
-  if (seconds == null || seconds.isNaN || seconds.isInfinite || seconds <= 0) {
+  if (seconds == null || seconds.isNaN || seconds <= 0) {
     return Duration.zero;
   }
+  const maxDelay = Duration(days: 1);
+  if (seconds >= maxDelay.inSeconds) return maxDelay;
   return Duration(milliseconds: (seconds * 1000).round());
 }
 
@@ -37,12 +40,10 @@ class SurveyService {
   Route<dynamic>? _currentSurveyRoute;
   PostHogDisplaySurvey? _currentSurvey;
   Completer<void>? _programmaticDismissal;
-  Completer<bool>? _contextWait;
+  Completer<bool>? _pendingShow;
   Timer? _popupDelayTimer;
-  Completer<void>? _popupDelayGate;
-  int _popupDelayGeneration = 0;
-  PostHogDisplaySurvey? _pendingSurvey;
-  OnSurveyClosed? _pendingOnClosed;
+  PostHogDisplaySurvey? _delayedSurvey;
+  OnSurveyClosed? _delayedOnClosed;
 
   /// Shows a survey using the PosthogObserver context
   Future<void> showSurvey(
@@ -58,24 +59,12 @@ class SurveyService {
 
     // A survey still waiting out its delay has not been shown. Replacing it
     // closes that presentation the same way the iOS surveys delegate does.
-    _cancelPendingSurvey();
+    _cancelPopupDelay();
 
     final delay = surveyPopupDelay(survey.appearance?.surveyPopupDelaySeconds);
-    if (delay > Duration.zero) {
-      final generation = ++_popupDelayGeneration;
-      final gate = Completer<void>();
-      _popupDelayGate = gate;
-      _pendingSurvey = survey;
-      _pendingOnClosed = onClosed;
-      _popupDelayTimer = Timer(delay, () {
-        if (!gate.isCompleted) gate.complete();
-      });
-      await gate.future;
-      if (generation != _popupDelayGeneration) return;
-      _popupDelayTimer = null;
-      _popupDelayGate = null;
-      _pendingSurvey = null;
-      _pendingOnClosed = null;
+    if (delay > Duration.zero &&
+        !await _waitForPopupDelay(survey, onClosed, delay)) {
+      return;
     }
 
     var context = PosthogObserver.currentContext;
@@ -102,24 +91,45 @@ class SurveyService {
     );
   }
 
-  /// Completes with true once [PosthogObserver] reports a context, or false
-  /// when the wait was cancelled by [hideSurvey] or replaced by a newer survey.
-  Future<bool> _waitForContext() {
-    _endContextWait(show: false);
-    final contextWait = Completer<bool>();
-    _contextWait = contextWait;
-    return contextWait.future;
+  /// Completes with true once the delay has elapsed, or false when the wait
+  /// was cancelled by [hideSurvey] or replaced by a newer survey.
+  Future<bool> _waitForPopupDelay(
+    PostHogDisplaySurvey survey,
+    OnSurveyClosed onClosed,
+    Duration delay,
+  ) {
+    final wait = _startPendingShow();
+    _delayedSurvey = survey;
+    _delayedOnClosed = onClosed;
+    _popupDelayTimer = Timer(delay, () {
+      _clearPopupDelay();
+      _endPendingShow(show: true);
+    });
+    return wait;
   }
 
-  void _endContextWait({required bool show}) {
-    final contextWait = _contextWait;
-    _contextWait = null;
-    contextWait?.complete(show);
+  /// Completes with true once [PosthogObserver] reports a context, or false
+  /// when the wait was cancelled by [hideSurvey] or replaced by a newer survey.
+  Future<bool> _waitForContext() => _startPendingShow();
+
+  Future<bool> _startPendingShow() {
+    _endPendingShow(show: false);
+    final pendingShow = Completer<bool>();
+    _pendingShow = pendingShow;
+    return pendingShow.future;
+  }
+
+  void _endPendingShow({required bool show}) {
+    final pendingShow = _pendingShow;
+    _pendingShow = null;
+    pendingShow?.complete(show);
   }
 
   /// Called by [PosthogObserver] when it has a context, so a survey that
   /// arrived before then can be shown.
-  void onContextAvailable() => _endContextWait(show: true);
+  void onContextAvailable() {
+    if (_popupDelayTimer == null) _endPendingShow(show: true);
+  }
 
   /// Shows a survey using a navigator context
   Future<void> _showSurveyWithNavigator(
@@ -212,30 +222,29 @@ class SurveyService {
     route.navigator?.removeRoute(route);
   }
 
-  void _cancelPendingSurvey() {
-    final survey = _pendingSurvey;
-    final onClosed = _pendingOnClosed;
+  void _cancelPopupDelay() {
+    final survey = _delayedSurvey;
+    final onClosed = _delayedOnClosed;
     if (survey == null) return;
 
-    _popupDelayGeneration++;
     _popupDelayTimer?.cancel();
-    _popupDelayTimer = null;
-    final gate = _popupDelayGate;
-    _popupDelayGate = null;
-    _pendingSurvey = null;
-    _pendingOnClosed = null;
-    if (gate != null && !gate.isCompleted) gate.complete();
+    _clearPopupDelay();
+    _endPendingShow(show: false);
     onClosed?.call(survey);
+  }
+
+  void _clearPopupDelay() {
+    _popupDelayTimer = null;
+    _delayedSurvey = null;
+    _delayedOnClosed = null;
   }
 
   /// Hides any active survey
   void hideSurvey({PostHogDisplaySurvey? survey}) {
-    if (survey == null) _endContextWait(show: false);
-    if (_pendingSurvey != null &&
-        (survey == null || identical(survey, _pendingSurvey))) {
-      _cancelPendingSurvey();
-      if (!_isShowingSurvey) return;
+    if (survey == null || identical(survey, _delayedSurvey)) {
+      _cancelPopupDelay();
     }
+    if (survey == null) _endPendingShow(show: false);
     if (survey != null && !identical(survey, _currentSurvey)) return;
     if (!_isShowingSurvey || _isDismissingSurvey) {
       return;

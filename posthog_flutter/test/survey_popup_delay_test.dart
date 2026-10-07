@@ -37,6 +37,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  void pushNextRoute(WidgetTester tester) {
+    tester.state<NavigatorState>(find.byType(Navigator).last).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Next')),
+          ),
+        );
+  }
+
   tearDown(() async {
     SurveyService().hideSurvey();
     PosthogObserver.clearCurrentContext();
@@ -82,7 +90,10 @@ void main() {
     expect(find.byType(SurveyBottomSheet), findsNothing);
     expect(closed, isEmpty);
 
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 1900));
+    expect(find.byType(SurveyBottomSheet), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
     expect(find.byType(SurveyBottomSheet), findsOneWidget);
@@ -91,6 +102,68 @@ void main() {
     SurveyService().hideSurvey();
     await tester.pumpAndSettle();
     await shown;
+  });
+
+  testWidgets(
+      'waits for the next navigation when there is no context after the delay',
+      (tester) async {
+    await pumpApp(tester);
+    PosthogObserver.clearCurrentContext();
+    final closed = <String>[];
+
+    final shown = SurveyService().showSurvey(
+      PostHogDisplaySurvey.fromDict(survey(delaySeconds: 1)),
+      (_) {},
+      (_, __, ___) async => null,
+      (survey) => closed.add(survey.id),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SurveyBottomSheet), findsNothing);
+    expect(closed, isEmpty);
+
+    pushNextRoute(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SurveyBottomSheet), findsOneWidget);
+    expect(closed, isEmpty);
+
+    SurveyService().hideSurvey();
+    await tester.pumpAndSettle();
+    await shown;
+  });
+
+  testWidgets('a navigation during the delay does not show the survey early', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    PosthogObserver.clearCurrentContext();
+
+    final shown = SurveyService().showSurvey(
+      PostHogDisplaySurvey.fromDict(survey(delaySeconds: 2)),
+      (_) {},
+      (_, __, ___) async => null,
+      (_) {},
+    );
+    await tester.pump();
+
+    pushNextRoute(tester);
+    await tester.pumpAndSettle();
+    expect(find.byType(SurveyBottomSheet), findsNothing);
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(find.byType(SurveyBottomSheet), findsOneWidget);
+
+    SurveyService().hideSurvey();
+    await tester.pumpAndSettle();
+    await shown;
+  });
+
+  test('caps a very large popup delay at one day', () {
+    expect(surveyPopupDelay(1e13), const Duration(days: 1));
+    expect(surveyPopupDelay(double.maxFinite), const Duration(days: 1));
   });
 
   testWidgets('does not show a survey hidden during its popup delay', (
