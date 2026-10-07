@@ -423,10 +423,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool sendFeatureFlagEvent = true,
   }) async {
     final result = await handleWebMethodCall(
-      MethodCall('getFeatureFlagResult', {'key': key, 'sendEvent': sendEvent}),
+      MethodCall('getFeatureFlagResult',
+          {'key': key, 'sendEvent': sendFeatureFlagEvent}),
     );
 
     // Web SDK returns: { key, enabled, variant, payload }

@@ -375,7 +375,7 @@ void main() {
       final result = await Posthog().getFeatureFlagResult('non-existent');
       expect(result, isNull);
       expect(fakePlatformInterface.getFeatureFlagResultCalls, [
-        {'key': 'non-existent', 'sendEvent': true}
+        {'key': 'non-existent', 'sendFeatureFlagEvent': true}
       ]);
     });
 
@@ -390,24 +390,26 @@ void main() {
       expect(
           await Posthog().getFeatureFlagResult('variant-flag'), same(expected));
       expect(fakePlatformInterface.getFeatureFlagResultCalls, [
-        {'key': 'variant-flag', 'sendEvent': true}
+        {'key': 'variant-flag', 'sendFeatureFlagEvent': true}
       ]);
     });
 
-    test('passes sendEvent=true by default', () async {
+    test('passes sendFeatureFlagEvent=true by default', () async {
       await Posthog().getFeatureFlagResult('test');
 
       expect(
-        fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
+        fakePlatformInterface
+            .getFeatureFlagResultCalls.last['sendFeatureFlagEvent'],
         isTrue,
       );
     });
 
-    test('passes sendEvent=false when specified', () async {
-      await Posthog().getFeatureFlagResult('test', sendEvent: false);
+    test('passes sendFeatureFlagEvent=false when specified', () async {
+      await Posthog().getFeatureFlagResult('test', sendFeatureFlagEvent: false);
 
       expect(
-        fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
+        fakePlatformInterface
+            .getFeatureFlagResultCalls.last['sendFeatureFlagEvent'],
         isFalse,
       );
     });
