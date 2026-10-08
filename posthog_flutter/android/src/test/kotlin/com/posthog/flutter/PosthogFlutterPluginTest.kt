@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.BadParcelableException
 import com.google.firebase.FirebaseApp
 import com.posthog.PostHogCompression
+import com.posthog.PostHogEvent
 import com.posthog.android.replay.PostHogScreenshotColorMode
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -222,6 +223,28 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
 
         assertEquals(PostHogCompression.NONE, assertNotNull(plugin.lastBuiltConfig).compression)
+    }
+
+    @Test
+    fun setup_flutterVersion_addedOnlyToInstallAndUpdateEvents() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "flutterVersion" to "3.35.0")),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+        val beforeSend = assertNotNull(plugin.lastBuiltConfig).beforeSendList
+
+        fun propertiesOf(name: String): Map<String, Any>? =
+            beforeSend
+                .fold(PostHogEvent(name, "id", properties = mutableMapOf())) { event, hook ->
+                    assertNotNull(hook.run(event))
+                }.properties
+
+        assertEquals("3.35.0", propertiesOf("Application Installed")?.get("\$flutter_version"))
+        assertEquals("3.35.0", propertiesOf("Application Updated")?.get("\$flutter_version"))
+        assertNull(propertiesOf("Application Opened")?.get("\$flutter_version"))
+        assertNull(propertiesOf("custom")?.get("\$flutter_version"))
     }
 
     @Test

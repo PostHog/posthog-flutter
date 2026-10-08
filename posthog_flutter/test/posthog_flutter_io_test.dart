@@ -7,7 +7,6 @@ import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
-import 'package:posthog_flutter/src/utils/flutter_version.dart';
 
 // Simplified void callback for feature flags
 void emptyCallback() {}
@@ -121,6 +120,22 @@ void main() {
       expect(args['projectToken'], equals('test_project_token'));
       expect(args['apiKey'], equals('test_project_token'));
     });
+
+    test(
+      'setup sends the Flutter version for native lifecycle events',
+      skip: const String.fromEnvironment('FLUTTER_VERSION').isEmpty
+          ? 'FLUTTER_VERSION is only defined on Flutter 3.32+'
+          : null,
+      () async {
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+
+        final call = log.firstWhere((c) => c.method == 'setup');
+        expect(
+          (call.arguments as Map)['flutterVersion'],
+          const String.fromEnvironment('FLUTTER_VERSION'),
+        );
+      },
+    );
 
     test(
       'invokes callback when native sends onFeatureFlagsCallback event',
@@ -362,160 +377,6 @@ void main() {
     });
   });
 
-  const flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
-
-  group('PosthogFlutterIO \$flutter_version',
-      skip: flutterVersion.isEmpty
-          ? 'Flutter < 3.32 does not report its version'
-          : false, () {
-    setUp(() async {
-      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
-    });
-
-    Map<String, dynamic> propertiesOf(String method) {
-      final call = log.lastWhere((c) => c.method == method);
-      return Map<String, dynamic>.from(
-        (call.arguments as Map)['properties'] as Map,
-      );
-    }
-
-    test('capture attaches the compile-time Flutter version', () async {
-      await posthogFlutterIO.capture(eventName: 'checkout');
-
-      expect(propertiesOf('capture'), {r'$flutter_version': flutterVersion});
-    });
-
-    test('screen attaches the compile-time Flutter version', () async {
-      await posthogFlutterIO.screen(screenName: 'Home');
-
-      expect(propertiesOf('screen'), {r'$flutter_version': flutterVersion});
-    });
-
-    test('captureException attaches the compile-time Flutter version',
-        () async {
-      await posthogFlutterIO.captureException(error: StateError('boom'));
-
-      expect(
-        propertiesOf('captureException'),
-        containsPair(r'$flutter_version', flutterVersion),
-      );
-    });
-
-    test('replaces a Flutter version the caller set', () async {
-      await posthogFlutterIO.capture(
-        eventName: 'checkout',
-        properties: {r'$flutter_version': 'custom'},
-      );
-
-      expect(propertiesOf('capture'), {r'$flutter_version': flutterVersion});
-    });
-
-    test('omits the property when the build reports no Flutter version', () {
-      expect(flutterVersionProperties(flutterVersion: ''), isEmpty);
-    });
-  });
-
-  group('PosthogFlutterIO \$flutter_version and beforeSend',
-      skip: flutterVersion.isEmpty
-          ? 'Flutter < 3.32 does not report its version'
-          : false, () {
-    final seen = <String, Object?>{};
-
-    Future<void> setUpRemovingFlutterVersion() async {
-      seen.clear();
-      await posthogFlutterIO.setup(PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) {
-            seen[event.event] = event.properties?[r'$flutter_version'];
-            event.properties?.remove(r'$flutter_version');
-            return event;
-          },
-        ],
-      ));
-    }
-
-    Map<String, dynamic> propertiesOf(String method) {
-      final call = log.lastWhere((c) => c.method == method);
-      return Map<String, dynamic>.from(
-        ((call.arguments as Map)['properties'] as Map?) ?? {},
-      );
-    }
-
-    test('capture: beforeSend sees and can remove it', () async {
-      await setUpRemovingFlutterVersion();
-      await posthogFlutterIO.capture(eventName: 'checkout');
-
-      expect(seen['checkout'], flutterVersion);
-      expect(propertiesOf('capture'), isNot(contains(r'$flutter_version')));
-    });
-
-    test('screen: beforeSend sees and can remove it', () async {
-      await setUpRemovingFlutterVersion();
-      await posthogFlutterIO.screen(screenName: 'Home');
-
-      expect(seen[r'$screen'], flutterVersion);
-      expect(propertiesOf('screen'), isNot(contains(r'$flutter_version')));
-    });
-
-    test('captureException: beforeSend sees and can remove it', () async {
-      await setUpRemovingFlutterVersion();
-      await posthogFlutterIO.captureException(error: StateError('boom'));
-
-      expect(seen[r'$exception'], flutterVersion);
-      expect(propertiesOf('captureException'),
-          isNot(contains(r'$flutter_version')));
-    });
-
-    // Renamed screen/exception events fall back to capture, which must not
-    // add the version back after beforeSend removed it.
-    Future<void> setUpRemoveAndRename() async {
-      await posthogFlutterIO.setup(PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) {
-            if (event.event == r'$screen' || event.event == r'$exception') {
-              event.properties?.remove(r'$flutter_version');
-              event.event = 'redacted_event';
-            }
-            return event;
-          },
-        ],
-      ));
-    }
-
-    for (final callerValue in [null, 'caller']) {
-      final props = {if (callerValue != null) r'$flutter_version': callerValue};
-      final label = callerValue == null ? 'automatic' : 'caller-set';
-
-      test('screen renamed by beforeSend keeps the $label version removed',
-          () async {
-        await setUpRemoveAndRename();
-        await posthogFlutterIO.screen(screenName: 'Home', properties: props);
-
-        final captures = log.where((c) => c.method == 'capture').toList();
-        expect(captures, hasLength(1));
-        expect(
-            (captures.single.arguments as Map)['eventName'], 'redacted_event');
-        expect(propertiesOf('capture'), isNot(contains(r'$flutter_version')));
-      });
-
-      test(
-          'captureException renamed by beforeSend keeps the $label version removed',
-          () async {
-        await setUpRemoveAndRename();
-        await posthogFlutterIO.captureException(
-            error: StateError('boom'), properties: props);
-
-        final captures = log.where((c) => c.method == 'capture').toList();
-        expect(captures, hasLength(1));
-        expect(
-            (captures.single.arguments as Map)['eventName'], 'redacted_event');
-        expect(propertiesOf('capture'), isNot(contains(r'$flutter_version')));
-      });
-    }
-  });
-
   group('PosthogFlutterIO beforeSend callback', () {
     test(
       'capture sends event unchanged when no beforeSend registered',
@@ -531,8 +392,7 @@ void main() {
         final captureCall = log.firstWhere((c) => c.method == 'capture');
         final args = Map<String, dynamic>.from(captureCall.arguments as Map);
         expect(args['eventName'], 'test_event');
-        expect(args['properties'],
-            {...flutterVersionProperties(), 'key': 'value'});
+        expect(args['properties'], {'key': 'value'});
       },
     );
 
@@ -574,7 +434,6 @@ void main() {
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      // beforeSend replaced the properties, so the SDK's $flutter_version is gone too.
       expect(args['properties'], {'modified': true});
     });
 
@@ -756,8 +615,7 @@ void main() {
 
         expect(capturedEvent, isNotNull);
         expect(capturedEvent!.event, 'test_event');
-        expect(capturedEvent!.properties,
-            {...flutterVersionProperties(), 'prop': 'value'});
+        expect(capturedEvent!.properties, {'prop': 'value'});
         expect(capturedEvent!.userProperties, {'user_prop': 'user_value'});
         expect(capturedEvent!.userPropertiesSetOnce, {
           'set_once_prop': 'set_once_value',
@@ -789,8 +647,7 @@ void main() {
 
         final captureCall = log.firstWhere((c) => c.method == 'capture');
         final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-        expect(args['properties'],
-            {...flutterVersionProperties(), 'event_prop': 'value'});
+        expect(args['properties'], {'event_prop': 'value'});
         expect(args['userProperties'], {'developer_name': 'John'});
       },
     );
@@ -819,8 +676,7 @@ void main() {
 
         final captureCall = log.firstWhere((c) => c.method == 'capture');
         final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-        expect(args['properties'],
-            {...flutterVersionProperties(), 'event_prop': 'value'});
+        expect(args['properties'], {'event_prop': 'value'});
         expect(args['userPropertiesSetOnce'], {'first_seen': '2025-01-01'});
       },
     );
@@ -848,8 +704,7 @@ void main() {
 
       final captureCall = log.firstWhere((c) => c.method == 'capture');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['properties'],
-          {...flutterVersionProperties(), 'event_prop': 'value'});
+      expect(args['properties'], {'event_prop': 'value'});
       expect(args['userProperties'], {
         'from_legacy': 'legacy_value',
         'from_direct': 'direct_value',

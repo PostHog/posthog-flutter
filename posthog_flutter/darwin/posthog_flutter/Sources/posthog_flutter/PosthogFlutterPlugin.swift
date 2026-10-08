@@ -153,6 +153,24 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         ])
     }
 
+    /// Returns a `beforeSend` block that adds `$flutter_version` to the
+    /// `Application Installed` and `Application Updated` events, or `nil` when
+    /// setup carries no `flutterVersion` (Info.plist auto-init, Flutter < 3.32).
+    ///
+    /// Native lifecycle events never pass through Dart, so the version Dart
+    /// reports at setup is added here, once per app build.
+    static func flutterVersionBeforeSend(_ posthogConfig: [String: Any]) -> BeforeSendBlock? {
+        guard let flutterVersion = posthogConfig["flutterVersion"] as? String, !flutterVersion.isEmpty else {
+            return nil
+        }
+        return { event in
+            if event.event == "Application Installed" || event.event == "Application Updated" {
+                event.properties["$flutter_version"] = flutterVersion
+            }
+            return event
+        }
+    }
+
     // `anchor` is the engine that called setup(); the static `instance` is only the
     // Info.plist auto-setup fallback. Resolving from `instance` would bind the mint
     // route to whichever engine registered last.
@@ -434,6 +452,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                     }
                 }
             }
+        }
+
+        if let flutterVersionBeforeSend = flutterVersionBeforeSend(posthogConfig) {
+            config.setBeforeSend(flutterVersionBeforeSend)
         }
 
         // Update SDK name and version

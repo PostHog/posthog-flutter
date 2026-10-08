@@ -264,14 +264,15 @@ void main() {
 // The Flutter version depends on the SDK running the tests, and Flutter < 3.32
 // doesn't report one, so it's checked here and left out of the snapshots.
 Object? _withoutFlutterVersion(Object? arguments) {
-  if (arguments is! Map || arguments['properties'] is! Map) return arguments;
-  final properties = Map<String, Object?>.from(arguments['properties'] as Map);
-  if (!properties.containsKey(r'$flutter_version')) return arguments;
+  if (arguments is! Map || !arguments.containsKey('flutterVersion')) {
+    return arguments;
+  }
+  final withoutVersion = Map<String, Object?>.from(arguments);
   expect(
-    properties.remove(r'$flutter_version'),
+    withoutVersion.remove('flutterVersion'),
     const String.fromEnvironment('FLUTTER_VERSION'),
   );
-  return {...arguments, 'properties': properties};
+  return withoutVersion;
 }
 
 Future<void> _expectSnapshot(String name, List<MethodCall> calls) async {
