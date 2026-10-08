@@ -1,0 +1,5 @@
+---
+"posthog_flutter": minor
+---
+
+Add Windows and Linux support, set up with the same `Posthog().setup(config)` as the other platforms. Event and screen capture, exception capture (including autocapture of Flutter and Dart errors, and exception steps), identify, alias, groups, super properties, feature flags, bootstrap, opt-out and application lifecycle events work on both. App metadata comes from the executable's `ProductName` and `ProductVersion` on Windows and the bundled `version.json` on Linux. State is stored under `posthog/<project token>` in the application support directory returned by the official Windows/Linux `path_provider` implementations. If the directory is unavailable, state stays in memory and is lost when the SDK closes or the app exits. Events include `$timezone` when the SDK can determine a local IANA time zone; on Windows, this uses the system ICU data on a best-effort basis. Session replay, surveys, logs, push notifications and native crash capture are not supported on Windows and Linux.

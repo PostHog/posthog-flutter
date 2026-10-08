@@ -235,6 +235,8 @@ class PostHogConfig {
   /// - For Flutter web, this setting will be ignored. Surveys on web use the
   ///   JavaScript Web SDK instead.
   ///   - See: https://posthog.com/docs/surveys/installation?tab=Web
+  /// - Surveys are not supported on Windows and Linux, where this setting is
+  ///   ignored.
   ///
   /// Defaults to true.
   var surveys = true;
@@ -254,9 +256,10 @@ class PostHogConfig {
   /// return caller-provided values before the first `/flags` response. Mirrors
   /// the [`bootstrap` option in `posthog-js`](https://posthog.com/docs/feature-flags/bootstrapping).
   ///
-  /// Forwarded to the native iOS/Android SDKs, which apply all precedence rules
-  /// (never overwrite persisted identity, overlay loaded flags over bootstrapped
-  /// ones, drop the bootstrap on `reset()`). Defaults to `null` (no bootstrap).
+  /// Forwarded to the native iOS/Android SDKs, and on Windows/Linux to the
+  /// pure-Dart implementation, which apply all precedence rules (never
+  /// overwrite persisted identity, overlay loaded flags over bootstrapped ones,
+  /// drop the bootstrap on `reset()`). Defaults to `null` (no bootstrap).
   ///
   /// **Flutter web:** not applied. The web SDK hooks onto an already-initialized
   /// posthog-js instance, so configure `bootstrap` in your `posthog.init({...})`
@@ -280,7 +283,7 @@ class PostHogConfig {
   /// The startup fetch does not see later token refreshes; wire those to
   /// [Posthog.registerPushNotificationToken] yourself.
   ///
-  /// **Flutter web:** not supported. Defaults to `true`.
+  /// **Flutter web, Windows and Linux:** not supported. Defaults to `true`.
   bool capturePushNotificationSubscriptions = true;
 
   /// Whether to automatically capture `$push_notification_opened` when a user
@@ -293,7 +296,7 @@ class PostHogConfig {
   /// so push delivered outside FCM is not seen. Call
   /// [Posthog.capturePushNotificationOpened] for the opens this misses.
   ///
-  /// **Flutter web:** not supported. Defaults to `true`.
+  /// **Flutter web, Windows and Linux:** not supported. Defaults to `true`.
   ///
   /// On iOS this requires your app to set `UNUserNotificationCenter.current().delegate`.
   /// Without one, iOS reports the tap to nobody and no open can be captured.
@@ -324,7 +327,7 @@ class PostHogConfig {
   /// installed. Set `com.posthog.posthog.AUTO_INIT` to `false` and call
   /// [Posthog.setup].
   ///
-  /// **Flutter web:** not supported. Defaults to `null`.
+  /// **Flutter web, Windows and Linux:** not supported. Defaults to `null`.
   PushIdentityProvider? pushIdentityProvider;
 
   /// Callbacks to intercept and modify events before they are sent to PostHog.
@@ -560,6 +563,9 @@ class PostHogBootstrapConfig {
 /// hooks onto an already-initialized posthog-js instance, so configure logs in
 /// your `posthog.init({...})` call instead. Only [beforeSend] runs on web (in
 /// Dart).
+///
+/// **Windows and Linux:** logs are not supported. Only [beforeSend] runs (in
+/// Dart); the records it keeps are then dropped.
 class PostHogLogsConfig {
   /// Creates a logs configuration with native defaults.
   PostHogLogsConfig();
@@ -1158,6 +1164,8 @@ class PostHogErrorTrackingConfig {
   /// the PostHog Gradle plugin to upload ProGuard/R8 mappings.
   /// See: https://posthog.com/docs/error-tracking/upload-mappings/android
   ///
+  /// **Windows and Linux:** not supported.
+  ///
   /// Default: false
   var captureNativeExceptions = false;
 
@@ -1180,6 +1188,7 @@ class PostHogErrorTrackingConfig {
   /// - Apple platforms: Not applicable (native crash capture is part of
   ///   [captureNativeExceptions])
   /// - Flutter web: Not supported
+  /// - Windows and Linux: Not supported
   ///
   /// Default: false
   var captureNativeCrashes = false;
@@ -1237,6 +1246,10 @@ class PostHogErrorTrackingConfig {
 /// **Flutter web:** the buffer lives in posthog-js. Steps are forwarded to it,
 /// but they only attach to exceptions captured by posthog-js itself, not to
 /// exceptions captured via `Posthog().captureException()` on web.
+///
+/// **Windows and Linux:** the buffer is kept in memory and attaches to every
+/// `$exception` captured by the app. There are no native crash reports to
+/// attach it to.
 class PostHogExceptionStepsConfig {
   /// Creates an exception-steps configuration with native defaults.
   PostHogExceptionStepsConfig();

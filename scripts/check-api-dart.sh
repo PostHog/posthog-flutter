@@ -45,7 +45,7 @@ dart run dart_apitool:main extract \
 
 dart run "$ROOT_DIR/scripts/annotate-api-dart.dart" "$RAW_API" "$ROOT_DIR/posthog_flutter"
 
-python3 - "$RAW_API" "$GENERATED_API" <<'PY'
+python3 - "$RAW_API" "$GENERATED_API" "$SNAPSHOT_FILE" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -58,6 +58,20 @@ package_api = data.get("packageApi", {})
 package_api.pop("packagePath", None)
 # Keep the checked-in public API snapshot independent from release bumps.
 package_api["packageVersion"] = "<version>"
+# File enumeration order differs between platforms. Preserve the baseline's
+# declaration order without sorting parameters or other ordered API members.
+snapshot_path = Path(sys.argv[3])
+baseline = json.loads(snapshot_path.read_text()).get("packageApi", {}) if snapshot_path.exists() else {}
+for collection in ("interfaceDeclarations", "executableDeclarations", "fieldDeclarations", "typeAliasDeclarations"):
+    order = {
+        (item.get("relativePath", ""), item["name"]): index
+        for index, item in enumerate(baseline.get(collection, []))
+    }
+    package_api.get(collection, []).sort(key=lambda item: (
+        order.get((item.get("relativePath", ""), item["name"]), len(order)),
+        item.get("relativePath", ""),
+        item["name"],
+    ))
 out_path.write_text(json.dumps(data, indent=4, sort_keys=True) + "\n")
 PY
 

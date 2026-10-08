@@ -293,7 +293,7 @@ Future<void> _expectSnapshot(String name, List<MethodCall> calls) async {
 
   expect(
     '$formatted\n',
-    await snapshotFile.readAsString(),
+    (await snapshotFile.readAsString()).replaceAll('\r\n', '\n'),
     reason: 'Update this explicit fixture only after reviewing the shape diff. '
         'Run with --dart-define=UPDATE_EVENT_SHAPE_SNAPSHOTS=true to accept it.',
   );
