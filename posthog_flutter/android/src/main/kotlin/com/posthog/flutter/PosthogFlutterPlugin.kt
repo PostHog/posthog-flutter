@@ -185,21 +185,10 @@ class PosthogFlutterPlugin :
                 return
             }
 
-            val projectToken =
-                (
-                    bundle.getString("com.posthog.posthog.PROJECT_TOKEN")
-                        ?: bundle.getString("com.posthog.posthog.API_KEY")
-                )?.trim()
-
-            if (!bundle.containsKey("com.posthog.posthog.PROJECT_TOKEN") && bundle.containsKey("com.posthog.posthog.API_KEY")) {
-                Log.w(
-                    "PostHog",
-                    "com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!",
-                )
-            }
+            val projectToken = bundle.getString("com.posthog.posthog.PROJECT_TOKEN")?.trim()
 
             if (projectToken.isNullOrEmpty()) {
-                Log.e("PostHog", "Either com.posthog.posthog.PROJECT_TOKEN or com.posthog.posthog.API_KEY must be provided!")
+                Log.e("PostHog", "com.posthog.posthog.PROJECT_TOKEN must be provided!")
                 return
             }
 
@@ -224,7 +213,6 @@ class PosthogFlutterPlugin :
 
             val posthogConfig = mutableMapOf<String, Any>()
             posthogConfig["projectToken"] = projectToken
-            posthogConfig["apiKey"] = projectToken
             posthogConfig["host"] = host
             posthogConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
             posthogConfig["debug"] = debug
@@ -320,10 +308,6 @@ class PosthogFlutterPlugin :
 
             "getFeatureFlag" -> {
                 getFeatureFlag(call, result)
-            }
-
-            "getFeatureFlagPayload" -> {
-                getFeatureFlagPayload(call, result)
             }
 
             "getFeatureFlagResult" -> {
@@ -552,19 +536,9 @@ class PosthogFlutterPlugin :
     }
 
     private fun setupPostHog(posthogConfig: Map<String, Any>) {
-        val projectToken =
-            (
-                (posthogConfig["projectToken"] as String?)
-                    ?: (posthogConfig["apiKey"] as String?)
-            )?.trim()
-        if (!posthogConfig.containsKey("projectToken") && posthogConfig.containsKey("apiKey")) {
-            Log.w(
-                "PostHog",
-                "apiKey is deprecated and will be removed in the next major version. Use projectToken instead!",
-            )
-        }
+        val projectToken = (posthogConfig["projectToken"] as String?)?.trim()
         if (projectToken.isNullOrEmpty()) {
-            Log.e("PostHog", "Either projectToken or apiKey must be provided!")
+            Log.e("PostHog", "projectToken must be provided!")
             return
         }
 
@@ -1664,19 +1638,6 @@ class PosthogFlutterPlugin :
         try {
             val featureFlagKey: String = call.argument("key")!!
             val flag = PostHog.getFeatureFlag(featureFlagKey)
-            result.success(flag)
-        } catch (e: Throwable) {
-            result.error("PosthogFlutterException", e.localizedMessage, null)
-        }
-    }
-
-    private fun getFeatureFlagPayload(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val featureFlagKey: String = call.argument("key")!!
-            val flag = PostHog.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent = false)?.payload
             result.success(flag)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

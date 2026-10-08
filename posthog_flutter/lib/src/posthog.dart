@@ -402,7 +402,7 @@ class Posthog {
       stopReplay = _posthog.stopSessionRecording();
     }
 
-    await Future.wait([if (stopReplay != null) stopReplay, _posthog.disable()]);
+    await Future.wait([if (stopReplay != null) stopReplay, _posthog.optOut()]);
   }
 
   /// Opts the current user back in to data collection.
@@ -417,7 +417,7 @@ class Posthog {
       _installFlutterIntegrations(config);
     }
 
-    await _posthog.enable();
+    await _posthog.optIn();
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
     if (restartReplay) {
@@ -426,18 +426,6 @@ class Posthog {
       await startSessionRecording(resumeCurrent: false);
     }
   }
-
-  /// Opts the current user out of data collection.
-  @Deprecated(
-    'Use optOut() instead. This will be removed in the next major version.',
-  )
-  Future<void> disable() => optOut();
-
-  /// Opts the current user back in to data collection.
-  @Deprecated(
-    'Use optIn() instead. This will be removed in the next major version.',
-  )
-  Future<void> enable() => optIn();
 
   /// Returns whether the current user has opted out of data collection.
   Future<bool> isOptOut() => _posthog.isOptOut();
@@ -761,9 +749,9 @@ class Posthog {
   /// This is the canonical method for getting feature flag data.
   /// Returns `null` if the flag does not exist or cannot be loaded.
   ///
-  /// Set [sendEvent] to `false` to suppress the `$feature_flag_called` event.
-  /// This is useful when you only need the payload and do not want to emit the
-  /// event.
+  /// Set [sendFeatureFlagEvent] to `false` to suppress the
+  /// `$feature_flag_called` event. This is useful when you only need the
+  /// payload and do not want to emit the event.
   ///
   /// **Example:**
   /// ```dart
@@ -775,19 +763,10 @@ class Posthog {
   /// ```
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult(
     String key, {
-    bool sendEvent = true,
+    bool sendFeatureFlagEvent = true,
   }) =>
-      _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
-
-  /// Returns the payload for the feature flag [key].
-  ///
-  /// Returns `null` when the flag does not exist, has no payload, or the payload
-  /// cannot be loaded.
-  @Deprecated(
-    'Use getFeatureFlagResult instead, which returns both value and payload.',
-  )
-  Future<Object?> getFeatureFlagPayload(String key) =>
-      _posthog.getFeatureFlagPayload(key: key);
+      _posthog.getFeatureFlagResult(
+          key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Flushes queued events immediately where supported by the platform.
   ///

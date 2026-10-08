@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 
 void main() {
   test('screenshot controls preserve native defaults', () {

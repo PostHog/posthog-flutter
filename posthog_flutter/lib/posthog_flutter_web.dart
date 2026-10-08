@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
+import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
@@ -315,12 +316,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {
+  Future<void> optOut() async {
     return handleWebMethodCall(const MethodCall('disable'));
   }
 
   @override
-  Future<void> enable() async {
+  Future<void> optIn() async {
     return handleWebMethodCall(const MethodCall('enable'));
   }
 
@@ -421,23 +422,17 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    return handleWebMethodCall(
-      MethodCall('getFeatureFlagPayload', {'key': key}),
-    );
-  }
-
-  @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool sendFeatureFlagEvent = true,
   }) async {
     final result = await handleWebMethodCall(
-      MethodCall('getFeatureFlagResult', {'key': key, 'sendEvent': sendEvent}),
+      MethodCall('getFeatureFlagResult',
+          {'key': key, 'sendEvent': sendFeatureFlagEvent}),
     );
 
     // Web SDK returns: { key, enabled, variant, payload }
-    return PostHogFeatureFlagResult.fromMap(result, key);
+    return featureFlagResultFromMap(result, key);
   }
 
   @override
