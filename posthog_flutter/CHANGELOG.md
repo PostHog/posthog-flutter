@@ -1,5 +1,24 @@
 ## Next
 
+## 5.52.0
+
+### Minor Changes
+
+- e8398cc: Add `$flutter_version` (for example `3.32.0`) to events captured through `capture`, `screen` and `captureException`, including the event `beforeSend` receives. Requires apps built with Flutter 3.32 or later; it's omitted on older Flutter versions and on events the native iOS/Android SDKs or posthog-js capture on their own, such as lifecycle events.
+
+## 5.51.1
+
+### Patch Changes
+
+- 6ec313e: Stop Flutter session replay when `optOut()` opts the user out, and start a new recording on `optIn()` if a recording was actually stopped.
+
+## 5.51.0
+
+### Minor Changes
+
+- 1d90e6e: - Add `Posthog().optIn()` and `Posthog().optOut()`, and deprecate `enable()` and `disable()`
+  - Add `PostHogConfig.sendFeatureFlagEvent`, and deprecate `sendFeatureFlagEvents`
+
 ## 5.50.15
 
 ### Patch Changes

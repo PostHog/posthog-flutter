@@ -141,7 +141,18 @@ class PostHogConfig {
   /// Whether calls that evaluate feature flags capture `$feature_flag_called`.
   ///
   /// Defaults to `true`.
-  var sendFeatureFlagEvents = true;
+  var sendFeatureFlagEvent = true;
+
+  /// Deprecated alias for [sendFeatureFlagEvent].
+  @Deprecated(
+    'Use sendFeatureFlagEvent instead. This will be removed in the next major version.',
+  )
+  bool get sendFeatureFlagEvents => sendFeatureFlagEvent;
+
+  @Deprecated(
+    'Use sendFeatureFlagEvent instead. This will be removed in the next major version.',
+  )
+  set sendFeatureFlagEvents(bool value) => sendFeatureFlagEvent = value;
 
   /// Whether feature flags are loaded when the SDK starts.
   ///
@@ -177,7 +188,7 @@ class PostHogConfig {
 
   /// Whether the SDK starts with data collection disabled.
   ///
-  /// Defaults to `false`. Use `Posthog().disable()` and `Posthog().enable()` to
+  /// Defaults to `false`. Use `Posthog().optOut()` and `Posthog().optIn()` to
   /// change this setting at runtime.
   var optOut = false;
 
@@ -378,7 +389,7 @@ class PostHogConfig {
   ///   - Application lifecycle events (`Application Opened`, etc.) when
   ///     `config.captureApplicationLifecycleEvents` is enabled
   ///   - Feature flag events (`$feature_flag_called`) when
-  ///     `config.sendFeatureFlagEvents` is enabled
+  ///     `config.sendFeatureFlagEvent` is enabled
   ///   - Identity events (`$set`) when `identify` is called
   ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
   /// - Only user-provided properties are available; system properties (like
@@ -429,7 +440,7 @@ class PostHogConfig {
       'maxQueueSize': maxQueueSize,
       'maxBatchSize': maxBatchSize,
       'flushInterval': flushInterval.inSeconds,
-      'sendFeatureFlagEvents': sendFeatureFlagEvents,
+      'sendFeatureFlagEvents': sendFeatureFlagEvent,
       'preloadFeatureFlags': preloadFeatureFlags,
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
       'rageClickConfig': rageClickConfig.toMap(),

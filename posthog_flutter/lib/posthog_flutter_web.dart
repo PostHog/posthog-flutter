@@ -19,6 +19,7 @@ import 'src/posthog_flutter_web_handler.dart';
 import 'src/utils/before_send.dart';
 import 'src/replay/web/web_canvas_mask_provider.dart';
 import 'src/utils/capture_utils.dart';
+import 'src/utils/flutter_version.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
 class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
@@ -168,6 +169,22 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+  }) {
+    return _capture(
+      eventName: eventName,
+      properties: withFlutterVersion(properties),
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+  }
+
+  /// Captures [properties] as given. Callers add `$flutter_version` first;
+  /// renamed screen/exception events skip it so a beforeSend removal sticks.
+  Future<void> _capture({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
   }) async {
     final processedEvent = await _runBeforeSend(
       eventName,
@@ -252,7 +269,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     final processedEvent = await _runBeforeSend(
       PostHogEventName.screen,
-      propsWithScreenName,
+      withFlutterVersion(propsWithScreenName),
     );
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
@@ -260,7 +277,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     }
 
     if (processedEvent.event != PostHogEventName.screen) {
-      await capture(
+      await _capture(
         eventName: processedEvent.event,
         properties: processedEvent.properties?.cast<String, Object>(),
       );
@@ -491,7 +508,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
       final processedEvent = await _runBeforeSend(
         PostHogEventName.exception,
-        exceptionData.cast<String, Object>(),
+        withFlutterVersion(exceptionData.cast<String, Object>()),
       );
       if (processedEvent == null) {
         printIfDebug(
@@ -501,7 +518,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       }
 
       if (processedEvent.event != PostHogEventName.exception) {
-        await capture(
+        await _capture(
           eventName: processedEvent.event,
           properties: processedEvent.properties?.cast<String, Object>(),
         );

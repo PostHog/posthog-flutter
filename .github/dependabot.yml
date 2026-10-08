@@ -6,6 +6,8 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # Flutter's flutter_test pins stack_trace/meta exactly, so raising our floors breaks consumers on older Flutter
+    versioning-strategy: increase-if-necessary
     groups:
       pub-dependencies:
         patterns:
