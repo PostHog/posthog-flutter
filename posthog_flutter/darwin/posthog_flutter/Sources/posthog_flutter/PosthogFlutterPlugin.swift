@@ -771,11 +771,52 @@ extension PosthogFlutterPlugin {
                     return
                 }
 
-                // No WKWebView found for the captured rect. Returning nil here
-                // keeps this safe: drawHierarchy over the full window would
-                // include any masked CALayer-backed platform view overlapping
-                // the crop region and leak it into replay.
+                // No web view: snapshot the platform view's own subtree rather than
+                // the window, so Flutter overlays and sibling platform views are
+                // never drawn into the image.
+                if let container = self.platformViewContainer(in: window, matching: cropRect) {
+                    let local = container.convert(cropRect, from: nil).intersection(container.bounds)
+                    guard !local.isNull, !local.isEmpty else {
+                        onResult(nil)
+                        return
+                    }
+                    let format = UIGraphicsImageRendererFormat.default()
+                    format.opaque = true
+                    format.scale = 1
+                    var drawn = false
+                    let image = UIGraphicsImageRenderer(bounds: local, format: format).image { _ in
+                        drawn = container.drawHierarchy(in: container.bounds, afterScreenUpdates: false)
+                    }
+                    onResult(drawn ? self.imageToRawRgba(image).map(FlutterStandardTypedData.init(bytes:)) : nil)
+                    return
+                }
+
                 onResult(nil)
+            }
+        }
+
+        // FlutterTouchInterceptingView is the engine's per-platform-view wrapper
+        // (private API, matched by name). Declines when any other platform view
+        // overlaps the crop: geometry alone can't say which one is being captured.
+        private func platformViewContainer(in window: UIWindow, matching rect: CGRect) -> UIView? {
+            var containers: [UIView] = []
+            collectPlatformViewContainers(in: window, into: &containers)
+            let overlapping = containers.filter {
+                $0.convert($0.bounds, to: nil).intersects(rect.insetBy(dx: 1, dy: 1))
+            }
+            guard overlapping.count == 1, let container = overlapping.first,
+                  rect.insetBy(dx: -1, dy: -1).contains(container.convert(container.bounds, to: nil))
+            else { return nil }
+            return container
+        }
+
+        private func collectPlatformViewContainers(in view: UIView, into result: inout [UIView]) {
+            if String(describing: type(of: view)) == "FlutterTouchInterceptingView" {
+                result.append(view)
+                return
+            }
+            for sub in view.subviews {
+                collectPlatformViewContainers(in: sub, into: &result)
             }
         }
 

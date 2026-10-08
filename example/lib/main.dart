@@ -11,6 +11,7 @@ import 'masking_tests_screen.dart';
 import 'text_mask_policy_screen.dart';
 import 'platform_view_spill_screen.dart';
 import 'platform_views_screen.dart';
+import 'spike593_screen.dart';
 import 'survey_nested_navigator_screen.dart';
 
 const kMaskAllPlatformViews = true;
@@ -107,7 +108,9 @@ class _MyAppState extends State<MyApp> {
         theme: ThemeData.light(),
         darkTheme: ThemeData.dark(),
         themeMode: ThemeMode.system,
-        home: const InitialScreen(),
+        home: const bool.fromEnvironment('SPIKE593')
+            ? const Spike593Screen()
+            : const InitialScreen(),
       ),
     );
   }
