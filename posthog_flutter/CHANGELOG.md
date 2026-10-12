@@ -1,5 +1,11 @@
 ## Next
 
+## 5.54.0
+
+### Minor Changes
+
+- 53370a9: Wait `surveyPopupDelaySeconds` before showing a survey. A missing, zero, or negative delay still shows it immediately.
+
 ## 5.53.0
 
 ### Minor Changes
