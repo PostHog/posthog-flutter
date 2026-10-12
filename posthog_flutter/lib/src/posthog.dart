@@ -75,6 +75,13 @@ class Posthog {
       return Future<void>.value();
     }
 
+    if (!config.enableWindowsAndLinux &&
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux)) {
+      return Future<void>.value();
+    }
+
     _config = config; // Store the config
     _restartSessionReplayOnEnable = false;
 

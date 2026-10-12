@@ -8,8 +8,14 @@ Specifically, the [Flutter docs](https://posthog.com/docs/libraries/flutter) det
 
 ## Desktop support
 
-Windows and Linux support the core analytics SDK. Session replay, surveys,
-logs, push notifications, and native crash capture are not supported.
+Windows and Linux support is experimental and enabled by default. They support
+the core analytics SDK. Session replay, surveys, logs, push notifications, and
+native crash capture are not supported.
+
+Apps that call `Posthog().setup(config)` will start tracking on Windows
+and Linux. To disable the SDK on these platforms without
+changing behavior on other platforms, set `config.enableWindowsAndLinux = false`
+before setup. Close the SDK before changing this setting and setting up again.
 
 Desktop state is stored under `posthog/<project token>` in the application
 support directory returned by Flutter's Windows/Linux `path_provider`

@@ -131,6 +131,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> setup(PostHogConfig config) {
+    if (!config.enableWindowsAndLinux) return Future<void>.value();
+
     // The Dart-side hooks follow every setup(), while a running client keeps
     // its configuration until close().
     _config = config;

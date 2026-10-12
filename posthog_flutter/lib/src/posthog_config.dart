@@ -209,6 +209,15 @@ class PostHogConfig {
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
 
+  /// Whether the SDK is enabled on Windows and Linux.
+  ///
+  /// Windows and Linux support is experimental. Defaults to `true`.
+  /// Set to `false` before [Posthog.setup] to disable the SDK on these
+  /// platforms. Other platforms are unaffected. Close the SDK before
+  /// changing this setting and calling setup again.
+  @experimental
+  bool enableWindowsAndLinux = true;
+
   /// Whether mobile session replay is enabled for Android and iOS.
   ///
   /// Requires Record user sessions to be enabled in PostHog project settings.

@@ -2371,6 +2371,17 @@
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
+                        "isExperimental": true,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "enableWindowsAndLinux",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
                         "isExperimental": false,
                         "isReadable": true,
                         "isStatic": false,

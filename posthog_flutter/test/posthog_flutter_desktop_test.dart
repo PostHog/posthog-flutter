@@ -114,6 +114,44 @@ void main() {
     });
   });
 
+  group('Windows and Linux support disabled', () {
+    test('skips storage, requests and capture until enabled setup', () async {
+      final server = await LocalPostHogServer.start();
+      final directory = createAppDirectory();
+      var directoryLookups = 0;
+      final platform = createPlatform(
+        appDirectory: directory,
+        resolveAppDirectory: () async {
+          directoryLookups++;
+          return directory.path;
+        },
+      );
+      final config = configFor(server)..enableWindowsAndLinux = false;
+
+      await platform.setup(config);
+      await platform.capture(eventName: 'disabled event');
+      await platform.identify(userId: 'disabled user');
+      await platform.enable();
+      await platform.reloadFeatureFlags();
+      await platform.flush();
+      expect(await platform.getFeatureFlag(key: 'flag'), isNull);
+      expect(await platform.getDistinctId(), isEmpty);
+      expect(directoryLookups, 0);
+      expect(directory.listSync(), isEmpty);
+      expect(server.requests, isEmpty);
+
+      await platform.close();
+      config.enableWindowsAndLinux = true;
+      await platform.setup(config);
+      await platform.capture(eventName: 'enabled event');
+      await server.waitForEvent('enabled event');
+      await server.waitForFlagsRequest(0);
+      expect(directoryLookups, 1);
+      expect(directory.listSync(), isNotEmpty);
+      expect(server.eventNames, isNot(contains('disabled event')));
+    });
+  });
+
   group('PosthogFlutterDesktop.capture', () {
     test('delivers the event with properties and person properties', () async {
       final server = await LocalPostHogServer.start();
