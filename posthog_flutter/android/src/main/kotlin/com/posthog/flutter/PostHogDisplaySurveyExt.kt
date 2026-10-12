@@ -79,6 +79,7 @@ fun PostHogDisplaySurvey.toMap(): Map<String, Any?> {
                 "inputBackground" to app.inputBackground,
                 "inputTextColor" to app.inputTextColor,
                 "placeholder" to app.placeholder,
+                "surveyPopupDelaySeconds" to app.surveyPopupDelaySeconds,
                 "displayThankYouMessage" to app.displayThankYouMessage,
                 "thankYouMessageHeader" to app.thankYouMessageHeader,
                 "thankYouMessageDescription" to app.thankYouMessageDescription,
