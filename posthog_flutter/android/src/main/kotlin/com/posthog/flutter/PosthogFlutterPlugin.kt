@@ -23,6 +23,7 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
+import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
@@ -807,6 +808,21 @@ class PosthogFlutterPlugin :
 
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
+
+                // Native lifecycle events never pass through Dart, so the version Dart
+                // reports at setup is added here, once per app build.
+                posthogConfig.getIfNotNull<String>("flutterVersion") { flutterVersion ->
+                    if (flutterVersion.isNotEmpty()) {
+                        addBeforeSend(
+                            PostHogBeforeSend { event ->
+                                if (event.event == "Application Installed" || event.event == "Application Updated") {
+                                    event.properties?.put("\$flutter_version", flutterVersion)
+                                }
+                                event
+                            },
+                        )
+                    }
+                }
 
                 onFeatureFlags =
                     PostHogOnFeatureFlags {

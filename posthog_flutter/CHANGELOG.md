@@ -1,5 +1,17 @@
 ## Next
 
+## 5.54.0
+
+### Minor Changes
+
+- 53370a9: Wait `surveyPopupDelaySeconds` before showing a survey. A missing, zero, or negative delay still shows it immediately.
+
+## 5.53.0
+
+### Minor Changes
+
+- 0703fbb: Send `$flutter_version` only on the `Application Installed` and `Application Updated` events on iOS, macOS and Android instead of on every event, and stop sending it on web
+
 ## 5.52.0
 
 ### Minor Changes

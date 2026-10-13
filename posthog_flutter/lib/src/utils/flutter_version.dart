@@ -3,20 +3,16 @@
 // that class is missing from the older Flutter versions this package supports.
 const _flutterVersion = String.fromEnvironment('FLUTTER_VERSION');
 
-/// Returns the `$flutter_version` property, or an empty map when the build
+/// Returns the `flutterVersion` setup argument, or an empty map when the build
 /// doesn't report a Flutter version (Flutter < 3.32).
-Map<String, String> flutterVersionProperties({
+///
+/// The native plugins add it as `$flutter_version` to the
+/// `Application Installed` and `Application Updated` events the native SDKs
+/// capture, since the version only changes with a new app build.
+Map<String, String> flutterVersionSetupArguments({
   String flutterVersion = _flutterVersion,
 }) {
   return {
-    if (flutterVersion.isNotEmpty) r'$flutter_version': flutterVersion,
+    if (flutterVersion.isNotEmpty) 'flutterVersion': flutterVersion,
   };
-}
-
-/// Adds the `$flutter_version` property to [properties], replacing any value
-/// the caller set. `beforeSend` runs afterwards and can still change it.
-Map<String, Object>? withFlutterVersion(Map<String, Object>? properties) {
-  final versionProperties = flutterVersionProperties();
-  if (versionProperties.isEmpty) return properties;
-  return {...?properties, ...versionProperties};
 }

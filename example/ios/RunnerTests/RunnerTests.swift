@@ -64,6 +64,35 @@ class RunnerTests: XCTestCase {
         XCTAssertNil(records.last?.spanId)
     }
 
+    func testFlutterVersionAddedOnlyToInstallAndUpdateEvents() throws {
+        var flutterVersions: [String: String] = [:]
+        let config = PostHogConfig(projectToken: "flutter-version-test", host: "http://127.0.0.1:1")
+        config.preloadFeatureFlags = false
+        config.captureApplicationLifecycleEvents = false
+        config.setBeforeSend(
+            try XCTUnwrap(PosthogFlutterPlugin.flutterVersionBeforeSend(["flutterVersion": "3.35.0"])),
+            { event in
+                flutterVersions[event.event] = event.properties["$flutter_version"] as? String ?? "none"
+                return nil
+            }
+        )
+        PostHogSDK.shared.close()
+        PostHogSDK.shared.setup(config)
+        defer { PostHogSDK.shared.close() }
+
+        for event in ["Application Installed", "Application Updated", "Application Opened", "custom"] {
+            PostHogSDK.shared.capture(event)
+        }
+
+        XCTAssertEqual(flutterVersions, [
+            "Application Installed": "3.35.0",
+            "Application Updated": "3.35.0",
+            "Application Opened": "none",
+            "custom": "none",
+        ])
+        XCTAssertNil(PosthogFlutterPlugin.flutterVersionBeforeSend([:]))
+    }
+
     func testCaptureLogMissingBodyReturnsError() {
         let plugin = PosthogFlutterPlugin()
 
