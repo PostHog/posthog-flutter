@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 // The replay capturer defines its own ImageInfo; hide Flutter's.
 import 'package:flutter/material.dart' hide ImageInfo;
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -69,9 +70,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
       return;
     }
 
-    // On web, session replay is recorded by posthog-js; this pipeline has no
-    // consumer there, so every snapshot it produces is discarded.
-    if (!kIsWeb && config.sessionReplay) {
+    if (_capturesSnapshots && config.sessionReplay) {
       _initComponents(config);
       _changeDetector?.start();
     }
@@ -194,6 +193,14 @@ class PostHogWidgetState extends State<PostHogWidget> {
         (_screenshotCapturer?.sessionStillCurrent(imageInfo) ?? false);
   }
 
+  /// On web, session replay is recorded by posthog-js, and Windows and Linux
+  /// have no native SDK to record it: this pipeline has no consumer there, so
+  /// every snapshot it produces would be discarded.
+  static bool get _capturesSnapshots =>
+      !kIsWeb &&
+      defaultTargetPlatform != TargetPlatform.windows &&
+      defaultTargetPlatform != TargetPlatform.linux;
+
   void _initComponents(PostHogConfig config) {
     _screenshotCapturer = ScreenshotCapturer(
       config,
@@ -219,7 +226,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   }
 
   void _startRecording() {
-    if (kIsWeb) {
+    if (!_capturesSnapshots) {
       return;
     }
 

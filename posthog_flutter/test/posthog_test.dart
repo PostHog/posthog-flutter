@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -41,6 +42,58 @@ void main() {
         );
       },
     );
+
+    test('Windows and Linux support is enabled by default', () {
+      expect(PostHogConfig('test_project_token').enableWindowsAndLinux, isTrue);
+    });
+
+    for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {
+      test('default config sets up on $platform', () async {
+        debugDefaultTargetPlatformOverride = platform;
+        try {
+          final config = PostHogConfig('test_project_token');
+          await Posthog().setup(config);
+          expect(fakePlatformInterface.receivedConfig, same(config));
+        } finally {
+          await Posthog().close();
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+    }
+
+    for (final platform in TargetPlatform.values) {
+      test('enableWindowsAndLinux only disables setup on $platform', () async {
+        debugDefaultTargetPlatformOverride = platform;
+        final originalHandler = FlutterError.onError;
+        void sentinelHandler(FlutterErrorDetails _) {}
+        FlutterError.onError = sentinelHandler;
+        try {
+          final config = PostHogConfig('test_project_token')
+            ..enableWindowsAndLinux = false
+            ..sessionReplay = true;
+          config.errorTrackingConfig.captureFlutterErrors = true;
+
+          await Posthog().setup(config);
+
+          if (!kIsWeb &&
+              (platform == TargetPlatform.windows ||
+                  platform == TargetPlatform.linux)) {
+            expect(fakePlatformInterface.receivedConfig, isNull);
+            expect(Posthog().config, isNull);
+            expect(FlutterError.onError, same(sentinelHandler));
+            expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
+          } else {
+            expect(fakePlatformInterface.receivedConfig, same(config));
+            expect(Posthog().config, same(config));
+            expect(FlutterError.onError, isNot(same(sentinelHandler)));
+          }
+        } finally {
+          await Posthog().close();
+          FlutterError.onError = originalHandler;
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+    }
 
     test(
       'setup after close with different masking flags rebuilds the parser map',
