@@ -136,6 +136,23 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun setup_surveysDelegate_staysTheSameInstanceAcrossRepeatedSetup() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        val call = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        val first = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
+
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        val second = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
+
+        // The native SDK keeps the delegate from the first setup, so a second instance here would
+        // render nothing yet still receive every Dart survey action and reject it.
+        assertSame(first, second)
+    }
+
+    @Test
     fun setup_verifyScreenshotMaskAlignment_defaultsToFalse() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
