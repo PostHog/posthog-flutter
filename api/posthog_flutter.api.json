@@ -13,7 +13,7 @@
     "packageApi": {
         "androidPlatformConstraints": {
             "compileSdkVersion": null,
-            "minSdkVersion": 21,
+            "minSdkVersion": 23,
             "targetSdkVersion": null
         },
         "executableDeclarations": [
@@ -595,7 +595,7 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "disable",
+                        "name": "optOut",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<void>",
@@ -607,7 +607,7 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "enable",
+                        "name": "optIn",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<void>",
@@ -911,28 +911,6 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "getFeatureFlagPayload",
-                        "parameters": [
-                            {
-                                "isDeprecated": false,
-                                "isExperimental": false,
-                                "isNamed": true,
-                                "isRequired": true,
-                                "name": "key",
-                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                                "typeName": "String"
-                            }
-                        ],
-                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                        "returnTypeName": "Future<Object?>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
                         "name": "getFeatureFlagResult",
                         "parameters": [
                             {
@@ -949,7 +927,7 @@
                                 "isExperimental": false,
                                 "isNamed": true,
                                 "isRequired": false,
-                                "name": "sendEvent",
+                                "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "bool"
                             }
@@ -1578,7 +1556,7 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "disable",
+                        "name": "optOut",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<void>",
@@ -1590,7 +1568,7 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "enable",
+                        "name": "optIn",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<void>",
@@ -1894,28 +1872,6 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "getFeatureFlagPayload",
-                        "parameters": [
-                            {
-                                "isDeprecated": false,
-                                "isExperimental": false,
-                                "isNamed": true,
-                                "isRequired": true,
-                                "name": "key",
-                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                                "typeName": "String"
-                            }
-                        ],
-                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                        "returnTypeName": "Future<Object?>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
                         "name": "getFeatureFlagResult",
                         "parameters": [
                             {
@@ -1932,7 +1888,7 @@
                                 "isExperimental": false,
                                 "isNamed": true,
                                 "isRequired": false,
-                                "name": "sendEvent",
+                                "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "bool"
                             }
@@ -2143,18 +2099,6 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "toMap",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, dynamic>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
                         "name": "new",
                         "parameters": [
                             {
@@ -2200,17 +2144,6 @@
                         "isStatic": false,
                         "isWriteable": false,
                         "name": "projectToken",
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "String"
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isReadable": true,
-                        "isStatic": false,
-                        "isWriteable": false,
-                        "name": "apiKey",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "String"
                     },
@@ -2277,17 +2210,6 @@
                         "isStatic": false,
                         "isWriteable": true,
                         "name": "sendFeatureFlagEvent",
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "bool"
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isReadable": true,
-                        "isStatic": false,
-                        "isWriteable": true,
-                        "name": "sendFeatureFlagEvents",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
                     },
@@ -2533,18 +2455,6 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "toMap",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, Object>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
                         "name": "new",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_config.dart",
@@ -2735,18 +2645,6 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "toMap",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, dynamic>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
                         "name": "new",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_config.dart",
@@ -2810,17 +2708,6 @@
                         "name": "textMaskPolicy",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "PostHogTextMask Function(String, Widget)?"
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isReadable": false,
-                        "isStatic": false,
-                        "isWriteable": true,
-                        "name": "debouncerDelay",
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "Duration"
                     },
                     {
                         "entryPoints": [],
@@ -2993,17 +2880,6 @@
                     },
                     {
                         "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isReadable": true,
-                        "isStatic": true,
-                        "isWriteable": false,
-                        "name": "cellular",
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "PostHogDataMode"
-                    },
-                    {
-                        "entryPoints": [],
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isReadable": true,
@@ -3042,18 +2918,6 @@
                     "posthog_flutter.dart"
                 ],
                 "executableDeclarations": [
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "toMap",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, dynamic>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
@@ -3200,18 +3064,6 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
-                        "name": "toMap",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, Object>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
                         "name": "new",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_config.dart",
@@ -3260,18 +3112,6 @@
                     "posthog_flutter.dart"
                 ],
                 "executableDeclarations": [
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "toMap",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, dynamic>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
@@ -3424,18 +3264,6 @@
                     "posthog_flutter.dart"
                 ],
                 "executableDeclarations": [
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "toMap",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "returnTypeName": "Map<String, Object?>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
@@ -3644,37 +3472,6 @@
                     "posthog_flutter.dart"
                 ],
                 "executableDeclarations": [
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isStatic": true,
-                        "name": "fromMap",
-                        "parameters": [
-                            {
-                                "isDeprecated": false,
-                                "isExperimental": false,
-                                "isNamed": false,
-                                "isRequired": true,
-                                "name": "result",
-                                "relativePath": "lib/src/feature_flag_result.dart",
-                                "typeName": "Object?"
-                            },
-                            {
-                                "isDeprecated": false,
-                                "isExperimental": false,
-                                "isNamed": false,
-                                "isRequired": true,
-                                "name": "fallbackKey",
-                                "relativePath": "lib/src/feature_flag_result.dart",
-                                "typeName": "String"
-                            }
-                        ],
-                        "relativePath": "lib/src/feature_flag_result.dart",
-                        "returnTypeName": "PostHogFeatureFlagResult?",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
@@ -4406,30 +4203,6 @@
                     },
                     {
                         "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "disable",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog.dart",
-                        "returnTypeName": "Future<void>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "enable",
-                        "parameters": [],
-                        "relativePath": "lib/src/posthog.dart",
-                        "returnTypeName": "Future<void>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
@@ -4857,35 +4630,13 @@
                                 "isExperimental": false,
                                 "isNamed": true,
                                 "isRequired": false,
-                                "name": "sendEvent",
+                                "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "bool"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<PostHogFeatureFlagResult?>",
-                        "type": "method",
-                        "typeParameterNames": []
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": true,
-                        "isExperimental": false,
-                        "isStatic": false,
-                        "name": "getFeatureFlagPayload",
-                        "parameters": [
-                            {
-                                "isDeprecated": false,
-                                "isExperimental": false,
-                                "isNamed": false,
-                                "isRequired": true,
-                                "name": "key",
-                                "relativePath": "lib/src/posthog.dart",
-                                "typeName": "String"
-                            }
-                        ],
-                        "relativePath": "lib/src/posthog.dart",
-                        "returnTypeName": "Future<Object?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
