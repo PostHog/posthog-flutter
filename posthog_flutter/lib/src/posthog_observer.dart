@@ -32,8 +32,7 @@ bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
 /// Add this observer to `MaterialApp.navigatorObservers` or a router such as
 /// `go_router` to capture screen views when named routes are pushed, popped, or
 /// replaced.
-class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
-    with WidgetsBindingObserver {
+class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
   /// Creates a PostHog route observer.
   ///
   /// The [nameExtractor] reads a screen name from route settings. It defaults
@@ -47,24 +46,14 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
   })  : _nameExtractor = nameExtractor,
-        _routeFilter = routeFilter {
-    WidgetsBinding.instance.addObserver(this);
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
-  }
-
-  AppLifecycleState? _appLifecycleState;
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appLifecycleState = state;
-  }
+        _routeFilter = routeFilter;
 
   /// Whether the app is currently in the foreground (resumed state).
   /// Screen events are suppressed when the app is not in the foreground
   /// to avoid ghost screen views caused by background widget rebuilds.
   bool get _isAppInForeground {
     // If we haven't received a lifecycle state yet, assume foreground
-    final state = _appLifecycleState;
+    final state = WidgetsBinding.instance.lifecycleState;
     return state == null || state == AppLifecycleState.resumed;
   }
 

@@ -5312,8 +5312,7 @@
                 "superTypeNames": [
                     "RouteObserver<ModalRoute<dynamic>>",
                     "NavigatorObserver",
-                    "Object",
-                    "WidgetsBindingObserver"
+                    "Object"
                 ],
                 "typeParameterNames": []
             },
