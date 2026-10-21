@@ -47,24 +47,14 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
   })  : _nameExtractor = nameExtractor,
-        _routeFilter = routeFilter {
-    WidgetsBinding.instance.addObserver(this);
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
-  }
-
-  AppLifecycleState? _appLifecycleState;
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appLifecycleState = state;
-  }
+        _routeFilter = routeFilter;
 
   /// Whether the app is currently in the foreground (resumed state).
   /// Screen events are suppressed when the app is not in the foreground
   /// to avoid ghost screen views caused by background widget rebuilds.
   bool get _isAppInForeground {
     // If we haven't received a lifecycle state yet, assume foreground
-    final state = _appLifecycleState;
+    final state = WidgetsBinding.instance.lifecycleState;
     return state == null || state == AppLifecycleState.resumed;
   }
 
