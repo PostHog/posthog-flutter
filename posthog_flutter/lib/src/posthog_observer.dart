@@ -32,7 +32,8 @@ bool defaultPostHogRouteFilter(Route<dynamic>? route) => route is PageRoute;
 /// Add this observer to `MaterialApp.navigatorObservers` or a router such as
 /// `go_router` to capture screen views when named routes are pushed, popped, or
 /// replaced.
-class PosthogObserver extends RouteObserver<ModalRoute<dynamic>> {
+class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
+    with WidgetsBindingObserver {
   /// Creates a PostHog route observer.
   ///
   /// The [nameExtractor] reads a screen name from route settings. It defaults

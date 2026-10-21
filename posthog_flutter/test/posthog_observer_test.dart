@@ -38,6 +38,10 @@ void main() {
     );
   }
 
+  test('preserves WidgetsBindingObserver compatibility', () {
+    expect(getSut(), isA<WidgetsBindingObserver>());
+  });
+
   test('returns current route name', () {
     final currentRoute = route(const RouteSettings(name: 'Current Route'));
 
@@ -219,9 +223,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
 
     // removeObserver returns true only for an observer still registered.
-    final Object registered = observer;
-    final wasRegistered = registered is WidgetsBindingObserver &&
-        tester.binding.removeObserver(registered);
+    final wasRegistered = tester.binding.removeObserver(observer);
     expect(wasRegistered, isFalse);
   });
 }
