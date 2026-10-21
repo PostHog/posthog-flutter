@@ -1,5 +1,11 @@
 ## Next
 
+## 5.56.1
+
+### Patch Changes
+
+- 7fa8179: Stop `PosthogObserver` from registering itself with `WidgetsBinding` and never unregistering, which leaked one observer per navigator, such as each nested auto_route router.
+
 ## 5.56.0
 
 ### Minor Changes
