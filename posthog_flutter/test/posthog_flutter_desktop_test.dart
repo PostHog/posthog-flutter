@@ -836,22 +836,31 @@ void main() {
           ['before capture', 'during beforeSend']);
     });
 
-    test('send their values as event properties send them', () async {
+    test('normalize non-finite step and event properties identically',
+        () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
 
-      await platform
-          .addExceptionStep('step', properties: {'ratio': double.nan});
+      final input = {
+        'ratio': double.nan,
+        'finite': 42.5,
+        'literal': 'NaN',
+      };
+      await platform.addExceptionStep('step', properties: input);
       await platform.captureException(
         error: StateError('not a number'),
-        properties: {'ratio': double.nan},
+        properties: input,
       );
 
       final properties =
           _propertiesOf(await server.waitForEvent(r'$exception'));
       final step = (properties[r'$exception_steps']! as List).single as Map;
-      expect(properties['ratio'], 'NaN');
-      expect(step['ratio'], 'NaN');
+      expect(properties, isNot(contains('ratio')));
+      expect(step, isNot(contains('ratio')));
+      for (final sent in [properties, step]) {
+        expect(sent['finite'], 42.5);
+        expect(sent['literal'], 'NaN');
+      }
     });
 
     test(r'attach to an $exception captured by name', () async {
