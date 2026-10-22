@@ -66,17 +66,21 @@ void main() {
       expect(step['nested'], {'kept': 1});
     });
 
-    test('keeps a step with a number JSON cannot represent, as its string', () {
+    test('keeps a step with non-finite numbers as null', () {
       final buffer = ExceptionStepsBuffer(maxBytes: 32768);
 
       buffer.add('step', properties: {
         'ratio': double.nan,
         'limits': [double.infinity, double.negativeInfinity],
+        'finite': 42.5,
+        'literal': 'NaN',
       });
 
       final step = buffer.steps.single;
-      expect(step['ratio'], 'NaN');
-      expect(step['limits'], ['Infinity', '-Infinity']);
+      expect(step, containsPair('ratio', null));
+      expect(step['limits'], [null, null]);
+      expect(step['finite'], 42.5);
+      expect(step['literal'], 'NaN');
     });
 
     test('evicts the oldest steps to stay within the budget', () {

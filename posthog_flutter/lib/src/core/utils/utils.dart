@@ -40,7 +40,8 @@ Future<T> retriable<T>(
 
 /// Returns [value] as a new structure that `jsonEncode` accepts.
 ///
-/// A [DateTime] becomes its ISO 8601 string in UTC and a [Uri] its string.
+/// Non-finite doubles become null. A [DateTime] becomes its ISO 8601 string
+/// in UTC and a [Uri] its string.
 /// Other values JSON cannot represent are converted like `jsonEncode` does,
 /// through their `toJson()`, or else sent as their `toString()` with a
 /// warning to [logger]. Map keys become strings. With [dropNullMembers],
@@ -56,6 +57,8 @@ Object? toJsonValue(Object? value, CoreLogger logger,
     switch (value) {
       case null || bool() || String() || int() || double(isFinite: true):
         return value;
+      case double():
+        return null;
       case final DateTime date:
         return date.toUtc().toIso8601String();
       case final Uri uri:
