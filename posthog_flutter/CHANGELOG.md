@@ -1,5 +1,11 @@
 ## Next
 
+## 5.56.2
+
+### Patch Changes
+
+- 94ca664: Omit numeric NaN and infinities from Windows/Linux event object properties and send them as null in arrays instead of strings. Preserve array positions and valid neighboring properties, and budget exception steps using their final wire form.
+
 ## 5.56.1
 
 ### Patch Changes
