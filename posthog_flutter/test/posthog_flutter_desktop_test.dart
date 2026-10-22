@@ -836,7 +836,7 @@ void main() {
           ['before capture', 'during beforeSend']);
     });
 
-    test('omit null-valued buffered step members when capturing the exception',
+    test('normalize non-finite step and event properties identically',
         () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
@@ -855,7 +855,7 @@ void main() {
       final properties =
           _propertiesOf(await server.waitForEvent(r'$exception'));
       final step = (properties[r'$exception_steps']! as List).single as Map;
-      expect(properties, containsPair('ratio', null));
+      expect(properties, isNot(contains('ratio')));
       expect(step, isNot(contains('ratio')));
       for (final sent in [properties, step]) {
         expect(sent['finite'], 42.5);

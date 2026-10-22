@@ -5,6 +5,7 @@ import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
+import 'package:posthog_flutter/src/posthog_desktop_exception_steps.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
 import '../posthog_api_fake.dart';
@@ -568,7 +569,7 @@ void main() {
       expect(props['link'], 'https://posthog.com/docs');
       expect(props['plan'], {'name': 'pro'},
           reason: 'jsonEncode supports toJson(), so the event must too');
-      expect(props, containsPair('ratio', null));
+      expect(props, isNot(contains('ratio')));
       expect(props['counts'], {'1': 'one'});
       expect(() => jsonEncode(getQueue(storage)), returnsNormally);
     });
@@ -578,7 +579,7 @@ void main() {
       ('positive infinity', double.infinity, 'Infinity'),
       ('negative infinity', double.negativeInfinity, '-Infinity'),
     ]) {
-      test('captures and sends numeric $label as null without changing input',
+      test('captures and sends numeric $label without changing input',
           () async {
         final nested = <String, Object?>{'ratio': value, 'finite': 42.5};
         final inArray = <String, Object?>{'ratio': value, 'enabled': false};
@@ -593,12 +594,11 @@ void main() {
           'drop': null,
         };
         final expected = <String, Object?>{
-          'ratio': null,
-          'nested': {'ratio': null, 'finite': 42.5},
+          'nested': {'finite': 42.5},
           'items': [
             0,
             null,
-            {'ratio': null, 'enabled': false},
+            {'enabled': false},
             null,
             'after'
           ],
@@ -617,6 +617,7 @@ void main() {
           expect(queued, containsPair(entry.key, entry.value));
         }
         expect(queued, isNot(contains('drop')));
+        expect(queued, isNot(contains('ratio')));
 
         await client.flush();
 
@@ -627,6 +628,7 @@ void main() {
           expect(sent, containsPair(entry.key, entry.value));
         }
         expect(sent, isNot(contains('drop')));
+        expect(sent, isNot(contains('ratio')));
         expect(batch.events.last['properties'],
             allOf(containsPair('finite', 7), containsPair('literal', literal)));
         expect(getQueue(storage), isEmpty);
@@ -641,6 +643,36 @@ void main() {
         expect(properties, containsPair('drop', null));
       });
     }
+
+    test(
+        'sends buffered non-finite exception steps without changing their form',
+        () async {
+      final buffer = ExceptionStepsBuffer(maxBytes: 32768);
+      buffer.add('step', properties: {
+        'ratio': double.nan,
+        'nested': {'ratio': double.infinity, 'finite': 42.5},
+        'items': [
+          0,
+          double.negativeInfinity,
+          {'ratio': double.nan},
+          'NaN'
+        ],
+      });
+      final buffered = jsonDecode(jsonEncode(buffer.steps));
+
+      client.capture(r'$exception', properties: {
+        r'$exception_steps': buffer.steps,
+      });
+      client.capture('healthy', properties: {'finite': 7});
+      await client.flush();
+
+      final batch = server.batchRequests.single;
+      expect(batch.eventNames, [r'$exception', 'healthy']);
+      final sent = batch.events.first['properties'] as Map;
+      expect(sent[r'$exception_steps'], buffered);
+      expect(buffer.steps, buffered);
+      expect(batch.events.last['properties'], containsPair('finite', 7));
+    });
 
     test('sends a value without a JSON form as its string, with a warning', () {
       final lines = printedLines(() => client
