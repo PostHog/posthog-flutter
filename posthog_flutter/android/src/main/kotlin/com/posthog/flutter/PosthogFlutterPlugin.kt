@@ -27,8 +27,8 @@ import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
+import com.posthog.PostHogFeatureFlagsCallback
 import com.posthog.PostHogFeatureFlagsLoaded
-import com.posthog.PostHogOnFeatureFlags
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
@@ -800,7 +800,7 @@ class PosthogFlutterPlugin :
                 }
 
                 onFeatureFlags =
-                    PostHogOnFeatureFlags { loaded ->
+                    PostHogFeatureFlagsCallback { loaded ->
                         Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
                         invokeFlutterMethod("onFeatureFlagsCallback", loaded.toFlutterMap())
                     }
