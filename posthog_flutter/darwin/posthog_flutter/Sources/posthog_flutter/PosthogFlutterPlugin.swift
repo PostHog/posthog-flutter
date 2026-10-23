@@ -1353,7 +1353,13 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String
         {
-            let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
+            // A missing sendEvent follows config.sendFeatureFlagEvent.
+            let value: Any?
+            if let sendEvent = args["sendEvent"] as? Bool {
+                value = PostHogSDK.shared.getFeatureFlag(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+            } else {
+                value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
+            }
             result(value)
         } else {
             _badArgumentError(result)
@@ -1367,7 +1373,12 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String
         {
-            let value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
+            let value: Bool
+            if let sendEvent = args["sendEvent"] as? Bool {
+                value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+            } else {
+                value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
+            }
             result(value)
         } else {
             _badArgumentError(result)

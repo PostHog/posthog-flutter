@@ -331,9 +331,13 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<bool> isFeatureEnabled(String key) async {
+  Future<bool> isFeatureEnabled(String key,
+      {bool? sendFeatureFlagEvent}) async {
     final result = await handleWebMethodCall(
-      MethodCall('isFeatureEnabled', {'key': key}),
+      MethodCall('isFeatureEnabled', {
+        'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      }),
     );
     return result as bool? ?? false;
   }
@@ -399,8 +403,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlag({required String key}) async {
-    return handleWebMethodCall(MethodCall('getFeatureFlag', {'key': key}));
+  Future<Object?> getFeatureFlag({
+    required String key,
+    bool? sendFeatureFlagEvent,
+  }) async {
+    return handleWebMethodCall(MethodCall('getFeatureFlag', {
+      'key': key,
+      if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+    }));
   }
 
   @override
