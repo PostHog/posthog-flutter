@@ -224,6 +224,14 @@ void main() {
       expect(config.toMap()['sendFeatureFlagEvents'], isFalse);
     });
 
+    test('toMap forwards evaluationContexts only when set', () {
+      final config = PostHogConfig('test_project_token');
+      expect(config.toMap().containsKey('evaluationContexts'), isFalse);
+
+      config.evaluationContexts = ['mobile', 'prod'];
+      expect(config.toMap()['evaluationContexts'], ['mobile', 'prod']);
+    });
+
     test('trims whitespace-sensitive config values in config and toMap', () {
       final config = PostHogConfig(' \n test_project_token\t ');
       config.host = ' \nhttps://eu.i.posthog.com/\t ';

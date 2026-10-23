@@ -603,6 +603,9 @@ class PosthogFlutterPlugin :
                 posthogConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
                     preloadFeatureFlags = it
                 }
+                posthogConfig.getIfNotNull<List<String>>("evaluationContexts") {
+                    evaluationContexts = it
+                }
                 posthogConfig.getIfNotNull<Boolean>("optOut") {
                     optOut = it
                 }

@@ -21,6 +21,7 @@ import 'uuid.dart';
 abstract class PostHogCore extends PostHogCoreStateless {
   final bool _sendFeatureFlagEvents;
   final PostHogPersonProfiles _personProfiles;
+  final List<String>? _evaluationContexts;
 
   /// The `$feature_flag_called` values already reported, per flag key.
   final Map<String, Set<PostHogFeatureFlagValue?>> _flagCallReported = {};
@@ -57,6 +58,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   PostHogCore(PostHogConfig config, {required super.storage})
       : _sendFeatureFlagEvents = config.sendFeatureFlagEvents,
         _personProfiles = config.personProfiles,
+        _evaluationContexts = config.evaluationContexts == null
+            ? null
+            : List.unmodifiable(config.evaluationContexts!),
         super(config) {
     final bootstrap = config.bootstrap;
     if (bootstrap != null) _seedBootstrapIdentity(bootstrap);
@@ -577,6 +581,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
         r'$anon_distinct_id': _getAnonymousId(),
         r'$device_id': _getDeviceId(),
         if (timezone != null) 'timezone': timezone,
+        if (_evaluationContexts?.isNotEmpty ?? false)
+          'evaluation_contexts': _evaluationContexts,
       };
 
       final result = await getFlags(
