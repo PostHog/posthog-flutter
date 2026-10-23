@@ -59,6 +59,8 @@ extension PostHogExtension on PostHog {
   external JSAny? getFeatureFlag(JSAny key, [JSAny? options]);
   external JSAny? getFeatureFlagPayload(JSAny key);
   external JSAny? getFeatureFlagResult(JSAny key, [JSAny? options]);
+  // Added in posthog-js 1.395.0; the call site guards with try/catch.
+  external JSAny? getAllFeatureFlags();
   external void register(JSAny properties);
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
@@ -390,6 +392,15 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
         {'send_event': sendEvent}.jsify(),
       );
       return result?.dartify();
+    case 'getAllFeatureFlags':
+      try {
+        return posthog?.getAllFeatureFlags()?.dartify();
+      } catch (error) {
+        printIfDebug(
+          '[PostHog] getAllFeatureFlags is not supported by the loaded posthog-js version: $error',
+        );
+        return null;
+      }
     case 'register':
       final key = args['key'] as String;
       final value = args['value'];

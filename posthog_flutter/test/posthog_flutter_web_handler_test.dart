@@ -7,6 +7,7 @@ import 'dart:js_interop_unsafe';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
+import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
 // Browser-only: handleWebMethodCall talks to the posthog-js instance on
@@ -271,6 +272,32 @@ void main() {
         });
       });
     }
+  });
+
+  group('PosthogFlutterWeb getAllFeatureFlags', () {
+    test('decodes the posthog-js results', () async {
+      final fake = JSObject();
+      fake.setProperty(
+        'getAllFeatureFlags'.toJS,
+        (() => [
+              {'key': 'on', 'enabled': true},
+              {'key': 'multi', 'enabled': true, 'variant': 'control'},
+            ].jsify()).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+
+      expect(await PosthogFlutterWeb().getAllFeatureFlags(), [
+        const PostHogFeatureFlagResult(key: 'on', enabled: true),
+        const PostHogFeatureFlagResult(
+            key: 'multi', enabled: true, variant: 'control'),
+      ]);
+    });
+
+    test('returns null when posthog-js predates getAllFeatureFlags', () async {
+      globalContext.setProperty('posthog'.toJS, JSObject());
+
+      expect(await PosthogFlutterWeb().getAllFeatureFlags(), isNull);
+    });
   });
 
   group('PosthogFlutterWeb captureException', () {

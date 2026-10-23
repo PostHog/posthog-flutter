@@ -844,6 +844,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
       capture(r'$feature_flag_called', properties: captureProperties);
     }
 
+    return _toFlagResult(key, featureFlag);
+  }
+
+  PostHogFeatureFlagResult? _toFlagResult(
+      String key, PostHogFeatureFlagDetail? featureFlag) {
+    final flagValue = getFeatureFlagValue(featureFlag);
     if (flagValue == null) return null;
 
     // Payloads only accompany enabled flags.
@@ -862,6 +868,17 @@ abstract class PostHogCore extends PostHogCoreStateless {
       variant: flagValue is String ? flagValue : null,
       payload: payload,
     );
+  }
+
+  /// Gets the results of all loaded feature flags without capturing
+  /// `$feature_flag_called`. Returns null when no flags have been loaded.
+  List<PostHogFeatureFlagResult>? getAllFeatureFlagResults() {
+    final flags = _getStoredFlagDetails()?.toResponse().flags;
+    if (flags == null) return null;
+    return [
+      for (final MapEntry(:key, :value) in flags.entries)
+        if (_toFlagResult(key, value) case final result?) result,
+    ];
   }
 
   /// Gets a feature flag value, capturing `$feature_flag_called` when

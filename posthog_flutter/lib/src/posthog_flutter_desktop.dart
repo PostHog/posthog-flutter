@@ -524,6 +524,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           (client) => client.getFeatureFlagResult(key, sendEvent: sendEvent));
 
   @override
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() => _guardWith(
+      'getAllFeatureFlags',
+      null,
+      (client) => client.getAllFeatureFlagResults());
+
+  @override
   Future<void> flush() => _guard('flush', (client) => client.flush());
 
   @override
