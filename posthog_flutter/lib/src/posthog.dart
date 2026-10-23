@@ -481,8 +481,23 @@ class Posthog {
   ///
   /// The [key] is the feature flag key.
   ///
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
+  /// this call, or `true` to capture it even when the config turns it off.
+  ///
   /// Returns `false` when the flag is disabled, missing, or not a boolean flag.
-  Future<bool> isFeatureEnabled(String key) => _posthog.isFeatureEnabled(key);
+  ///
+  /// **Example:**
+  /// ```dart
+  /// if (await Posthog().isFeatureEnabled('new-checkout',
+  ///     sendFeatureFlagEvent: false)) {
+  ///   // show the new checkout without recording a flag exposure
+  /// }
+  /// ```
+  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
+      _posthog.isFeatureEnabled(key,
+          sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Reloads feature flags for the current user.
   ///
@@ -761,8 +776,23 @@ class Posthog {
   /// Returns `null` if the flag does not exist or cannot be loaded. For boolean
   /// flags, returns `true` or `false`. For multivariate flags, returns the
   /// variant key.
-  Future<Object?> getFeatureFlag(String key) =>
-      _posthog.getFeatureFlag(key: key);
+  ///
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
+  /// this call, or `true` to capture it even when the config turns it off.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final variant = await Posthog().getFeatureFlag('button-color',
+  ///     sendFeatureFlagEvent: false);
+  /// if (variant == 'red') {
+  ///   // show the red button without recording a flag exposure
+  /// }
+  /// ```
+  Future<Object?> getFeatureFlag(String key, {bool? sendFeatureFlagEvent}) =>
+      _posthog.getFeatureFlag(
+          key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Returns the full feature flag result for [key], including value and
   /// payload.

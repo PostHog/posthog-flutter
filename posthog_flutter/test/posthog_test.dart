@@ -451,6 +451,24 @@ void main() {
     ]);
   });
 
+  test('getFeatureFlag and isFeatureEnabled forward sendFeatureFlagEvent',
+      () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+
+    await Posthog().getFeatureFlag('a');
+    await Posthog().getFeatureFlag('b', sendFeatureFlagEvent: false);
+    await Posthog().isFeatureEnabled('c');
+    await Posthog().isFeatureEnabled('d', sendFeatureFlagEvent: true);
+
+    expect(fake.flagReadCalls, [
+      {'method': 'getFeatureFlag', 'key': 'a', 'sendFeatureFlagEvent': null},
+      {'method': 'getFeatureFlag', 'key': 'b', 'sendFeatureFlagEvent': false},
+      {'method': 'isFeatureEnabled', 'key': 'c', 'sendFeatureFlagEvent': null},
+      {'method': 'isFeatureEnabled', 'key': 'd', 'sendFeatureFlagEvent': true},
+    ]);
+  });
+
   group('getFeatureFlagResult', () {
     late PosthogFlutterPlatformFake fakePlatformInterface;
 

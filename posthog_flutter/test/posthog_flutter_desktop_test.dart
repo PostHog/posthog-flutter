@@ -1802,6 +1802,56 @@ void main() {
       expect(view['distinct_id'], distinctId);
     });
 
+    test(r'sendFeatureFlagEvent false skips $feature_flag_called', () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final flagsLoaded = Completer<void>();
+      final config = configFor(server)
+        ..onFeatureFlags = () {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        };
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+
+      expect(
+          await platform.isFeatureEnabled('variant-flag',
+              sendFeatureFlagEvent: false),
+          isTrue);
+      expect(
+          await platform.getFeatureFlag(
+              key: 'variant-flag', sendFeatureFlagEvent: false),
+          'test-variant');
+      await platform.capture(eventName: 'sentinel event');
+      await server.waitForEvent('sentinel event');
+      expect(server.eventNames, isNot(contains(r'$feature_flag_called')));
+    });
+
+    test(
+        r'getFeatureFlag follows config.sendFeatureFlagEvent unless overridden',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final flagsLoaded = Completer<void>();
+      final config = configFor(server)
+        ..sendFeatureFlagEvent = false
+        ..onFeatureFlags = () {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        };
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+
+      expect(
+          await platform.getFeatureFlag(key: 'variant-flag'), 'test-variant');
+      await platform.capture(eventName: 'sentinel event');
+      await server.waitForEvent('sentinel event');
+      expect(server.eventNames, isNot(contains(r'$feature_flag_called')));
+
+      await platform.getFeatureFlag(
+          key: 'variant-flag', sendFeatureFlagEvent: true);
+      final called = await server.waitForEvent(r'$feature_flag_called');
+      expect(_propertiesOf(called)[r'$feature_flag'], 'variant-flag');
+    });
+
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();

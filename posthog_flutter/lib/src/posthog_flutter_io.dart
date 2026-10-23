@@ -566,7 +566,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<bool> isFeatureEnabled(String key) async {
+  Future<bool> isFeatureEnabled(String key,
+      {bool? sendFeatureFlagEvent}) async {
     if (!isSupportedPlatform()) {
       return false;
     }
@@ -574,6 +575,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       return await _methodChannel.invokeMethod('isFeatureEnabled', {
         'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on isFeatureEnabled: $exception');
@@ -691,13 +693,19 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlag({required String key}) async {
+  Future<Object?> getFeatureFlag({
+    required String key,
+    bool? sendFeatureFlagEvent,
+  }) async {
     if (!isSupportedPlatform()) {
       return null;
     }
 
     try {
-      return await _methodChannel.invokeMethod('getFeatureFlag', {'key': key});
+      return await _methodChannel.invokeMethod('getFeatureFlag', {
+        'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on getFeatureFlag: $exception');
       return null;
