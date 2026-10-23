@@ -788,6 +788,29 @@ class Posthog {
   }) =>
       _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
 
+  /// Returns the results of all currently loaded feature flags.
+  ///
+  /// Each [PostHogFeatureFlagResult] carries the flag's key, enabled state,
+  /// variant (for multivariate flags), and payload. This reads the flags from
+  /// the last load without a network request; call [reloadFeatureFlags] first
+  /// to refresh them. Unlike [getFeatureFlag], it never captures the
+  /// `$feature_flag_called` event.
+  ///
+  /// Returns `null` when no flags have been loaded yet or the SDK is disabled.
+  /// On web, posthog-js returns an empty list before flags load, and this
+  /// returns `null` when the loaded posthog-js predates `getAllFeatureFlags`
+  /// (1.395.0).
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final flags = await Posthog().getAllFeatureFlags() ?? [];
+  /// for (final flag in flags) {
+  ///   print('${flag.key}: ${flag.variant ?? flag.enabled}');
+  /// }
+  /// ```
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() =>
+      _posthog.getAllFeatureFlags();
+
   /// Returns the payload for the feature flag [key].
   ///
   /// Returns `null` when the flag does not exist, has no payload, or the payload

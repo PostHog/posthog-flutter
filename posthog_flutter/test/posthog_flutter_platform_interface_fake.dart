@@ -271,4 +271,10 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
     return featureFlagResult;
   }
+
+  List<PostHogFeatureFlagResult>? allFeatureFlags;
+
+  @override
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() async =>
+      allFeatureFlags;
 }

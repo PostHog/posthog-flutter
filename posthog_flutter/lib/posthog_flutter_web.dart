@@ -424,6 +424,17 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() async {
+    final results =
+        await handleWebMethodCall(const MethodCall('getAllFeatureFlags'));
+    if (results is! List) return null;
+    return results
+        .map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+        .nonNulls
+        .toList();
+  }
+
+  @override
   Future<void> flush() async {
     return handleWebMethodCall(const MethodCall('flush'));
   }
