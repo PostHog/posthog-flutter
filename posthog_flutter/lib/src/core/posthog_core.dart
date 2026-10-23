@@ -858,11 +858,14 @@ abstract class PostHogCore extends PostHogCoreStateless {
     );
   }
 
-  /// Gets a feature flag value.
+  /// Gets a feature flag value, capturing `$feature_flag_called` when
+  /// [sendEvent] is true, or when it is null and `sendFeatureFlagEvents` is
+  /// enabled in the config.
   ///
   /// Returns null if the flag does not exist or has not been loaded.
-  PostHogFeatureFlagValue? getFeatureFlag(String key) {
-    final result = getFeatureFlagResult(key, sendEvent: _sendFeatureFlagEvents);
+  PostHogFeatureFlagValue? getFeatureFlag(String key, {bool? sendEvent}) {
+    final result = getFeatureFlagResult(key,
+        sendEvent: sendEvent ?? _sendFeatureFlagEvents);
     if (result == null) return null;
     return result.variant ?? result.enabled;
   }
@@ -871,8 +874,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       _getStoredFlagDetails()?.toResponse().featureFlags;
 
   /// Checks if a feature flag is enabled.
-  bool? isFeatureEnabled(String key) {
-    final response = getFeatureFlag(key);
+  bool? isFeatureEnabled(String key, {bool? sendEvent}) {
+    final response = getFeatureFlag(key, sendEvent: sendEvent);
     if (response == null) return null;
     if (response is bool) return response;
     return true; // String variants are truthy

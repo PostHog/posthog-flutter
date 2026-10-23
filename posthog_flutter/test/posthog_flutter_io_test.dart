@@ -82,6 +82,29 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO sendFeatureFlagEvent', () {
+    for (final sendFeatureFlagEvent in [null, true, false]) {
+      final expected = {
+        'key': 'flag',
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      };
+
+      test('getFeatureFlag sends $expected', () async {
+        await posthogFlutterIO.getFeatureFlag(
+            key: 'flag', sendFeatureFlagEvent: sendFeatureFlagEvent);
+        expect(log.single.method, 'getFeatureFlag');
+        expect(log.single.arguments, expected);
+      });
+
+      test('isFeatureEnabled sends $expected', () async {
+        await posthogFlutterIO.isFeatureEnabled('flag',
+            sendFeatureFlagEvent: sendFeatureFlagEvent);
+        expect(log.single.method, 'isFeatureEnabled');
+        expect(log.single.arguments, expected);
+      });
+    }
+  });
+
   group('PosthogFlutterIO onFeatureFlags via setup', () {
     test(
       'setup initializes method call handler and registers callback if provided',

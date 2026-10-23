@@ -153,7 +153,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('unregister() has not been implemented.');
   }
 
-  Future<bool> isFeatureEnabled(String key) {
+  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');
   }
 
@@ -200,7 +200,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('group() has not been implemented.');
   }
 
-  Future<Object?> getFeatureFlag({required String key}) {
+  Future<Object?> getFeatureFlag({
+    required String key,
+    bool? sendFeatureFlagEvent,
+  }) {
     throw UnimplementedError('getFeatureFlag() has not been implemented.');
   }
 
