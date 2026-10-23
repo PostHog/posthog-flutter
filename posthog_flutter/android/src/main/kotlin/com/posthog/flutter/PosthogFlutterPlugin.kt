@@ -2175,8 +2175,7 @@ class PosthogFlutterPlugin :
         }
     }
 
-    private fun PostHogFeatureFlagsLoaded.toFlutterMap(): Map<String, Any> =
-        mapOf("variants" to variants, "errorsLoading" to errorsLoading)
+    private fun PostHogFeatureFlagsLoaded.toFlutterMap(): Map<String, Any> = mapOf("variants" to variants, "errorsLoading" to errorsLoading)
 
     private fun invokeFlutterMethod(
         method: String,
