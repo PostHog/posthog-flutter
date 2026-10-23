@@ -375,13 +375,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   Future<void> reset() => _guard('reset', (client) => client.reset());
 
   @override
-  Future<void> disable() => _guard('disable', (client) {
+  Future<void> optOut() => _guard('optOut', (client) {
         client.optOut();
         _appLifecycle?.stop();
       });
 
   @override
-  Future<void> enable() => _guard('enable', (client) {
+  Future<void> optIn() => _guard('optIn', (client) {
         client.optIn();
         // Opting in is not an app open: an active app is reported as opened
         // on its next activation.
@@ -462,18 +462,15 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       'getFeatureFlag', null, (client) => client.getFeatureFlag(key));
 
   @override
-  Future<Object?> getFeatureFlagPayload({required String key}) => _guardWith(
-      'getFeatureFlagPayload',
-      null,
-      (client) => client.getFeatureFlagResult(key, sendEvent: false)?.payload);
-
-  @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool sendFeatureFlagEvent = true,
   }) =>
-      _guardWith('getFeatureFlagResult', null,
-          (client) => client.getFeatureFlagResult(key, sendEvent: sendEvent));
+      _guardWith(
+          'getFeatureFlagResult',
+          null,
+          (client) => client.getFeatureFlagResult(key,
+              sendEvent: sendFeatureFlagEvent));
 
   @override
   Future<void> flush() => _guard('flush', (client) => client.flush());
