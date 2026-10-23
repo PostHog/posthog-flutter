@@ -212,28 +212,42 @@ String _exceptionMessage(Map<String, Object?> properties) {
   return 'Exception';
 }
 
-/// Reloads feature flags and completes with the next flags posthog-js reports.
+/// Reloads feature flags and completes with the flags that reload loaded.
 ///
-/// posthog-js skips the request without calling back when flags are disabled
-/// (completes right away), and while reloading is paused or after repeated
-/// network failures (completes after twice its flags request timeout). Both
-/// report the current flags with `errorsLoading` set.
+/// posthog-js 1.438.2+ has `reloadFeatureFlagsAsync()`, which settles after
+/// this reload's own request, even when another request is already in flight.
+/// Anything but a successful load reports the current flags with
+/// `errorsLoading` set.
+///
+/// Older posthog-js completes with the next flags posthog-js reports. It skips
+/// the request without calling back when flags are disabled (completes right
+/// away), and while reloading is paused or after repeated network failures
+/// (completes after twice its flags request timeout).
 Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
   final featureFlags = ph?.featureFlags;
   if (ph == null || featureFlags == null) {
     return {'variants': null, 'errorsLoading': true};
   }
-  Map<String, Object?> currentFlags() => {
+  Map<String, Object?> currentFlags({required bool errorsLoading}) => {
         'variants': featureFlags.getFlagVariants().dartify(),
-        'errorsLoading': true
+        'errorsLoading': errorsLoading
       };
+
+  final flagsObject = featureFlags as JSObject;
+  if (flagsObject.has('reloadFeatureFlagsAsync')) {
+    final result = await flagsObject
+        .callMethod<JSPromise<JSObject?>>('reloadFeatureFlagsAsync'.toJS)
+        .toDart;
+    final status = result?.getProperty<JSString?>('status'.toJS)?.toDart;
+    return currentFlags(errorsLoading: status != 'loaded');
+  }
 
   final config = ph.config;
   if (config
           ?.getProperty<JSAny?>('advanced_disable_feature_flags'.toJS)
           ?.dartify() ==
       true) {
-    return currentFlags();
+    return currentFlags(errorsLoading: true);
   }
 
   final reloaded = Completer<Map<String, Object?>>();
@@ -257,7 +271,7 @@ Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
   try {
     return await reloaded.future.timeout(
       Duration(milliseconds: 2 * (requestTimeoutMs ?? 3000)),
-      onTimeout: currentFlags,
+      onTimeout: () => currentFlags(errorsLoading: true),
     );
   } finally {
     unsubscribe.callAsFunction();
