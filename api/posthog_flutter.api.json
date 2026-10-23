@@ -929,7 +929,7 @@
                                 "isRequired": false,
                                 "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                                "typeName": "bool"
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1890,7 +1890,7 @@
                                 "isRequired": false,
                                 "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                                "typeName": "bool"
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -4632,7 +4632,7 @@
                                 "isRequired": false,
                                 "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog.dart",
-                                "typeName": "bool"
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
