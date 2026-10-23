@@ -27,7 +27,8 @@ import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
-import com.posthog.PostHogOnFeatureFlags
+import com.posthog.PostHogFeatureFlagsCallback
+import com.posthog.PostHogFeatureFlagsLoaded
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
@@ -799,9 +800,9 @@ class PosthogFlutterPlugin :
                 }
 
                 onFeatureFlags =
-                    PostHogOnFeatureFlags {
+                    PostHogFeatureFlagsCallback { loaded ->
                         Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
-                        invokeFlutterMethod("onFeatureFlagsCallback", emptyMap<String, Any?>())
+                        invokeFlutterMethod("onFeatureFlagsCallback", loaded.toFlutterMap())
                     }
             }
 
@@ -1871,9 +1872,9 @@ class PosthogFlutterPlugin :
             // Resolve the Dart Future only once flags have actually finished
             // loading. The native callback fires on a background thread, so the
             // result must be posted back to the main thread for Flutter.
-            PostHog.reloadFeatureFlags {
+            PostHog.reloadFeatureFlags { loaded ->
                 Handler(Looper.getMainLooper()).post {
-                    result.success(null)
+                    result.success(loaded.toFlutterMap())
                 }
             }
         } catch (e: Throwable) {
@@ -2173,6 +2174,8 @@ class PosthogFlutterPlugin :
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
     }
+
+    private fun PostHogFeatureFlagsLoaded.toFlutterMap(): Map<String, Any> = mapOf("variants" to variants, "errorsLoading" to errorsLoading)
 
     private fun invokeFlutterMethod(
         method: String,

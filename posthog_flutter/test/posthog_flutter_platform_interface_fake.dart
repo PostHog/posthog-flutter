@@ -1,4 +1,5 @@
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
@@ -126,8 +127,9 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> stopSessionRecording() async {}
 
   @override
-  Future<void> reloadFeatureFlags() async {
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
     reloadFeatureFlagsCount++;
+    return PostHogFeatureFlagsLoaded(variants: const {}, errorsLoading: false);
   }
 
   @override
