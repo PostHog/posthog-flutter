@@ -55,7 +55,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   bool _flagsRequestAnnounced = false;
 
   PostHogCore(PostHogConfig config, {required super.storage})
-      : _sendFeatureFlagEvents = config.sendFeatureFlagEvents,
+      : _sendFeatureFlagEvents = config.sendFeatureFlagEvent,
         _personProfiles = config.personProfiles,
         super(config) {
     final bootstrap = config.bootstrap;

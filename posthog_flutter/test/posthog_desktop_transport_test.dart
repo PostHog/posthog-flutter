@@ -58,10 +58,10 @@ void main() {
     );
     await IOOverrides.runZoned(() async {
       await Posthog().setup(config()..preloadFeatureFlags = false);
-      await Posthog().disable();
+      await Posthog().optOut();
       expect(await Posthog().isOptOut(), isTrue);
       await Posthog().capture(eventName: 'blocked event');
-      await Posthog().enable();
+      await Posthog().optIn();
       await Posthog().capture(eventName: 'memory event');
       await Posthog().flush();
       expect(server.eventNames, ['memory event']);
@@ -118,10 +118,10 @@ void main() {
     expect(personProperties[r'$device_type'], 'Desktop');
     expect(personProperties[r'$app_version'], '1.2.3');
 
-    await Posthog().disable();
+    await Posthog().optOut();
     expect(await Posthog().isOptOut(), isTrue);
     await Posthog().capture(eventName: 'blocked event');
-    await Posthog().enable();
+    await Posthog().optIn();
     await Posthog().capture(eventName: 'allowed event');
     await server.waitForEvent('allowed event');
 
