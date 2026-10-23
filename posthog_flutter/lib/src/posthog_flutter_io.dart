@@ -452,6 +452,39 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _invokeFeatureEvent('captureFeatureView', flag, flagVariant);
+
+  @override
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _invokeFeatureEvent('captureFeatureInteraction', flag, flagVariant);
+
+  Future<void> _invokeFeatureEvent(
+    String method,
+    String flag,
+    String? flagVariant,
+  ) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod(method, {
+        'flag': flag,
+        if (flagVariant != null) 'flagVariant': flagVariant,
+      });
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on $method: $exception');
+    }
+  }
+
+  @override
   Future<String> getDistinctId() async {
     if (!isSupportedPlatform()) {
       return "";

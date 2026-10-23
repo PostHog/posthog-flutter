@@ -164,6 +164,53 @@ void main() {
     });
   });
 
+  test('PosthogFlutterWeb captureFeatureView captures the native event shape',
+      () async {
+    final calls = <List<Object?>>[];
+    final fake = JSObject();
+    fake.setProperty(
+      'getFeatureFlagResult'.toJS,
+      ((JSString key, JSAny? options) {
+        calls.add(['getFeatureFlagResult', key.toDart, options.dartify()]);
+        return {'key': key.toDart, 'enabled': true, 'variant': 'control'}
+            .jsify();
+      }).toJS,
+    );
+    fake.setProperty(
+      'capture'.toJS,
+      ((JSString event, JSAny? properties, JSAny? options) {
+        final props = properties.dartify()! as Map;
+        calls.add([
+          'capture',
+          event.toDart,
+          props['feature_flag'],
+          props['feature_flag_variant'],
+          options.dartify(),
+        ]);
+      }).toJS,
+    );
+    globalContext.setProperty('posthog'.toJS, fake);
+
+    await PosthogFlutterWeb().captureFeatureView(flag: 'checkout');
+
+    expect(calls, [
+      [
+        'getFeatureFlagResult',
+        'checkout',
+        {'send_event': false}
+      ],
+      [
+        'capture',
+        r'$feature_view',
+        'checkout',
+        'control',
+        {
+          r'$set': {r'$feature_view/checkout': 'control'}
+        },
+      ],
+    ]);
+  });
+
   group('PosthogFlutterWeb captureException', () {
     test('handles native JavaScript failures from posthog-js', () async {
       final failWithJavaScriptError = globalContext.callMethod<JSFunction>(

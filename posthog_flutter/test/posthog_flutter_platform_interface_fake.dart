@@ -250,6 +250,24 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     });
   }
 
+  final List<List<Object?>> featureEventCalls = [];
+
+  @override
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) async {
+    featureEventCalls.add(['captureFeatureView', flag, flagVariant]);
+  }
+
+  @override
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) async {
+    featureEventCalls.add(['captureFeatureInteraction', flag, flagVariant]);
+  }
+
   @override
   Future<Object?> getFeatureFlag({required String key}) async {
     return featureFlagValues[key];

@@ -82,6 +82,26 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO feature events', () {
+    test('captureFeatureView and captureFeatureInteraction call the native SDK',
+        () async {
+      await posthogFlutterIO.captureFeatureView(flag: 'a');
+      await posthogFlutterIO.captureFeatureInteraction(
+          flag: 'b', flagVariant: 'control');
+
+      expect(log.map((call) => [call.method, call.arguments]), [
+        [
+          'captureFeatureView',
+          {'flag': 'a'}
+        ],
+        [
+          'captureFeatureInteraction',
+          {'flag': 'b', 'flagVariant': 'control'}
+        ],
+      ]);
+    });
+  });
+
   group('PosthogFlutterIO onFeatureFlags via setup', () {
     test(
       'setup initializes method call handler and registers callback if provided',
