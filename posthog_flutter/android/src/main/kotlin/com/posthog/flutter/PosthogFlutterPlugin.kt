@@ -671,7 +671,10 @@ class PosthogFlutterPlugin :
                 posthogConfig.getIfNotNull<Boolean>("surveys") {
                     surveys = it
                     if (surveys) {
-                        val delegate = PostHogFlutterSurveysDelegate(channel)
+                        // The native SDK ignores a repeated setup() and keeps the delegate from the
+                        // first one. A new instance here would render nothing yet still receive
+                        // every Dart survey action, so each action comes back as SurveyInvalidated.
+                        val delegate = flutterSurveysDelegate ?: PostHogFlutterSurveysDelegate(channel)
                         surveysConfig.surveysDelegate = delegate
                         flutterSurveysDelegate = delegate
                     }
