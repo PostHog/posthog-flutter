@@ -798,6 +798,48 @@ class Posthog {
   Future<Object?> getFeatureFlagPayload(String key) =>
       _posthog.getFeatureFlagPayload(key: key);
 
+  /// Captures a `$feature_view` event when the user sees the feature behind
+  /// the feature flag [flag].
+  ///
+  /// The event carries `feature_flag` and, for multivariate flags,
+  /// `feature_flag_variant`, and sets the person property
+  /// `$feature_view/<flag>` to the variant.
+  ///
+  /// [flagVariant] defaults to `null`, which uses the flag's current value
+  /// without capturing `$feature_flag_called`. When the flag has no value
+  /// (not loaded or unknown), Android falls back to `true`, while iOS, macOS,
+  /// web, Windows, and Linux skip the event.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().captureFeatureView('new-checkout');
+  /// await Posthog().captureFeatureView('button-color', flagVariant: 'red');
+  /// ```
+  Future<void> captureFeatureView(String flag, {String? flagVariant}) =>
+      _posthog.captureFeatureView(flag: flag, flagVariant: flagVariant);
+
+  /// Captures a `$feature_interaction` event when the user interacts with the
+  /// feature behind the feature flag [flag].
+  ///
+  /// The event carries `feature_flag` and, for multivariate flags,
+  /// `feature_flag_variant`, and sets the person property
+  /// `$feature_interaction/<flag>` to the variant.
+  ///
+  /// [flagVariant] defaults to `null`, which uses the flag's current value
+  /// without capturing `$feature_flag_called`. When the flag has no value
+  /// (not loaded or unknown), Android falls back to `true`, while iOS, macOS,
+  /// web, Windows, and Linux skip the event.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// ElevatedButton(
+  ///   onPressed: () => Posthog().captureFeatureInteraction('new-checkout'),
+  ///   child: const Text('Checkout'),
+  /// );
+  /// ```
+  Future<void> captureFeatureInteraction(String flag, {String? flagVariant}) =>
+      _posthog.captureFeatureInteraction(flag: flag, flagVariant: flagVariant);
+
   /// Flushes queued events immediately where supported by the platform.
   ///
   /// Returns a [Future] that completes when the flush request has finished.
