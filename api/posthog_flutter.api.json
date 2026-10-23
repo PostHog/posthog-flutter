@@ -2309,6 +2309,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "evaluationContexts",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "List<String>?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "captureApplicationLifecycleEvents",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"

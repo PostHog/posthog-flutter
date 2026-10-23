@@ -223,6 +223,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         if let preloadFeatureFlags = posthogConfig["preloadFeatureFlags"] as? Bool {
             config.preloadFeatureFlags = preloadFeatureFlags
         }
+        if let evaluationContexts = posthogConfig["evaluationContexts"] as? [String] {
+            config.evaluationContexts = evaluationContexts
+        }
         if let optOut = posthogConfig["optOut"] as? Bool {
             config.optOut = optOut
         }

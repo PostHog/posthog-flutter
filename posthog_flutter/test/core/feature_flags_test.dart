@@ -32,6 +32,22 @@ void main() {
           {..._sdkProperties, 'age': 30, 'beta': true, 'plan': 'pro'});
     });
 
+    for (final (contexts, expected) in [
+      (null, null),
+      (<String>[], null),
+      (['mobile', 'prod'], ['mobile', 'prod']),
+    ]) {
+      test('evaluationContexts $contexts sends evaluation_contexts $expected',
+          () async {
+        final client = testClient(server,
+            config: testConfig()..evaluationContexts = contexts);
+
+        await client.reloadFeatureFlagsAsync();
+
+        expect(_flagsRequestBody(server)['evaluation_contexts'], expected);
+      });
+    }
+
     test('group properties keep their JSON types in the /flags request',
         () async {
       final client = testClient(server);

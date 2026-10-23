@@ -103,6 +103,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         'advanced_disable_feature_flags_on_first_load in your posthog.init({...}) call instead.',
       );
     }
+    if (config.evaluationContexts?.isNotEmpty ?? false) {
+      printIfDebug(
+        'Warning: PostHogConfig.evaluationContexts is not applied on Flutter web. '
+        'Set evaluation_contexts in your posthog.init({...}) call instead.',
+      );
+    }
     if (config.bootstrap != null) {
       printIfDebug(
         'Warning: PostHogConfig.bootstrap is not applied on Flutter web. '
