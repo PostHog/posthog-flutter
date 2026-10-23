@@ -70,8 +70,18 @@ extension PostHogExtension on PostHog {
   external void set_config(JSAny config);
   external JSObject? get config;
   external SessionManager? get sessionManager;
+  external FeatureFlags? get featureFlags;
   // ignore: non_constant_identifier_names
   external void _overrideSDKInfo(JSAny sdkName, JSAny sdkVersion);
+}
+
+// Feature flags JS interop
+@JS()
+@staticInterop
+class FeatureFlags {}
+
+extension FeatureFlagsExtension on FeatureFlags {
+  external JSObject getFlagVariants();
 }
 
 // SessionManager JS interop
@@ -325,7 +335,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'reloadFeatureFlags':
       posthog?.reloadFeatureFlags();
-      break;
+      // posthog-js doesn't report when the reload finishes, so this is the
+      // flags loaded so far.
+      return {
+        'variants': posthog?.featureFlags?.getFlagVariants().dartify(),
+        'errorsLoading': posthog == null,
+      };
     case 'setPersonPropertiesForFlags':
       final userProperties = safeMapConversion(args['userProperties']);
       // reload is orchestrated by the Dart layer, so disable it here.

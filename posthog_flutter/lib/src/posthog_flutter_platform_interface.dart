@@ -1,15 +1,17 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'feature_flag_result.dart';
+import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
 /// Defines the callback signature for when feature flags are loaded.
 ///
-/// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
-/// callback to access the loaded flag values.
-typedef OnFeatureFlagsCallback = void Function();
+/// The callback receives the enabled flags and whether loading failed. See
+/// [PostHogFeatureFlagsLoaded].
+typedef OnFeatureFlagsCallback = void Function(
+    PostHogFeatureFlagsLoaded loaded);
 
 abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PosthogFlutterPlatform.
@@ -157,7 +159,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');
   }
 
-  Future<void> reloadFeatureFlags() {
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() {
     throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
   }
 
