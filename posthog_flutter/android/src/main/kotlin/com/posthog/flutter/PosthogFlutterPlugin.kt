@@ -1670,7 +1670,7 @@ class PosthogFlutterPlugin :
                 result.error("PosthogFlutterException", "Missing argument: key", null)
                 return
             }
-            val sendEvent: Boolean = call.argument("sendEvent") ?: true
+            val sendEvent: Boolean? = call.argument("sendEvent")
             val flagResult = PostHog.getFeatureFlagResult(featureFlagKey, sendEvent)
 
             if (flagResult != null) {

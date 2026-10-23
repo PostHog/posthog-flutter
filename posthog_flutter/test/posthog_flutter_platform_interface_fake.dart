@@ -259,7 +259,7 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendFeatureFlagEvent = true,
+    bool? sendFeatureFlagEvent,
   }) async {
     getFeatureFlagResultCalls
         .add({'key': key, 'sendFeatureFlagEvent': sendFeatureFlagEvent});
