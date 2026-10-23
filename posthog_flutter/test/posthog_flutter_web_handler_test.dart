@@ -80,6 +80,95 @@ void main() {
     });
   });
 
+  group('handleWebMethodCall reloadFeatureFlags', () {
+    late JSFunction? listener;
+    late int reloads;
+    late int unsubscribes;
+
+    /// Installs a fake posthog-js whose reload answers with [answer], if any.
+    void installFake({
+      Map<String, Object?> config = const {},
+      ({Map<String, Object> variants, bool errorsLoading})? answer,
+    }) {
+      listener = null;
+      reloads = 0;
+      unsubscribes = 0;
+      final current = {'cached': true}.jsify()!;
+      final featureFlags = JSObject()
+        ..setProperty('getFlagVariants'.toJS, (() => current).toJS);
+      final fake = JSObject()
+        ..setProperty('featureFlags'.toJS, featureFlags)
+        ..setProperty('config'.toJS, config.jsify())
+        ..setProperty(
+          'onFeatureFlags'.toJS,
+          ((JSFunction callback) {
+            listener = callback;
+            callback.callAsFunction(null, <String>[].jsify(), current);
+            return (() => unsubscribes++).toJS;
+          }).toJS,
+        )
+        ..setProperty(
+          'reloadFeatureFlags'.toJS,
+          (() {
+            reloads++;
+            if (answer == null) return;
+            Future(() => listener?.callAsFunction(
+                  null,
+                  answer.variants.keys.toList().jsify(),
+                  answer.variants.jsify(),
+                  {'errorsLoading': answer.errorsLoading}.jsify(),
+                ));
+          }).toJS,
+        );
+      globalContext.setProperty('posthog'.toJS, fake);
+    }
+
+    test('completes with the flags the reload delivers, not the replayed ones',
+        () async {
+      installFake(answer: (variants: {'fresh': 'v2'}, errorsLoading: true));
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': true,
+      });
+      expect(unsubscribes, 1);
+    });
+
+    test('completes right away with an error when flags are disabled',
+        () async {
+      installFake(config: {'advanced_disable_feature_flags': true});
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'cached': true},
+        'errorsLoading': true,
+      });
+      expect(reloads, 0);
+    });
+
+    test('completes with an error when posthog-js never calls back', () async {
+      installFake(config: {'feature_flag_request_timeout_ms': 5});
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'cached': true},
+        'errorsLoading': true,
+      });
+      expect(reloads, 1);
+      expect(unsubscribes, 1);
+    });
+  });
+
   group('handleWebMethodCall addExceptionStep', () {
     String? capturedMessage;
     JSAny? capturedProperties;

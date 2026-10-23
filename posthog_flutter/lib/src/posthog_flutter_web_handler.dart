@@ -1,6 +1,8 @@
 // ignore_for_file: avoid_dynamic_calls, avoid_annotating_with_dynamic
 
+import 'dart:async';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
@@ -64,7 +66,7 @@ extension PostHogExtension on PostHog {
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
-  external void onFeatureFlags(JSFunction callback);
+  external JSFunction onFeatureFlags(JSFunction callback);
   external void startSessionRecording();
   external void stopSessionRecording();
   external bool sessionRecordingStarted();
@@ -210,6 +212,58 @@ String _exceptionMessage(Map<String, Object?> properties) {
   return 'Exception';
 }
 
+/// Reloads feature flags and completes with the next flags posthog-js reports.
+///
+/// posthog-js skips the request without calling back when flags are disabled
+/// (completes right away), and while reloading is paused or after repeated
+/// network failures (completes after twice its flags request timeout). Both
+/// report the current flags with `errorsLoading` set.
+Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
+  final featureFlags = ph?.featureFlags;
+  if (ph == null || featureFlags == null) {
+    return {'variants': null, 'errorsLoading': true};
+  }
+  Map<String, Object?> currentFlags() => {
+        'variants': featureFlags.getFlagVariants().dartify(),
+        'errorsLoading': true
+      };
+
+  final config = ph.config;
+  if (config
+          ?.getProperty<JSAny?>('advanced_disable_feature_flags'.toJS)
+          ?.dartify() ==
+      true) {
+    return currentFlags();
+  }
+
+  final reloaded = Completer<Map<String, Object?>>();
+  var subscribed = false;
+  final unsubscribe = ph
+      .onFeatureFlags((JSArray flags, JSObject variants, [JSObject? context]) {
+    // onFeatureFlags replays the current flags synchronously: skip them.
+    if (!subscribed || reloaded.isCompleted) return;
+    reloaded.complete({
+      'variants': variants.dartify(),
+      'errorsLoading': (context?.dartify() as Map?)?['errorsLoading'] == true,
+    });
+  }.toJS);
+  subscribed = true;
+  ph.reloadFeatureFlags();
+
+  final requestTimeoutMs = (config
+          ?.getProperty<JSAny?>('feature_flag_request_timeout_ms'.toJS)
+          ?.dartify() as num?)
+      ?.toInt();
+  try {
+    return await reloaded.future.timeout(
+      Duration(milliseconds: 2 * (requestTimeoutMs ?? 3000)),
+      onTimeout: currentFlags,
+    );
+  } finally {
+    unsubscribe.callAsFunction();
+  }
+}
+
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
   _maybeOverrideSDKInfo();
 
@@ -344,13 +398,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       );
       break;
     case 'reloadFeatureFlags':
-      posthog?.reloadFeatureFlags();
-      // posthog-js doesn't report when the reload finishes, so this is the
-      // flags loaded so far.
-      return {
-        'variants': posthog?.featureFlags?.getFlagVariants().dartify(),
-        'errorsLoading': posthog == null,
-      };
+      return _reloadFeatureFlags(posthog);
     case 'setPersonPropertiesForFlags':
       final userProperties = safeMapConversion(args['userProperties']);
       // reload is orchestrated by the Dart layer, so disable it here.

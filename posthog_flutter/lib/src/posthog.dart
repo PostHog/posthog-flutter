@@ -495,10 +495,11 @@ class Posthog {
   /// [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the flags are the
   /// last known values.
   ///
-  /// **Flutter web:** completes right away with the flags posthog-js has
-  /// loaded so far, and `errorsLoading` is always `false`, because posthog-js
-  /// does not report when a reload finishes. Use [PostHogConfig.onFeatureFlags]
-  /// to observe the reloaded flags.
+  /// **Flutter web:** completes with the next flags posthog-js reports. When
+  /// posthog-js skips the request (flags disabled, reloading paused, or after
+  /// repeated network failures), it completes with the current flags and
+  /// `errorsLoading: true`: right away when flags are disabled, otherwise
+  /// after twice posthog-js's `feature_flag_request_timeout_ms`.
   ///
   /// **Example:**
   /// ```dart
