@@ -88,13 +88,23 @@ void main() {
     void installFake({
       Map<String, Object?> config = const {},
       ({Map<String, Object> variants, bool errorsLoading})? answer,
+      String? asyncStatus,
     }) {
       listener = null;
       reloads = 0;
       unsubscribes = 0;
-      final current = {'cached': true}.jsify()!;
+      var current = {'cached': true}.jsify()!;
       final featureFlags = JSObject()
         ..setProperty('getFlagVariants'.toJS, (() => current).toJS);
+      if (asyncStatus != null) {
+        featureFlags.setProperty(
+          'reloadFeatureFlagsAsync'.toJS,
+          (() => Future(() {
+                current = {'fresh': 'v2'}.jsify()!;
+                return {'status': asyncStatus}.jsify();
+              }).toJS).toJS,
+        );
+      }
       final fake = JSObject()
         ..setProperty('featureFlags'.toJS, featureFlags)
         ..setProperty('config'.toJS, config.jsify())
@@ -135,6 +145,31 @@ void main() {
         'errorsLoading': true,
       });
       expect(unsubscribes, 1);
+    });
+
+    test('awaits reloadFeatureFlagsAsync when posthog-js has it', () async {
+      installFake(asyncStatus: 'loaded');
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': false,
+      });
+      expect(reloads, 0);
+    });
+
+    test('reports an error when reloadFeatureFlagsAsync skips the request',
+        () async {
+      installFake(asyncStatus: 'skipped');
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result['errorsLoading'], isTrue);
     });
 
     test('completes right away with an error when flags are disabled',
