@@ -43,6 +43,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     private static var instance: PosthogFlutterPlugin?
     private var channel: FlutterMethodChannel?
+    private var featureFlagsSubscription: PostHogFeatureFlagsSubscription?
 
     // Mint route for pushIdentityProvider, anchored to the engine whose setup()
     // installed the provider. A live owner is never displaced; provider-enabled
@@ -61,15 +62,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     override init() {
         super.init()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(featureFlagsDidUpdate),
-            name: PostHogSDK.didReceiveFeatureFlags,
-            object: nil
-        )
+        featureFlagsSubscription = PostHogSDK.shared.onFeatureFlags { [weak self] _ in
+            self?.featureFlagsDidUpdate()
+        }
     }
 
     deinit {
+        featureFlagsSubscription?.unsubscribe()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -88,7 +87,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
     }
 
-    @objc func featureFlagsDidUpdate() {
+    func featureFlagsDidUpdate() {
         invokeFlutterMethod("onFeatureFlagsCallback", arguments: [String: Any]())
     }
 
@@ -1562,7 +1561,7 @@ extension PosthogFlutterPlugin {
     private func reloadFeatureFlags(_ result: @escaping FlutterResult) {
         // Resolve the Dart Future only once flags have actually finished loading.
         // The native callback fires on a background thread, so hop to main for Flutter.
-        PostHogSDK.shared.reloadFeatureFlags {
+        PostHogSDK.shared.reloadFeatureFlags { _ in
             DispatchQueue.main.async {
                 result(nil)
             }
