@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
@@ -79,6 +80,37 @@ void main() {
           await posthogFlutterIO.getFeatureFlagResult(key: 'missing'), isNull);
       expect(log.single.method, 'getFeatureFlagResult');
       expect(log.single.arguments, {'key': 'missing', 'sendEvent': true});
+    });
+  });
+
+  group('PosthogFlutterIO getAllFeatureFlags', () {
+    test('decodes the native results', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'getAllFeatureFlags');
+        return [
+          {'key': 'on', 'enabled': true, 'variant': null, 'payload': null},
+          {
+            'key': 'multi',
+            'enabled': true,
+            'variant': 'control',
+            'payload': {'discount': 10}
+          },
+        ];
+      });
+
+      final results = await posthogFlutterIO.getAllFeatureFlags();
+      expect(results, [
+        const PostHogFeatureFlagResult(key: 'on', enabled: true),
+        const PostHogFeatureFlagResult(
+            key: 'multi', enabled: true, variant: 'control'),
+      ]);
+      expect(results![1].payload, {'discount': 10});
+    });
+
+    test('preserves a missing native result', () async {
+      expect(await posthogFlutterIO.getAllFeatureFlags(), isNull);
+      expect(log.single.method, 'getAllFeatureFlags');
     });
   });
 
