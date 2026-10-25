@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 
 import 'feature_flags_loaded.dart';
 import 'posthog_flutter_platform_interface.dart';
+import 'util/logging.dart';
 
 /// Delivers each feature flags load to the listeners added with
 /// [Posthog.onFeatureFlags].
@@ -24,7 +25,7 @@ class FeatureFlagsListeners {
       // Skipped if a newer load already reached the listener.
       scheduleMicrotask(() {
         if (_listeners.containsKey(token) && identical(_last, current)) {
-          listener(current);
+          _notify(listener, current);
         }
       });
     }
@@ -35,7 +36,17 @@ class FeatureFlagsListeners {
     _last = loaded;
     for (final entry in _listeners.entries.toList()) {
       // An earlier listener may have unsubscribed this one.
-      if (_listeners.containsKey(entry.key)) entry.value(loaded);
+      if (_listeners.containsKey(entry.key)) _notify(entry.value, loaded);
+    }
+  }
+
+  // A throwing listener must not stop the others from getting the load.
+  void _notify(
+      OnFeatureFlagsCallback listener, PostHogFeatureFlagsLoaded loaded) {
+    try {
+      listener(loaded);
+    } catch (e) {
+      printIfDebug('onFeatureFlags listener threw: $e');
     }
   }
 

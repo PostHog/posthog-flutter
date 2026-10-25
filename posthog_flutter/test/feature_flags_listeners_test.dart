@@ -70,6 +70,17 @@ void main() {
     expect(received, isEmpty);
   });
 
+  test('delivers to the other listeners when one throws', () {
+    subscriptions.add(listeners.add((_) => throw StateError('listener')));
+    final received = <PostHogFeatureFlagsLoaded>[];
+    listen(received);
+    final load = loaded('a');
+
+    listeners.deliver(load);
+
+    expect(received, [load]);
+  });
+
   test('skips a listener unsubscribed by an earlier one during delivery', () {
     late PostHogFeatureFlagsSubscription second;
     subscriptions.add(listeners.add((_) => second.unsubscribe()));

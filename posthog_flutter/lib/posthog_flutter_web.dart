@@ -2,6 +2,7 @@
 // of your plugin as a separate package, instead of inlining it in the same
 // package as the core of your plugin.
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -128,7 +129,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     WebCanvasMaskProvider(config).register();
 
-    if (ph != null) {
+    // Skipped for a posthog-js stub without onFeatureFlags.
+    if (ph != null && (ph as JSObject).has('onFeatureFlags')) {
       final dartCallback = config.onFeatureFlags;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})

@@ -4531,6 +4531,28 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "onFeatureFlags",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "callback",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "void Function(PostHogFeatureFlagsLoaded)"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "PostHogFeatureFlagsSubscription",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "setPersonPropertiesForFlags",
                         "parameters": [
                             {
@@ -6104,6 +6126,36 @@
                 "isRequired": false,
                 "isSealed": false,
                 "name": "PostHogFeatureFlagsLoaded",
+                "relativePath": "lib/src/feature_flags_loaded.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "unsubscribe",
+                        "parameters": [],
+                        "relativePath": "lib/src/feature_flags_loaded.dart",
+                        "returnTypeName": "void",
+                        "type": "method",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogFeatureFlagsSubscription",
                 "relativePath": "lib/src/feature_flags_loaded.dart",
                 "superTypeNames": [
                     "Object"
