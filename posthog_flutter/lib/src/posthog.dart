@@ -527,9 +527,9 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing; on iOS and Android this means flags
-  /// have finished loading, so the next [getFeatureFlag] / [getFeatureFlagResult]
-  /// reflects the updated properties. On web the reload is best-effort.
+  /// awaits the reload before completing, so the next [getFeatureFlag] /
+  /// [getFeatureFlagResult] reflects the updated properties. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   ///
   /// **Example:**
   /// ```dart
@@ -557,8 +557,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   Future<void> resetPersonPropertiesForFlags({
     bool reloadFeatureFlags = true,
   }) async {
@@ -581,8 +581,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   ///
   /// **Example:**
   /// ```dart
@@ -613,8 +613,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   Future<void> resetGroupPropertiesForFlags({
     String? groupType,
     bool reloadFeatureFlags = true,
