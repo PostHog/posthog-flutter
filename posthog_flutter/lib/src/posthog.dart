@@ -59,7 +59,7 @@ class Posthog {
   /// ```dart
   /// final config = PostHogConfig('YOUR_PROJECT_TOKEN');
   /// config.host = 'YOUR_POSTHOG_HOST';
-  /// config.onFeatureFlags = () {
+  /// config.onFeatureFlags = (loaded) {
   ///   // Feature flags are now loaded, you can read flag values here
   /// };
   /// await Posthog().setup(config);
