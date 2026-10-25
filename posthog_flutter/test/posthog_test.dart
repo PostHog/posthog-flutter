@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
@@ -43,6 +44,25 @@ void main() {
         );
       },
     );
+
+    for (final entry in <String, Future<void> Function()>{
+      'reset': () => Posthog().reset(),
+      'close': () => Posthog().close(),
+    }.entries) {
+      test('onFeatureFlags does not replay flags loaded before ${entry.key}',
+          () async {
+        FeatureFlagsListeners.instance.deliver(PostHogFeatureFlagsLoaded(
+            variants: {'flag': true}, errorsLoading: false));
+        await entry.value();
+        final received = <PostHogFeatureFlagsLoaded>[];
+        final subscription = Posthog().onFeatureFlags(received.add);
+        addTearDown(subscription.unsubscribe);
+
+        await pumpEventQueue();
+
+        expect(received, isEmpty);
+      });
+    }
 
     test('Windows and Linux support is enabled by default', () {
       expect(PostHogConfig('test_project_token').enableWindowsAndLinux, isTrue);

@@ -6,6 +6,7 @@ import 'core/file_storage.dart';
 import 'core/utils/utils.dart';
 import 'error_tracking/dart_exception_processor.dart';
 import 'feature_flag_result.dart';
+import 'feature_flags_listeners.dart';
 import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
@@ -176,8 +177,11 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       projectToken: config.projectToken,
       host: removeTrailingSlash(config.host),
     );
-    _featureFlagsUnsubscribe = client.onFeatureFlags(
-        () => _config?.onFeatureFlags?.call(client.featureFlagsLoaded()));
+    _featureFlagsUnsubscribe = client.onFeatureFlags(() {
+      final loaded = client.featureFlagsLoaded();
+      _config?.onFeatureFlags?.call(loaded);
+      FeatureFlagsListeners.instance.deliver(loaded);
+    });
 
     final stepsConfig = config.errorTrackingConfig.exceptionSteps;
     _exceptionSteps = stepsConfig.enabled

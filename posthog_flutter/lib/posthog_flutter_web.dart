@@ -11,6 +11,7 @@ import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
+import 'src/feature_flags_listeners.dart';
 import 'src/feature_flags_loaded.dart';
 import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
@@ -34,6 +35,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Copied at setup. Event beforeSend runs here, before posthog-js, the same
   /// way [PosthogFlutterIO] runs it before the platform channel.
   List<BeforeSendCallback> _beforeSendCallbacks = [];
+  JSFunction? _featureFlagsUnsubscribe;
 
   // posthog-js has no current screen, so the feature events get it from here
   // the way native SDKs stamp it: the last screen beforeSend accepted, under
@@ -126,19 +128,23 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     WebCanvasMaskProvider(config).register();
 
-    if (config.onFeatureFlags != null && ph != null) {
-      final dartCallback = config.onFeatureFlags!;
+    if (ph != null) {
+      final dartCallback = config.onFeatureFlags;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        dartCallback(featureFlagsLoadedFromMap({
+        final loaded = featureFlagsLoadedFromMap({
           'variants': jsFlagVariants.dartify(),
           'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
-        }));
+        });
+        dartCallback?.call(loaded);
+        FeatureFlagsListeners.instance.deliver(loaded);
       }.toJS;
 
-      ph.onFeatureFlags(jsCallback);
+      // Repeated setup would otherwise deliver each load twice.
+      _featureFlagsUnsubscribe?.callAsFunction();
+      _featureFlagsUnsubscribe = ph.onFeatureFlags(jsCallback);
     }
   }
 
@@ -502,6 +508,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<void> close() async {
     _currentScreen = null;
+    _featureFlagsUnsubscribe?.callAsFunction();
+    _featureFlagsUnsubscribe = null;
     return handleWebMethodCall(const MethodCall('close'));
   }
 

@@ -17,6 +17,7 @@ import 'utils/flutter_version.dart';
 import 'utils/property_normalizer.dart';
 
 import 'feature_flag_result.dart';
+import 'feature_flags_listeners.dart';
 import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
@@ -74,8 +75,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         await cleanupSurveys();
         return null;
       case 'onFeatureFlagsCallback':
-        _onFeatureFlagsCallback
-            ?.call(featureFlagsLoadedFromMap(call.arguments));
+        final loaded = featureFlagsLoadedFromMap(call.arguments);
+        _onFeatureFlagsCallback?.call(loaded);
+        FeatureFlagsListeners.instance.deliver(loaded);
         break;
       case 'pushIdentityProvider':
         // Returning a value here is the reply the native SDK awaits.

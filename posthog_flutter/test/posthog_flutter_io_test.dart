@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
@@ -252,6 +253,29 @@ void main() {
       );
 
       expect(received.single.variants, isEmpty);
+    });
+
+    test('passes the native flags to onFeatureFlags listeners', () async {
+      FeatureFlagsListeners.instance.clear();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(const MethodCall(
+          'onFeatureFlagsCallback',
+          {
+            'variants': {'on': true},
+            'errorsLoading': false,
+          },
+        )),
+        (ByteData? data) {},
+      );
+
+      expect(received.single.variants, {'on': true});
     });
 
     test('does not invoke callback when no callback is registered', () async {

@@ -2,10 +2,13 @@
 library;
 
 import 'dart:async';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/replay/web/web_canvas_mask_provider.dart';
 
 /// posthog-js is initialized by the host app on web, so options the plugin
@@ -62,5 +65,33 @@ void main() {
 
     expect(logs.where((line) => line.contains('evaluationContexts')),
         hasLength(1));
+  });
+
+  test('delivers posthog-js flag loads to onFeatureFlags listeners once',
+      () async {
+    final listeners = <JSFunction>[];
+    globalContext.setProperty(
+        'posthog'.toJS,
+        JSObject()
+          ..setProperty(
+            'onFeatureFlags'.toJS,
+            ((JSFunction callback) {
+              listeners.add(callback);
+              return (() => listeners.remove(callback)).toJS;
+            }).toJS,
+          ));
+    addTearDown(() => globalContext.delete('posthog'.toJS));
+    final received = <PostHogFeatureFlagsLoaded>[];
+    final subscription = FeatureFlagsListeners.instance.add(received.add);
+    addTearDown(subscription.unsubscribe);
+    final web = PosthogFlutterWeb();
+
+    await web.setup(PostHogConfig('test_project_token'));
+    await web.setup(PostHogConfig('test_project_token'));
+    for (final listener in listeners.toList()) {
+      listener.callAsFunction(null, ['on'].jsify(), {'on': true}.jsify(), null);
+    }
+
+    expect(received.single.variants, {'on': true});
   });
 }
