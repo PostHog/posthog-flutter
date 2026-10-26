@@ -37,6 +37,24 @@ void main() {
     globalContext.setProperty('posthog'.toJS, fake);
   });
 
+  test('feature events carry the screen name beforeSend accepted', () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token', beforeSend: [
+      (event) {
+        final name = event.properties?[r'$screen_name'];
+        if (name == 'Secret') return null;
+        if (name == 'Cart') event.properties?[r'$screen_name'] = 'Basket';
+        return event;
+      },
+    ]));
+
+    await web.screen(screenName: 'Cart');
+    await web.screen(screenName: 'Secret');
+    await web.captureFeatureView(flag: 'checkout', flagVariant: 'a');
+
+    expect((captures.last['properties'] as Map)[r'$screen_name'], 'Basket');
+  });
+
   test('beforeSend null drops capture on web', () async {
     final web = PosthogFlutterWeb();
     await web.setup(

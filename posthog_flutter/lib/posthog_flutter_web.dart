@@ -34,7 +34,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   List<BeforeSendCallback> _beforeSendCallbacks = [];
 
   // posthog-js has no current screen, so the feature events get it from here
-  // the way native SDKs stamp it. Kept like Posthog's own, until close().
+  // the way native SDKs stamp it: the last screen beforeSend accepted, under
+  // its final name, until close().
   String? _currentScreen;
 
   Future<PostHogEvent?> _runBeforeSend(
@@ -248,7 +249,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String screenName,
     Map<String, Object>? properties,
   }) async {
-    _currentScreen = screenName;
     // The screen name argument wins over a properties `$screen_name`.
     // beforeSend still runs after this and can change the name.
     final propsWithScreenName = <String, Object>{
@@ -276,6 +276,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final finalScreenName =
         processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
             screenName;
+    _currentScreen = finalScreenName;
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
     final remaining = processedEvent.properties;
 
