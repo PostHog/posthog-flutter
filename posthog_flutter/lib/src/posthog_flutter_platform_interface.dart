@@ -4,7 +4,6 @@ import 'feature_flag_result.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
-import 'util/logging.dart';
 
 /// Defines the callback signature for when feature flags are loaded.
 ///
@@ -122,41 +121,19 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
-  // Platforms without a native SDK build the event the way posthog-ios does;
-  // PosthogFlutterIO overrides these to call the native SDK.
   Future<void> captureFeatureView({
     required String flag,
     String? flagVariant,
-  }) =>
-      _captureFeatureEvent(r'$feature_view', flag, flagVariant);
+  }) {
+    throw UnimplementedError('captureFeatureView() has not been implemented.');
+  }
 
   Future<void> captureFeatureInteraction({
     required String flag,
     String? flagVariant,
-  }) =>
-      _captureFeatureEvent(r'$feature_interaction', flag, flagVariant);
-
-  Future<void> _captureFeatureEvent(
-    String event,
-    String flag,
-    String? flagVariant,
-  ) async {
-    final result = flagVariant == null
-        ? await getFeatureFlagResult(key: flag, sendEvent: false)
-        : null;
-    final Object? variant = flagVariant ?? result?.variant ?? result?.enabled;
-    if (variant == null) {
-      printIfDebug(
-          '[PostHog] $event skipped: feature flag "$flag" has no value.');
-      return;
-    }
-    await capture(
-      eventName: event,
-      properties: {
-        'feature_flag': flag,
-        if (variant is String) 'feature_flag_variant': variant,
-      },
-      userProperties: {'$event/$flag': variant},
+  }) {
+    throw UnimplementedError(
+      'captureFeatureInteraction() has not been implemented.',
     );
   }
 

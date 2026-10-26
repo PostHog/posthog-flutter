@@ -211,6 +211,29 @@ void main() {
     ]);
   });
 
+  test('PosthogFlutterWeb feature events carry the current screen until close',
+      () async {
+    final screenNames = <String, Object?>{};
+    final fake = JSObject();
+    fake.setProperty(
+      'capture'.toJS,
+      ((JSString event, JSAny? properties, JSAny? options) {
+        final props = properties.dartify()! as Map;
+        screenNames[event.toDart] = props[r'$screen_name'];
+      }).toJS,
+    );
+    globalContext.setProperty('posthog'.toJS, fake);
+    final web = PosthogFlutterWeb();
+
+    await web.screen(screenName: 'Cart');
+    await web.captureFeatureInteraction(flag: 'checkout', flagVariant: 'a');
+    expect(screenNames[r'$feature_interaction'], 'Cart');
+
+    await web.close();
+    await web.captureFeatureView(flag: 'checkout', flagVariant: 'a');
+    expect(screenNames[r'$feature_view'], isNull);
+  });
+
   group('PosthogFlutterWeb captureException', () {
     test('handles native JavaScript failures from posthog-js', () async {
       final failWithJavaScriptError = globalContext.callMethod<JSFunction>(

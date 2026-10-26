@@ -20,6 +20,7 @@ import 'posthog_flutter_platform_interface.dart';
 import 'util/logging.dart';
 import 'utils/before_send.dart';
 import 'utils/capture_utils.dart';
+import 'utils/feature_event.dart';
 import 'utils/property_normalizer.dart';
 
 typedef _ClientScope = ({String projectToken, String host});
@@ -392,20 +393,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final result = flagVariant == null
             ? client.getFeatureFlagResult(flag, sendEvent: false)
             : null;
-        final Object? variant =
-            flagVariant ?? result?.variant ?? result?.enabled;
-        if (variant == null) {
-          printIfDebug(
-              '[PostHog] $event skipped: feature flag "$flag" has no value.');
-          return null;
-        }
+        final captured = featureEvent(
+            event, flag, flagVariant ?? result?.variant ?? result?.enabled);
+        if (captured == null) return null;
         return capture(
           eventName: event,
-          properties: {
-            'feature_flag': flag,
-            if (variant is String) 'feature_flag_variant': variant,
-          },
-          userProperties: {'$event/$flag': variant},
+          properties: captured.properties,
+          userProperties: captured.userProperties,
         );
       });
 
