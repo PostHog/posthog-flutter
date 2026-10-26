@@ -436,6 +436,21 @@ void main() {
     });
   });
 
+  test(
+      'captureFeatureView and captureFeatureInteraction forward to the platform',
+      () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+
+    await Posthog().captureFeatureView('a');
+    await Posthog().captureFeatureInteraction('b', flagVariant: 'control');
+
+    expect(fake.featureEventCalls, [
+      ['captureFeatureView', 'a', null],
+      ['captureFeatureInteraction', 'b', 'control'],
+    ]);
+  });
+
   group('getFeatureFlagResult', () {
     late PosthogFlutterPlatformFake fakePlatformInterface;
 

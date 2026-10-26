@@ -498,6 +498,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             captureLog(call, result: result)
         case "alias":
             alias(call, result: result)
+        case "captureFeatureView":
+            captureFeatureView(call, result: result)
+        case "captureFeatureInteraction":
+            captureFeatureInteraction(call, result: result)
         case "distinctId":
             distinctId(result)
         case "reset":
@@ -1547,6 +1551,34 @@ extension PosthogFlutterPlugin {
            let alias = args["alias"] as? String
         {
             PostHogSDK.shared.alias(alias)
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func captureFeatureView(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let flag = args["flag"] as? String
+        {
+            PostHogSDK.shared.captureFeatureView(flag: flag, flagVariant: args["flagVariant"] as? String)
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func captureFeatureInteraction(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let flag = args["flag"] as? String
+        {
+            PostHogSDK.shared.captureFeatureInteraction(flag: flag, flagVariant: args["flagVariant"] as? String)
             result(nil)
         } else {
             _badArgumentError(result)

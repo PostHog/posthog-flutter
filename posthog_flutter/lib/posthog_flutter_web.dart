@@ -19,6 +19,7 @@ import 'src/posthog_flutter_web_handler.dart';
 import 'src/utils/before_send.dart';
 import 'src/replay/web/web_canvas_mask_provider.dart';
 import 'src/utils/capture_utils.dart';
+import 'src/utils/feature_event.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
 class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
@@ -31,6 +32,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Copied at setup. Event beforeSend runs here, before posthog-js, the same
   /// way [PosthogFlutterIO] runs it before the platform channel.
   List<BeforeSendCallback> _beforeSendCallbacks = [];
+
+  // posthog-js has no current screen, so the feature events get it from here
+  // the way native SDKs stamp it: the last screen beforeSend accepted, under
+  // its final name, until close().
+  String? _currentScreen;
 
   Future<PostHogEvent?> _runBeforeSend(
     String eventName,
@@ -276,6 +282,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final finalScreenName =
         processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
             screenName;
+    _currentScreen = finalScreenName;
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
     final remaining = processedEvent.properties;
 
@@ -296,6 +303,42 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<String> getDistinctId() async {
     final result = await handleWebMethodCall(const MethodCall('distinctId'));
     return result as String? ?? '';
+  }
+
+  @override
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _captureFeatureEvent(r'$feature_view', flag, flagVariant);
+
+  @override
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _captureFeatureEvent(r'$feature_interaction', flag, flagVariant);
+
+  Future<void> _captureFeatureEvent(
+    String event,
+    String flag,
+    String? flagVariant,
+  ) async {
+    final screenName = _currentScreen;
+    final result = flagVariant == null
+        ? await getFeatureFlagResult(key: flag, sendEvent: false)
+        : null;
+    final captured = featureEvent(
+        event, flag, flagVariant ?? result?.variant ?? result?.enabled);
+    if (captured == null) return;
+    await capture(
+      eventName: event,
+      properties: {
+        ...captured.properties,
+        if (screenName != null) PostHogPropertyName.screenName: screenName,
+      },
+      userProperties: captured.userProperties,
+    );
   }
 
   @override
@@ -436,6 +479,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> close() async {
+    _currentScreen = null;
     return handleWebMethodCall(const MethodCall('close'));
   }
 

@@ -259,6 +259,14 @@ class PosthogFlutterPlugin :
                 capture(call, result)
             }
 
+            "captureFeatureView" -> {
+                captureFeatureView(call, result)
+            }
+
+            "captureFeatureInteraction" -> {
+                captureFeatureInteraction(call, result)
+            }
+
             "screen" -> {
                 screen(call, result)
             }
@@ -1831,6 +1839,32 @@ class PosthogFlutterPlugin :
         try {
             val alias: String = call.argument("alias")!!
             PostHog.alias(alias)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureFeatureView(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val flag: String = call.argument("flag")!!
+            PostHog.captureFeatureView(flag, call.argument("flagVariant"))
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureFeatureInteraction(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val flag: String = call.argument("flag")!!
+            PostHog.captureFeatureInteraction(flag, call.argument("flagVariant"))
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

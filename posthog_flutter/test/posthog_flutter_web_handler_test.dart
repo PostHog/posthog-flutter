@@ -164,6 +164,76 @@ void main() {
     });
   });
 
+  test('PosthogFlutterWeb captureFeatureView captures the native event shape',
+      () async {
+    final calls = <List<Object?>>[];
+    final fake = JSObject();
+    fake.setProperty(
+      'getFeatureFlagResult'.toJS,
+      ((JSString key, JSAny? options) {
+        calls.add(['getFeatureFlagResult', key.toDart, options.dartify()]);
+        return {'key': key.toDart, 'enabled': true, 'variant': 'control'}
+            .jsify();
+      }).toJS,
+    );
+    fake.setProperty(
+      'capture'.toJS,
+      ((JSString event, JSAny? properties, JSAny? options) {
+        final props = properties.dartify()! as Map;
+        calls.add([
+          'capture',
+          event.toDart,
+          props['feature_flag'],
+          props['feature_flag_variant'],
+          options.dartify(),
+        ]);
+      }).toJS,
+    );
+    globalContext.setProperty('posthog'.toJS, fake);
+
+    await PosthogFlutterWeb().captureFeatureView(flag: 'checkout');
+
+    expect(calls, [
+      [
+        'getFeatureFlagResult',
+        'checkout',
+        {'send_event': false}
+      ],
+      [
+        'capture',
+        r'$feature_view',
+        'checkout',
+        'control',
+        {
+          r'$set': {r'$feature_view/checkout': 'control'}
+        },
+      ],
+    ]);
+  });
+
+  test('PosthogFlutterWeb feature events carry the current screen until close',
+      () async {
+    final screenNames = <String, Object?>{};
+    final fake = JSObject();
+    fake.setProperty(
+      'capture'.toJS,
+      ((JSString event, JSAny? properties, JSAny? options) {
+        final props = properties.dartify()! as Map;
+        screenNames[event.toDart] = props[r'$screen_name'];
+      }).toJS,
+    );
+    globalContext.setProperty('posthog'.toJS, fake);
+    final web = PosthogFlutterWeb();
+
+    await web.screen(screenName: 'Cart');
+    await web.captureFeatureInteraction(flag: 'checkout', flagVariant: 'a');
+    expect(screenNames[r'$feature_interaction'], 'Cart');
+
+    await web.close();
+    await web.captureFeatureView(flag: 'checkout', flagVariant: 'a');
+    expect(screenNames[r'$feature_view'], isNull);
+  });
+
   group('PosthogFlutterWeb captureException', () {
     test('handles native JavaScript failures from posthog-js', () async {
       final failWithJavaScriptError = globalContext.callMethod<JSFunction>(

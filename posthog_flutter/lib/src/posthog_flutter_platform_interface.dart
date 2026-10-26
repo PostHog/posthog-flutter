@@ -121,6 +121,22 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) {
+    throw UnimplementedError('captureFeatureView() has not been implemented.');
+  }
+
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) {
+    throw UnimplementedError(
+      'captureFeatureInteraction() has not been implemented.',
+    );
+  }
+
   Future<String> getDistinctId() {
     throw UnimplementedError('getDistinctId() has not been implemented.');
   }

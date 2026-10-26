@@ -571,6 +571,68 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "captureFeatureView",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "flag",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "flagVariant",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureFeatureInteraction",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "flag",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "flagVariant",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "getDistinctId",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1542,6 +1604,68 @@
                                 "name": "alias",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureFeatureView",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "flag",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "flagVariant",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureFeatureInteraction",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "flag",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "flagVariant",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -4897,6 +5021,68 @@
                         ],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<Object?>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureFeatureView",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "flag",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "flagVariant",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureFeatureInteraction",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "flag",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "flagVariant",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<void>",
                         "type": "method",
                         "typeParameterNames": []
                     },

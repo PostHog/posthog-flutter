@@ -20,6 +20,7 @@ import 'posthog_flutter_platform_interface.dart';
 import 'util/logging.dart';
 import 'utils/before_send.dart';
 import 'utils/capture_utils.dart';
+import 'utils/feature_event.dart';
 import 'utils/property_normalizer.dart';
 
 typedef _ClientScope = ({String projectToken, String host});
@@ -366,6 +367,41 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   @override
   Future<void> alias({required String alias}) =>
       _guard('alias', (client) => client.alias(alias));
+
+  @override
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _captureFeatureEvent(r'$feature_view', flag, flagVariant);
+
+  @override
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _captureFeatureEvent(r'$feature_interaction', flag, flagVariant);
+
+  // Looks up the flag and starts the capture without an await in between, so
+  // a reset() right after the call cannot move the event to the next user.
+  Future<void> _captureFeatureEvent(
+    String event,
+    String flag,
+    String? flagVariant,
+  ) =>
+      _guard(event, (client) {
+        final result = flagVariant == null
+            ? client.getFeatureFlagResult(flag, sendEvent: false)
+            : null;
+        final captured = featureEvent(
+            event, flag, flagVariant ?? result?.variant ?? result?.enabled);
+        if (captured == null) return null;
+        return capture(
+          eventName: event,
+          properties: captured.properties,
+          userProperties: captured.userProperties,
+        );
+      });
 
   @override
   Future<String> getDistinctId() =>
