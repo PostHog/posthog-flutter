@@ -55,6 +55,60 @@ void main() {
     expect((captures.last['properties'] as Map)[r'$screen_name'], 'Basket');
   });
 
+  group('a reset() right after an un-awaited capture', () {
+    late List<String> sentAs;
+    late String distinctId;
+
+    setUp(() {
+      sentAs = [];
+      distinctId = 'old-user';
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty('get_distinct_id'.toJS, (() => distinctId.toJS).toJS);
+      fake.setProperty('reset'.toJS, (() => distinctId = 'new-user').toJS);
+      for (final method in ['capture', 'captureException']) {
+        fake.setProperty(
+          method.toJS,
+          ((JSAny? a, JSAny? b, [JSAny? c]) => sentAs.add(distinctId)).toJS,
+        );
+      }
+    });
+
+    test('sends the events as the old user without beforeSend', () async {
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token'));
+
+      final sent = [
+        web.capture(eventName: 'checkout'),
+        web.screen(screenName: 'Cart'),
+        web.captureException(error: StateError('boom')),
+      ];
+      await web.reset();
+      await Future.wait(sent);
+
+      expect(sentAs, ['old-user', 'old-user', 'old-user']);
+    });
+
+    test('drops the events when beforeSend outlasts the reset', () async {
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) async {
+          await Future<void>.delayed(Duration.zero);
+          return event;
+        },
+      ]));
+
+      final sent = [
+        web.capture(eventName: 'checkout'),
+        web.screen(screenName: 'Cart'),
+        web.captureException(error: StateError('boom')),
+      ];
+      await web.reset();
+      await Future.wait(sent);
+
+      expect(sentAs, isEmpty);
+    });
+  });
+
   test('beforeSend null drops capture on web', () async {
     final web = PosthogFlutterWeb();
     await web.setup(

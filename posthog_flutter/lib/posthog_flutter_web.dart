@@ -1,6 +1,7 @@
 // In order to *not* need this ignore, consider extracting the "web" version
 // of your plugin as a separate package, instead of inlining it in the same
 // package as the core of your plugin.
+import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:flutter/services.dart';
@@ -38,21 +39,42 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   // its final name, until close().
   String? _currentScreen;
 
-  Future<PostHogEvent?> _runBeforeSend(
+  /// Without callbacks the event comes back synchronously, so a reset()
+  /// right after an un-awaited capture cannot move it to the next user.
+  FutureOr<PostHogEvent?> _runBeforeSend(
     String eventName,
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) {
-    return applyBeforeSend(
-      _beforeSendCallbacks,
-      PostHogEvent(
-        event: eventName,
-        properties: properties,
-        userProperties: userProperties,
-        userPropertiesSetOnce: userPropertiesSetOnce,
-      ),
+    final event = PostHogEvent(
+      event: eventName,
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
     );
+    return _beforeSendCallbacks.isEmpty ? event : _applyCallbacks(event);
+  }
+
+  /// Drops the event when the user changed while the callbacks ran, as
+  /// Windows and Linux do, rather than sending it as the next user.
+  Future<PostHogEvent?> _applyCallbacks(PostHogEvent event) async {
+    final distinctId = _distinctId();
+    final processed = await applyBeforeSend(_beforeSendCallbacks, event);
+    if (processed != null && _distinctId() != distinctId) {
+      printIfDebug('[PostHog] ${processed.event} dropped: the user changed '
+          'while beforeSend was running.');
+      return null;
+    }
+    return processed;
+  }
+
+  static String? _distinctId() {
+    try {
+      return posthog?.get_distinct_id()?.dartify() as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   static void registerWith(Registrar registrar) {
@@ -181,12 +203,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
-    final processedEvent = await _runBeforeSend(
+    final hooked = _runBeforeSend(
       eventName,
       properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
+    final processedEvent =
+        hooked is Future<PostHogEvent?> ? await hooked : hooked;
     if (processedEvent == null) {
       printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
       return;
@@ -262,10 +286,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       PostHogPropertyName.screenName: screenName,
     };
 
-    final processedEvent = await _runBeforeSend(
+    final hooked = _runBeforeSend(
       PostHogEventName.screen,
       propsWithScreenName,
     );
+    final processedEvent =
+        hooked is Future<PostHogEvent?> ? await hooked : hooked;
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
       return;
@@ -539,10 +565,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-      final processedEvent = await _runBeforeSend(
+      final hooked = _runBeforeSend(
         PostHogEventName.exception,
         exceptionData.cast<String, Object>(),
       );
+      final processedEvent =
+          hooked is Future<PostHogEvent?> ? await hooked : hooked;
       if (processedEvent == null) {
         printIfDebug(
           '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
