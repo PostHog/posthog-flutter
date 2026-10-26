@@ -68,7 +68,10 @@ void main() {
       for (final method in ['capture', 'captureException']) {
         fake.setProperty(
           method.toJS,
-          ((JSAny? a, JSAny? b, [JSAny? c]) => sentAs.add(distinctId)).toJS,
+          ((JSAny? a, JSAny? b, [JSAny? c]) {
+            final props = b.dartify() as Map?;
+            sentAs.add(props?['distinct_id'] as String? ?? distinctId);
+          }).toJS,
         );
       }
     });
@@ -106,7 +109,7 @@ void main() {
       expect(sentAs, ['old-user']);
     });
 
-    test('drops the events when beforeSend outlasts the reset', () async {
+    test('keeps the old user when beforeSend outlasts the reset', () async {
       final web = PosthogFlutterWeb();
       await web.setup(PostHogConfig('test_token', beforeSend: [
         (event) async {
@@ -123,7 +126,7 @@ void main() {
       await web.reset();
       await Future.wait(sent);
 
-      expect(sentAs, isEmpty);
+      expect(sentAs, ['old-user', 'old-user', 'old-user']);
     });
   });
 

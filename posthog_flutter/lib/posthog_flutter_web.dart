@@ -56,8 +56,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     return _beforeSendCallbacks.isEmpty ? event : _applyCallbacks(event);
   }
 
-  /// Drops the event when the user changed while the callbacks ran, as
-  /// Windows and Linux do, rather than sending it as the next user.
+  /// When the user changed while the callbacks ran, pins the event to the
+  /// user it was captured for: posthog-js lets an event's `distinct_id`
+  /// property override the current one.
   Future<PostHogEvent?> _applyCallbacks(PostHogEvent event) async {
     final distinctId = _distinctId();
     final processed = await applyBeforeSend(_beforeSendCallbacks, event);
@@ -66,9 +67,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     if (processed != null &&
         distinctId != null &&
         _distinctId() != distinctId) {
-      printIfDebug('[PostHog] ${processed.event} dropped: the user changed '
-          'while beforeSend was running.');
-      return null;
+      processed.properties = {
+        'distinct_id': distinctId,
+        ...?processed.properties,
+      };
     }
     return processed;
   }
