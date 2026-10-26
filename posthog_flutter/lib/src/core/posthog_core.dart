@@ -160,7 +160,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (timezone != null) r'$timezone': timezone,
       ...getCommonEventProperties(),
       r'$session_id': sessionId,
-      r'$process_person_profile': _hasPersonProcessing(),
+      // A `$process_person_profile` passed for this event, such as the
+      // `process_person_profile` option, wins for this event only.
+      r'$process_person_profile':
+          properties?[r'$process_person_profile'] is bool
+              ? properties![r'$process_person_profile']
+              : _hasPersonProcessing(),
       r'$is_identified': _isIdentified(),
       ..._sessionDebugProperties(now),
     };
@@ -292,10 +297,13 @@ abstract class PostHogCore extends PostHogCoreStateless {
   ///
   /// An empty [distinctId] is ignored, as are all calls while opted out or
   /// when `personProfiles` is `never`.
+  ///
+  /// The optional [properties] are added to the event this call sends.
   void identify(
     String distinctId, {
     Map<String, Object?>? userProperties,
     Map<String, Object?>? userPropertiesSetOnce,
+    Map<String, Object?>? properties,
   }) {
     wrap(() {
       if (distinctId.trim().isEmpty) {
@@ -330,13 +338,15 @@ abstract class PostHogCore extends PostHogCoreStateless {
         identifyStateless(
           distinctId,
           properties: _enrichProperties({
+            ...?properties,
             'distinct_id': distinctId,
             r'$anon_distinct_id': previousDistinctId,
             ...maybeAdd(r'$set', userProperties),
             ...maybeAdd(r'$set_once', userPropertiesSetOnce),
           }),
         );
-        if (userProperties != null || userPropertiesSetOnce != null) {
+        if ((userProperties != null || userPropertiesSetOnce != null) &&
+            !_isPersonless(properties)) {
           _cachedPersonProperties = _personPropertiesHash(
               distinctId, userProperties, userPropertiesSetOnce);
         }
@@ -346,6 +356,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         // anonymous one, so the transition is recorded with a $set.
         setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
         capture(r'$set', properties: {
+          ...?properties,
           r'$set': userProperties ?? {},
           r'$set_once': userPropertiesSetOnce ?? {},
         });
@@ -356,6 +367,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         setPersonProperties(
           userPropertiesToSet: userProperties,
           userPropertiesToSetOnce: userPropertiesSetOnce,
+          properties: properties,
         );
       } else {
         logger.info('identify was called with the current distinct id of an '
@@ -387,8 +399,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
       );
 
       final allProperties = _enrichProperties(properties);
-      // Once an event is person-processed, all later ones are too.
-      if (allProperties[r'$process_person_profile'] == true) {
+      // Once an event is person-processed, all later ones are too. A value
+      // passed for this event alone doesn't count.
+      if (_hasPersonProcessing()) {
         _enablePersonProcessing();
       }
 
@@ -396,7 +409,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (event == r'$set' || event == r'$identify') {
         final set = allProperties[r'$set'];
         final setOnce = allProperties[r'$set_once'];
-        if (set is Map || setOnce is Map) {
+        if ((set is Map || setOnce is Map) && !_isPersonless(allProperties)) {
           _cachedPersonProperties =
               _personPropertiesHash(getDistinctId(), set, setOnce);
         }
@@ -405,7 +418,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   /// Creates an alias for a user. An empty [alias] is ignored.
-  void alias(String alias) {
+  ///
+  /// The optional [properties] are added to the `$create_alias` event.
+  void alias(String alias, {Map<String, Object?>? properties}) {
     wrap(() {
       if (alias.trim().isEmpty) {
         logger.warn('alias was called with an empty alias. '
@@ -415,7 +430,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (_ignoredWhileOptedOut('posthog.alias')) return;
       if (!_requirePersonProcessing('posthog.alias')) return;
 
-      aliasStateless(alias, getDistinctId(), properties: _enrichProperties({}));
+      aliasStateless(alias, getDistinctId(),
+          properties: _enrichProperties({...?properties}));
     });
   }
 
@@ -440,10 +456,13 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// key changes, the properties stored for the previous key are dropped and
   /// flags are reloaded. A call with an empty [groupType]
   /// or [groupKey] is ignored.
+  ///
+  /// The optional [properties] are added to the `$groupidentify` event.
   void group(
     String groupType,
     String groupKey, {
     Map<String, Object?>? groupProperties,
+    Map<String, Object?>? properties,
   }) {
     wrap(() {
       if (groupType.trim().isEmpty || groupKey.trim().isEmpty) {
@@ -468,7 +487,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         groupType,
         groupKey,
         distinctId: getDistinctId(),
-        eventProperties: _enrichProperties({}),
+        eventProperties: _enrichProperties({...?properties}),
         groupProperties: groupProperties,
       );
     });
@@ -989,9 +1008,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   /// Sets properties on the person profile. They also feed feature flag
   /// evaluation from the next flags reload on.
+  ///
+  /// The optional [properties] are added to the `$set` event.
   void setPersonProperties({
     Map<String, Object?>? userPropertiesToSet,
     Map<String, Object?>? userPropertiesToSetOnce,
+    Map<String, Object?>? properties,
   }) {
     wrap(() {
       final isSetEmpty =
@@ -1006,7 +1028,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
       final hash = _personPropertiesHash(
           getDistinctId(), userPropertiesToSet, userPropertiesToSetOnce);
 
-      if (_cachedPersonProperties == hash) {
+      // A personless `$set` doesn't update the person, so it is never a
+      // duplicate.
+      if (_cachedPersonProperties == hash && !_isPersonless(properties)) {
         logger.info(
             'A duplicate setPersonProperties call was made. It has been ignored.');
         return;
@@ -1019,6 +1043,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       setPersonPropertiesForFlags(mergedProperties);
 
       capture(r'$set', properties: {
+        ...?properties,
         r'$set': userPropertiesToSet ?? {},
         r'$set_once': userPropertiesToSetOnce ?? {},
       });
@@ -1041,6 +1066,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   static bool _isNonEmptyMap(Object? value) => value is Map && value.isNotEmpty;
+
+  /// Whether [properties] turn person processing off for their event.
+  static bool _isPersonless(Map<String, Object?>? properties) =>
+      properties?[r'$process_person_profile'] == false;
 
   static Map<String, Object>? _asPropertyMap(Object? value) {
     if (value is! Map) return null;

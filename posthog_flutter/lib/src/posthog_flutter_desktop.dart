@@ -20,6 +20,7 @@ import 'posthog_flutter_platform_interface.dart';
 import 'util/logging.dart';
 import 'utils/before_send.dart';
 import 'utils/capture_utils.dart';
+import 'utils/event_options.dart';
 import 'utils/feature_event.dart';
 import 'utils/property_normalizer.dart';
 
@@ -217,12 +218,17 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) =>
       _guard('identify', (client) {
         client.identify(
           userId,
           userProperties: _normalize(userProperties),
           userPropertiesSetOnce: _normalize(userPropertiesSetOnce),
+          properties: eventOptionsToLegacyProperties(
+            options,
+            method: 'identify',
+          ),
         );
       });
 
@@ -230,11 +236,16 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) =>
       _guard('setPersonProperties', (client) {
         client.setPersonProperties(
           userPropertiesToSet: _normalize(userPropertiesToSet),
           userPropertiesToSetOnce: _normalize(userPropertiesToSetOnce),
+          properties: eventOptionsToLegacyProperties(
+            options,
+            method: 'setPersonProperties',
+          ),
         );
       });
 
@@ -244,6 +255,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) =>
       _guard('capture', (client) async {
         if (client.optedOut) return;
@@ -258,6 +270,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           properties,
           userProperties: userProperties,
           userPropertiesSetOnce: userPropertiesSetOnce,
+          options: options,
         );
         final processed =
             hooked is Future<PostHogEvent?> ? await hooked : hooked;
@@ -271,10 +284,25 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         _captureProcessed(current, processed, exceptionSteps);
       });
 
+  /// AI events are not sent on desktop.
+  @override
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    printIfDebug('[PostHog] captureAi is not supported on Windows and Linux. '
+        'The event "$eventName" was not sent.');
+    return null;
+  }
+
   @override
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) =>
       _guard('screen', (client) async {
         // Opted out, nothing happens: no callback runs, and the screen does
@@ -291,6 +319,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
             ...?properties,
             PostHogPropertyName.screenName: screenName,
           },
+          options: options,
         );
         final processed =
             hooked is Future<PostHogEvent?> ? await hooked : hooked;
@@ -365,8 +394,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> alias({required String alias}) =>
-      _guard('alias', (client) => client.alias(alias));
+  Future<void> alias({required String alias, Map<String, Object?>? options}) =>
+      _guard(
+        'alias',
+        (client) => client.alias(
+          alias,
+          properties: eventOptionsToLegacyProperties(options, method: 'alias'),
+        ),
+      );
 
   @override
   Future<void> captureFeatureView({
@@ -489,12 +524,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
   }) =>
       _guard('group', (client) {
         client.group(
           groupType,
           groupKey,
           groupProperties: _normalize(groupProperties),
+          properties: eventOptionsToLegacyProperties(options, method: 'group'),
         );
       });
 
@@ -534,6 +571,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) =>
       _guard('captureException', (client) async {
         if (client.optedOut) return;
@@ -554,6 +592,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final hooked = _runBeforeSend(
           PostHogEventName.exception,
           exceptionProps.cast<String, Object>(),
+          options: options,
         );
         final processed =
             hooked is Future<PostHogEvent?> ? await hooked : hooked;
@@ -661,12 +700,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
     final event = PostHogEvent(
       event: eventName,
       properties: properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options == null ? null : {...options},
     );
     final callbacks = _config?.beforeSend ?? const <BeforeSendCallback>[];
     return callbacks.isEmpty ? event : _applyCallbacks(callbacks, event);
@@ -691,17 +732,24 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     ExceptionStepsBuffer? exceptionSteps,
   ) {
     if (!_hasName(event.event)) return;
+    final properties = _withExceptionSteps(
+      event.event,
+      exceptionSteps,
+      _mergeUserProps(
+        event.properties,
+        event.userProperties,
+        event.userPropertiesSetOnce,
+      ),
+    );
+    // Options go out as their legacy properties, winning over a legacy
+    // property set on the event.
+    final optionProperties =
+        eventOptionsToLegacyProperties(event.options, method: event.event);
     client.capture(
       event.event,
-      properties: _withExceptionSteps(
-        event.event,
-        exceptionSteps,
-        _mergeUserProps(
-          event.properties,
-          event.userProperties,
-          event.userPropertiesSetOnce,
-        ),
-      ),
+      properties: optionProperties.isEmpty
+          ? properties
+          : {...?properties, ...optionProperties},
     );
   }
 

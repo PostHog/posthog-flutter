@@ -452,6 +452,133 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO event options', () {
+    const options = <String, Object?>{
+      'process_person_profile': false,
+      'custom_key': 'kept',
+      'unset_key': null,
+    };
+    const sent = {'process_person_profile': false, 'custom_key': 'kept'};
+
+    Map<String, dynamic> argsOf(String method) => Map<String, dynamic>.from(
+          log.singleWhere((c) => c.method == method).arguments as Map,
+        );
+
+    setUp(() async {
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+    });
+
+    final callsByMethod = <String, Future<void> Function(PosthogFlutterIO)>{
+      'capture': (io) => io.capture(eventName: 'clicked', options: options),
+      'screen': (io) => io.screen(screenName: 'Home', options: options),
+      'captureException': (io) =>
+          io.captureException(error: StateError('boom'), options: options),
+      'identify': (io) => io.identify(userId: 'user-1', options: options),
+      'setPersonProperties': (io) => io.setPersonProperties(
+            userPropertiesToSet: {'plan': 'pro'},
+            options: options,
+          ),
+      'alias': (io) => io.alias(alias: 'alias-1', options: options),
+      'group': (io) =>
+          io.group(groupType: 'company', groupKey: 'acme', options: options),
+      'captureAi': (io) =>
+          io.captureAi(eventName: r'$ai_generation', options: options),
+    };
+
+    for (final entry in callsByMethod.entries) {
+      test('${entry.key} sends the options without unset keys', () async {
+        await entry.value(posthogFlutterIO);
+        expect(argsOf(entry.key)['options'], sent);
+      });
+    }
+
+    test('calls without options send no options argument', () async {
+      await posthogFlutterIO.capture(eventName: 'clicked');
+      await posthogFlutterIO.alias(alias: 'alias-1', options: {'k': null});
+      expect(argsOf('capture'), isNot(contains('options')));
+      expect(argsOf('alias'), isNot(contains('options')));
+    });
+
+    test('captureAi sends the event and returns the native uuid', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return call.method == 'captureAi' ? 'uuid-1' : null;
+      });
+
+      final uuid = await posthogFlutterIO.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_model': 'gpt-4o'},
+        userProperties: {'plan': 'pro'},
+      );
+
+      expect(uuid, 'uuid-1');
+      expect(argsOf('captureAi'), {
+        'eventName': r'$ai_generation',
+        'properties': {r'$ai_model': 'gpt-4o'},
+        'userProperties': {'plan': 'pro'},
+      });
+      expect(log.where((c) => c.method == 'capture'), isEmpty);
+    });
+
+    test('beforeSend sees and can change the options', () async {
+      final seen = <Map<String, Object?>?>[];
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            seen.add({...?event.options});
+            event.options = {...?event.options, 'product_tour_id': 'tour-1'}
+              ..remove('custom_key');
+            return event;
+          },
+        ],
+      ));
+
+      await posthogFlutterIO.captureAi(
+          eventName: r'$ai_span', options: options);
+      await posthogFlutterIO.screen(screenName: 'Home', options: options);
+
+      expect(seen, [options, options]);
+      const changed = {
+        'process_person_profile': false,
+        'product_tour_id': 'tour-1',
+      };
+      expect(argsOf('captureAi')['options'], changed);
+      expect(argsOf('screen')['options'], changed);
+    });
+
+    test('a screen renamed by beforeSend keeps its options', () async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            if (event.event == r'$screen') event.event = 'screen viewed';
+            return event;
+          },
+        ],
+      ));
+
+      await posthogFlutterIO.screen(screenName: 'Home', options: options);
+
+      expect(argsOf('capture')['eventName'], 'screen viewed');
+      expect(argsOf('capture')['options'], sent);
+    });
+
+    test('captureAi dropped by beforeSend returns null', () async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [(event) => null],
+      ));
+
+      expect(
+        await posthogFlutterIO.captureAi(eventName: r'$ai_generation'),
+        isNull,
+      );
+      expect(log.where((c) => c.method == 'captureAi'), isEmpty);
+    });
+  });
+
   group('PosthogFlutterIO beforeSend callback', () {
     test(
       'capture sends event unchanged when no beforeSend registered',
