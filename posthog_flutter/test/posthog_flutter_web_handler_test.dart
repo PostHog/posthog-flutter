@@ -234,6 +234,45 @@ void main() {
     expect(screenNames[r'$feature_view'], isNull);
   });
 
+  group('PosthogFlutterWeb sendFeatureFlagEvent', () {
+    late Map<String, Object?> optionsByMethod;
+
+    setUp(() {
+      optionsByMethod = {};
+      final fake = JSObject();
+      for (final method in ['getFeatureFlag', 'isFeatureEnabled']) {
+        fake.setProperty(
+          method.toJS,
+          ((JSString key, JSAny? options) {
+            optionsByMethod[method] = options.dartify();
+            return true.toJS;
+          }).toJS,
+        );
+      }
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    for (final (sendFeatureFlagEvent, expected) in [
+      (null, <String, Object?>{}),
+      (false, {'send_event': false}),
+      (true, {'send_event': true}),
+    ]) {
+      test('maps $sendFeatureFlagEvent to posthog-js options $expected',
+          () async {
+        final web = PosthogFlutterWeb();
+        await web.getFeatureFlag(
+            key: 'flag', sendFeatureFlagEvent: sendFeatureFlagEvent);
+        await web.isFeatureEnabled('flag',
+            sendFeatureFlagEvent: sendFeatureFlagEvent);
+
+        expect(optionsByMethod, {
+          'getFeatureFlag': expected,
+          'isFeatureEnabled': expected,
+        });
+      });
+    }
+  });
+
   group('PosthogFlutterWeb captureException', () {
     test('handles native JavaScript failures from posthog-js', () async {
       final failWithJavaScriptError = globalContext.callMethod<JSFunction>(

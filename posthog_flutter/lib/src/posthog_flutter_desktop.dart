@@ -442,8 +442,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _guard('unregister', (client) => client.unregister(key));
 
   @override
-  Future<bool> isFeatureEnabled(String key) => _guardWith('isFeatureEnabled',
-      false, (client) => client.isFeatureEnabled(key) ?? false);
+  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
+      _guardWith(
+          'isFeatureEnabled',
+          false,
+          (client) =>
+              client.isFeatureEnabled(key, sendEvent: sendFeatureFlagEvent) ??
+              false);
 
   @override
   Future<void> reloadFeatureFlags() => _guard(
@@ -494,8 +499,15 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       });
 
   @override
-  Future<Object?> getFeatureFlag({required String key}) => _guardWith<Object?>(
-      'getFeatureFlag', null, (client) => client.getFeatureFlag(key));
+  Future<Object?> getFeatureFlag({
+    required String key,
+    bool? sendFeatureFlagEvent,
+  }) =>
+      _guardWith<Object?>(
+          'getFeatureFlag',
+          null,
+          (client) =>
+              client.getFeatureFlag(key, sendEvent: sendFeatureFlagEvent));
 
   @override
   Future<Object?> getFeatureFlagPayload({required String key}) => _guardWith(
