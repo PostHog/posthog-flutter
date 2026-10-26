@@ -954,6 +954,152 @@ void main() {
     });
   });
 
+  group('Event options', () {
+    test('are sent as their legacy properties, winning over them', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+
+      final lines = await _printsOf(() => platform.capture(
+            eventName: 'tour step',
+            properties: {r'$product_tour_id': 'from-property'},
+            options: {
+              'process_person_profile': false,
+              'cookieless_mode': true,
+              'disable_skew_correction': true,
+              'product_tour_id': 'from-option',
+              'unknown_option': 'x',
+              'unset_option': null,
+            },
+          ));
+
+      final properties = _propertiesOf(await server.waitForEvent('tour step'));
+      expect(properties[r'$process_person_profile'], isFalse);
+      expect(properties[r'$cookieless_mode'], isTrue);
+      expect(properties[r'$ignore_sent_at'], isTrue);
+      expect(properties[r'$product_tour_id'], 'from-option');
+      expect(properties, isNot(contains('unknown_option')));
+      expect(properties, isNot(contains('unset_option')));
+      expect(lines, [contains('option "unknown_option" is not supported')]);
+    });
+
+    test('a process_person_profile option applies to its event only', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+
+      await platform.capture(
+        eventName: 'processed',
+        options: {'process_person_profile': true},
+      );
+      await platform.capture(eventName: 'anonymous');
+
+      final processed = await server.waitForEvent('processed');
+      final anonymous = await server.waitForEvent('anonymous');
+      expect(_propertiesOf(processed)[r'$process_person_profile'], isTrue);
+      expect(_propertiesOf(anonymous)[r'$process_person_profile'], isFalse);
+    });
+
+    test('beforeSend can change them', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            event.options = {
+              ...?event.options,
+              'product_tour_id': 'from-hook',
+            };
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.screen(
+        screenName: 'Home',
+        options: {'product_tour_id': 'from-call'},
+      );
+      await platform.captureException(
+        error: StateError('boom'),
+        options: {'disable_skew_correction': true},
+      );
+
+      final screen = _propertiesOf(await server.waitForEvent(r'$screen'));
+      final exception = _propertiesOf(await server.waitForEvent(r'$exception'));
+      expect(screen[r'$product_tour_id'], 'from-hook');
+      expect(exception[r'$product_tour_id'], 'from-hook');
+      expect(exception[r'$ignore_sent_at'], isTrue);
+    });
+
+    test('reach the events identify, setPersonProperties, group and alias send',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+      Map<String, Object?> options(String id) =>
+          {'product_tour_id': id, 'cookieless_mode': false};
+
+      await platform.identify(userId: 'user-1', options: options('identify'));
+      await platform.setPersonProperties(
+        userPropertiesToSet: {'plan': 'pro'},
+        options: options('set'),
+      );
+      await platform.group(
+        groupType: 'company',
+        groupKey: 'acme',
+        options: options('group'),
+      );
+      await platform.alias(alias: 'alias-1', options: options('alias'));
+
+      for (final (name, id) in [
+        (r'$identify', 'identify'),
+        (r'$set', 'set'),
+        (r'$groupidentify', 'group'),
+        (r'$create_alias', 'alias'),
+      ]) {
+        final properties = _propertiesOf(await server.waitForEvent(name));
+        expect(properties[r'$product_tour_id'], id, reason: name);
+        expect(properties[r'$cookieless_mode'], isFalse, reason: name);
+      }
+    });
+
+    test(r'a personless $set does not mark the person properties as sent',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+      await platform.identify(userId: 'user-1');
+
+      await platform.setPersonProperties(
+        userPropertiesToSet: {'plan': 'pro'},
+        options: {'process_person_profile': false},
+      );
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+      await platform.capture(eventName: 'done');
+      await server.waitForEvent('done');
+
+      final sets = [
+        for (final event in server.events)
+          if (event['event'] == r'$set') _propertiesOf(event),
+      ];
+      expect(
+        [for (final set in sets) set[r'$process_person_profile']],
+        [isFalse, isTrue],
+      );
+    });
+
+    test('captureAi sends nothing and returns null', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+
+      String? uuid = 'not called';
+      final lines = await _printsOf(() async {
+        uuid = await platform.captureAi(eventName: r'$ai_generation');
+      });
+      await platform.capture(eventName: 'after');
+      await server.waitForEvent('after');
+
+      expect(uuid, isNull);
+      expect(lines, [contains('captureAi is not supported')]);
+      expect(server.eventNames, isNot(contains(r'$ai_generation')));
+    });
+  });
+
   group('Application lifecycle', () {
     /// A launch of the app with [build], keeping its state in [appDirectory].
     PosthogFlutterDesktop launch(

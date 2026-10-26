@@ -22,6 +22,13 @@ class PostHogEvent {
   /// These properties will only be set if they don't already exist on the user profile.
   Map<String, Object>? userPropertiesSetOnce;
 
+  /// Settings that tell PostHog how to process this event, sent apart from
+  /// its properties. See `Posthog.capture` for the known keys.
+  ///
+  /// A callback can read, add, change or remove them. A null value means
+  /// unset.
+  Map<String, Object?>? options;
+
   /// Creates an event passed to a before-send callback.
   ///
   /// The [event] is the event name to capture.
@@ -33,15 +40,18 @@ class PostHogEvent {
   ///
   /// The optional [userPropertiesSetOnce] are person properties to set with
   /// `$set_once`.
+  ///
+  /// The optional [options] are the event's per-event options.
   PostHogEvent({
     required this.event,
     this.properties,
     this.userProperties,
     this.userPropertiesSetOnce,
+    this.options,
   });
 
   @override
   String toString() {
-    return 'PostHogEvent(event: $event, properties: $properties, userProperties: $userProperties, userPropertiesSetOnce: $userPropertiesSetOnce)';
+    return 'PostHogEvent(event: $event, properties: $properties, userProperties: $userProperties, userPropertiesSetOnce: $userPropertiesSetOnce, options: $options)';
   }
 }

@@ -481,6 +481,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             setPersonProperties(call, result: result)
         case "capture":
             capture(call, result: result)
+        case "captureAi":
+            captureAi(call, result: result)
         case "screen":
             screen(call, result: result)
         case "captureLog":
@@ -1432,11 +1434,13 @@ extension PosthogFlutterPlugin {
         {
             let userProperties = args["userProperties"] as? [String: Any]
             let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
 
             PostHogSDK.shared.identify(
                 userId,
                 userProperties: userProperties,
-                userPropertiesSetOnce: userPropertiesSetOnce
+                userPropertiesSetOnce: userPropertiesSetOnce,
+                options: options
             )
             result(nil)
         } else {
@@ -1451,10 +1455,12 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any] {
             let userPropertiesToSet = args["userPropertiesToSet"] as? [String: Any]
             let userPropertiesToSetOnce = args["userPropertiesToSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
 
             PostHogSDK.shared.setPersonProperties(
                 userPropertiesToSet: userPropertiesToSet,
-                userPropertiesToSetOnce: userPropertiesToSetOnce
+                userPropertiesToSetOnce: userPropertiesToSetOnce,
+                options: options
             )
             result(nil)
         } else {
@@ -1472,13 +1478,39 @@ extension PosthogFlutterPlugin {
             let properties = args["properties"] as? [String: Any]
             let userProperties = args["userProperties"] as? [String: Any]
             let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
             PostHogSDK.shared.capture(
                 eventName,
                 properties: properties,
                 userProperties: userProperties,
-                userPropertiesSetOnce: userPropertiesSetOnce
+                userPropertiesSetOnce: userPropertiesSetOnce,
+                options: options
             )
             result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func captureAi(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let eventName = args["eventName"] as? String
+        {
+            let properties = args["properties"] as? [String: Any]
+            let userProperties = args["userProperties"] as? [String: Any]
+            let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
+            let uuid = PostHogSDK.shared.captureAi(
+                eventName,
+                properties: properties,
+                userProperties: userProperties,
+                userPropertiesSetOnce: userPropertiesSetOnce,
+                options: options
+            )
+            result(uuid)
         } else {
             _badArgumentError(result)
         }
@@ -1492,9 +1524,11 @@ extension PosthogFlutterPlugin {
            let screenName = args["screenName"] as? String
         {
             let properties = args["properties"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
             PostHogSDK.shared.screen(
                 screenName,
-                properties: properties
+                properties: properties,
+                options: options
             )
             result(nil)
         } else {
@@ -1553,7 +1587,8 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let alias = args["alias"] as? String
         {
-            PostHogSDK.shared.alias(alias)
+            let options = args["options"] as? [String: Any]
+            PostHogSDK.shared.alias(alias, options: options)
             result(nil)
         } else {
             _badArgumentError(result)
@@ -1695,7 +1730,8 @@ extension PosthogFlutterPlugin {
            let groupKey = args["groupKey"] as? String
         {
             let groupProperties = args["groupProperties"] as? [String: Any]
-            PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties)
+            let options = args["options"] as? [String: Any]
+            PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties, options: options)
             result(nil)
         } else {
             _badArgumentError(result)
@@ -1799,6 +1835,7 @@ extension PosthogFlutterPlugin {
         }
 
         let properties = arguments["properties"] as? [String: Any]
+        let options = arguments["options"] as? [String: Any]
 
         // Extract timestamp from Flutter and convert to Date
         var timestamp: Date? = nil
@@ -1807,7 +1844,7 @@ extension PosthogFlutterPlugin {
         }
 
         // Use capture method with timestamp to ensure Flutter timestamp is used
-        PostHogSDK.shared.capture("$exception", properties: properties, timestamp: timestamp)
+        PostHogSDK.shared.capture("$exception", properties: properties, timestamp: timestamp, options: options)
         result(nil)
     }
 

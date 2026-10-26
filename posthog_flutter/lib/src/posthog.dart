@@ -140,6 +140,9 @@ class Posthog {
   /// The optional [userPropertiesSetOnce] are person properties set with
   /// `$set_once`.
   ///
+  /// The optional [options] tell PostHog how to process the `$identify` or
+  /// `$set` event this call sends, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the identify call has been queued.
   ///
   /// Note that identifying a user reloads feature flags, which issues a
@@ -157,11 +160,13 @@ class Posthog {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) =>
       _posthog.identify(
         userId: userId,
         userProperties: userProperties,
         userPropertiesSetOnce: userPropertiesSetOnce,
+        options: options,
       );
 
   /// Sets person properties for the current user without requiring identify.
@@ -174,6 +179,9 @@ class Posthog {
   ///
   /// The optional [userPropertiesToSetOnce] values are set with `$set_once` and
   /// do not overwrite existing values.
+  ///
+  /// The optional [options] tell PostHog how to process the `$set` event this
+  /// call sends, as described on [capture].
   ///
   /// Returns a [Future] that completes when the update has been queued.
   /// If both property maps are null or empty, no event is queued.
@@ -188,10 +196,12 @@ class Posthog {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) =>
       _posthog.setPersonProperties(
         userPropertiesToSet: userPropertiesToSet,
         userPropertiesToSetOnce: userPropertiesToSetOnce,
+        options: options,
       );
 
   /// Captures a custom event.
@@ -210,6 +220,29 @@ class Posthog {
   /// The optional [userPropertiesSetOnce] are person properties set with
   /// `$set_once`.
   ///
+  /// The optional [options] tell PostHog how to process this event and are
+  /// sent apart from its properties. Known keys:
+  /// - `process_person_profile` (`bool`): whether PostHog creates or updates a
+  ///   person profile for this event.
+  /// - `cookieless_mode` (`bool`): whether PostHog processes this event in
+  ///   cookieless mode.
+  /// - `disable_skew_correction` (`bool`): whether PostHog keeps the event
+  ///   timestamp as sent instead of correcting it for device clock skew.
+  /// - `product_tour_id` (`String`): the product tour the event belongs to.
+  ///
+  /// These replace the `$process_person_profile`, `$cookieless_mode`,
+  /// `$ignore_sent_at` and `$product_tour_id` properties, and an option wins
+  /// over its property. A null value means unset. [PostHogConfig.beforeSend]
+  /// can change them through [PostHogEvent.options].
+  ///
+  /// On iOS, macOS and Android, other keys are sent unchanged. On Windows,
+  /// Linux and web, the known keys are sent as their legacy properties and
+  /// other keys are dropped. On web, posthog-js sets
+  /// `$process_person_profile` itself, so `process_person_profile` has no
+  /// effect there, and the options of [identify], [setPersonProperties],
+  /// [alias] and [group] are dropped because posthog-js sends those events
+  /// without event properties.
+  ///
   /// Returns a [Future] that completes when the event has been queued.
   ///
   /// **Example**
@@ -227,7 +260,65 @@ class Posthog {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
+    return _posthog.capture(
+      eventName: eventName,
+      properties: _withCurrentScreen(properties),
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
+    );
+  }
+
+  /// Captures an AI observability event, such as `$ai_generation`,
+  /// `$ai_span`, `$ai_trace` or `$ai_embedding`, and sends it to PostHog's AI
+  /// endpoint, which accepts much larger events than [capture].
+  ///
+  /// Takes the same arguments as [capture] and goes through the same
+  /// [PostHogConfig.beforeSend] callbacks. The event is queued separately from
+  /// other events and sent unchanged: the SDK doesn't redact or truncate
+  /// prompts, outputs or media. PostHog drops an event sent here whose name
+  /// doesn't start with `$ai_`. [capture] never sends events here, even ones
+  /// named `$ai_*`.
+  ///
+  /// Returns the event's UUID, or `null` if the event wasn't queued: for
+  /// example, the SDK is opted out or a [PostHogConfig.beforeSend] callback
+  /// dropped it. An event over the AI size limit is dropped: iOS and macOS
+  /// then return `null`, while Android returns the UUID and logs the drop.
+  ///
+  /// **Note:** supported on iOS, macOS and Android. On Windows, Linux and web
+  /// the event is not sent, a debug message is logged, and `null` is
+  /// returned.
+  ///
+  /// **Example**
+  /// ```dart
+  ///   await Posthog().captureAi(
+  ///     eventName: r'$ai_generation',
+  ///     properties: {
+  ///       r'$ai_trace_id': traceId,
+  ///       r'$ai_model': 'gpt-4o',
+  ///       r'$ai_provider': 'openai',
+  ///     },
+  ///   );
+  /// ```
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) {
+    return _posthog.captureAi(
+      eventName: eventName,
+      properties: _withCurrentScreen(properties),
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
+    );
+  }
+
+  Map<String, Object>? _withCurrentScreen(Map<String, Object>? properties) {
     final propertiesCopy = properties == null ? null : {...properties};
 
     final currentScreen = _currentScreen;
@@ -236,12 +327,7 @@ class Posthog {
         currentScreen != null) {
       propertiesCopy['\$screen_name'] = currentScreen;
     }
-    return _posthog.capture(
-      eventName: eventName,
-      properties: propertiesCopy,
-      userProperties: userProperties,
-      userPropertiesSetOnce: userPropertiesSetOnce,
-    );
+    return propertiesCopy;
   }
 
   /// Captures a screen view event.
@@ -250,13 +336,20 @@ class Posthog {
   ///
   /// The optional [properties] are additional screen event properties.
   ///
+  /// The optional [options] tell PostHog how to process the `$screen` event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the screen event has been queued.
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) {
     _currentScreen = screenName;
-    return _posthog.screen(screenName: screenName, properties: properties);
+    return _posthog.screen(
+      screenName: screenName,
+      properties: properties,
+      options: options,
+    );
   }
 
   /// Captures a structured log record.
@@ -372,8 +465,12 @@ class Posthog {
   ///
   /// The [alias] is the additional distinct ID to associate with the user.
   ///
+  /// The optional [options] tell PostHog how to process the `$create_alias`
+  /// event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the alias call has been queued.
-  Future<void> alias({required String alias}) => _posthog.alias(alias: alias);
+  Future<void> alias({required String alias, Map<String, Object?>? options}) =>
+      _posthog.alias(alias: alias, options: options);
 
   /// Returns the registered `distinctId` property.
   ///
@@ -637,6 +734,9 @@ class Posthog {
   ///
   /// The optional [groupProperties] are group properties set with `$group_set`.
   ///
+  /// The optional [options] tell PostHog how to process the `$groupidentify`
+  /// event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the group call has been queued.
   ///
   /// Note that setting a group reloads feature flags, which issues a `/flags`
@@ -655,11 +755,13 @@ class Posthog {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
   }) =>
       _posthog.group(
         groupType: groupType,
         groupKey: groupKey,
         groupProperties: groupProperties,
+        options: options,
       );
 
   /// Registers this device's push token so PostHog Workflows can target it.
@@ -910,16 +1012,20 @@ class Posthog {
   ///
   /// The optional [properties] are added to the `$exception` event.
   ///
+  /// The optional [options] tell PostHog how to process the `$exception` event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the exception event has been queued.
   Future<void> captureException({
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) =>
       _posthog.captureException(
         error: error,
         stackTrace: stackTrace,
         properties: properties,
+        options: options,
       );
 
   /// Captures a `runZonedGuarded` error with optional custom properties.
