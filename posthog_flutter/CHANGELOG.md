@@ -1,5 +1,11 @@
 ## Next
 
+## 5.57.1
+
+### Patch Changes
+
+- dda207d: Upgrade the Android SDK to 3.72.9, which pulls in OkHttp 4.12.1 to block the compromised eMudhra intermediate certificates.
+
 ## 5.57.0
 
 ### Minor Changes
