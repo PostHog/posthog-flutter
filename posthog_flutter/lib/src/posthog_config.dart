@@ -170,6 +170,24 @@ class PostHogConfig {
   /// in your `posthog.init({...})` call instead.
   var preloadFeatureFlags = true;
 
+  /// Evaluation contexts sent with every `/flags` request, so only flags
+  /// tagged with at least one of these contexts are evaluated.
+  ///
+  /// Defaults to `null`, which sends no contexts and evaluates every flag.
+  /// Flags without evaluation contexts are always evaluated. Use this to keep
+  /// flags meant for other apps or environments out of this app's requests.
+  ///
+  /// **Flutter web:** not applied. posthog-js is initialized by your app, so
+  /// set `evaluation_contexts` in your `posthog.init({...})` call instead.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('<YOUR_PROJECT_TOKEN>')
+  ///   ..evaluationContexts = ['mobile-app', 'production'];
+  /// await Posthog().setup(config);
+  /// ```
+  List<String>? evaluationContexts;
+
   /// Whether the SDK captures application lifecycle events automatically.
   ///
   /// Captured events include app opened, backgrounded, installed, and updated
@@ -451,6 +469,7 @@ class PostHogConfig {
       'flushInterval': flushInterval.inSeconds,
       'sendFeatureFlagEvents': sendFeatureFlagEvent,
       'preloadFeatureFlags': preloadFeatureFlags,
+      if (evaluationContexts != null) 'evaluationContexts': evaluationContexts,
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
       'rageClickConfig': rageClickConfig.toMap(),
       'debug': debug,
