@@ -88,6 +88,24 @@ void main() {
       expect(sentAs, ['old-user', 'old-user', 'old-user']);
     });
 
+    test('keeps an event when posthog-js loads during beforeSend', () async {
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      // The loader snippet's stub returns undefined until posthog-js loads.
+      fake.setProperty('get_distinct_id'.toJS, (() => null).toJS);
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) async {
+          fake.setProperty(
+              'get_distinct_id'.toJS, (() => distinctId.toJS).toJS);
+          return event;
+        },
+      ]));
+
+      await web.capture(eventName: 'app_started');
+
+      expect(sentAs, ['old-user']);
+    });
+
     test('drops the events when beforeSend outlasts the reset', () async {
       final web = PosthogFlutterWeb();
       await web.setup(PostHogConfig('test_token', beforeSend: [

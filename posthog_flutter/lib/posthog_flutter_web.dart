@@ -61,7 +61,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<PostHogEvent?> _applyCallbacks(PostHogEvent event) async {
     final distinctId = _distinctId();
     final processed = await applyBeforeSend(_beforeSendCallbacks, event);
-    if (processed != null && _distinctId() != distinctId) {
+    // Null while the posthog-js loader stub is active: loading is not a
+    // change of user.
+    if (processed != null &&
+        distinctId != null &&
+        _distinctId() != distinctId) {
       printIfDebug('[PostHog] ${processed.event} dropped: the user changed '
           'while beforeSend was running.');
       return null;
