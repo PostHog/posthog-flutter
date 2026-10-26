@@ -68,7 +68,7 @@ void main() {
       final event = await server.waitForEvent('e2e event');
       final properties = event['properties'] as Map<String, Object?>;
       expect(properties['source'], 'integration test');
-      expect(properties[r'$lib'], 'posthog-flutter');
+      expect(event['session_id'], allOf(isA<String>(), isNotEmpty));
       expect(properties[r'$os_name'], Platform.isWindows ? 'Windows' : 'Linux');
       expect(properties[r'$os_version'], allOf(isA<String>(), isNotEmpty));
       expect(properties[r'$device_type'], 'Desktop');
@@ -201,7 +201,7 @@ class _FakePostHog {
 
     final response = request.response;
     switch (request.uri.path) {
-      case '/batch/':
+      case '/i/v1/analytics/events':
         response.statusCode = batchStatus;
         if (batchStatus == HttpStatus.ok) _batches.add(body);
       case '/flags/':

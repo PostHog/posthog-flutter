@@ -148,24 +148,7 @@ void main() {
       });
     });
 
-    // (status, reason the batch stays queued)
-    const transientStatuses = <(int, String)>[
-      (408, 'the server timed out'),
-      (429, 'the server asks to slow down'),
-      (500, 'the server failed'),
-      (
-        301,
-        'a POST redirect is not followed, so the batch never reached '
-            'ingestion'
-      ),
-      (
-        307,
-        'a POST redirect is not followed, so the batch never reached '
-            'ingestion'
-      ),
-    ];
-
-    for (final (status, reason) in transientStatuses) {
+    for (final status in [408, 500, 502, 503, 504]) {
       test('HTTP $status keeps the batch queued after the retries', () {
         final api = InProcessPostHogApi()
           ..respond = (_) => PostHogResponse(status);
@@ -182,7 +165,33 @@ void main() {
 
           expect(error, isA<PostHogFetchHttpError>());
           expect(api.batchRequests, hasLength(4));
-          expect(getQueue(storage), hasLength(1), reason: reason);
+          expect(getQueue(storage), hasLength(1));
+        });
+      });
+    }
+
+    // Capture v1 retries only the statuses above: a rate limit, a redirect
+    // it does not follow, or a missing route fails the same way again.
+    for (final status in [301, 302, 307, 308, 401, 403, 404, 429, 501]) {
+      test('HTTP $status drops the batch without a retry', () {
+        final api = InProcessPostHogApi()
+          ..respond = (_) => PostHogResponse(status,
+              location: 'https://elsewhere.invalid/i/v1/analytics/events',
+              headers: {'Retry-After': '5'});
+        final storage = tempStorage();
+        fakeAsync((async) {
+          final client = testClient(api, storage: storage);
+          Object? error;
+
+          client.capture('evt');
+          client.flush().catchError((Object e) {
+            error = e;
+          });
+          async.elapse(const Duration(seconds: 40));
+
+          expect(error, isA<PostHogFetchHttpError>());
+          expect(api.batchRequests, hasLength(1));
+          expect(getQueue(storage), isEmpty);
         });
       });
     }
@@ -247,7 +256,7 @@ void main() {
   });
 
   group('Retry-After', () {
-    for (final status in [429, 503]) {
+    for (final status in [503]) {
       test('HTTP $status pauses every send path and resumes the queue', () {
         final api = InProcessPostHogApi();
         final storage = tempStorage();
@@ -270,7 +279,8 @@ void main() {
           client.capture('second');
           client.flush();
           client.flush();
-          async.elapse(const Duration(seconds: 119));
+          // Retry-After 120 is capped at 30 seconds.
+          async.elapse(const Duration(seconds: 29));
           expect(api.batchRequests, hasLength(1));
           expect(queuedEvents(storage), ['first', 'second']);
 
@@ -321,7 +331,7 @@ void main() {
         ..respond =
             (_) => PostHogResponse(HttpStatus.serviceUnavailable, headers: {
                   'retry-after': HttpDate.format(
-                      DateTime.now().toUtc().add(const Duration(seconds: 120)))
+                      DateTime.now().toUtc().add(const Duration(seconds: 20)))
                 });
       fakeAsync((async) {
         final client = testClient(api);
@@ -333,7 +343,7 @@ void main() {
         async.elapse(Duration.zero);
         expect(error, isA<PostHogFetchHttpError>());
         api.respond = (_) => const PostHogResponse(HttpStatus.ok);
-        async.elapse(const Duration(seconds: 118));
+        async.elapse(const Duration(seconds: 18));
         expect(api.batchRequests, hasLength(1));
         async.elapse(const Duration(seconds: 2));
         expect(api.batchRequests, hasLength(2));
@@ -361,8 +371,8 @@ void main() {
 
     test('keeps the pause when consent changes and identity resets', () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '120'});
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'});
       fakeAsync((async) {
         final client = testClient(api);
         final previousId = client.getDistinctId();
@@ -377,7 +387,7 @@ void main() {
         expect(nextId, isNot(previousId));
         client.capture('after');
         client.flush();
-        async.elapse(const Duration(seconds: 119));
+        async.elapse(const Duration(seconds: 19));
         expect(api.batchRequests, hasLength(1));
         async.elapse(const Duration(seconds: 1));
         final events = api.batchRequests.last.events;
@@ -389,7 +399,7 @@ void main() {
 
     test('does not send automatically when the interval is zero', () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
             headers: {'retry-after': '120'});
       fakeAsync((async) {
         final client = testClient(api,
@@ -425,7 +435,8 @@ void main() {
         expect(api.flagsRequests, hasLength(2));
         expect(api.batchRequests, hasLength(1));
         api.respond = (_) => const PostHogResponse(HttpStatus.ok);
-        async.elapse(const Duration(milliseconds: 119700));
+        // Retry-After 120 is capped at 30 seconds.
+        async.elapse(const Duration(milliseconds: 29700));
         expect(api.batchRequests, hasLength(2));
       });
     });
@@ -450,17 +461,18 @@ void main() {
 
     test('a new rate limit starts a new pause with the minimum delay', () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '60'});
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'});
       final storage = tempStorage();
       fakeAsync((async) {
         final client = testClient(api, storage: storage);
         client.capture('event');
         client.flush().catchError((Object _) {});
         async.elapse(Duration.zero);
-        api.respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
+        api.respond = (_) => const PostHogResponse(
+            HttpStatus.serviceUnavailable,
             headers: {'retry-after': '1'});
-        async.elapse(const Duration(seconds: 60));
+        async.elapse(const Duration(seconds: 20));
         expect(api.batchRequests, hasLength(2));
         api.respond = (_) => const PostHogResponse(HttpStatus.ok);
         client.flush();
@@ -475,8 +487,8 @@ void main() {
     test('close cancels the timer and preserves the queue for the next launch',
         () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '120'});
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'});
       final dir = tempDirectory();
       fakeAsync((async) {
         final client = testClient(api, storage: FileStorage(dir.path));
@@ -505,8 +517,8 @@ void main() {
         client.flush().catchError((Object _) {});
         async.elapse(Duration.zero);
         client.close();
-        response.complete(const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '120'}));
+        response.complete(const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'}));
         async.flushMicrotasks();
         expect(async.pendingTimers, isEmpty);
         expect(api.batchRequests, hasLength(1));
