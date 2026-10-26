@@ -19,7 +19,7 @@ import 'uuid.dart';
 /// It extends [PostHogCoreStateless] with state management for sessions,
 /// identity, feature flags, and person profiles.
 abstract class PostHogCore extends PostHogCoreStateless {
-  final bool _sendFeatureFlagEvents;
+  final bool _sendFeatureFlagEvent;
   final PostHogPersonProfiles _personProfiles;
   final List<String>? _evaluationContexts;
 
@@ -56,7 +56,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   bool _flagsRequestAnnounced = false;
 
   PostHogCore(PostHogConfig config, {required super.storage})
-      : _sendFeatureFlagEvents = config.sendFeatureFlagEvents,
+      : _sendFeatureFlagEvent = config.sendFeatureFlagEvent,
         _personProfiles = config.personProfiles,
         _evaluationContexts = config.evaluationContexts == null
             ? null
@@ -865,13 +865,13 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   /// Gets a feature flag value, capturing `$feature_flag_called` when
-  /// [sendEvent] is true, or when it is null and `sendFeatureFlagEvents` is
+  /// [sendEvent] is true, or when it is null and `sendFeatureFlagEvent` is
   /// enabled in the config.
   ///
   /// Returns null if the flag does not exist or has not been loaded.
   PostHogFeatureFlagValue? getFeatureFlag(String key, {bool? sendEvent}) {
     final result = getFeatureFlagResult(key,
-        sendEvent: sendEvent ?? _sendFeatureFlagEvents);
+        sendEvent: sendEvent ?? _sendFeatureFlagEvent);
     if (result == null) return null;
     return result.variant ?? result.enabled;
   }
