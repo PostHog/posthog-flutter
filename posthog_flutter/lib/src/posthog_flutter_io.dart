@@ -746,7 +746,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       final results = await _methodChannel
           .invokeMethod<List<Object?>>('getAllFeatureFlags');
       return results
-          ?.map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+          ?.map((result) => featureFlagResultFromMap(result, ''))
           .nonNulls
           .toList();
     } on PlatformException catch (exception) {

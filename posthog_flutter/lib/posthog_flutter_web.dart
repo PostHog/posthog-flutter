@@ -327,7 +327,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   ) async {
     final screenName = _currentScreen;
     final result = flagVariant == null
-        ? await getFeatureFlagResult(key: flag, sendEvent: false)
+        ? await getFeatureFlagResult(key: flag, sendFeatureFlagEvent: false)
         : null;
     final captured = featureEvent(
         event, flag, flagVariant ?? result?.variant ?? result?.enabled);
@@ -483,7 +483,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         await handleWebMethodCall(const MethodCall('getAllFeatureFlags'));
     if (results is! List) return null;
     return results
-        .map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+        .map((result) => featureFlagResultFromMap(result, ''))
         .nonNulls
         .toList();
   }
