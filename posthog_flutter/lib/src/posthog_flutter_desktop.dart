@@ -368,6 +368,48 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _guard('alias', (client) => client.alias(alias));
 
   @override
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _captureFeatureEvent(r'$feature_view', flag, flagVariant);
+
+  @override
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) =>
+      _captureFeatureEvent(r'$feature_interaction', flag, flagVariant);
+
+  // Looks up the flag and starts the capture without an await in between, so
+  // a reset() right after the call cannot move the event to the next user.
+  Future<void> _captureFeatureEvent(
+    String event,
+    String flag,
+    String? flagVariant,
+  ) =>
+      _guard(event, (client) {
+        final result = flagVariant == null
+            ? client.getFeatureFlagResult(flag, sendEvent: false)
+            : null;
+        final Object? variant =
+            flagVariant ?? result?.variant ?? result?.enabled;
+        if (variant == null) {
+          printIfDebug(
+              '[PostHog] $event skipped: feature flag "$flag" has no value.');
+          return null;
+        }
+        return capture(
+          eventName: event,
+          properties: {
+            'feature_flag': flag,
+            if (variant is String) 'feature_flag_variant': variant,
+          },
+          userProperties: {'$event/$flag': variant},
+        );
+      });
+
+  @override
   Future<String> getDistinctId() =>
       _guardWith('getDistinctId', '', (client) => client.getDistinctId());
 

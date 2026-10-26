@@ -1782,6 +1782,26 @@ void main() {
       expect(server.eventNames, isNot(contains(r'$feature_flag_called')));
     });
 
+    test('captureFeatureView keeps the user it was called for across reset',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final flagsLoaded = Completer<void>();
+      final config = configFor(server)
+        ..onFeatureFlags = () {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        };
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+      final distinctId = await platform.getDistinctId();
+
+      unawaited(platform.captureFeatureView(flag: 'variant-flag'));
+      await platform.reset();
+
+      final view = await server.waitForEvent(r'$feature_view');
+      expect(view['distinct_id'], distinctId);
+    });
+
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();
