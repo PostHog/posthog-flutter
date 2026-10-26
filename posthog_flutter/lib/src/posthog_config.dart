@@ -1204,9 +1204,12 @@ class PostHogErrorTrackingConfig {
 
   /// Enable automatic capture of isolate errors.
   ///
-  /// Controls whether errors from the current isolate are captured.
-  /// This includes errors from the main isolate and any isolates spawned
-  /// without explicit error handling.
+  /// Installs an error listener on the isolate that calls `Posthog().setup()`.
+  /// It does not install listeners on other isolates or Flutter engines. In
+  /// particular, a plugin-created Android headless engine must call setup from
+  /// its own Dart entrypoint to capture errors in that engine's isolate.
+  /// Isolates spawned with `Isolate.spawn` also need their own error handling;
+  /// their errors are not forwarded to the parent isolate's listener.
   ///
   /// **Note:**
   /// - Flutter web: Not supported

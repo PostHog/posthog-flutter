@@ -6,6 +6,42 @@ Please see the main [PostHog docs](https://posthog.com/docs).
 
 Specifically, the [Flutter docs](https://posthog.com/docs/libraries/flutter) details.
 
+## Android background Flutter engines and error tracking
+
+A plugin-created headless Flutter engine runs Dart in a separate isolate. Error
+handlers installed by `Posthog().setup()` in the foreground isolate do **not**
+observe that engine's errors. Native Android exception capture covers Java/Kotlin
+errors, not uncaught Dart errors in the headless engine.
+
+If your background plugin invokes a Dart entrypoint, initialize PostHog **inside
+that entrypoint** (after the engine has registered the PostHog plugin), before
+starting work that may fail. Use the same project token and host as the app:
+
+```dart
+@pragma('vm:entry-point')
+Future<void> backgroundTask() async {
+  final config = PostHogConfig('YOUR_PROJECT_TOKEN');
+  config.errorTrackingConfig.capturePlatformDispatcherErrors = true;
+  await Posthog().setup(config);
+
+  // Run the background task here. Report exceptions you catch yourself with
+  // Posthog().captureException(error: error, stackTrace: stackTrace).
+}
+```
+
+Register `backgroundTask` according to the background plugin's instructions;
+PostHog cannot register another plugin's callback or discover its engine. Setup
+only installs handlers in the isolate that calls it. Alternatively,
+`captureIsolateErrors` adds a listener to that same isolate; enabling both hooks
+may report the same uncaught error twice. `Isolate.spawn` workers likewise need
+explicit handling (for example, pass an `onError` port to the parent and report
+there). A plugin that catches/logs its own errors must call
+`captureException` from its handler; uncaught-error hooks cannot see handled
+exceptions. If the plugin does not run app Dart code in its background engine,
+its integration must forward the error to app code or report it itself. On Android,
+engines share the process-wide native PostHog client; do not call `Posthog().close()`
+just because the background callback finishes while the foreground app is running.
+
 ## Desktop support
 
 Windows and Linux support is experimental and enabled by default. They support
