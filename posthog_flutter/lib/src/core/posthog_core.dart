@@ -603,6 +603,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
           requestError: result.error,
           // A failed request says nothing about the minimal events gate.
           minimalFlagCalledEvents: stored?.minimalFlagCalledEvents,
+          notLoaded: stored?.notLoaded ?? true,
         ));
         return;
       }
@@ -623,6 +624,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
           errorsWhileComputingFlags: stored?.errorsWhileComputingFlags,
           quotaLimited: res.quotaLimited,
           minimalFlagCalledEvents: stored?.minimalFlagCalledEvents,
+          notLoaded: stored?.notLoaded ?? true,
         ));
         logger.warn('[FEATURE FLAGS] Feature flags quota limit exceeded.');
         return;
@@ -844,6 +846,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
       capture(r'$feature_flag_called', properties: captureProperties);
     }
 
+    return _toFlagResult(key, featureFlag);
+  }
+
+  PostHogFeatureFlagResult? _toFlagResult(
+      String key, PostHogFeatureFlagDetail? featureFlag) {
+    final flagValue = getFeatureFlagValue(featureFlag);
     if (flagValue == null) return null;
 
     // Payloads only accompany enabled flags.
@@ -864,6 +872,17 @@ abstract class PostHogCore extends PostHogCoreStateless {
     );
   }
 
+  /// Gets the results of all loaded feature flags without capturing
+  /// `$feature_flag_called`. Returns null when no flags have been loaded.
+  List<PostHogFeatureFlagResult>? getAllFeatureFlagResults() {
+    final flags = _getLoadedFlagDetails()?.toResponse().flags;
+    if (flags == null) return null;
+    return [
+      for (final MapEntry(:key, :value) in flags.entries)
+        if (_toFlagResult(key, value) case final result?) result,
+    ];
+  }
+
   /// Gets a feature flag value, capturing `$feature_flag_called` when
   /// [sendEvent] is true, or when it is null and `sendFeatureFlagEvent` is
   /// enabled in the config.
@@ -877,7 +896,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   Map<String, PostHogFeatureFlagValue>? _getFeatureFlags() =>
-      _getStoredFlagDetails()?.toResponse().featureFlags;
+      _getLoadedFlagDetails()?.toResponse().featureFlags;
+
+  PostHogFlagsStorageFormat? _getLoadedFlagDetails() {
+    final stored = _getStoredFlagDetails();
+    return stored == null || stored.notLoaded ? null : stored;
+  }
 
   /// Checks if a feature flag is enabled.
   bool? isFeatureEnabled(String key, {bool? sendEvent}) {

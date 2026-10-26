@@ -339,6 +339,10 @@ class PosthogFlutterPlugin :
                 getFeatureFlagResult(call, result)
             }
 
+            "getAllFeatureFlags" -> {
+                getAllFeatureFlags(result)
+            }
+
             "register" -> {
                 register(call, result)
             }
@@ -1735,6 +1739,23 @@ class PosthogFlutterPlugin :
             } else {
                 result.success(null)
             }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun getAllFeatureFlags(result: Result) {
+        try {
+            val flagResults =
+                PostHog.getAllFeatureFlags()?.map {
+                    mapOf(
+                        "key" to it.key,
+                        "enabled" to it.enabled,
+                        "variant" to it.variant,
+                        "payload" to it.payload,
+                    )
+                }
+            result.success(flagResults)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }

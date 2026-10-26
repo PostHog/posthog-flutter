@@ -752,6 +752,25 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() async {
+    if (!isSupportedPlatform()) {
+      return null;
+    }
+
+    try {
+      final results = await _methodChannel
+          .invokeMethod<List<Object?>>('getAllFeatureFlags');
+      return results
+          ?.map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+          .nonNulls
+          .toList();
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on getAllFeatureFlags: $exception');
+      return null;
+    }
+  }
+
+  @override
   Future<void> register(String key, Object value) async {
     if (!isSupportedPlatform()) {
       return;

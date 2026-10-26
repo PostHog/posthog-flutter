@@ -469,6 +469,16 @@ void main() {
     ]);
   });
 
+  test('getAllFeatureFlags returns the platform results unchanged', () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+    expect(await Posthog().getAllFeatureFlags(), isNull);
+
+    final flags = [PostHogFeatureFlagResult(key: 'a', enabled: true)];
+    fake.allFeatureFlags = flags;
+    expect(await Posthog().getAllFeatureFlags(), same(flags));
+  });
+
   group('getFeatureFlagResult', () {
     late PosthogFlutterPlatformFake fakePlatformInterface;
 

@@ -486,6 +486,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             getFeatureFlagPayload(call, result: result)
         case "getFeatureFlagResult":
             getFeatureFlagResult(call, result: result)
+        case "getAllFeatureFlags":
+            getAllFeatureFlags(result)
         case "identify":
             identify(call, result: result)
         case "setPersonProperties":
@@ -1429,6 +1431,18 @@ extension PosthogFlutterPlugin {
         } else {
             _badArgumentError(result)
         }
+    }
+
+    private func getAllFeatureFlags(_ result: @escaping FlutterResult) {
+        let flagResults = PostHogSDK.shared.getAllFeatureFlags()?.map { flagResult -> [String: Any] in
+            [
+                "key": flagResult.key,
+                "enabled": flagResult.enabled,
+                "variant": flagResult.variant as Any,
+                "payload": flagResult.payload as Any,
+            ]
+        }
+        result(flagResults)
     }
 
     private func identify(

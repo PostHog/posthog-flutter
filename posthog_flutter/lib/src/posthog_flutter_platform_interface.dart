@@ -238,6 +238,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     );
   }
 
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() {
+    throw UnimplementedError('getAllFeatureFlags() has not been implemented.');
+  }
+
   Future<void> flush() {
     throw UnimplementedError('flush() has not been implemented.');
   }

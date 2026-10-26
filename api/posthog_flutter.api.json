@@ -1044,6 +1044,18 @@
                         "isDeprecated": false,
                         "isExperimental": false,
                         "isStatic": false,
+                        "name": "getAllFeatureFlags",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<List<PostHogFeatureFlagResult>?>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
                         "name": "flush",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2099,6 +2111,18 @@
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<PostHogFeatureFlagResult?>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "getAllFeatureFlags",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<List<PostHogFeatureFlagResult>?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -5053,6 +5077,18 @@
                         ],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<PostHogFeatureFlagResult?>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "getAllFeatureFlags",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<List<PostHogFeatureFlagResult>?>",
                         "type": "method",
                         "typeParameterNames": []
                     },

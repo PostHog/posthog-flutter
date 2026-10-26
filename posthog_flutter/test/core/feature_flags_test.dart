@@ -116,6 +116,23 @@ void main() {
       expect(_storedFlagDetails(storage).containsKey('requestError'), isFalse);
     });
 
+    test('a failed first request leaves the flags unloaded', () async {
+      final storage = tempStorage();
+      final client = testClient(server, storage: storage);
+
+      server.respond =
+          (_) => const PostHogResponse(HttpStatus.internalServerError);
+      await client.reloadFeatureFlagsAsync();
+      expect(client.getAllFeatureFlagResults(), isNull);
+      expect(testClient(server, storage: storage).getAllFeatureFlagResults(),
+          isNull,
+          reason: 'the next launch reads the same record');
+
+      server.respond = (_) => _flagsResponse({});
+      await client.reloadFeatureFlagsAsync();
+      expect(client.getAllFeatureFlagResults(), isEmpty);
+    });
+
     test('a malformed flag in the response is skipped, its neighbours stay',
         () async {
       final client = testClient(server);
