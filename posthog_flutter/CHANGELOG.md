@@ -1,5 +1,14 @@
 ## Next
 
+## 5.57.0
+
+### Minor Changes
+
+- 0db911a: Add `getAllFeatureFlags()` to read every loaded feature flag result without capturing `$feature_flag_called`
+- 60bc22b: Add `captureFeatureView()` and `captureFeatureInteraction()` to capture `$feature_view` and `$feature_interaction` events for a feature flag
+- 48876f4: Add `PostHogConfig.evaluationContexts` to limit which feature flags are evaluated on iOS, Android, macOS, Windows, and Linux
+- cec2fc3: Add an optional `sendFeatureFlagEvent` parameter to `getFeatureFlag()` and `isFeatureEnabled()` to override `PostHogConfig.sendFeatureFlagEvent` per call
+
 ## 5.56.2
 
 ### Patch Changes
