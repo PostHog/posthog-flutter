@@ -30,6 +30,9 @@ class DartExceptionProcessor {
   static final _aotFrame = RegExp(
     r'^[ \t]*#[0-9]+[ \t]+abs[ \t]+([0-9a-fA-F]+)(?:[ \t]|$)',
   );
+  static final _aotLoadingUnitFrame = RegExp(
+    r'^[ \t]*#[0-9]+[ \t]+abs[ \t]+[0-9a-fA-F]+[ \t]+unit(?:[ \t]|$)',
+  );
   static final _firstFrame = RegExp(
     r'^[ \t]*#[0-9]+[ \t]+',
     multiLine: true,
@@ -364,7 +367,10 @@ class DartExceptionProcessor {
           skipNextPostHogFrame = false;
         }
 
-        final nativeAddress = aotImage != null && frame is UnparsedFrame
+        // A deferred loading unit needs its own build ID and image base.
+        final nativeAddress = aotImage != null &&
+                frame is UnparsedFrame &&
+                !_aotLoadingUnitFrame.hasMatch(frame.member)
             ? _aotFrame.firstMatch(frame.member)?.group(1)
             : null;
         final instructionAddress = nativeAddress == null
@@ -382,7 +388,7 @@ class DartExceptionProcessor {
             'lang': 'dart',
             'instruction_addr': '0x${instructionAddress.toRadixString(16)}',
             'image_addr': aotImage!.imageAddr,
-            'in_app': true,
+            'in_app': inAppByDefault,
           };
           hasNativeFrame = true;
         } else {

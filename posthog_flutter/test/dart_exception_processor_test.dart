@@ -455,6 +455,7 @@ void main() {
           base: '7000000000',
           address: '7000205218',
           imageType: 'elf',
+          inAppByDefault: false,
         ),
         (
           platform: TargetPlatform.android,
@@ -463,6 +464,7 @@ void main() {
           base: '7000000000',
           address: '7000205218',
           imageType: 'elf',
+          inAppByDefault: true,
         ),
         (
           platform: TargetPlatform.iOS,
@@ -471,6 +473,7 @@ void main() {
           base: '10fa20000',
           address: '10fb6f1f8',
           imageType: 'macho',
+          inAppByDefault: true,
         ),
       ];
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -488,6 +491,7 @@ isolate_dso_base: ${build.base}, vm_dso_base: ${build.base}
           error: StateError('sample failure'),
           stackTrace: stackTrace,
           properties: {'\$debug_images': 'untrusted'},
+          inAppByDefault: build.inAppByDefault,
         );
 
         expect(result['\$debug_images'], [
@@ -508,7 +512,7 @@ isolate_dso_base: ${build.base}, vm_dso_base: ${build.base}
           'lang': 'dart',
           'instruction_addr': '0x${build.address}',
           'image_addr': '0x${build.base}',
-          'in_app': true,
+          'in_app': build.inAppByDefault,
         });
       }
     });
@@ -548,6 +552,38 @@ ${input.header}
         expect(frames, isNotEmpty);
         expect(frames.every((frame) => frame['platform'] == 'dart'), isTrue);
       }
+    });
+
+    test('does not attribute a deferred loading-unit frame to the root image',
+        () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final result = DartExceptionProcessor.processException(
+        error: StateError('sample failure'),
+        stackTrace: StackTrace.fromString('''
+build_id: 'b718850999efbed01ab80642060ddbf3'
+loading_unit: 2, build_id: '1234567890abcdef1234567890abcdef', dso_base: 7000400000, instructions: 7000401000
+isolate_dso_base: 7000000000, vm_dso_base: 7000000000
+#0 abs 7000505218 unit 2 virt 0000000000205218 _kDartIsolateSnapshotInstructions+0x20
+#1 abs 7000205218 _kDartIsolateSnapshotInstructions+0x20
+'''),
+      );
+
+      final exceptions =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+      final frames = exceptions.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
+      expect(frames, hasLength(2));
+      expect(frames.first['platform'], 'native');
+      expect(frames.last['platform'], 'dart');
+      expect(frames.last['function'], contains('unit 2'));
+      expect(result['\$debug_images'], [
+        {
+          'debug_id': '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+          'image_addr': '0x7000000000',
+          'type': 'elf',
+        },
+      ]);
     });
 
     test('includes a debug image for an AOT cause stack', () {
