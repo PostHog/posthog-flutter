@@ -612,6 +612,21 @@ class PosthogFlutterPlugin :
                         "none" -> compression = PostHogCompression.NONE
                     }
                 }
+                posthogConfig.getIfNotNull<String>("captureAiCompression") {
+                    when (it) {
+                        "gzip" -> captureAiCompression = PostHogCompression.GZIP
+                        "none" -> captureAiCompression = PostHogCompression.NONE
+                    }
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiMaxQueueSize") {
+                    captureAiMaxQueueSize = it
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiTimeoutSeconds") {
+                    captureAiTimeout = it
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiMaxEventBytes") {
+                    captureAiMaxEventBytes = it
+                }
                 posthogConfig.getIfNotNull<Boolean>("sessionReplay") {
                     sessionReplay = it
                 }

@@ -239,6 +239,25 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
                 break
             }
         }
+        if let captureAiCompression = posthogConfig["captureAiCompression"] as? String {
+            switch captureAiCompression {
+            case "gzip":
+                config.captureAiCompression = .gzip
+            case "none":
+                config.captureAiCompression = .none
+            default:
+                break
+            }
+        }
+        if let captureAiMaxQueueSize = posthogConfig["captureAiMaxQueueSize"] as? Int {
+            config.captureAiMaxQueueSize = captureAiMaxQueueSize
+        }
+        if let captureAiTimeoutSeconds = posthogConfig["captureAiTimeoutSeconds"] as? Int {
+            config.captureAiTimeout = TimeInterval(captureAiTimeoutSeconds)
+        }
+        if let captureAiMaxEventBytes = posthogConfig["captureAiMaxEventBytes"] as? Int {
+            config.captureAiMaxEventBytes = captureAiMaxEventBytes
+        }
         if let dataMode = posthogConfig["dataMode"] as? String {
             switch dataMode {
             case "wifi":
