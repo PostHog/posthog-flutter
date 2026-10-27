@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.BadParcelableException
 import com.google.firebase.FirebaseApp
 import com.posthog.PostHogCompression
+import com.posthog.PostHogConfig
 import com.posthog.PostHogEvent
 import com.posthog.android.replay.PostHogScreenshotColorMode
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -223,6 +224,48 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
 
         assertEquals(PostHogCompression.NONE, assertNotNull(plugin.lastBuiltConfig).compression)
+    }
+
+    @Test
+    fun setup_captureAiSettings_forwardToNativeConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        val call =
+            MethodCall(
+                "setup",
+                mapOf(
+                    "projectToken" to "test-token",
+                    "captureAiCompression" to "none",
+                    "captureAiMaxQueueSize" to 7,
+                    "captureAiTimeoutSeconds" to 90,
+                    "captureAiMaxEventBytes" to 1024,
+                ),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        val config = assertNotNull(plugin.lastBuiltConfig)
+        assertEquals(PostHogCompression.NONE, config.captureAiCompression)
+        assertEquals(7, config.captureAiMaxQueueSize)
+        assertEquals(90, config.captureAiTimeout)
+        assertEquals(1024, config.captureAiMaxEventBytes)
+    }
+
+    @Test
+    fun setup_captureAiSettings_unsetKeepNativeDefaults() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token")),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+
+        val config = assertNotNull(plugin.lastBuiltConfig)
+        assertEquals(PostHogCompression.GZIP, config.captureAiCompression)
+        assertEquals(PostHogConfig.DEFAULT_CAPTURE_AI_MAX_QUEUE_SIZE, config.captureAiMaxQueueSize)
+        assertEquals(PostHogConfig.DEFAULT_CAPTURE_AI_TIMEOUT_SECONDS, config.captureAiTimeout)
+        assertEquals(PostHogConfig.DEFAULT_CAPTURE_AI_MAX_EVENT_BYTES, config.captureAiMaxEventBytes)
     }
 
     @Test

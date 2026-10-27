@@ -2730,6 +2730,50 @@
                     {
                         "entryPoints": [],
                         "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiCompression",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogCompression?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiMaxQueueSize",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiTimeout",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "Duration?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiMaxEventBytes",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
                         "isExperimental": true,
                         "isReadable": true,
                         "isStatic": false,

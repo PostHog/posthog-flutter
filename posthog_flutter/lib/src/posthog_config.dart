@@ -196,6 +196,55 @@ class PostHogConfig {
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
 
+  /// How [Posthog.captureAi] request bodies are compressed, separately from
+  /// [compression].
+  ///
+  /// Applies on iOS, macOS and Android. Not applied on Windows, Linux and web,
+  /// where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the native SDK default (gzip).
+  PostHogCompression? captureAiCompression;
+
+  /// Maximum number of [Posthog.captureAi] events kept in their on-disk queue
+  /// before the oldest are dropped.
+  ///
+  /// AI events can be megabytes, so the native default (100) is lower than
+  /// [maxQueueSize]. The native queue also keeps at most 50 MiB of AI events,
+  /// whatever this is set to. A value of `0` or less uses the native default.
+  ///
+  /// Applies on iOS, macOS and Android. Not applied on Windows, Linux and web,
+  /// where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the native SDK default.
+  int? captureAiMaxQueueSize;
+
+  /// Timeout of a [Posthog.captureAi] request, sent to the native SDK in whole
+  /// seconds (a positive value under one second is sent as one second).
+  ///
+  /// AI requests can carry several MB, so the native default (60 seconds) is
+  /// longer than for other requests. [Duration.zero] or less uses the native
+  /// default.
+  ///
+  /// Applies on iOS, macOS and Android. Not applied on Windows, Linux and web,
+  /// where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the native SDK default.
+  Duration? captureAiTimeout;
+
+  /// Maximum size, in bytes, of a [Posthog.captureAi] event. The native SDK
+  /// drops a larger event and [Posthog.captureAi] returns `null`.
+  ///
+  /// Use it to lower the limit. PostHog drops AI events whose properties are
+  /// over 8 MiB, so a larger value, or a value of `0` or less, uses the native
+  /// default (8 MiB on Android, 8 MiB plus 64 KiB for the rest of the event on
+  /// iOS and macOS).
+  ///
+  /// Applies on iOS, macOS and Android. Not applied on Windows, Linux and web,
+  /// where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the native SDK default.
+  int? captureAiMaxEventBytes;
+
   /// Whether the SDK is enabled on Windows and Linux.
   ///
   /// Windows and Linux support is experimental. Defaults to `true`.
