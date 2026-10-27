@@ -270,6 +270,9 @@ class PostHogConfig {
   /// fails, [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the flags
   /// are the last known values. Defaults to `null`.
   ///
+  /// **Android:** not called after [Posthog.reloadFeatureFlags]. Use the
+  /// flags that call returns instead.
+  ///
   /// **Example:**
   /// ```dart
   /// final config = PostHogConfig('<project_token>')

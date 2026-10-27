@@ -30,6 +30,10 @@ class PostHogFeatureFlagsLoaded {
   /// Whether the latest attempt to load feature flags failed.
   ///
   /// When it did, [flags] and [variants] hold the last known values.
+  ///
+  /// **Flutter web:** when [PostHogConfig.onFeatureFlags] is first set, it is
+  /// called right away with the current flags and `false`, even if
+  /// posthog-js's last load before that failed.
   final bool errorsLoading;
 
   /// Creates the loaded feature flags from [variants], keeping only enabled
