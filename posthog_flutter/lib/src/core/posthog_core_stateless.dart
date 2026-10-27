@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:meta/meta.dart';
 
 import '../posthog_config.dart';
@@ -83,6 +84,15 @@ abstract class PostHogCoreStateless {
   /// The identity of the last capture request whose events are still to be
   /// retried. Kept in memory: after a restart the retry is a new request.
   CaptureV1Identity? _pendingCaptureIdentity;
+
+  /// Flushes in a row whose batch failed with a transient error. Once one
+  /// has failed, later flushes send once and wait longer, so a failure that
+  /// lasts, like a missing capture route, doesn't resend the batch with
+  /// every capture. A delivered batch resets it.
+  int _failedFlushes = 0;
+
+  /// Whether this client already warned that capture returned a 404.
+  bool _warnedCaptureNotFound = false;
 
   /// The latest consent decision made through this client. It wins over the
   /// stored one: [clearPersistedOptOut] removes the stored decision while
@@ -476,8 +486,9 @@ abstract class PostHogCoreStateless {
     _flushTimer = null;
   }
 
-  /// Stops sending events for [delay], the server's `Retry-After`, kept
-  /// between the retry delay and [_maxRetryAfter].
+  /// Stops sending events for [delay], the server's `Retry-After` or the
+  /// backoff after failed flushes, kept between the retry delay and
+  /// [_maxRetryAfter].
   void _pauseFlush(Duration delay) {
     _clearFlushTimer();
     _retryAfterTimer?.cancel();
@@ -558,6 +569,7 @@ abstract class PostHogCoreStateless {
       final Duration? retryAfter;
       try {
         (:retryUuids, :retryAfter) = await _postCaptureV1(pending);
+        _failedFlushes = 0;
       } catch (e) {
         if (_closed) rethrow;
         if (e is PostHogFetchHttpError &&
@@ -567,9 +579,23 @@ abstract class PostHogCoreStateless {
           logger.warn('Received 413, reducing batch size to $_maxBatchSize');
           return true;
         }
+        if (e is PostHogFetchHttpError &&
+            e.status == HttpStatus.notFound &&
+            !_warnedCaptureNotFound) {
+          _warnedCaptureNotFound = true;
+          // Printed even without debug: the events stay queued, and nothing
+          // else tells the app that the route is missing.
+          debugPrint('[PostHog] [WARN] $_host$captureV1Path returned 404. '
+              'Events stay queued and are retried. If you use a reverse '
+              'proxy or self-host PostHog, make sure it serves '
+              '$captureV1Path.');
+        }
         final transient = _isTransientCaptureError(e);
         final retryAfter = e is PostHogFetchHttpError ? e.retryAfter : null;
-        if (transient && retryAfter == null && attempt < _fetchRetryCount) {
+        if (transient &&
+            retryAfter == null &&
+            _failedFlushes == 0 &&
+            attempt < _fetchRetryCount) {
           continue;
         }
         if (!transient) {
@@ -579,6 +605,9 @@ abstract class PostHogCoreStateless {
         // next capture (forever in an idle app after an offline failure).
         if (transient && retryAfter != null) {
           _pauseFlush(retryAfter);
+        } else if (transient) {
+          _failedFlushes++;
+          _pauseFlush(_fetchRetryDelay * (1 << _failedFlushes.clamp(1, 4)));
         } else {
           _scheduleFlush();
         }

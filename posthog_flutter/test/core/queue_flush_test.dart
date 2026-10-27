@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
@@ -217,16 +218,87 @@ void main() {
       });
     });
 
+    test('after a failed flush, later flushes send once and back off longer',
+        () {
+      final api = InProcessPostHogApi()
+        ..respond = (_) => const PostHogResponse(HttpStatus.notFound);
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client =
+            testClient(api, storage: storage, config: testConfig(flushAt: 1));
+
+        client.capture('first');
+        async.elapse(const Duration(seconds: 9));
+        expect(api.batchRequests, hasLength(4));
+        client.capture('second');
+
+        var now = const Duration(seconds: 9);
+        var requests = 4;
+        for (final next in [15, 27, 51, 81, 111]) {
+          async.elapse(Duration(seconds: next) - now - _ms);
+          expect(api.batchRequests, hasLength(requests));
+          async.elapse(_ms);
+          expect(api.batchRequests, hasLength(++requests));
+          now = Duration(seconds: next);
+        }
+        expect(getQueue(storage), hasLength(2));
+      });
+    });
+
+    test('a delivered batch restores the retries', () {
+      final api = InProcessPostHogApi();
+      var status = HttpStatus.notFound;
+      api.respond = (_) => PostHogResponse(status);
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client =
+            testClient(api, storage: storage, config: testConfig(flushAt: 1));
+
+        client.capture('first');
+        async.elapse(const Duration(seconds: 9));
+        status = HttpStatus.ok;
+        async.elapse(const Duration(seconds: 6));
+        expect(api.batchRequests, hasLength(5));
+        expect(getQueue(storage), isEmpty);
+
+        status = HttpStatus.serviceUnavailable;
+        client.capture('second');
+        async.elapse(const Duration(seconds: 9));
+        expect(api.batchRequests, hasLength(9));
+      });
+    });
+
+    test('warns once about a 404, also without debug', () {
+      final printed = <String?>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) => printed.add(message);
+      addTearDown(() => debugPrint = originalDebugPrint);
+      final api = InProcessPostHogApi()
+        ..respond = (_) => const PostHogResponse(HttpStatus.notFound);
+      fakeAsync((async) {
+        final client = testClient(api, config: testConfig(flushAt: 1));
+
+        client.capture('evt');
+        async.elapse(const Duration(seconds: 60));
+
+        expect(api.batchRequests.length, greaterThan(4));
+        expect(printed, [
+          '[PostHog] [WARN] ${api.url}/i/v1/analytics/events returned 404. '
+              'Events stay queued and are retried. If you use a reverse '
+              'proxy or self-host PostHog, make sure it serves '
+              '/i/v1/analytics/events.',
+        ]);
+      });
+    });
+
     test('the timer firing while a flush is in flight stays re-armable', () {
       final api = InProcessPostHogApi();
       final storage = tempStorage();
       fakeAsync((async) {
         final release = Completer<void>();
-        var online = false;
         api.respond = (_) async {
           await release.future;
-          return PostHogResponse(
-              online ? HttpStatus.ok : HttpStatus.serviceUnavailable);
+          return const PostHogResponse(HttpStatus.ok);
         };
         final client = testClient(api,
             config: testConfig(flushInterval: const Duration(milliseconds: 20)),
@@ -239,16 +311,14 @@ void main() {
         client.capture('second');
         async.elapse(const Duration(milliseconds: 60));
         release.complete();
-        // The flush and its retries fail.
-        async.elapse(const Duration(seconds: 9));
-        expect(api.batchRequests, hasLength(4));
+        async.elapse(Duration.zero);
+        expect(getQueue(storage), isEmpty);
 
-        online = true;
+        client.capture('third');
         async.elapse(const Duration(milliseconds: 20));
 
-        expect(api.batchRequests.last.eventNames, ['first', 'second'],
+        expect(api.batchRequests.last.eventNames, ['third'],
             reason: 'only a re-armed timer sends the queue again');
-        expect(getQueue(storage), isEmpty);
       });
     });
   });
@@ -812,3 +882,5 @@ void main() {
     });
   });
 }
+
+const _ms = Duration(milliseconds: 1);
