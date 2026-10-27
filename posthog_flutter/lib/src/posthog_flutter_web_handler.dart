@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
+import 'dart:math' show max;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
@@ -212,6 +213,9 @@ String _exceptionMessage(Map<String, Object?> properties) {
   return 'Exception';
 }
 
+/// posthog-js's pause between `/flags` retries.
+const _flagsRetryDelayMs = 500;
+
 /// Reloads feature flags and completes with the flags that reload loaded.
 ///
 /// posthog-js 1.438.2+ has `reloadFeatureFlagsAsync()`, which settles after
@@ -222,7 +226,8 @@ String _exceptionMessage(Map<String, Object?> properties) {
 /// Older posthog-js completes with the next flags posthog-js reports. It skips
 /// the request without calling back when flags are disabled (completes right
 /// away), and while reloading is paused or after repeated network failures
-/// (completes after twice its flags request timeout).
+/// (completes once every request attempt posthog-js may make, including its
+/// retries, would have timed out, plus one more request timeout).
 Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
   final featureFlags = ph?.featureFlags;
   if (ph == null || featureFlags == null) {
@@ -264,13 +269,17 @@ Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
   subscribed = true;
   ph.reloadFeatureFlags();
 
-  final requestTimeoutMs = (config
-          ?.getProperty<JSAny?>('feature_flag_request_timeout_ms'.toJS)
-          ?.dartify() as num?)
-      ?.toInt();
+  int? configInt(String key) =>
+      (config?.getProperty<JSAny?>(key.toJS)?.dartify() as num?)?.toInt();
+  final requestTimeoutMs = configInt('feature_flag_request_timeout_ms') ?? 3000;
+  // posthog-js retries a timed-out /flags request within the same reload,
+  // 500 ms apart, so a successful retry can land well after one timeout.
+  final retries = max(0, configInt('feature_flag_request_max_retries') ?? 1);
   try {
     return await reloaded.future.timeout(
-      Duration(milliseconds: 2 * (requestTimeoutMs ?? 3000)),
+      Duration(
+          milliseconds:
+              (retries + 2) * requestTimeoutMs + retries * _flagsRetryDelayMs),
       onTimeout: () => currentFlags(errorsLoading: true),
     );
   } finally {

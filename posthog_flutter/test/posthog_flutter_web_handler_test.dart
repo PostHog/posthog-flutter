@@ -89,6 +89,7 @@ void main() {
     void installFake({
       Map<String, Object?> config = const {},
       ({Map<String, Object> variants, bool errorsLoading})? answer,
+      Duration answerAfter = Duration.zero,
       String? asyncStatus,
     }) {
       listener = null;
@@ -122,12 +123,14 @@ void main() {
           (() {
             reloads++;
             if (answer == null) return;
-            Future(() => listener?.callAsFunction(
-                  null,
-                  answer.variants.keys.toList().jsify(),
-                  answer.variants.jsify(),
-                  {'errorsLoading': answer.errorsLoading}.jsify(),
-                ));
+            Future.delayed(
+                answerAfter,
+                () => listener?.callAsFunction(
+                      null,
+                      answer.variants.keys.toList().jsify(),
+                      answer.variants.jsify(),
+                      {'errorsLoading': answer.errorsLoading}.jsify(),
+                    ));
           }).toJS,
         );
       globalContext.setProperty('posthog'.toJS, fake);
@@ -186,6 +189,25 @@ void main() {
         'errorsLoading': true,
       });
       expect(reloads, 0);
+    });
+
+    test('waits for a reload that posthog-js retries after a timeout',
+        () async {
+      // Past twice the request timeout, but within one retry after 500 ms.
+      installFake(
+        config: {'feature_flag_request_timeout_ms': 20},
+        answer: (variants: {'fresh': 'v2'}, errorsLoading: false),
+        answerAfter: const Duration(milliseconds: 300),
+      );
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': false,
+      });
     });
 
     test('completes with an error when posthog-js never calls back', () async {
