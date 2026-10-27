@@ -671,12 +671,15 @@ abstract class PostHogCoreStateless {
       );
     }
 
-    var retryUuids = captureV1RetryUuids(response.body, uuids);
-    if (retryUuids == null) {
+    final results = captureV1Results(response.body, uuids);
+    if (results == null) {
       logger.info('Capture returned ${response.status} without readable '
           'per-event results; ${uuids.length} events count as delivered.');
-      retryUuids = const {};
+    } else if (results.rejected > 0) {
+      logger.warn('Capture dropped ${results.rejected} of ${uuids.length} '
+          'events for good.');
     }
+    final retryUuids = results?.retry ?? const <String>{};
     _pendingCaptureIdentity =
         retryUuids.isEmpty ? null : identity.withUuids(retryUuids);
     return (retryUuids: retryUuids, retryAfter: response.retryAfter);

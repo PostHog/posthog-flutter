@@ -169,7 +169,8 @@ void main() {
         'retried': 'retry',
       };
       fakeAsync((async) {
-        final client = testClient(api, storage: storage);
+        final client =
+            testClient(api, config: testConfig(debug: true), storage: storage);
         results.keys.forEach(client.capture);
         // Left out of the results: counts as delivered.
         client.capture('missing');
@@ -186,10 +187,20 @@ void main() {
               })
             : PostHogResponse.results(request, (_) => 'ok');
 
-        client.flush();
-        async.elapse(Duration.zero);
+        final lines = printedLines(() {
+          client.flush();
+          async.elapse(Duration.zero);
+        });
         expect(api.batchRequests, hasLength(1));
         expect(queuedEvents(storage), ['retried']);
+        final uuids = [
+          for (final event in api.batchRequests.single.events) event['uuid'],
+        ];
+        final rejection =
+            lines.singleWhere((line) => line.contains('dropped 2 of 7'));
+        for (final uuid in uuids) {
+          expect(rejection, isNot(contains('$uuid')));
+        }
 
         async.elapse(const Duration(seconds: 3));
         expect(api.batchRequests, hasLength(2));
