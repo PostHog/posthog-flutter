@@ -38,6 +38,40 @@ next client, or are lost when state is kept in memory. Closing the app window
 does not call `close()`, but the SDK also sends the queue whenever the app
 becomes inactive.
 
+## Background isolate errors
+
+`captureIsolateErrors` only monitors the isolate where PostHog is set up, normally
+the main isolate. For each background isolate, call `addPostHogErrorListener()`
+from the main isolate after initializing PostHog:
+
+```dart
+import 'dart:isolate';
+import 'package:posthog_flutter/posthog_flutter.dart';
+
+final isolate = await Isolate.spawn(worker, message, paused: true);
+final listener = isolate.addPostHogErrorListener();
+isolate.resume(isolate.pauseCapability!);
+```
+
+Starting paused prevents errors before the listener is added. Uncaught errors are
+forwarded with their background stack trace and debug name, and are reported as
+unhandled. Dart sends error strings, not the original exception objects.
+
+The listener does not require `captureIsolateErrors` to be enabled. It is removed
+and its port closed automatically when the isolate exits. To stop forwarding
+earlier and close its port explicitly:
+
+```dart
+isolate.removePostHogErrorListener(listener);
+```
+
+Repeated removal is safe. Add only once per isolate to avoid duplicate reports.
+Existing error listeners and whether errors terminate the isolate are unchanged.
+
+Flutter web does not support isolates. For `compute()` or `Isolate.run()`, catch
+errors from the returned future and report them with
+`Posthog().captureException(error: error, stackTrace: stackTrace)`.
+
 ## Questions?
 
 ### [Check out our community page.](https://posthog.com/posts)

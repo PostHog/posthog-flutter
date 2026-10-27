@@ -6275,6 +6275,56 @@
                     "Object"
                 ],
                 "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "addPostHogErrorListener",
+                        "parameters": [],
+                        "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                        "returnTypeName": "RawReceivePort",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "removePostHogErrorListener",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "listener",
+                                "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                                "typeName": "RawReceivePort"
+                            }
+                        ],
+                        "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                        "returnTypeName": "void",
+                        "type": "method",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogIsolateExtension",
+                "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                "superTypeNames": [],
+                "typeParameterNames": []
             }
         ],
         "iosPlatformConstraints": null,
