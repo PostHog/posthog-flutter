@@ -284,9 +284,7 @@ class Posthog {
   /// Returns the event's UUID once the SDK has admitted it to the AI queue.
   /// `null` means the event was not admitted and will not be sent:
   /// - a [PostHogConfig.beforeSend] callback dropped it,
-  /// - it is over [PostHogConfig.captureAiMaxEventBytes] (iOS and macOS only:
-  ///   Android checks the size after returning, so it returns the UUID and
-  ///   logs the drop),
+  /// - it is over [PostHogConfig.captureAiMaxEventBytes],
   /// - the SDK is disabled, not set up or opted out, or
   /// - the platform is Windows, Linux or web (see below).
   ///
