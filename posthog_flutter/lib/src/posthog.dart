@@ -500,8 +500,10 @@ class Posthog {
   /// reloading paused, or after repeated network failures), it completes right
   /// away with the current flags and `errorsLoading: true`. Older posthog-js
   /// completes with the next flags it reports, and when it skips the request,
-  /// with `errorsLoading: true` after twice its
-  /// `feature_flag_request_timeout_ms` (right away when flags are disabled).
+  /// with `errorsLoading: true` once every request attempt posthog-js may
+  /// make could have timed out: `feature_flag_request_max_retries + 2` times
+  /// its `feature_flag_request_timeout_ms`, plus 500 ms per retry (9.5 s with
+  /// the defaults; right away when flags are disabled).
   ///
   /// **Example:**
   /// ```dart
