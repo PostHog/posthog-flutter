@@ -140,8 +140,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
           'variants': jsFlagVariants.dartify(),
           'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
         });
-        dartCallback?.call(loaded);
+        // First, so a throwing config callback can't starve listeners and a
+        // reset() or close() it starts clears this load.
         FeatureFlagsListeners.instance.deliver(loaded);
+        dartCallback?.call(loaded);
       }.toJS;
 
       // Repeated setup would otherwise deliver each load twice.

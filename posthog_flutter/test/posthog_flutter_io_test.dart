@@ -8,7 +8,9 @@ import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
+import 'package:posthog_flutter/src/posthog.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
+import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 
 // Simplified void callback for feature flags
@@ -276,6 +278,58 @@ void main() {
       );
 
       expect(received.single.variants, {'on': true});
+    });
+
+    Future<void> sendNativeFlags() =>
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .handlePlatformMessage(
+          channel.name,
+          channel.codec.encodeMethodCall(const MethodCall(
+            'onFeatureFlagsCallback',
+            {
+              'variants': {'old-user-only': true},
+              'errorsLoading': false,
+            },
+          )),
+          (ByteData? data) {},
+        );
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('a $name started by the config callback is not undone by the load',
+          () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        Future<void>? pending;
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token',
+            onFeatureFlags: (_) => pending ??= transition()));
+
+        await sendNativeFlags();
+        await pending;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        final subscription = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(subscription.unsubscribe);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(received, isEmpty);
+      });
+    }
+
+    test(
+        'onFeatureFlags listeners get the load when the config callback throws',
+        () async {
+      FeatureFlagsListeners.instance.clear();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token',
+          onFeatureFlags: (_) => throw StateError('app callback')));
+
+      await sendNativeFlags();
+
+      expect(received.single.variants, {'old-user-only': true});
     });
 
     test('does not invoke callback when no callback is registered', () async {

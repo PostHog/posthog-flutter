@@ -1955,6 +1955,43 @@ void main() {
       expect(received.last.variants, {'variant-flag': 'test-variant'});
     });
 
+    test(
+        'onFeatureFlags listeners get the load when the config callback throws',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      FeatureFlagsListeners.instance.clear();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = (_) => throw StateError('app callback'));
+
+      await platform.reloadFeatureFlags();
+
+      expect(received.last.variants, {'variant-flag': 'test-variant'});
+    });
+
+    test('a reset started by the config callback is not undone by the load',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      FeatureFlagsListeners.instance.clear();
+      // What reset() and close() do before reaching the platform.
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = (_) => FeatureFlagsListeners.instance.clear());
+
+      await platform.reloadFeatureFlags();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received, isEmpty);
+    });
+
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();

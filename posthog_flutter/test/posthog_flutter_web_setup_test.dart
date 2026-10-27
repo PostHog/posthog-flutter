@@ -94,4 +94,60 @@ void main() {
 
     expect(received.single.variants, {'on': true});
   });
+
+  List<JSFunction> stubPosthogJs() {
+    final listeners = <JSFunction>[];
+    globalContext.setProperty(
+        'posthog'.toJS,
+        JSObject()
+          ..setProperty(
+            'onFeatureFlags'.toJS,
+            ((JSFunction callback) {
+              listeners.add(callback);
+              return (() => listeners.remove(callback)).toJS;
+            }).toJS,
+          ));
+    addTearDown(() => globalContext.delete('posthog'.toJS));
+    return listeners;
+  }
+
+  void loadFlags(List<JSFunction> listeners) {
+    for (final listener in listeners.toList()) {
+      listener.callAsFunction(null, ['on'].jsify(), {'on': true}.jsify(), null);
+    }
+  }
+
+  test('onFeatureFlags listeners get the load when the config callback throws',
+      () async {
+    final listeners = stubPosthogJs();
+    FeatureFlagsListeners.instance.clear();
+    final received = <PostHogFeatureFlagsLoaded>[];
+    final subscription = FeatureFlagsListeners.instance.add(received.add);
+    addTearDown(subscription.unsubscribe);
+
+    await PosthogFlutterWeb().setup(PostHogConfig('test_project_token',
+        onFeatureFlags: (_) => throw StateError('app callback')));
+    try {
+      loadFlags(listeners);
+    } catch (_) {}
+
+    expect(received.single.variants, {'on': true});
+  });
+
+  test('a reset started by the config callback is not undone by the load',
+      () async {
+    final listeners = stubPosthogJs();
+    FeatureFlagsListeners.instance.clear();
+
+    // What reset() and close() do before reaching the platform.
+    await PosthogFlutterWeb().setup(PostHogConfig('test_project_token',
+        onFeatureFlags: (_) => FeatureFlagsListeners.instance.clear()));
+    loadFlags(listeners);
+    final received = <PostHogFeatureFlagsLoaded>[];
+    final subscription = FeatureFlagsListeners.instance.add(received.add);
+    addTearDown(subscription.unsubscribe);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(received, isEmpty);
+  });
 }
