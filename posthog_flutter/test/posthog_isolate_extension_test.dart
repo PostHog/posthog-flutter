@@ -55,7 +55,7 @@ void main() {
     final call = await captured.timeout(const Duration(seconds: 10));
     await exited.first;
     expect(call.stackTrace.toString(), contains('_failImmediately'));
-    expect(call.properties?['isolate_name'], 'background-worker');
+    expect(call.properties, {'isolate_name': 'background-worker'});
 
     final event = DartExceptionProcessor.processException(
       error: call.error,
@@ -65,8 +65,8 @@ void main() {
     final exception = (event['\$exception_list'] as List).single as Map;
     expect(exception['value'], 'Bad state: immediate background failure');
     expect(exception['mechanism'], containsPair('handled', false));
-    expect(exception['mechanism'], containsPair('type', 'onuncaughtexception'));
-    expect(event['\$exception_source'], 'dart.isolate_error_listener');
+    expect(exception['mechanism'], containsPair('type', 'isolateError'));
+    expect(event, isNot(contains('\$exception_source')));
     expect((exception['stacktrace'] as Map)['frames'], isNotEmpty);
     expect(platform.capturedExceptions, hasLength(1));
 

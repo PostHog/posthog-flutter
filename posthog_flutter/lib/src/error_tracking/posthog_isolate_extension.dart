@@ -32,6 +32,8 @@ extension PostHogIsolateExtension on Isolate {
   /// Not supported on Flutter web, which has no isolates.
   RawReceivePort addPostHogErrorListener() {
     final isolateName = debugName;
+    // Observing worker errors must not keep the receiving isolate alive.
+    // Messages are still delivered while that isolate runs; only shutdown is affected.
     final port = RawReceivePort()..keepIsolateAlive = false;
 
     port.handler = (Object? message) {
@@ -41,14 +43,12 @@ extension PostHogIsolateExtension on Isolate {
         unawaited(Posthog().captureException(
           error: PostHogException(
             source: error,
-            mechanism: 'onuncaughtexception',
+            mechanism: 'isolateError',
             handled: false,
           ),
           stackTrace: stack == null ? null : StackTrace.fromString(stack),
-          properties: {
-            '\$exception_source': 'dart.isolate_error_listener',
-            if (isolateName != null) 'isolate_name': isolateName,
-          },
+          properties:
+              isolateName != null ? {'isolate_name': isolateName} : null,
         ));
       }
     };
