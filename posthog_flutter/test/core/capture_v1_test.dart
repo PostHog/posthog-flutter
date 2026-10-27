@@ -318,20 +318,27 @@ void main() {
       expect(getQueue(storage), isEmpty);
     });
 
-    test('drops the batch on 404 without falling back to /batch', () async {
-      final server = await LocalPostHogServer.start();
+    test('retries a 404 without falling back to /batch', () {
+      final api = InProcessPostHogApi()
+        ..respond = (request) => request.isFlags
+            ? PostHogResponse.json({'flags': <String, Object?>{}})
+            : const PostHogResponse(HttpStatus.notFound);
       final storage = tempStorage();
-      final client = testClient(server, storage: storage);
-      server.respond = (request) => request.isFlags
-          ? PostHogResponse.json({'flags': <String, Object?>{}})
-          : const PostHogResponse(HttpStatus.notFound);
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+        Object? error;
 
-      client.capture('evt');
-      await expectLater(client.flush(), throwsA(isA<PostHogFetchHttpError>()));
+        client.capture('evt');
+        client.flush().catchError((Object e) {
+          error = e;
+        });
+        async.elapse(const Duration(seconds: 9));
 
-      expect([for (final r in server.requests) r.path],
-          ['/i/v1/analytics/events']);
-      expect(getQueue(storage), isEmpty);
+        expect(error, isA<PostHogFetchHttpError>());
+        expect([for (final r in api.requests) r.path],
+            List.filled(4, '/i/v1/analytics/events'));
+        expect(getQueue(storage), hasLength(1));
+      });
     });
   });
 

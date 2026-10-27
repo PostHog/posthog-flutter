@@ -148,7 +148,7 @@ void main() {
       });
     });
 
-    for (final status in [408, 500, 502, 503, 504]) {
+    for (final status in [404, 408, 429, 500, 502, 503, 504]) {
       test('HTTP $status keeps the batch queued after the retries', () {
         final api = InProcessPostHogApi()
           ..respond = (_) => PostHogResponse(status);
@@ -170,9 +170,7 @@ void main() {
       });
     }
 
-    // Capture v1 retries only the statuses above: a rate limit, a redirect
-    // it does not follow, or a missing route fails the same way again.
-    for (final status in [301, 302, 307, 308, 401, 403, 404, 429, 501]) {
+    for (final status in [301, 302, 307, 308, 401, 403, 501]) {
       test('HTTP $status drops the batch without a retry', () {
         final api = InProcessPostHogApi()
           ..respond = (_) => PostHogResponse(status,
@@ -256,7 +254,7 @@ void main() {
   });
 
   group('Retry-After', () {
-    for (final status in [503]) {
+    for (final status in [429, 503]) {
       test('HTTP $status pauses every send path and resumes the queue', () {
         final api = InProcessPostHogApi();
         final storage = tempStorage();

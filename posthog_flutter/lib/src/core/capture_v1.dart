@@ -6,9 +6,11 @@ import 'logger.dart';
 const captureV1Path = '/i/v1/analytics/events';
 
 /// Capture v1 statuses worth retrying. Everything else is terminal,
-/// including 429 and 3xx; 413 halves the batch instead.
+/// including 3xx; 413 halves the batch instead.
 bool isRetriableCaptureV1Status(int status) =>
+    status == 404 ||
     status == 408 ||
+    status == 429 ||
     status == 500 ||
     status == 502 ||
     status == 503 ||
