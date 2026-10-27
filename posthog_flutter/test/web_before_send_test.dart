@@ -152,6 +152,29 @@ void main() {
 
       expect(sentAs, ['new-user', 'new-user', 'new-user']);
     });
+
+    test('does not pin the old user across a cookieless opt-out', () async {
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty('opt_out_capturing'.toJS,
+          (() => distinctId = r'$posthog_cookieless').toJS);
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) async {
+          await Future<void>.delayed(Duration.zero);
+          return event;
+        },
+      ]));
+
+      final sent = [
+        web.capture(eventName: 'checkout'),
+        web.screen(screenName: 'Cart'),
+        web.captureException(error: StateError('boom')),
+      ];
+      await web.disable();
+      await Future.wait(sent);
+
+      expect(sentAs, List.filled(3, r'$posthog_cookieless'));
+    });
   });
 
   test('beforeSend null drops capture on web', () async {
