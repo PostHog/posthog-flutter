@@ -282,14 +282,18 @@ class Posthog {
   /// doesn't start with `$ai_`. [capture] never sends events here, even ones
   /// named `$ai_*`.
   ///
-  /// Returns the event's UUID, or `null` if the event wasn't queued: for
-  /// example, the SDK is opted out or a [PostHogConfig.beforeSend] callback
-  /// dropped it. An event over the AI size limit is dropped: iOS and macOS
-  /// then return `null`, while Android returns the UUID and logs the drop.
+  /// Returns the event's UUID once the SDK has admitted it to the AI queue.
+  /// `null` means the event was not admitted and will not be sent:
+  /// - a [PostHogConfig.beforeSend] callback dropped it,
+  /// - it is over [PostHogConfig.captureAiMaxEventBytes] (iOS and macOS only:
+  ///   Android checks the size after returning, so it returns the UUID and
+  ///   logs the drop),
+  /// - the SDK is disabled, not set up or opted out, or
+  /// - the platform is Windows, Linux or web (see below).
   ///
-  /// **Note:** supported on iOS, macOS and Android. On Windows, Linux and web
-  /// the event is not sent, a debug message is logged, and `null` is
-  /// returned.
+  /// **Platforms:** supported on iOS, macOS and Android. On Windows, Linux and
+  /// web, `captureAi` is a no-op: it sends nothing, logs a debug message and
+  /// returns `null`.
   ///
   /// **Example**
   /// ```dart
