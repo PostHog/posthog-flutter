@@ -63,9 +63,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final distinctId = _distinctId();
     final processed = await applyBeforeSend(_beforeSendCallbacks, event);
     // Null while the posthog-js loader stub is active: loading is not a
-    // change of user.
+    // change of user. The cookieless sentinel is not a user either; sent
+    // without `$cookieless_mode` after an opt-in, ingestion would keep it as
+    // a shared distinct_id instead of hashing it.
     if (processed != null &&
         distinctId != null &&
+        distinctId != _cookielessSentinel &&
         _distinctId() != distinctId) {
       processed.properties = {
         'distinct_id': distinctId,
@@ -74,6 +77,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     }
     return processed;
   }
+
+  // posthog-js COOKIELESS_SENTINEL_VALUE.
+  static const _cookielessSentinel = r'$posthog_cookieless';
 
   static String? _distinctId() {
     try {
