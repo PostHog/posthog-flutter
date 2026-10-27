@@ -585,7 +585,7 @@ abstract class PostHogCoreStateless {
           _warnedCaptureNotFound = true;
           // Printed even without debug: the events stay queued, and nothing
           // else tells the app that the route is missing.
-          debugPrint('[PostHog] [WARN] $_host$captureV1Path returned 404. '
+          debugPrint('[PostHog] [WARN] $captureV1Path returned 404. '
               'Events stay queued and are retried. If you use a reverse '
               'proxy or self-host PostHog, make sure it serves '
               '$captureV1Path.');

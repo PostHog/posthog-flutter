@@ -283,7 +283,7 @@ void main() {
 
         expect(api.batchRequests.length, greaterThan(4));
         expect(printed, [
-          '[PostHog] [WARN] ${api.url}/i/v1/analytics/events returned 404. '
+          '[PostHog] [WARN] /i/v1/analytics/events returned 404. '
               'Events stay queued and are retried. If you use a reverse '
               'proxy or self-host PostHog, make sure it serves '
               '/i/v1/analytics/events.',
