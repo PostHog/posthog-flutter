@@ -286,9 +286,9 @@ class Posthog {
   /// - a [PostHogConfig.beforeSend] callback dropped it,
   /// - it is over [PostHogConfig.captureAiMaxEventBytes],
   /// - the SDK is disabled, not set up or opted out, or
-  /// - the platform is Windows, Linux or web (see below).
+  /// - the platform is web (see below).
   ///
-  /// **Platforms:** supported on iOS, macOS and Android. On Windows, Linux and
+  /// **Platforms:** supported on iOS, macOS, Android, Windows and Linux. On
   /// web, `captureAi` is a no-op: it sends nothing, logs a debug message and
   /// returns `null`.
   ///

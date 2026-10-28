@@ -441,12 +441,21 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   /// Queues an event built by [prepareEvent], possibly changed since.
   /// Unlike [capture], it adds nothing to it.
-  void capturePrepared(String event, PostHogPreparedEvent prepared) {
-    wrap(() {
-      if (_ignoredWhileOptedOut('posthog.capture')) return;
-      _queuePrepared(event, prepared);
-    });
-  }
+  ///
+  /// With [ai], the event goes to PostHog's AI endpoint from a queue of its
+  /// own, which drops a serialized event over its size limit.
+  ///
+  /// Returns the event's uuid, or null when it is not queued: the client
+  /// is closed or opted out, or the AI event is over the size limit.
+  String? capturePrepared(
+    String event,
+    PostHogPreparedEvent prepared, {
+    bool ai = false,
+  }) =>
+      wrap<String?>(() {
+        if (_ignoredWhileOptedOut('posthog.capture')) return null;
+        return _queuePrepared(event, prepared, ai: ai);
+      });
 
   PostHogPreparedEvent? _prepareEvent(
     String event, {
@@ -480,11 +489,17 @@ abstract class PostHogCore extends PostHogCoreStateless {
     );
   }
 
-  void _queuePrepared(String event, PostHogPreparedEvent prepared) {
+  String? _queuePrepared(
+    String event,
+    PostHogPreparedEvent prepared, {
+    bool ai = false,
+  }) {
     final (:properties, :options, :timestamp) = prepared;
-    captureStateless(getDistinctId(), event,
-        properties: properties, options: options, timestamp: timestamp);
-    if (event == r'$set' || event == r'$identify') {
+    final uuid = captureStateless(getDistinctId(), event,
+        properties: properties, options: options, timestamp: timestamp, ai: ai);
+    // PostHog drops an AI event that is not an `$ai_*` event, so it never
+    // updates the person.
+    if (!ai && (event == r'$set' || event == r'$identify')) {
       final set = properties[r'$set'];
       final setOnce = properties[r'$set_once'];
       if ((set is Map || setOnce is Map) &&
@@ -493,6 +508,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
             _personPropertiesHash(getDistinctId(), set, setOnce);
       }
     }
+    return uuid;
   }
 
   /// Creates an alias for a user. An empty [alias] is ignored.

@@ -1125,21 +1125,87 @@ void main() {
         [isFalse, isNull],
       );
     });
+  });
 
-    test('captureAi sends nothing and returns null', () async {
+  group('captureAi', () {
+    test('sends to the AI endpoint through beforeSend and returns the uuid',
+        () async {
+      final server = await LocalPostHogServer.start();
+      PostHogEvent? seen;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen = event;
+            event.properties = {...?event.properties, 'from_hook': true};
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      final uuid = await platform.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_model': 'gpt-5'},
+        options: {'custom': 'x'},
+      );
+      await platform.flush();
+
+      final event = await server.waitForAiEvent(r'$ai_generation');
+      expect(uuid, isNotNull);
+      expect(event['uuid'], uuid);
+      expect(_propertiesOf(event)[r'$ai_model'], 'gpt-5');
+      expect(_propertiesOf(event)['from_hook'], isTrue);
+      expect(_optionsOf(event)['custom'], 'x');
+      expect(seen!.properties, contains(r'$session_id'));
+      expect(server.eventNames, isNot(contains(r'$ai_generation')));
+    });
+
+    test('returns null when beforeSend drops the event', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server)
+        ..beforeSend = [
+          (event) => event.event == r'$ai_generation' ? null : event,
+        ]);
+
+      final uuid = await platform.captureAi(eventName: r'$ai_generation');
+      await platform.captureAi(eventName: r'$ai_span');
+
+      expect(uuid, isNull);
+      await server.waitForAiEvent(r'$ai_span');
+      expect(server.aiEvents, hasLength(1));
+    });
+
+    test('returns null when the event is over captureAiMaxEventBytes',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform =
+          await setUpPlatform(configFor(server)..captureAiMaxEventBytes = 4096);
+
+      final uuid = await platform.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_input': 'x' * 5000},
+      );
+
+      expect(uuid, isNull);
+    });
+
+    test('returns null while opted out', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+      await platform.optOut();
+
+      expect(await platform.captureAi(eventName: r'$ai_generation'), isNull);
+    });
+
+    test('logs a non-AI event name and still sends it', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
 
-      String? uuid = 'not called';
-      final lines = await _printsOf(() async {
-        uuid = await platform.captureAi(eventName: r'$ai_generation');
-      });
-      await platform.capture(eventName: 'after');
-      await server.waitForEvent('after');
+      final lines = await _printsOf(
+          () => platform.captureAi(eventName: 'not an AI event'));
 
-      expect(uuid, isNull);
-      expect(lines, [contains('captureAi is not supported')]);
-      expect(server.eventNames, isNot(contains(r'$ai_generation')));
+      expect(lines, [contains(r'does not start with $ai_')]);
+      await platform.flush();
+      expect(server.aiEvents.single['event'], 'not an AI event');
     });
   });
 

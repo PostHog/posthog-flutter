@@ -282,7 +282,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
             current, processed, exceptionSteps, prepared.timestamp);
       });
 
-  /// AI events are not sent on desktop.
   @override
   Future<String?> captureAi({
     required String eventName,
@@ -290,11 +289,43 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
     Map<String, Object?>? options,
-  }) async {
-    printIfDebug('[PostHog] captureAi is not supported on Windows and Linux. '
-        'The event "$eventName" was not sent.');
-    return null;
-  }
+  }) =>
+      _guardWith<String?>('captureAi', null, (client) async {
+        if (!eventName.startsWith(r'$ai_')) {
+          printIfDebug('[PostHog] captureAi event $eventName does not start '
+              r'with $ai_, so PostHog will drop it. Use capture for non-AI '
+              'events.');
+        }
+        if (client.optedOut) return null;
+        if (!_hasName(eventName)) return null;
+        final scope = _clientScope;
+        if (scope == null) return null;
+        final distinctId = client.getDistinctId();
+        final exceptionSteps = _exceptionSteps;
+
+        final prepared = _prepare(
+          client,
+          eventName,
+          properties,
+          userProperties: userProperties,
+          userPropertiesSetOnce: userPropertiesSetOnce,
+          options: options,
+        );
+        if (prepared == null) return null;
+        final hooked = _runBeforeSend(prepared.event);
+        final processed =
+            hooked is Future<PostHogEvent?> ? await hooked : hooked;
+        if (processed == null) {
+          printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
+          return null;
+        }
+
+        final current = _clientForContinuation('captureAi', scope, distinctId);
+        if (current == null) return null;
+        return _captureProcessed(
+            current, processed, exceptionSteps, prepared.timestamp,
+            ai: true);
+      });
 
   @override
   Future<void> screen({
@@ -764,32 +795,37 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return processed;
   }
 
-  /// Queues [event] as the beforeSend callbacks left it. The client adds
-  /// nothing to it; an `$exception` event gets the exception steps recorded
-  /// up to now.
-  void _captureProcessed(
+  /// Queues [event] as the beforeSend callbacks left it, on the AI queue
+  /// with [ai], and returns its uuid, or null when it is not queued. The
+  /// client adds nothing to it; an `$exception` event gets the exception
+  /// steps recorded up to now.
+  String? _captureProcessed(
     DesktopPostHog client,
     PostHogEvent event,
     ExceptionStepsBuffer? exceptionSteps,
-    String timestamp,
-  ) {
-    if (!_hasName(event.event)) return;
+    String timestamp, {
+    bool ai = false,
+  }) {
+    if (!_hasName(event.event)) return null;
     // Options are sent as they are, unknown keys included. An option wins
     // over its legacy property on the event.
-    client.capturePrepared(event.event, (
-      properties: _withExceptionSteps(
-            event.event,
-            exceptionSteps,
-            _mergeUserProps(
-              event.properties,
-              event.userProperties,
-              event.userPropertiesSetOnce,
-            ),
-          ) ??
-          const {},
-      options: cleanEventOptions(event.options),
-      timestamp: timestamp,
-    ));
+    return client.capturePrepared(
+        event.event,
+        (
+          properties: _withExceptionSteps(
+                event.event,
+                exceptionSteps,
+                _mergeUserProps(
+                  event.properties,
+                  event.userProperties,
+                  event.userPropertiesSetOnce,
+                ),
+              ) ??
+              const {},
+          options: cleanEventOptions(event.options),
+          timestamp: timestamp,
+        ),
+        ai: ai);
   }
 
   /// Whether [event] has a name; an event without one is dropped.

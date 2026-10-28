@@ -10,6 +10,23 @@ const captureV1Path = '/i/v1/analytics/events';
 /// stay under proxy and capture body limits.
 const captureV1MaxBatchBytes = 5 * 1024 * 1024;
 
+/// The capture v1 endpoint for AI events.
+const captureV1AiPath = '/i/v1/ai/events';
+
+/// The default number of AI events kept queued.
+const captureAiDefaultMaxQueueSize = 100;
+
+/// The default timeout of an AI request.
+const captureAiDefaultTimeout = Duration(seconds: 60);
+
+/// The largest serialized AI event the SDK queues: PostHog's 8 MiB limit on
+/// an AI event's properties, plus 64 KiB for the rest of the event.
+const captureAiMaxEventBytes = 8 * 1024 * 1024 + 64 * 1024;
+
+/// The most AI event bytes kept queued; the oldest events are dropped
+/// first.
+const captureAiMaxQueueBytes = 50 * 1024 * 1024;
+
 /// The oldest events of [events] whose serialized size stays within
 /// [maxBytes]. Each event is checked before it is added, so one that does
 /// not fit starts the next batch, and the first event always goes, alone
