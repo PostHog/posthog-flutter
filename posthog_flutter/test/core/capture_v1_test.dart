@@ -95,6 +95,41 @@ void main() {
     });
   });
 
+  group('takeCaptureV1Batch', () {
+    PostHogQueuedEvent queued(String id, String padding) =>
+        (id: id, event: {'p': padding});
+
+    test('closes the batch before the event that would pass the limit', () {
+      // Each event serializes to `{"p":"<padding>"}`, 18 bytes here.
+      final events = [
+        queued('a', 'x' * 10),
+        queued('b', 'x' * 10),
+        queued('c', 'x' * 10),
+      ];
+
+      final batch = takeCaptureV1Batch(events, maxBytes: 18 * 2);
+
+      expect(batch.map((e) => e.id), ['a', 'b']);
+    });
+
+    test('sends an event over the limit alone', () {
+      final events = [queued('a', 'x' * 100), queued('b', 'x')];
+
+      final batch = takeCaptureV1Batch(events, maxBytes: 50);
+
+      expect(batch.map((e) => e.id), ['a']);
+    });
+
+    test('counts UTF-8 bytes, not characters', () {
+      // Each event serializes to 18 characters but 28 bytes.
+      final events = [queued('a', 'é' * 10), queued('b', 'é' * 10)];
+
+      final batch = takeCaptureV1Batch(events, maxBytes: 18 * 2);
+
+      expect(batch.map((e) => e.id), ['a']);
+    });
+  });
+
   group('captureV1Event', () {
     final logger = CoreLogger((_) {});
 

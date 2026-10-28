@@ -681,6 +681,29 @@ void main() {
         expect(getQueue(storage), isEmpty);
       });
     });
+
+    test('closes a batch at 5 MiB of serialized events', () {
+      final api = InProcessPostHogApi();
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+        final padding = 'x' * (2 * 1024 * 1024);
+
+        for (var i = 0; i < 3; i++) {
+          client.capture('event_$i', properties: {'padding': padding});
+        }
+        client.flush();
+        async.elapse(Duration.zero);
+
+        expect([
+          for (final request in api.batchRequests) request.eventNames
+        ], [
+          ['event_0', 'event_1'],
+          ['event_2'],
+        ]);
+        expect(getQueue(storage), isEmpty);
+      });
+    });
   });
 
   group('Queue persistence', () {
