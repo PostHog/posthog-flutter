@@ -886,8 +886,7 @@ abstract class PostHogCoreStateless {
     Duration timeout = _requestTimeout,
     PostHogCompression? compression,
   }) async {
-    final attempt = _FetchAttempt(
-        timeout,
+    final attempt = _FetchAttempt(timeout,
         timeout > _responseBodyTimeout ? timeout : _responseBodyTimeout);
     try {
       return await attempt.guard(
