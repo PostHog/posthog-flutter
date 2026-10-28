@@ -93,6 +93,12 @@ class PosthogFlutterPlugin :
     @Volatile
     private var isHostActivityStopped = false
 
+    // Dart's feature flags lifecycle, sent with setup, reset and close. Each
+    // flags notification carries the one current when it fired, so Dart can
+    // drop loads from before a reset or close.
+    @Volatile
+    private var flagsGeneration = 0
+
     // A count, not a boolean: under multi-resume (Android 10+ split-screen)
     // two non-host activities can be resumed at once, and pausing one must
     // not read as "nothing covers the host" while the other still does.
@@ -273,6 +279,7 @@ class PosthogFlutterPlugin :
             }
 
             "reset" -> {
+                updateFlagsGeneration(call)
                 reset(result)
             }
 
@@ -353,6 +360,7 @@ class PosthogFlutterPlugin :
             }
 
             "close" -> {
+                updateFlagsGeneration(call)
                 close(result)
             }
 
@@ -541,6 +549,7 @@ class PosthogFlutterPlugin :
                 return
             }
 
+            updateFlagsGeneration(call)
             setupPostHog(args)
 
             result.success(null)
@@ -817,7 +826,10 @@ class PosthogFlutterPlugin :
                 onFeatureFlags =
                     PostHogFeatureFlagsCallback { loaded ->
                         Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
-                        invokeFlutterMethod("onFeatureFlagsCallback", loaded.toFlutterMap())
+                        invokeFlutterMethod(
+                            "onFeatureFlagsCallback",
+                            loaded.toFlutterMap() + ("generation" to flagsGeneration),
+                        )
                     }
             }
 
@@ -2161,6 +2173,10 @@ class PosthogFlutterPlugin :
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
+    }
+
+    private fun updateFlagsGeneration(call: MethodCall) {
+        call.argument<Int>("flagsGeneration")?.let { flagsGeneration = it }
     }
 
     private fun close(result: Result) {

@@ -16,6 +16,12 @@ class FeatureFlagsListeners {
 
   final _listeners = <Object, OnFeatureFlagsCallback>{};
   PostHogFeatureFlagsLoaded? _last;
+  int _generation = 0;
+
+  /// Bumped by [clear]. The native SDKs tag each load with the generation
+  /// they last got, so a load sent before a `reset()` or `close()` reached
+  /// them can be told apart.
+  int get generation => _generation;
 
   PostHogFeatureFlagsSubscription add(OnFeatureFlagsCallback listener) {
     final token = Object();
@@ -52,5 +58,8 @@ class FeatureFlagsListeners {
 
   /// Forgets the last load, so new listeners don't get the previous user's
   /// flags after `reset()` or `close()`.
-  void clear() => _last = null;
+  void clear() {
+    _last = null;
+    _generation++;
+  }
 }

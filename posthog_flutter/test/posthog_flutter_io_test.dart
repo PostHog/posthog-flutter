@@ -162,6 +162,14 @@ void main() {
   });
 
   group('PosthogFlutterIO onFeatureFlags via setup', () {
+    // The native SDKs tag each load with the generation they last got.
+    Map<String, Object?> nativeFlagsArgs(Map<String, Object?> args,
+            {int? generation}) =>
+        {
+          ...args,
+          'generation': generation ?? FeatureFlagsListeners.instance.generation,
+        };
+
     test(
       'setup initializes method call handler and registers callback if provided',
       () async {
@@ -181,7 +189,7 @@ void main() {
             .handlePlatformMessage(
           channel.name,
           channel.codec.encodeMethodCall(
-            const MethodCall('onFeatureFlagsCallback', {}),
+            MethodCall('onFeatureFlagsCallback', nativeFlagsArgs({})),
           ),
           (ByteData? data) {},
         );
@@ -224,12 +232,12 @@ void main() {
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
         channel.name,
-        channel.codec.encodeMethodCall(const MethodCall(
+        channel.codec.encodeMethodCall(MethodCall(
           'onFeatureFlagsCallback',
-          {
+          nativeFlagsArgs({
             'variants': {'on': true, 'variant': 'test', 'off': false},
             'errorsLoading': true,
-          },
+          }),
         )),
         (ByteData? data) {},
       );
@@ -249,7 +257,8 @@ void main() {
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
-          const MethodCall('onFeatureFlagsCallback', {'variants': 123}),
+          MethodCall(
+              'onFeatureFlagsCallback', nativeFlagsArgs({'variants': 123})),
         ),
         (ByteData? data) {},
       );
@@ -267,12 +276,12 @@ void main() {
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
         channel.name,
-        channel.codec.encodeMethodCall(const MethodCall(
+        channel.codec.encodeMethodCall(MethodCall(
           'onFeatureFlagsCallback',
-          {
+          nativeFlagsArgs({
             'variants': {'on': true},
             'errorsLoading': false,
-          },
+          }),
         )),
         (ByteData? data) {},
       );
@@ -280,19 +289,43 @@ void main() {
       expect(received.single.variants, {'on': true});
     });
 
-    Future<void> sendNativeFlags() =>
+    Future<void> sendNativeFlags({int? generation}) =>
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .handlePlatformMessage(
           channel.name,
-          channel.codec.encodeMethodCall(const MethodCall(
+          channel.codec.encodeMethodCall(MethodCall(
             'onFeatureFlagsCallback',
-            {
+            nativeFlagsArgs({
               'variants': {'old-user-only': true},
               'errorsLoading': false,
-            },
+            }, generation: generation),
           )),
           (ByteData? data) {},
         );
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('drops a native load sent before the $name reached native',
+          () async {
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        await posthogFlutterIO.setup(
+            PostHogConfig('test_project_token', onFeatureFlags: received.add));
+        final before = FeatureFlagsListeners.instance.generation;
+
+        await transition();
+        await sendNativeFlags(generation: before);
+        final subscription = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(subscription.unsubscribe);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(received, isEmpty);
+        expect((log.last.arguments as Map)['flagsGeneration'],
+            FeatureFlagsListeners.instance.generation);
+      });
+    }
 
     for (final (name, transition) in <(String, Future<void> Function())>[
       ('reset', () => Posthog().reset()),
@@ -342,7 +375,7 @@ void main() {
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
-          const MethodCall('onFeatureFlagsCallback', {}),
+          MethodCall('onFeatureFlagsCallback', nativeFlagsArgs({})),
         ),
         (ByteData? data) => reply = data,
       );

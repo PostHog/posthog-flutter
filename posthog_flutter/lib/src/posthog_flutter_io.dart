@@ -75,6 +75,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         await cleanupSurveys();
         return null;
       case 'onFeatureFlagsCallback':
+        final arguments = call.arguments;
+        // Sent before the native SDK got the latest reset() or close(), so
+        // these may be the previous user's flags.
+        if (arguments is! Map ||
+            arguments['generation'] !=
+                FeatureFlagsListeners.instance.generation) {
+          break;
+        }
         final loaded = featureFlagsLoadedFromMap(call.arguments);
         // First, so a throwing config callback can't starve listeners and a
         // reset() or close() it starts clears this load.
@@ -196,6 +204,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     SurveyService().hideSurvey();
   }
 
+  Map<String, Object> _flagsGenerationArguments() =>
+      {'flagsGeneration': FeatureFlagsListeners.instance.generation};
+
   /// Flutter to Native Calls
   ///
   @override
@@ -215,6 +226,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       await _methodChannel.invokeMethod('setup', {
         ...config.toMap(),
         ...flutterVersionSetupArguments(),
+        ..._flagsGenerationArguments(),
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on setup: $exception');
@@ -512,7 +524,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      await _methodChannel.invokeMethod('reset');
+      await _methodChannel.invokeMethod('reset', _flagsGenerationArguments());
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reset: $exception');
     }
@@ -892,7 +904,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      return await _methodChannel.invokeMethod('close');
+      return await _methodChannel.invokeMethod(
+          'close', _flagsGenerationArguments());
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on close: $exception');
     }
