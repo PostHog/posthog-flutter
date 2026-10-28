@@ -546,8 +546,12 @@ class Posthog {
   /// subscription.unsubscribe();
   /// ```
   PostHogFeatureFlagsSubscription onFeatureFlags(
-          OnFeatureFlagsCallback callback) =>
-      FeatureFlagsListeners.instance.add(callback);
+      OnFeatureFlagsCallback callback) {
+    // Creating the platform installs the channel handler native loads arrive
+    // on. With native auto-init this can be the app's only Dart SDK call.
+    _posthog;
+    return FeatureFlagsListeners.instance.add(callback);
+  }
 
   /// Sets person properties that are used only for feature flag evaluation.
   ///
