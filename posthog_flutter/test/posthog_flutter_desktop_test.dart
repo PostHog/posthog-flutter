@@ -954,31 +954,33 @@ void main() {
   });
 
   group('Event options', () {
-    test('are sent as their legacy properties, winning over them', () async {
+    test('are sent as they are, winning over their legacy properties',
+        () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
 
-      final lines = await _printsOf(() => platform.capture(
-            eventName: 'tour step',
-            properties: {r'$product_tour_id': 'from-property'},
-            options: {
-              'process_person_profile': false,
-              'cookieless_mode': true,
-              'disable_skew_correction': true,
-              'product_tour_id': 'from-option',
-              'unknown_option': 'x',
-              'unset_option': null,
-            },
-          ));
+      await platform.capture(
+        eventName: 'tour step',
+        properties: {r'$product_tour_id': 'from-property'},
+        options: {
+          'process_person_profile': false,
+          'cookieless_mode': true,
+          'disable_skew_correction': true,
+          'product_tour_id': 'from-option',
+          'unknown_option': {'nested': 'x'},
+          'unset_option': null,
+        },
+      );
 
-      final properties = _propertiesOf(await server.waitForEvent('tour step'));
-      expect(properties[r'$process_person_profile'], isFalse);
-      expect(properties[r'$cookieless_mode'], isTrue);
-      expect(properties[r'$ignore_sent_at'], isTrue);
-      expect(properties[r'$product_tour_id'], 'from-option');
-      expect(properties, isNot(contains('unknown_option')));
-      expect(properties, isNot(contains('unset_option')));
-      expect(lines, [contains('option "unknown_option" is not supported')]);
+      final event = await server.waitForEvent('tour step');
+      expect(event['options'], {
+        'process_person_profile': false,
+        'cookieless_mode': true,
+        'disable_skew_correction': true,
+        'product_tour_id': 'from-option',
+        'unknown_option': {'nested': 'x'},
+      });
+      expect(_propertiesOf(event), isNot(contains(r'$product_tour_id')));
     });
 
     test('a process_person_profile option applies to its event only', () async {
@@ -993,8 +995,8 @@ void main() {
 
       final processed = await server.waitForEvent('processed');
       final anonymous = await server.waitForEvent('anonymous');
-      expect(_propertiesOf(processed)[r'$process_person_profile'], isTrue);
-      expect(_propertiesOf(anonymous)[r'$process_person_profile'], isFalse);
+      expect(_optionsOf(processed)['process_person_profile'], isTrue);
+      expect(_optionsOf(anonymous)['process_person_profile'], isFalse);
     });
 
     test('beforeSend can change them', () async {
@@ -1020,11 +1022,11 @@ void main() {
         options: {'disable_skew_correction': true},
       );
 
-      final screen = _propertiesOf(await server.waitForEvent(r'$screen'));
-      final exception = _propertiesOf(await server.waitForEvent(r'$exception'));
-      expect(screen[r'$product_tour_id'], 'from-hook');
-      expect(exception[r'$product_tour_id'], 'from-hook');
-      expect(exception[r'$ignore_sent_at'], isTrue);
+      final screen = _optionsOf(await server.waitForEvent(r'$screen'));
+      final exception = _optionsOf(await server.waitForEvent(r'$exception'));
+      expect(screen['product_tour_id'], 'from-hook');
+      expect(exception['product_tour_id'], 'from-hook');
+      expect(exception['disable_skew_correction'], isTrue);
     });
 
     test('reach the events identify, setPersonProperties, group and alias send',
@@ -1032,7 +1034,7 @@ void main() {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
       Map<String, Object?> options(String id) =>
-          {'product_tour_id': id, 'cookieless_mode': false};
+          {'product_tour_id': id, 'cookieless_mode': false, 'custom': id};
 
       await platform.identify(userId: 'user-1', options: options('identify'));
       await platform.setPersonProperties(
@@ -1052,9 +1054,10 @@ void main() {
         (r'$groupidentify', 'group'),
         (r'$create_alias', 'alias'),
       ]) {
-        final properties = _propertiesOf(await server.waitForEvent(name));
-        expect(properties[r'$product_tour_id'], id, reason: name);
-        expect(properties[r'$cookieless_mode'], isFalse, reason: name);
+        final options = _optionsOf(await server.waitForEvent(name));
+        expect(options['product_tour_id'], id, reason: name);
+        expect(options['cookieless_mode'], isFalse, reason: name);
+        expect(options['custom'], id, reason: name);
       }
     });
 
@@ -1074,10 +1077,10 @@ void main() {
 
       final sets = [
         for (final event in server.events)
-          if (event['event'] == r'$set') _propertiesOf(event),
+          if (event['event'] == r'$set') _optionsOf(event),
       ];
       expect(
-        [for (final set in sets) set[r'$process_person_profile']],
+        [for (final set in sets) set['process_person_profile']],
         [isFalse, isTrue],
       );
     });
@@ -2073,6 +2076,9 @@ void main() {
 
 Map<String, Object?> _propertiesOf(Map<String, Object?> event) =>
     Map<String, Object?>.from(event['properties']! as Map);
+
+Map<String, Object?> _optionsOf(Map<String, Object?> event) =>
+    Map<String, Object?>.from((event['options'] ?? const {}) as Map);
 
 /// Runs [body] and returns the lines it printed.
 Future<List<String>> _printsOf(Future<void> Function() body) async {

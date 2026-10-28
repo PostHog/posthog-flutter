@@ -234,9 +234,9 @@ class Posthog {
   /// over its property. A null value means unset. [PostHogConfig.beforeSend]
   /// can change them through [PostHogEvent.options].
   ///
-  /// On iOS, macOS and Android, other keys are sent unchanged. On Windows,
-  /// Linux and web, the known keys are sent as their legacy properties and
-  /// other keys are dropped. On web, posthog-js sets
+  /// On iOS, macOS, Android, Windows and Linux, other keys are sent
+  /// unchanged. On web, the known keys are sent as their legacy properties
+  /// and other keys are dropped. On web, posthog-js sets
   /// `$process_person_profile` itself, so `process_person_profile` has no
   /// effect there, and the options of [identify], [setPersonProperties],
   /// [alias] and [group] are dropped because posthog-js sends those events

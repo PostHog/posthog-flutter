@@ -265,6 +265,7 @@ abstract class PostHogCoreStateless {
   void identifyStateless(
     String distinctId, {
     required Map<String, Object?> properties,
+    Map<String, Object?>? options,
   }) {
     _enqueue(
       'identify',
@@ -273,6 +274,7 @@ abstract class PostHogCoreStateless {
         event: r'$identify',
         properties: properties,
       ),
+      options: options,
     );
   }
 
@@ -299,6 +301,7 @@ abstract class PostHogCoreStateless {
     String alias,
     String distinctId, {
     required Map<String, Object?> properties,
+    Map<String, Object?>? options,
   }) {
     _enqueue(
       'alias',
@@ -311,6 +314,7 @@ abstract class PostHogCoreStateless {
           'alias': alias,
         },
       ),
+      options: options,
     );
   }
 
@@ -321,6 +325,7 @@ abstract class PostHogCoreStateless {
     required String distinctId,
     required Map<String, Object?> eventProperties,
     Map<String, Object?>? groupProperties,
+    Map<String, Object?>? options,
   }) {
     _enqueue(
       'capture',
@@ -334,6 +339,7 @@ abstract class PostHogCoreStateless {
           ...eventProperties,
         },
       ),
+      options: options,
     );
   }
 

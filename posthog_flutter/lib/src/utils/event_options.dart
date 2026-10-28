@@ -19,8 +19,8 @@ Map<String, Object>? cleanEventOptions(Map<String, Object?>? options) {
   return Map<String, Object>.from(cleaned);
 }
 
-/// Converts [options] to the legacy event properties for transports that
-/// have no options field (the desktop client and posthog-js).
+/// Converts [options] to the legacy event properties for posthog-js, which
+/// has no options field.
 ///
 /// Known keys become their `$` property. Other keys have no legacy property,
 /// so they are dropped with a debug log naming [method].

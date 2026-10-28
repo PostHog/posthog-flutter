@@ -225,10 +225,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           userId,
           userProperties: _normalize(userProperties),
           userPropertiesSetOnce: _normalize(userPropertiesSetOnce),
-          properties: eventOptionsToLegacyProperties(
-            options,
-            method: 'identify',
-          ),
+          options: cleanEventOptions(options),
         );
       });
 
@@ -242,10 +239,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         client.setPersonProperties(
           userPropertiesToSet: _normalize(userPropertiesToSet),
           userPropertiesToSetOnce: _normalize(userPropertiesToSetOnce),
-          properties: eventOptionsToLegacyProperties(
-            options,
-            method: 'setPersonProperties',
-          ),
+          options: cleanEventOptions(options),
         );
       });
 
@@ -399,7 +393,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         'alias',
         (client) => client.alias(
           alias,
-          properties: eventOptionsToLegacyProperties(options, method: 'alias'),
+          options: cleanEventOptions(options),
         ),
       );
 
@@ -531,7 +525,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           groupType,
           groupKey,
           groupProperties: _normalize(groupProperties),
-          properties: eventOptionsToLegacyProperties(options, method: 'group'),
+          options: cleanEventOptions(options),
         );
       });
 
@@ -741,15 +735,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         event.userPropertiesSetOnce,
       ),
     );
-    // Options go out as their legacy properties, winning over a legacy
-    // property set on the event.
-    final optionProperties =
-        eventOptionsToLegacyProperties(event.options, method: event.event);
+    // Options are sent as they are, unknown keys included. An option wins
+    // over its legacy property on the event.
     client.capture(
       event.event,
-      properties: optionProperties.isEmpty
-          ? properties
-          : {...?properties, ...optionProperties},
+      properties: properties,
+      options: cleanEventOptions(event.options),
     );
   }
 
