@@ -69,27 +69,67 @@ void main() {
       expect(getQueue(storage), isEmpty);
     });
 
-    test('halves the batch size on HTTP 413 until the server accepts',
-        () async {
+    test('halves the batch size and flushAt on HTTP 413, sending next flush',
+        () {
+      final api = InProcessPostHogApi()
+        // This server rejects anything bigger than two events per request.
+        ..respond = (request) => PostHogResponse(request.events.length > 2
+            ? HttpStatus.requestEntityTooLarge
+            : HttpStatus.ok);
       final storage = tempStorage();
-      final client = testClient(server, storage: storage);
-      // This server rejects anything bigger than two events per request.
-      server.respond = (request) => PostHogResponse(request.events.length > 2
-          ? HttpStatus.requestEntityTooLarge
-          : HttpStatus.ok);
+      fakeAsync((async) {
+        final client = testClient(api,
+            config: testConfig(flushAt: 10, maxBatchSize: 10),
+            storage: storage);
+        List<int> sizes() =>
+            [for (final request in api.batchRequests) request.events.length];
 
-      for (var i = 0; i < 8; i++) {
-        client.capture('event_$i');
-      }
-      await client.flush();
+        for (var i = 0; i < 10; i++) {
+          client.capture('event_$i');
+        }
+        async.elapse(Duration.zero);
+        expect(sizes(), [10], reason: 'a 413 ends the flush');
 
-      final batches = [
-        for (final request in server.batchRequests) request.eventNames,
-      ];
-      expect(batches.map((batch) => batch.length).toList(), [8, 4, 2, 2, 2, 2]);
-      expect(batches.skip(2).expand((batch) => batch).toList(),
-          [for (var i = 0; i < 8; i++) 'event_$i']);
-      expect(getQueue(storage), isEmpty);
+        // flushAt is 5 now: the next capture flushes.
+        client.capture('event_10');
+        async.elapse(Duration.zero);
+        expect(sizes(), [10, 5]);
+
+        // flushAt is 2 now, as is the batch size.
+        client.capture('event_11');
+        async.elapse(Duration.zero);
+        expect(sizes(), [10, 5, 2, 2, 2, 2, 2, 2]);
+        expect(api.batchRequests.skip(2).expand((r) => r.eventNames).toList(),
+            [for (var i = 0; i < 12; i++) 'event_$i']);
+        expect(getQueue(storage), isEmpty);
+
+        client.capture('event_12');
+        async.elapse(Duration.zero);
+        expect(getQueue(storage), hasLength(1),
+            reason: 'flushAt stays at 2 after the deliveries');
+      });
+    });
+
+    test('sends the halved batches with the periodic flush after a 413', () {
+      final api = InProcessPostHogApi()
+        ..respond = (request) => PostHogResponse(request.events.length > 2
+            ? HttpStatus.requestEntityTooLarge
+            : HttpStatus.ok);
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+        for (var i = 0; i < 4; i++) {
+          client.capture('event_$i');
+        }
+        client.flush();
+        async.elapse(Duration.zero);
+        expect(api.batchRequests, hasLength(1));
+        expect(getQueue(storage), hasLength(4));
+
+        async.elapse(const Duration(seconds: 30));
+        expect([for (final r in api.batchRequests) r.events.length], [4, 2, 2]);
+        expect(getQueue(storage), isEmpty);
+      });
     });
 
     test('shares one network cycle between concurrent calls', () async {

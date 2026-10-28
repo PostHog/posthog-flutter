@@ -87,7 +87,7 @@ Duration captureRetryDelay({
 abstract class PostHogCoreStateless {
   final String _apiKey;
   final String _host;
-  final int _flushAt;
+  int _flushAt;
   int _maxBatchSize;
   final int _maxQueueSize;
   final Duration _flushInterval;
@@ -596,7 +596,8 @@ abstract class PostHogCoreStateless {
   ///
   /// Returns whether the flush goes on with the rest of the queue. It stops
   /// while events of [batch] wait for a later retry: the queue backs off,
-  /// and sends them again once the pause is over.
+  /// and sends them again once the pause is over. It also stops after a 413
+  /// halves the batch size.
   Future<bool> _sendBatch(
     List<PostHogQueuedEvent> batch,
     List<Map<String, Object?>> sent,
@@ -611,9 +612,14 @@ abstract class PostHogCoreStateless {
       if (e is PostHogFetchHttpError &&
           e.status == HttpStatus.requestEntityTooLarge &&
           batch.length > 1) {
+        // flushAt stays within the batch size, so the queue doesn't pile up
+        // more events than one batch can carry.
         _maxBatchSize = (batch.length ~/ 2).clamp(1, _maxBatchSize);
+        _flushAt = (_flushAt ~/ 2).clamp(1, _maxBatchSize);
         logger.warn('Received 413, reducing batch size to $_maxBatchSize');
-        return true;
+        // The smaller batches go out with the next flush, not right away.
+        _scheduleFlush();
+        return false;
       }
       if (e is PostHogFetchHttpError &&
           e.status == HttpStatus.notFound &&
