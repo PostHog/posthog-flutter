@@ -731,6 +731,27 @@ void main() {
       });
     });
 
+    test('flushes once 5 MiB of serialized events are queued', () {
+      final api = InProcessPostHogApi();
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+        final padding = 'x' * (2 * 1024 * 1024 + 512 * 1024);
+
+        client.capture('event_0', properties: {'padding': padding});
+        async.elapse(Duration.zero);
+        expect(api.batchRequests, isEmpty);
+
+        client.capture('event_1', properties: {'padding': padding});
+        async.elapse(Duration.zero);
+        expect(
+            [for (final r in api.batchRequests) r.eventNames].expand((n) => n),
+            ['event_0', 'event_1'],
+            reason: 'well below flushAt and before the periodic flush');
+        expect(getQueue(storage), isEmpty);
+      });
+    });
+
     test('closes a batch at 5 MiB of serialized events', () {
       final api = InProcessPostHogApi();
       final storage = tempStorage();

@@ -485,7 +485,9 @@ abstract class PostHogCoreStateless {
 
     events.emit(type, prepared);
 
-    if (queue.length >= _flushAt) {
+    // A full request's worth of bytes flushes like flushAt does, so large
+    // events go out before the queue starts dropping them.
+    if (queue.length >= _flushAt || queue.byteCount >= captureV1MaxBatchBytes) {
       _flushBackground();
     }
 
