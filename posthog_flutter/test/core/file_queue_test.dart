@@ -95,7 +95,9 @@ void main() {
           ['event_3', 'event_4']);
       expect(api.requests, isEmpty);
       async.elapse(const Duration(seconds: 30));
-      expect(api.batchRequests.single.events, original);
+      expect(
+          [for (final event in api.batchRequests.single.events) event['uuid']],
+          [for (final event in original) (event as Map)['uuid']]);
       expect(_queueFiles(dir), isEmpty);
     });
   });

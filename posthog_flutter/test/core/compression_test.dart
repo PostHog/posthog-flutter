@@ -21,7 +21,11 @@ void main() {
         expect(request.headers['content-type'], 'application/json');
         expect(request.headers['content-encoding'],
             compression == PostHogCompression.gzip ? 'gzip' : isNull);
-        expect(request.body['api_key'] ?? request.body['token'], 'k');
+        if (request.isFlags) {
+          expect(request.body['token'], 'k');
+        } else {
+          expect(request.headers['authorization'], 'Bearer k');
+        }
       }
     });
   }

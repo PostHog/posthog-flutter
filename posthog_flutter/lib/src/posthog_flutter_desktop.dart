@@ -797,7 +797,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return merged.isNotEmpty ? merged : null;
   }
 
-  /// Converts the values jsonEncode cannot handle, which storage and /batch/
+  /// Converts the values jsonEncode cannot handle, which storage and capture
   /// payloads need.
   Map<String, Object>? _normalize(Map<String, Object>? properties) {
     if (properties == null || properties.isEmpty) return properties;

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
@@ -148,24 +149,7 @@ void main() {
       });
     });
 
-    // (status, reason the batch stays queued)
-    const transientStatuses = <(int, String)>[
-      (408, 'the server timed out'),
-      (429, 'the server asks to slow down'),
-      (500, 'the server failed'),
-      (
-        301,
-        'a POST redirect is not followed, so the batch never reached '
-            'ingestion'
-      ),
-      (
-        307,
-        'a POST redirect is not followed, so the batch never reached '
-            'ingestion'
-      ),
-    ];
-
-    for (final (status, reason) in transientStatuses) {
+    for (final status in [404, 408, 429, 500, 502, 503, 504]) {
       test('HTTP $status keeps the batch queued after the retries', () {
         final api = InProcessPostHogApi()
           ..respond = (_) => PostHogResponse(status);
@@ -182,7 +166,31 @@ void main() {
 
           expect(error, isA<PostHogFetchHttpError>());
           expect(api.batchRequests, hasLength(4));
-          expect(getQueue(storage), hasLength(1), reason: reason);
+          expect(getQueue(storage), hasLength(1));
+        });
+      });
+    }
+
+    for (final status in [301, 302, 307, 308, 401, 403, 501]) {
+      test('HTTP $status drops the batch without a retry', () {
+        final api = InProcessPostHogApi()
+          ..respond = (_) => PostHogResponse(status,
+              location: 'https://elsewhere.invalid/i/v1/analytics/events',
+              headers: {'Retry-After': '5'});
+        final storage = tempStorage();
+        fakeAsync((async) {
+          final client = testClient(api, storage: storage);
+          Object? error;
+
+          client.capture('evt');
+          client.flush().catchError((Object e) {
+            error = e;
+          });
+          async.elapse(const Duration(seconds: 40));
+
+          expect(error, isA<PostHogFetchHttpError>());
+          expect(api.batchRequests, hasLength(1));
+          expect(getQueue(storage), isEmpty);
         });
       });
     }
@@ -210,16 +218,87 @@ void main() {
       });
     });
 
+    test('after a failed flush, later flushes send once and back off longer',
+        () {
+      final api = InProcessPostHogApi()
+        ..respond = (_) => const PostHogResponse(HttpStatus.notFound);
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client =
+            testClient(api, storage: storage, config: testConfig(flushAt: 1));
+
+        client.capture('first');
+        async.elapse(const Duration(seconds: 9));
+        expect(api.batchRequests, hasLength(4));
+        client.capture('second');
+
+        var now = const Duration(seconds: 9);
+        var requests = 4;
+        for (final next in [15, 27, 51, 81, 111]) {
+          async.elapse(Duration(seconds: next) - now - _ms);
+          expect(api.batchRequests, hasLength(requests));
+          async.elapse(_ms);
+          expect(api.batchRequests, hasLength(++requests));
+          now = Duration(seconds: next);
+        }
+        expect(getQueue(storage), hasLength(2));
+      });
+    });
+
+    test('a delivered batch restores the retries', () {
+      final api = InProcessPostHogApi();
+      var status = HttpStatus.notFound;
+      api.respond = (_) => PostHogResponse(status);
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client =
+            testClient(api, storage: storage, config: testConfig(flushAt: 1));
+
+        client.capture('first');
+        async.elapse(const Duration(seconds: 9));
+        status = HttpStatus.ok;
+        async.elapse(const Duration(seconds: 6));
+        expect(api.batchRequests, hasLength(5));
+        expect(getQueue(storage), isEmpty);
+
+        status = HttpStatus.serviceUnavailable;
+        client.capture('second');
+        async.elapse(const Duration(seconds: 9));
+        expect(api.batchRequests, hasLength(9));
+      });
+    });
+
+    test('warns once about a 404, also without debug', () {
+      final printed = <String?>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) => printed.add(message);
+      addTearDown(() => debugPrint = originalDebugPrint);
+      final api = InProcessPostHogApi()
+        ..respond = (_) => const PostHogResponse(HttpStatus.notFound);
+      fakeAsync((async) {
+        final client = testClient(api, config: testConfig(flushAt: 1));
+
+        client.capture('evt');
+        async.elapse(const Duration(seconds: 60));
+
+        expect(api.batchRequests.length, greaterThan(4));
+        expect(printed, [
+          '[PostHog] [WARN] /i/v1/analytics/events returned 404. '
+              'Events stay queued and are retried. If you use a reverse '
+              'proxy or self-host PostHog, make sure it serves '
+              '/i/v1/analytics/events.',
+        ]);
+      });
+    });
+
     test('the timer firing while a flush is in flight stays re-armable', () {
       final api = InProcessPostHogApi();
       final storage = tempStorage();
       fakeAsync((async) {
         final release = Completer<void>();
-        var online = false;
         api.respond = (_) async {
           await release.future;
-          return PostHogResponse(
-              online ? HttpStatus.ok : HttpStatus.serviceUnavailable);
+          return const PostHogResponse(HttpStatus.ok);
         };
         final client = testClient(api,
             config: testConfig(flushInterval: const Duration(milliseconds: 20)),
@@ -232,16 +311,14 @@ void main() {
         client.capture('second');
         async.elapse(const Duration(milliseconds: 60));
         release.complete();
-        // The flush and its retries fail.
-        async.elapse(const Duration(seconds: 9));
-        expect(api.batchRequests, hasLength(4));
+        async.elapse(Duration.zero);
+        expect(getQueue(storage), isEmpty);
 
-        online = true;
+        client.capture('third');
         async.elapse(const Duration(milliseconds: 20));
 
-        expect(api.batchRequests.last.eventNames, ['first', 'second'],
+        expect(api.batchRequests.last.eventNames, ['third'],
             reason: 'only a re-armed timer sends the queue again');
-        expect(getQueue(storage), isEmpty);
       });
     });
   });
@@ -270,7 +347,8 @@ void main() {
           client.capture('second');
           client.flush();
           client.flush();
-          async.elapse(const Duration(seconds: 119));
+          // Retry-After 120 is capped at 30 seconds.
+          async.elapse(const Duration(seconds: 29));
           expect(api.batchRequests, hasLength(1));
           expect(queuedEvents(storage), ['first', 'second']);
 
@@ -321,7 +399,7 @@ void main() {
         ..respond =
             (_) => PostHogResponse(HttpStatus.serviceUnavailable, headers: {
                   'retry-after': HttpDate.format(
-                      DateTime.now().toUtc().add(const Duration(seconds: 120)))
+                      DateTime.now().toUtc().add(const Duration(seconds: 20)))
                 });
       fakeAsync((async) {
         final client = testClient(api);
@@ -333,7 +411,7 @@ void main() {
         async.elapse(Duration.zero);
         expect(error, isA<PostHogFetchHttpError>());
         api.respond = (_) => const PostHogResponse(HttpStatus.ok);
-        async.elapse(const Duration(seconds: 118));
+        async.elapse(const Duration(seconds: 18));
         expect(api.batchRequests, hasLength(1));
         async.elapse(const Duration(seconds: 2));
         expect(api.batchRequests, hasLength(2));
@@ -361,8 +439,8 @@ void main() {
 
     test('keeps the pause when consent changes and identity resets', () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '120'});
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'});
       fakeAsync((async) {
         final client = testClient(api);
         final previousId = client.getDistinctId();
@@ -377,7 +455,7 @@ void main() {
         expect(nextId, isNot(previousId));
         client.capture('after');
         client.flush();
-        async.elapse(const Duration(seconds: 119));
+        async.elapse(const Duration(seconds: 19));
         expect(api.batchRequests, hasLength(1));
         async.elapse(const Duration(seconds: 1));
         final events = api.batchRequests.last.events;
@@ -389,7 +467,7 @@ void main() {
 
     test('does not send automatically when the interval is zero', () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
             headers: {'retry-after': '120'});
       fakeAsync((async) {
         final client = testClient(api,
@@ -425,7 +503,8 @@ void main() {
         expect(api.flagsRequests, hasLength(2));
         expect(api.batchRequests, hasLength(1));
         api.respond = (_) => const PostHogResponse(HttpStatus.ok);
-        async.elapse(const Duration(milliseconds: 119700));
+        // Retry-After 120 is capped at 30 seconds.
+        async.elapse(const Duration(milliseconds: 29700));
         expect(api.batchRequests, hasLength(2));
       });
     });
@@ -450,17 +529,18 @@ void main() {
 
     test('a new rate limit starts a new pause with the minimum delay', () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '60'});
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'});
       final storage = tempStorage();
       fakeAsync((async) {
         final client = testClient(api, storage: storage);
         client.capture('event');
         client.flush().catchError((Object _) {});
         async.elapse(Duration.zero);
-        api.respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
+        api.respond = (_) => const PostHogResponse(
+            HttpStatus.serviceUnavailable,
             headers: {'retry-after': '1'});
-        async.elapse(const Duration(seconds: 60));
+        async.elapse(const Duration(seconds: 20));
         expect(api.batchRequests, hasLength(2));
         api.respond = (_) => const PostHogResponse(HttpStatus.ok);
         client.flush();
@@ -475,8 +555,8 @@ void main() {
     test('close cancels the timer and preserves the queue for the next launch',
         () {
       final api = InProcessPostHogApi()
-        ..respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '120'});
+        ..respond = (_) => const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'});
       final dir = tempDirectory();
       fakeAsync((async) {
         final client = testClient(api, storage: FileStorage(dir.path));
@@ -505,8 +585,8 @@ void main() {
         client.flush().catchError((Object _) {});
         async.elapse(Duration.zero);
         client.close();
-        response.complete(const PostHogResponse(HttpStatus.tooManyRequests,
-            headers: {'retry-after': '120'}));
+        response.complete(const PostHogResponse(HttpStatus.serviceUnavailable,
+            headers: {'retry-after': '20'}));
         async.flushMicrotasks();
         expect(async.pendingTimers, isEmpty);
         expect(api.batchRequests, hasLength(1));
@@ -597,6 +677,29 @@ void main() {
           ['event_0', 'event_1'],
           ['event_2', 'event_3'],
           ['event_4'],
+        ]);
+        expect(getQueue(storage), isEmpty);
+      });
+    });
+
+    test('closes a batch at 5 MiB of serialized events', () {
+      final api = InProcessPostHogApi();
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+        final padding = 'x' * (2 * 1024 * 1024);
+
+        for (var i = 0; i < 3; i++) {
+          client.capture('event_$i', properties: {'padding': padding});
+        }
+        client.flush();
+        async.elapse(Duration.zero);
+
+        expect([
+          for (final request in api.batchRequests) request.eventNames
+        ], [
+          ['event_0', 'event_1'],
+          ['event_2'],
         ]);
         expect(getQueue(storage), isEmpty);
       });
@@ -802,3 +905,5 @@ void main() {
     });
   });
 }
+
+const _ms = Duration(milliseconds: 1);

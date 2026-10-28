@@ -24,7 +24,8 @@ class PostHogRequest {
     );
   }
 
-  /// The path of the endpoint, such as `/batch/` or `/flags/`.
+  /// The path of the endpoint, such as `/i/v1/analytics/events` or
+  /// `/flags/`.
   final String path;
 
   /// The headers, by lowercase name.
@@ -33,17 +34,18 @@ class PostHogRequest {
   /// The JSON body, decompressed and decoded.
   final Map<String, Object?> body;
 
-  bool get isBatch => path == '/batch/';
+  /// Whether this is a capture v1 request for analytics events.
+  bool get isBatch => path == '/i/v1/analytics/events';
 
   bool get isFlags => path == '/flags/';
 
-  /// The events of a `/batch/` request, oldest first.
+  /// The events of a capture request, oldest first.
   List<Map<String, Object?>> get events => [
         for (final event in body['batch']! as List)
           Map<String, Object?>.from(event as Map),
       ];
 
-  /// The names of the events of a `/batch/` request, oldest first.
+  /// The names of the events of a capture request, oldest first.
   List<Object?> get eventNames => [for (final event in events) event['event']];
 }
 
@@ -54,8 +56,22 @@ class PostHogResponse {
       : isDropped = false;
 
   /// A success with [json] as its body.
-  PostHogResponse.json(Object? json)
-      : this(HttpStatus.ok, body: jsonEncode(json));
+  PostHogResponse.json(Object? json, {Map<String, String> headers = const {}})
+      : this(HttpStatus.ok, body: jsonEncode(json), headers: headers);
+
+  /// A capture v1 success that answers each event of [request] with the
+  /// result [resultOf] gives its name, `ok` when it gives none.
+  factory PostHogResponse.results(
+    PostHogRequest request,
+    String? Function(Object? eventName) resultOf, {
+    Map<String, String> headers = const {},
+  }) =>
+      PostHogResponse.json({
+        'results': {
+          for (final event in request.events)
+            '${event['uuid']}': {'result': resultOf(event['event']) ?? 'ok'},
+        },
+      }, headers: headers);
 
   /// No answer: the connection is closed instead.
   const PostHogResponse.dropped()

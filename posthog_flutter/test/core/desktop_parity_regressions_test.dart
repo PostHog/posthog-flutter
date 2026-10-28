@@ -28,9 +28,9 @@ void main() {
       await client.reloadFeatureFlagsAsync();
       await client.flush();
 
-      final properties = server.events.single['properties']! as Map;
-      expect(properties['plan'], 'pro');
-      expect(properties[r'$process_person_profile'], isFalse);
+      final event = server.events.single;
+      expect((event['properties']! as Map)['plan'], 'pro');
+      expect(event['options'], {'process_person_profile': false});
       expect(server.flagsRequests.last.body['groups'], isEmpty);
 
       client.group('company', 'acme');

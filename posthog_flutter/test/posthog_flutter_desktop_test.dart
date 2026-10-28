@@ -599,8 +599,8 @@ void main() {
       expect(seenProperties, {'plan': 'pro'});
       // ...while the delivered event is still enriched after the hook ran.
       final properties = _propertiesOf(event);
-      expect(properties, containsPair(r'$lib', 'posthog-flutter'));
-      expect(properties.keys, contains(r'$session_id'));
+      expect(properties, containsPair(r'$device_type', 'Desktop'));
+      expect(event['session_id'], isA<String>());
     });
 
     test('SDK-internal events bypass the callbacks', () async {

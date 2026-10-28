@@ -28,7 +28,7 @@ void main() {
       expect(request.headers['content-type'], 'application/json');
       expect(request.headers['user-agent'],
           '$postHogFlutterSdkName/$postHogFlutterVersion');
-      expect(request.body['api_key'], 'k');
+      expect(request.headers['authorization'], 'Bearer k');
       expect(request.eventNames, ['desktop_event']);
     });
 
@@ -61,8 +61,9 @@ void main() {
 
     test('respects HTTP Retry-After without waiting inside flush', () async {
       final client = testClient(server);
-      server.respond = (_) => const PostHogResponse(HttpStatus.tooManyRequests,
-          headers: {'Retry-After': '120'});
+      server.respond = (_) => const PostHogResponse(
+          HttpStatus.serviceUnavailable,
+          headers: {'Retry-After': '20'});
       client.capture('event');
 
       await expectLater(client.flush().timeout(const Duration(seconds: 2)),
@@ -122,8 +123,11 @@ void main() {
             return bodyCancellationDone.future;
           },
         );
+        // A 2xx whose body fails counts as delivered, so the status here is
+        // one that is retried.
         final request = _ControlledRequest(
-          response: _ControlledResponse(body.stream),
+          response: _ControlledResponse(body.stream,
+              statusCode: HttpStatus.serviceUnavailable),
         );
         var openCalls = 0;
         final http = _ControlledHttpClient((_) async {
@@ -155,6 +159,36 @@ void main() {
         async.elapse(const Duration(seconds: 4));
         async.flushMicrotasks();
         expect(openCalls, 2);
+        client.close();
+      });
+    });
+
+    test('counts a 2xx whose body times out as delivered', () {
+      fakeAsync((async) {
+        // Cancelled in this zone: fake_async does not run the root zone's
+        // microtasks.
+        final body =
+            StreamController<List<int>>(onCancel: () => Future<void>.value());
+        var openCalls = 0;
+        final http = _ControlledHttpClient((_) async {
+          openCalls++;
+          return _ControlledRequest(response: _ControlledResponse(body.stream));
+        });
+        final storage = tempStorage();
+        late final client = HttpOverrides.runZoned(
+          () => testClient(server, storage: storage),
+          createHttpClient: (_) => http,
+        );
+        client.capture('evt');
+        var flushed = false;
+        client.flush().then((_) => flushed = true);
+        async.elapse(const Duration(seconds: 10));
+
+        expect(flushed, isTrue);
+        async.elapse(const Duration(seconds: 30));
+        expect(openCalls, 1,
+            reason: 'a resend would store the events a second time');
+        expect(getQueue(storage), isEmpty);
         client.close();
       });
     });
@@ -213,10 +247,10 @@ class _ControlledRequest implements HttpClientRequest {
 
 class _ControlledResponse extends StreamView<List<int>>
     implements HttpClientResponse {
-  _ControlledResponse(super.stream);
+  _ControlledResponse(super.stream, {this.statusCode = HttpStatus.ok});
 
   @override
-  int get statusCode => HttpStatus.ok;
+  final int statusCode;
 
   @override
   final headers = _ControlledHeaders();
