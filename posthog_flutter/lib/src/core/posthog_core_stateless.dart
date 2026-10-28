@@ -636,8 +636,10 @@ abstract class PostHogCoreStateless {
     try {
       while (!_closed) {
         // Peeked again after every request, so events queued in the meantime
-        // go out with the same flush.
-        final batch = takeCaptureV1Batch(queue.peek(lane.maxBatchSize));
+        // go out with the same flush. The queue sizes the batch before
+        // reading it, so events past the batch are not decoded.
+        final batch =
+            queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
         if (batch.isEmpty) {
           if (queue.length > 0) _scheduleFlush(lane);
           break;

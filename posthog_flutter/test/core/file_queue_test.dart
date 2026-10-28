@@ -70,6 +70,51 @@ void main() {
     expect(restored.byteCount, size(third));
   });
 
+  group('peek with maxBytes', () {
+    // Each event serializes to `{"p":"<padding>"}`, 18 bytes here.
+    FileEventQueue queueOf(List<String> paddings) {
+      final storage = FileStorage(dir.path);
+      addTearDown(storage.close);
+      final queue = storage.queue;
+      for (final padding in paddings) {
+        queue.add({'p': padding});
+      }
+      return queue;
+    }
+
+    List<Object?> paddingsOf(List<PostHogQueuedEvent> events) =>
+        [for (final queued in events) queued.event['p']];
+
+    test('stops before the event that would pass the limit', () {
+      final queue = queueOf(['a' * 10, 'b' * 10, 'c' * 10]);
+
+      expect(
+          paddingsOf(queue.peek(10, maxBytes: 18 * 2)), ['a' * 10, 'b' * 10]);
+    });
+
+    test('returns an event over the limit alone', () {
+      final queue = queueOf(['a' * 100, 'b']);
+
+      expect(paddingsOf(queue.peek(10, maxBytes: 50)), ['a' * 100]);
+    });
+
+    test('counts UTF-8 bytes, not characters', () {
+      // 18 characters but 28 bytes each.
+      final queue = queueOf(['é' * 10, 'è' * 10]);
+
+      expect(paddingsOf(queue.peek(10, maxBytes: 18 * 2)), ['é' * 10]);
+    });
+
+    test('does not read the events past the limit', () {
+      final queue = queueOf(['a' * 10, 'b' * 10]);
+      // Unreadable: a peek that read it would delete it.
+      final second = _queueFiles(dir).last..writeAsStringSync('not json');
+
+      expect(paddingsOf(queue.peek(10, maxBytes: 18)), ['a' * 10]);
+      expect(second.existsSync(), isTrue);
+    });
+  });
+
   test('keeps the queue order across a restart', () async {
     final before = client();
     for (var i = 0; i < 50; i++) {

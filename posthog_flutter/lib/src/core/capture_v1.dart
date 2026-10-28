@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'file_storage.dart';
 import 'logger.dart';
 
 /// The capture v1 endpoint for analytics events.
@@ -26,22 +25,6 @@ const captureAiMaxEventBytes = 8 * 1024 * 1024 + 64 * 1024;
 /// The most AI event bytes kept queued; the oldest events are dropped
 /// first.
 const captureAiMaxQueueBytes = 50 * 1024 * 1024;
-
-/// The oldest events of [events] whose serialized size stays within
-/// [maxBytes]. Each event is checked before it is added, so one that does
-/// not fit starts the next batch, and the first event always goes, alone
-/// when it is over the limit.
-List<PostHogQueuedEvent> takeCaptureV1Batch(
-  List<PostHogQueuedEvent> events, {
-  int maxBytes = captureV1MaxBatchBytes,
-}) {
-  var bytes = 0;
-  for (var i = 0; i < events.length; i++) {
-    bytes += utf8.encode(jsonEncode(events[i].event)).length;
-    if (i > 0 && bytes > maxBytes) return events.sublist(0, i);
-  }
-  return events;
-}
 
 /// Capture v1 statuses worth retrying. Everything else is terminal,
 /// including 3xx; 413 halves the batch instead.

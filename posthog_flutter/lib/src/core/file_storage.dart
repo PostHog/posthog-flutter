@@ -410,13 +410,25 @@ class FileEventQueue {
 
   /// Returns up to [count] events from the front of the queue, oldest
   /// first.
-  List<PostHogQueuedEvent> peek(int count) {
+  ///
+  /// With [maxBytes], the events also stay within that serialized size. Each
+  /// event is checked before it is read, so one that does not fit is left
+  /// for the next peek, and the first event always comes, alone when it is
+  /// over the limit.
+  List<PostHogQueuedEvent> peek(int count, {int? maxBytes}) {
     final events = <PostHogQueuedEvent>[];
     final gone = <String>{};
+    var bytes = 0;
     for (final id in _ids) {
       if (events.length >= count) break;
+      final size = _sizes[id] ?? 0;
+      if (maxBytes != null && events.isNotEmpty && bytes + size > maxBytes) {
+        break;
+      }
       final event = _unwritten[id] ?? _read(id, gone);
-      if (event != null) events.add((id: id, event: event));
+      if (event == null) continue;
+      events.add((id: id, event: event));
+      bytes += size;
     }
     if (gone.isNotEmpty) {
       _ids.removeWhere(gone.contains);
