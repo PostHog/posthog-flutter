@@ -151,12 +151,13 @@ class CaptureV1Identity {
 }
 
 /// The uuids among [uuids] that a capture v1 response [body] asks to
-/// retry, with how many of them it rejected (`drop` or `limited`), or null
+/// retry, with how many of them it rejected (`drop` or `limited`) and how
+/// many repeated copies of them it dropped (`duplicates_dropped`), or null
 /// when the body has no readable per-event results.
 ///
 /// `ok`, `warning`, `drop`, `limited` and any unknown result are final.
 /// An event missing from the results counts as delivered.
-({Set<String> retry, int rejected})? captureV1Results(
+({Set<String> retry, int rejected, int duplicates})? captureV1Results(
   String? body,
   Iterable<String> uuids,
 ) {
@@ -171,15 +172,21 @@ class CaptureV1Identity {
   if (results is! Map) return null;
   final retry = <String>{};
   var rejected = 0;
+  var duplicates = 0;
   for (final uuid in uuids) {
-    switch (results[uuid]) {
+    final result = results[uuid];
+    switch (result) {
       case {'result': 'retry'}:
         retry.add(uuid);
       case {'result': 'drop' || 'limited'}:
         rejected++;
     }
+    if (result case {'duplicates_dropped': final int dropped}
+        when dropped > 0) {
+      duplicates += dropped;
+    }
   }
-  return (retry: retry, rejected: rejected);
+  return (retry: retry, rejected: rejected, duplicates: duplicates);
 }
 
 /// Whether two `Set`s hold the same elements.

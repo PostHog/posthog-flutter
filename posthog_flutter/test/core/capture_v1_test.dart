@@ -359,6 +359,21 @@ void main() {
       });
     });
 
+    test('counts the duplicate copies capture dropped', () {
+      final body = jsonEncode({
+        'results': {
+          'a': {'result': 'ok', 'duplicates_dropped': 2},
+          'b': {'result': 'retry', 'duplicates_dropped': 1},
+          'c': {'result': 'ok'},
+        },
+      });
+
+      final results = captureV1Results(body, ['a', 'b', 'c'])!;
+
+      expect(results.duplicates, 3);
+      expect(results.retry, {'b'});
+    });
+
     test('counts a 2xx without readable results as delivered', () async {
       final server = await LocalPostHogServer.start();
       final storage = tempStorage();

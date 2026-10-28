@@ -46,7 +46,8 @@ void main() {
           client.flush(),
           throwsA(isA<PostHogFetchHttpError>()
               .having((e) => e.status, 'status', 400)
-              .having((e) => e.responseBody, 'responseBody', 'invalid batch')));
+              .having((e) => e.responseBody, 'responseBody', 'invalid batch')
+              .having((e) => '$e', 'toString', isNot(contains('invalid')))));
     });
 
     test('leave a redirect unfollowed', () async {

@@ -44,6 +44,22 @@ void main() {
       },
     );
 
+    for (final token in [' \n\t ', 'phx_personal_api_key']) {
+      test('setup is skipped for the project token "$token"', () async {
+        final lines = <String?>[];
+        final previous = debugPrint;
+        debugPrint = (message, {wrapWidth}) => lines.add(message);
+        try {
+          await Posthog().setup(PostHogConfig(token));
+        } finally {
+          debugPrint = previous;
+        }
+
+        expect(fakePlatformInterface.receivedConfig, isNull);
+        expect(lines, hasLength(1));
+      });
+    }
+
     test('Windows and Linux support is enabled by default', () {
       expect(PostHogConfig('test_project_token').enableWindowsAndLinux, isTrue);
     });

@@ -28,9 +28,11 @@ class PostHogFetchHttpError implements Exception {
   PostHogFetchHttpError(this.status, this.responseBody, this.reqByteLength,
       {this.retryAfter});
 
+  /// Leaves out [responseBody]: capture's error details can echo request
+  /// values.
   @override
   String toString() => 'PostHogFetchHttpError: status=$status, '
-      'reqByteLength=$reqByteLength, response=$responseBody';
+      'reqByteLength=$reqByteLength';
 }
 
 /// Network error during PostHog fetch.
@@ -615,7 +617,7 @@ abstract class PostHogCoreStateless {
 
   void _flushBackground(_CaptureLane lane) {
     _flushLane(lane).catchError((e) {
-      logger.error('Error while flushing PostHog', e);
+      logger.error('Error while flushing PostHog ${lane.path}', e);
     });
   }
 
@@ -795,9 +797,15 @@ abstract class PostHogCoreStateless {
     if (results == null) {
       logger.info('Capture returned ${response.status} without readable '
           'per-event results; ${uuids.length} events count as delivered.');
-    } else if (results.rejected > 0) {
-      logger.warn('Capture dropped ${results.rejected} of ${uuids.length} '
-          'events for good.');
+    } else {
+      if (results.rejected > 0) {
+        logger.warn('Capture dropped ${results.rejected} of ${uuids.length} '
+            'events for good.');
+      }
+      if (results.duplicates > 0) {
+        logger.warn('Capture dropped ${results.duplicates} copies of events '
+            'with a repeated uuid.');
+      }
     }
     final retryUuids = results?.retry ?? const <String>{};
     lane.pendingIdentity =
