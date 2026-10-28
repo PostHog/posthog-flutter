@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:meta/meta.dart';
@@ -53,6 +54,34 @@ bool _isRetryableFlagsError(Object err) =>
     err is PostHogFetchNetworkError ||
     (err is PostHogFetchHttpError && (err.status == 502 || err.status == 504));
 
+/// The largest fraction a capture retry wait moves either way, so clients
+/// refused together don't all come back at the same moment.
+const _retryJitter = 0.25;
+
+/// The wait before capture is sent again after the [attempt]-th failure in a
+/// row: 1 second doubling up to 30 seconds, scaled by a jitter factor in
+/// `[1 - _retryJitter, 1 + _retryJitter)` drawn from [jitterUnit] and capped
+/// again. A server [retryAfter], capped at 30 seconds, is a floor applied
+/// after the jitter, so a retry never comes earlier than the server asked.
+/// A [jitterUnit] outside `[0, 1)` leaves the delay unjittered.
+@visibleForTesting
+Duration captureRetryDelay({
+  required int attempt,
+  required double jitterUnit,
+  Duration? retryAfter,
+}) {
+  const initialMs = 1000.0;
+  const maxMs = 30000.0;
+  final computed =
+      min(initialMs * pow(2, (attempt < 1 ? 1 : attempt) - 1), maxMs);
+  final factor = jitterUnit >= 0 && jitterUnit < 1
+      ? 1 - _retryJitter + 2 * _retryJitter * jitterUnit
+      : 1.0;
+  final jittered = min(computed * factor, maxMs).round();
+  final floor = min(retryAfter?.inMilliseconds ?? 0, maxMs.toInt());
+  return Duration(milliseconds: jittered > floor ? jittered : floor);
+}
+
 /// Base stateless PostHog client: the queue of events, consent, super
 /// properties and the requests to PostHog.
 abstract class PostHogCoreStateless {
@@ -68,15 +97,13 @@ abstract class PostHogCoreStateless {
 
   static const _requestTimeout = Duration(seconds: 10);
 
-  // A batch is retried after a transient failure; a flags request only after
-  // a network error or a gateway timeout.
-  static const _fetchRetryCount = 3;
-  static const _fetchRetryDelay = Duration(seconds: 3);
+  // A flags request is retried only after a network error or a gateway
+  // timeout. A batch is not retried within a flush: the queue backs off.
   static const _flagsRetryCount = 1;
   static const _flagsRetryDelay = Duration(milliseconds: 300);
 
-  /// The longest `Retry-After` pause honored for events.
-  static const _maxRetryAfter = Duration(seconds: 30);
+  /// The [_failedFlushes] at which the backoff reaches its 30 second cap.
+  static const _maxBackoffStep = 6;
 
   /// How many same-origin 307/308 redirects a capture request follows.
   static const _maxCaptureRedirects = 5;
@@ -85,11 +112,16 @@ abstract class PostHogCoreStateless {
   /// retried. Kept in memory: after a restart the retry is a new request.
   CaptureV1Identity? _pendingCaptureIdentity;
 
-  /// Flushes in a row whose batch failed with a transient error. Once one
-  /// has failed, later flushes send once and wait longer, so a failure that
-  /// lasts, like a missing capture route, doesn't resend the batch with
-  /// every capture. A delivered batch resets it.
+  /// Flushes in a row whose batch failed with a transient error or had
+  /// events the server asked to retry. Each one pauses the queue for longer,
+  /// see [captureRetryDelay], so a failure that lasts, like a missing
+  /// capture route, doesn't resend the batch with every capture. A delivered
+  /// or dropped batch resets it.
   int _failedFlushes = 0;
+
+  /// The source of the backoff jitter: a uniform value in `[0, 1)`.
+  @visibleForTesting
+  double Function() jitterUnit = Random().nextDouble;
 
   /// Whether this client already warned that capture returned a 404.
   bool _warnedCaptureNotFound = false;
@@ -486,16 +518,22 @@ abstract class PostHogCoreStateless {
     _flushTimer = null;
   }
 
-  /// Stops sending events for [delay], the server's `Retry-After` or the
-  /// backoff after failed flushes, kept between the retry delay and
-  /// [_maxRetryAfter].
+  /// Counts one more failed flush and stops sending events for the backoff
+  /// it calls for, at least the server's [retryAfter].
+  void _backOff(Duration? retryAfter) {
+    if (_failedFlushes < _maxBackoffStep) _failedFlushes++;
+    _pauseFlush(captureRetryDelay(
+      attempt: _failedFlushes,
+      jitterUnit: jitterUnit(),
+      retryAfter: retryAfter,
+    ));
+  }
+
+  /// Stops sending events for [delay].
   void _pauseFlush(Duration delay) {
     _clearFlushTimer();
     _retryAfterTimer?.cancel();
-    final pause = delay < _fetchRetryDelay
-        ? _fetchRetryDelay
-        : (delay > _maxRetryAfter ? _maxRetryAfter : delay);
-    _retryAfterTimer = Timer(pause, () {
+    _retryAfterTimer = Timer(delay, () {
       _retryAfterTimer = null;
       if (!_closed &&
           _flushInterval > Duration.zero &&
@@ -545,103 +583,74 @@ abstract class PostHogCoreStateless {
     }
   }
 
-  /// Sends [batch] to capture v1, retrying what is worth it, and removes
-  /// from the queue the events that are done: delivered, or dropped for
-  /// good. Adds the delivered ones to [sent].
+  /// Sends [batch] to capture v1 and removes from the queue the events that
+  /// are done: delivered, or dropped for good. Adds the delivered ones to
+  /// [sent].
   ///
   /// Returns whether the flush goes on with the rest of the queue. It stops
-  /// while events of [batch] wait for a later retry; the periodic flush or
-  /// the server's `Retry-After` sends them again.
+  /// while events of [batch] wait for a later retry: the queue backs off,
+  /// and sends them again once the pause is over.
   Future<bool> _sendBatch(
     List<PostHogQueuedEvent> batch,
     List<Map<String, Object?>> sent,
   ) async {
     final queue = storage.queue;
-    var pending = batch;
-    for (var attempt = 0;; attempt++) {
-      if (attempt > 0) {
-        await Future<void>.delayed(_fetchRetryDelay);
-        // A client closed meanwhile leaves the queue to the next one.
-        if (_closed) return false;
+    final Set<String> retryUuids;
+    final Duration? retryAfter;
+    try {
+      (:retryUuids, :retryAfter) = await _postCaptureV1(batch);
+    } catch (e) {
+      if (_closed) rethrow;
+      if (e is PostHogFetchHttpError &&
+          e.status == HttpStatus.requestEntityTooLarge &&
+          batch.length > 1) {
+        _maxBatchSize = (batch.length ~/ 2).clamp(1, _maxBatchSize);
+        logger.warn('Received 413, reducing batch size to $_maxBatchSize');
+        return true;
       }
-
-      final Set<String> retryUuids;
-      final Duration? retryAfter;
-      try {
-        (:retryUuids, :retryAfter) = await _postCaptureV1(pending);
+      if (e is PostHogFetchHttpError &&
+          e.status == HttpStatus.notFound &&
+          !_warnedCaptureNotFound) {
+        _warnedCaptureNotFound = true;
+        // Printed even without debug: the events stay queued, and nothing
+        // else tells the app that the route is missing.
+        debugPrint('[PostHog] [WARN] $captureV1Path returned 404. '
+            'Events stay queued and are retried. If you use a reverse '
+            'proxy or self-host PostHog, make sure it serves '
+            '$captureV1Path.');
+      }
+      // The pause re-arms the periodic flush: otherwise queued events sit
+      // until the next capture (forever in an idle app after an offline
+      // failure).
+      if (_isTransientCaptureError(e)) {
+        _backOff(e is PostHogFetchHttpError ? e.retryAfter : null);
+      } else {
+        queue.remove([for (final queued in batch) queued.id]);
         _failedFlushes = 0;
-      } catch (e) {
-        if (_closed) rethrow;
-        if (e is PostHogFetchHttpError &&
-            e.status == HttpStatus.requestEntityTooLarge &&
-            pending.length > 1) {
-          _maxBatchSize = (pending.length ~/ 2).clamp(1, _maxBatchSize);
-          logger.warn('Received 413, reducing batch size to $_maxBatchSize');
-          return true;
-        }
-        if (e is PostHogFetchHttpError &&
-            e.status == HttpStatus.notFound &&
-            !_warnedCaptureNotFound) {
-          _warnedCaptureNotFound = true;
-          // Printed even without debug: the events stay queued, and nothing
-          // else tells the app that the route is missing.
-          debugPrint('[PostHog] [WARN] $captureV1Path returned 404. '
-              'Events stay queued and are retried. If you use a reverse '
-              'proxy or self-host PostHog, make sure it serves '
-              '$captureV1Path.');
-        }
-        final transient = _isTransientCaptureError(e);
-        final retryAfter = e is PostHogFetchHttpError ? e.retryAfter : null;
-        if (transient &&
-            retryAfter == null &&
-            _failedFlushes == 0 &&
-            attempt < _fetchRetryCount) {
-          continue;
-        }
-        if (!transient) {
-          queue.remove([for (final queued in pending) queued.id]);
-        }
-        // Re-arm the periodic flush: otherwise queued events sit until the
-        // next capture (forever in an idle app after an offline failure).
-        if (transient && retryAfter != null) {
-          _pauseFlush(retryAfter);
-        } else if (transient) {
-          _failedFlushes++;
-          _pauseFlush(_fetchRetryDelay * (1 << _failedFlushes.clamp(1, 4)));
-        } else {
-          _scheduleFlush();
-        }
-        events.emit('error', e);
-        rethrow;
-      }
-
-      final retained = [
-        for (final queued in pending)
-          if (retryUuids.contains(queued.event['uuid'])) queued,
-      ];
-      final delivered = [
-        for (final queued in pending)
-          if (!retryUuids.contains(queued.event['uuid'])) queued,
-      ];
-      // Removed by id: the queue may have changed while the batch was in
-      // flight, e.g. its oldest events dropped to make room.
-      queue.remove([for (final queued in delivered) queued.id]);
-      sent.addAll([for (final queued in delivered) queued.event]);
-      if (retained.isEmpty) return true;
-
-      // Counts only: uuids and server details can identify users.
-      logger.info('Capture asked to retry ${retained.length} of '
-          '${pending.length} events.');
-      pending = retained;
-      if (retryAfter != null) {
-        _pauseFlush(retryAfter);
-        return false;
-      }
-      if (attempt >= _fetchRetryCount) {
         _scheduleFlush();
-        return false;
       }
+      events.emit('error', e);
+      rethrow;
     }
+
+    final delivered = [
+      for (final queued in batch)
+        if (!retryUuids.contains(queued.event['uuid'])) queued,
+    ];
+    // Removed by id: the queue may have changed while the batch was in
+    // flight, e.g. its oldest events dropped to make room.
+    queue.remove([for (final queued in delivered) queued.id]);
+    sent.addAll([for (final queued in delivered) queued.event]);
+    if (delivered.length == batch.length) {
+      _failedFlushes = 0;
+      return true;
+    }
+
+    // Counts only: uuids and server details can identify users.
+    logger.info('Capture asked to retry ${batch.length - delivered.length} '
+        'of ${batch.length} events.');
+    _backOff(retryAfter);
+    return false;
   }
 
   /// Posts [batch] to capture v1 and returns the uuids of the events the
