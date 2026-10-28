@@ -175,6 +175,48 @@ void main() {
 
       expect(sentAs, List.filled(3, r'$posthog_cookieless'));
     });
+
+    test('does not pin the old user when reset() rejects consent', () async {
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      var rejected = false;
+      // opt_out_capturing_by_default: reset() clears consent, so posthog-js
+      // only swaps in the sentinel when it builds the event.
+      fake.setProperty(
+          'reset'.toJS,
+          (() {
+            distinctId = 'reset-anonymous';
+            rejected = true;
+          }).toJS);
+      fake.setProperty(
+          'has_opted_out_capturing'.toJS, (() => rejected.toJS).toJS);
+      for (final method in ['capture', 'captureException']) {
+        fake.setProperty(
+          method.toJS,
+          ((JSAny? a, JSAny? b, [JSAny? c]) {
+            if (rejected) distinctId = r'$posthog_cookieless';
+            final props = b.dartify() as Map?;
+            sentAs.add(props?['distinct_id'] as String? ?? distinctId);
+          }).toJS,
+        );
+      }
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) async {
+          await Future<void>.delayed(Duration.zero);
+          return event;
+        },
+      ]));
+
+      final sent = [
+        web.capture(eventName: 'checkout'),
+        web.screen(screenName: 'Cart'),
+        web.captureException(error: StateError('boom')),
+      ];
+      await web.reset();
+      await Future.wait(sent);
+
+      expect(sentAs, List.filled(3, r'$posthog_cookieless'));
+    });
   });
 
   test('beforeSend null drops capture on web', () async {

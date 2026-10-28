@@ -66,13 +66,16 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     // change of user. Opting in or out of cookieless mode is not one either:
     // pinning the sentinel after an opt-in would send it unhashed as a shared
     // distinct_id, and pinning the old user after an opt-out would tie a
-    // cookieless event to them.
+    // cookieless event to them. A reset() can also fall back to rejected
+    // default consent before the id becomes the sentinel, so ask posthog-js
+    // whether this event will go out cookieless.
     final currentId = _distinctId();
     if (processed != null &&
         distinctId != null &&
         distinctId != _cookielessSentinel &&
         currentId != _cookielessSentinel &&
-        currentId != distinctId) {
+        currentId != distinctId &&
+        !_hasOptedOut()) {
       processed.properties = {
         'distinct_id': distinctId,
         ...?processed.properties,
@@ -89,6 +92,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       return posthog?.get_distinct_id()?.dartify() as String?;
     } catch (_) {
       return null;
+    }
+  }
+
+  static bool _hasOptedOut() {
+    try {
+      return posthog?.has_opted_out_capturing() ?? false;
+    } catch (_) {
+      return false;
     }
   }
 
