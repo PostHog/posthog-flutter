@@ -100,6 +100,10 @@ abstract class PostHogCoreStateless {
   /// response body. A slow but moving upload never times out.
   static const _requestTimeout = Duration(seconds: 10);
 
+  /// How long the response body may take in total, so a body that trickles
+  /// in without end can't hold the flush.
+  static const _responseBodyTimeout = Duration(seconds: 30);
+
   /// The size of the body chunks handed to the socket, each one progress.
   static const _bodyChunkSize = 64 * 1024;
 
@@ -812,7 +816,7 @@ abstract class PostHogCoreStateless {
     Map<String, String> headers = const {},
     bool deliveredOnBodyFailure = false,
   }) async {
-    final attempt = _FetchAttempt(_requestTimeout);
+    final attempt = _FetchAttempt(_requestTimeout, _responseBodyTimeout);
     try {
       return await attempt.guard(_fetch(url, body, attempt, headers));
     } catch (e) {
@@ -923,11 +927,13 @@ abstract class PostHogCoreStateless {
 }
 
 class _FetchAttempt {
-  _FetchAttempt(this._idleTimeout);
+  _FetchAttempt(this._idleTimeout, this._bodyTimeout);
 
   final Duration _idleTimeout;
+  final Duration _bodyTimeout;
   final timeout = TimeoutException('PostHog request timed out');
   Timer? _idleTimer;
+  Timer? _bodyTimer;
   void Function()? _onIdle;
 
   HttpClientRequest? _request;
@@ -940,7 +946,8 @@ class _FetchAttempt {
   bool _cancelled = false;
 
   /// Completes with [work], or fails with [timeout] once the request has
-  /// made no [progress] for the idle timeout. The request is cancelled
+  /// made no [progress] for the idle timeout or its response body has taken
+  /// longer than the body timeout. The request is cancelled
   /// before that failure is reported, so a retry never overlaps it.
   Future<T> guard<T>(Future<T> work) {
     final result = Completer<T>();
@@ -958,7 +965,10 @@ class _FetchAttempt {
         result.completeError(error, stackTrace);
       }
     });
-    return result.future.whenComplete(() => _idleTimer?.cancel());
+    return result.future.whenComplete(() {
+      _idleTimer?.cancel();
+      _bodyTimer?.cancel();
+    });
   }
 
   /// Restarts the idle timeout.
@@ -979,6 +989,8 @@ class _FetchAttempt {
   }
 
   Future<String> readBody(HttpClientResponse response) {
+    final onIdle = _onIdle;
+    if (onIdle != null) _bodyTimer = Timer(_bodyTimeout, onIdle);
     final contents = StringBuffer();
     final body = Completer<String>();
     late final StreamSubscription<String> subscription;
