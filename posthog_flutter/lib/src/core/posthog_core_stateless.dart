@@ -175,6 +175,10 @@ abstract class PostHogCoreStateless {
     final aiMaxQueueSize = config.captureAiMaxQueueSize ?? 0;
     final aiTimeout = config.captureAiTimeout ?? Duration.zero;
     final aiMaxEventBytes = config.captureAiMaxEventBytes ?? 0;
+    if (aiMaxEventBytes > captureAiMaxEventBytes) {
+      logger.warn('captureAiMaxEventBytes $aiMaxEventBytes is over the '
+          '$captureAiMaxEventBytes byte ceiling, using the ceiling.');
+    }
     _ai = _CaptureLane(
       path: captureV1AiPath,
       queue: storage.aiQueue,

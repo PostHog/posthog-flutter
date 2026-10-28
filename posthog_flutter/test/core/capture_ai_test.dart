@@ -120,11 +120,19 @@ void main() {
       expect(dropLines.join(), isNot(contains('secret')));
     });
 
-    test('caps captureAiMaxEventBytes at 8 MiB plus 64 KiB', () {
+    test('caps captureAiMaxEventBytes at 8 MiB plus 64 KiB, with a warning',
+        () {
       final storage = tempStorage();
-      final client = testClient(server,
-          config: testConfig()..captureAiMaxEventBytes = 100 * 1024 * 1024,
-          storage: storage);
+      late DesktopPostHog client;
+      final lines = printedLines(() {
+        client = testClient(server,
+            config: testConfig(debug: true)
+              ..captureAiMaxEventBytes = 100 * 1024 * 1024,
+            storage: storage);
+      });
+
+      expect(
+          lines.where((line) => line.contains('byte ceiling')), hasLength(1));
 
       expect(
         captureAi(client, r'$ai_generation',
