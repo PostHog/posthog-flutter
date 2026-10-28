@@ -87,8 +87,8 @@ class DartExceptionProcessor {
             removeTopPostHogFrames: isGeneratedStackTrace,
           )
         : null;
-    final frames = parsedTrace?.frames ?? <Map<String, dynamic>>[];
-    final debugImages = <Map<String, dynamic>>[];
+    final frames = parsedTrace?.frames ?? <Map<String, Object?>>[];
+    final debugImages = <Map<String, Object?>>[];
     if (parsedTrace?.debugImage case final image?) {
       debugImages.add(image);
     }
@@ -102,7 +102,7 @@ class DartExceptionProcessor {
     final isSynthetic =
         errorType == null || isGeneratedStackTrace || !hasValidStackTrace;
 
-    final exceptionData = <String, dynamic>{
+    final exceptionData = <String, Object?>{
       'type': errorType ?? 'Error',
       'mechanism': {
         'handled': handled,
@@ -130,7 +130,7 @@ class DartExceptionProcessor {
 
     // Walk the error's cause chain into additional exception items,
     // outermost-first (wrapper first, root cause last)
-    final exceptionList = <Map<String, dynamic>>[exceptionData];
+    final exceptionList = <Map<String, Object?>>[exceptionData];
     _appendCauses(
       exceptionList,
       currentError,
@@ -161,7 +161,7 @@ class DartExceptionProcessor {
   /// outermost-first, guarding against cycles and capping the chain at
   /// [maxExceptionChainLength] items.
   static void _appendCauses(
-    List<Map<String, dynamic>> exceptionList,
+    List<Map<String, Object?>> exceptionList,
     Object error, {
     required bool handled,
     required String mechanismType,
@@ -169,7 +169,7 @@ class DartExceptionProcessor {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
-    required List<Map<String, dynamic>> debugImages,
+    required List<Map<String, Object?>> debugImages,
   }) {
     final seen = Set<Object>.identity()..add(error);
     _appendCauseItems(
@@ -187,7 +187,7 @@ class DartExceptionProcessor {
   }
 
   static void _appendCauseItems(
-    List<Map<String, dynamic>> exceptionList,
+    List<Map<String, Object?>> exceptionList,
     Iterable<Object> causes,
     Set<Object> seen, {
     required bool handled,
@@ -196,7 +196,7 @@ class DartExceptionProcessor {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
-    required List<Map<String, dynamic>> debugImages,
+    required List<Map<String, Object?>> debugImages,
   }) {
     for (final cause in causes) {
       if (exceptionList.length >= maxExceptionChainLength || !seen.add(cause)) {
@@ -204,7 +204,7 @@ class DartExceptionProcessor {
       }
 
       final causeType = _getExceptionType(cause);
-      final causeData = <String, dynamic>{
+      final causeData = <String, Object?>{
         'type': causeType ?? 'Error',
         'mechanism': {
           'handled': handled,
@@ -325,7 +325,7 @@ class DartExceptionProcessor {
   }
 
   /// Asynchronous gap frame for separating async traces
-  static const _asynchronousGapFrame = <String, dynamic>{
+  static const _asynchronousGapFrame = <String, Object?>{
     'platform': 'dart',
     'abs_path': '<asynchronous suspension>',
     'in_app': false,
@@ -336,7 +336,7 @@ class DartExceptionProcessor {
   ///
   /// Approach inspired by Sentry's stack trace factory implementation:
   /// https://github.com/getsentry/sentry-dart/blob/a69a51fd1695dd93024be80a50ad05dd990b2b82/packages/dart/lib/src/sentry_stack_trace_factory.dart#L29-L53
-  static ({List<Map<String, dynamic>> frames, Map<String, dynamic>? debugImage})
+  static ({List<Map<String, Object?>> frames, Map<String, Object?>? debugImage})
       _parseStackTrace(
     StackTrace stackTrace, {
     List<String>? inAppIncludes,
@@ -351,7 +351,7 @@ class DartExceptionProcessor {
     final chain = firstFrame == null
         ? Chain.forTrace(stackTrace)
         : Chain.parse(traceText.substring(firstFrame.start));
-    final frames = <Map<String, dynamic>>[];
+    final frames = <Map<String, Object?>>[];
     final chunkIdMap = getPosthogChunkIds() ?? {};
     var hasNativeFrame = false;
 
@@ -379,7 +379,7 @@ class DartExceptionProcessor {
         final imageBase = aotImage == null
             ? null
             : int.parse(aotImage.imageAddr.substring(2), radix: 16);
-        final Map<String, dynamic>? processedFrame;
+        final Map<String, Object?>? processedFrame;
         if (instructionAddress != null &&
             imageBase != null &&
             instructionAddress >= imageBase) {
@@ -419,7 +419,7 @@ class DartExceptionProcessor {
     return (
       frames: frames.reversed.toList(),
       debugImage: hasNativeFrame
-          ? <String, dynamic>{
+          ? <String, Object?>{
               'debug_id': aotImage!.debugId,
               'image_addr': aotImage.imageAddr,
               'type': aotImage.imageType,
@@ -476,7 +476,7 @@ class DartExceptionProcessor {
   }
 
   /// Converts a Frame from stack_trace package to PostHog format
-  static Map<String, dynamic>? _convertFrameToPostHog(
+  static Map<String, Object?>? _convertFrameToPostHog(
     Frame frame,
     Map<String, String> chunkIdMap, {
     List<String>? inAppIncludes,
@@ -484,7 +484,7 @@ class DartExceptionProcessor {
     bool inAppByDefault = true,
   }) {
     final absPath = '$eventOrigin${_extractAbsolutePath(frame)}';
-    final frameData = <String, dynamic>{
+    final frameData = <String, Object?>{
       'platform': kIsWeb ? 'web:javascript' : 'dart',
       'abs_path': absPath,
       'in_app': _isInAppFrame(
