@@ -579,6 +579,25 @@ void main() {
       expect(personProperties, isNot(contains('dropped')));
     });
 
+    test('a dropped person update does not turn on person processing',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event.event == 'dropped' ? null : event,
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'dropped',
+        userProperties: {'email': 'user@example.com'},
+      );
+      await platform.capture(eventName: 'after drop');
+
+      final event = await server.waitForEvent('after drop');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+    });
+
     test('a throwing callback drops the event and stops the chain', () async {
       final server = await LocalPostHogServer.start();
       final callOrder = <String>[];

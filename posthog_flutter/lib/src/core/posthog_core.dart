@@ -182,14 +182,16 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   /// The [options] of an event with [properties], with
-  /// `process_person_profile: false` added when person processing is off
-  /// and neither an option nor a `$process_person_profile` property says
-  /// otherwise.
+  /// `process_person_profile: false` added when person processing is off,
+  /// the event is not [requested] to update the person, and neither an
+  /// option nor a `$process_person_profile` property says otherwise.
   Map<String, Object?>? _personProcessingOptions(
     Map<String, Object?>? options,
-    Map<String, Object?> properties,
-  ) {
-    if (_hasPersonProcessing() ||
+    Map<String, Object?> properties, {
+    required bool requested,
+  }) {
+    if (requested ||
+        _hasPersonProcessing() ||
         properties[r'$process_person_profile'] != null ||
         options?['process_person_profile'] != null) {
       return options;
@@ -465,14 +467,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }) {
     if (_ignoredWhileOptedOut('posthog.capture')) return null;
 
-    final userProperties = properties?[r'$set'];
-    final userPropertiesSetOnce = properties?[r'$set_once'];
-    if (_personProfiles != PostHogPersonProfiles.never &&
-        (_isNonEmptyMap(userProperties) ||
-            _isNonEmptyMap(userPropertiesSetOnce))) {
-      _enablePersonProcessing();
-    }
-
     final allProperties = _enrichProperties(properties);
     // Once an event is person-processed, all later ones are too. A value
     // passed for this event alone doesn't count.
@@ -481,7 +475,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
     }
     return (
       properties: allProperties,
-      options: _personProcessingOptions(options, allProperties),
+      options: _personProcessingOptions(
+        options,
+        allProperties,
+        requested: _requestsPersonProcessing(properties),
+      ),
       timestamp: currentISOTime(),
     );
   }
@@ -493,7 +491,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }) {
     final (:properties, :options, :timestamp) = prepared;
     // Taken from the event as queued, after the beforeSend callbacks, so a
-    // value they removed or an event they dropped never reaches /flags.
+    // value they removed or an event they dropped neither reaches /flags
+    // nor turns on person processing for later events.
+    if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
     _setPersonPropertiesForFlagsIfNeeded(
       _asPropertyMap(properties[r'$set']),
       _asPropertyMap(properties[r'$set_once']),
@@ -1059,6 +1059,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
           entry.key as String: entry.value as String,
     };
   }
+
+  bool _requestsPersonProcessing(Map<String, Object?>? properties) =>
+      _personProfiles != PostHogPersonProfiles.never &&
+      (_isNonEmptyMap(properties?[r'$set']) ||
+          _isNonEmptyMap(properties?[r'$set_once']));
 
   bool _hasPersonProcessing() {
     if (_personProfiles == PostHogPersonProfiles.always) return true;
