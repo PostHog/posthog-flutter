@@ -319,8 +319,9 @@ class FileEventQueue {
   /// this client.
   final Map<String, Map<String, Object?>> _unwritten = {};
 
-  /// The serialized size of the events whose size is known so far.
+  /// The serialized size of each queued event, by id, and their total.
   final Map<String, int> _sizes = {};
+  int _byteCount = 0;
 
   List<String> get _ids => _loadedIds ??= _load();
 
@@ -331,7 +332,8 @@ class FileEventQueue {
     try {
       return [
         for (final entity in Directory(_directory).listSync())
-          if (entity is File && entity.path.endsWith(_extension)) _idOf(entity),
+          if (entity is File && entity.path.endsWith(_extension))
+            _track(_idOf(entity), _lengthOf(entity)),
       ]..sort();
     } on PathNotFoundException {
       return [];
@@ -344,6 +346,22 @@ class FileEventQueue {
     }
   }
 
+  static int _lengthOf(File file) {
+    try {
+      return file.lengthSync();
+    } on FileSystemException {
+      return 0;
+    }
+  }
+
+  String _track(String id, int size) {
+    _sizes[id] = size;
+    _byteCount += size;
+    return id;
+  }
+
+  void _untrack(String id) => _byteCount -= _sizes.remove(id) ?? 0;
+
   static String _idOf(File file) {
     final name = file.uri.pathSegments.last;
     return name.substring(0, name.length - _extension.length);
@@ -352,24 +370,10 @@ class FileEventQueue {
   /// The number of queued events.
   int get length => _ids.length;
 
-  /// The serialized size of the queued events, in bytes. The size of an
-  /// event found on disk is read once, from its file.
-  int get bytes {
-    var total = 0;
-    for (final id in _ids) {
-      total += _sizes[id] ??= _sizeOf(id);
-    }
-    return total;
-  }
-
-  int _sizeOf(String id) {
-    final unwritten = _unwritten[id];
-    if (unwritten != null) return utf8.encode(jsonEncode(unwritten)).length;
-    try {
-      return File(_pathOf(id)).lengthSync();
-    } on FileSystemException {
-      return 0;
-    }
+  /// The serialized size of the queued events, in bytes.
+  int get byteCount {
+    _ids; // Loads the queue, and the sizes, on first use.
+    return _byteCount;
   }
 
   /// Adds [event] at the end of the queue. [json] is the event already
@@ -379,14 +383,22 @@ class FileEventQueue {
     // on top of being added.
     final ids = _ids;
     final id = generateUuidV7();
-    ids.add(id);
-    if (bytes != null) _sizes[id] = bytes;
+    var encoded = json;
+    if (encoded == null) {
+      try {
+        encoded = jsonEncode(event);
+      } catch (_) {
+        // Reported below when it is written.
+      }
+    }
+    ids.add(_track(
+        id, bytes ?? (encoded == null ? 0 : utf8.encode(encoded).length)));
     if (_directory.isEmpty) {
       _unwritten[id] = event;
       return;
     }
     try {
-      _writeAtomically(File(_pathOf(id)), json ?? jsonEncode(event));
+      _writeAtomically(File(_pathOf(id)), encoded ?? jsonEncode(event));
     } catch (e) {
       _unwritten[id] = event;
       _logger()?.warn(
@@ -408,7 +420,7 @@ class FileEventQueue {
     }
     if (gone.isNotEmpty) {
       _ids.removeWhere(gone.contains);
-      gone.forEach(_sizes.remove);
+      gone.forEach(_untrack);
     }
     return events;
   }
@@ -452,7 +464,7 @@ class FileEventQueue {
   /// Removes the oldest events until the queue holds at most [maxBytes],
   /// always keeping the newest event. Returns how many were removed.
   int removeOldestOver(int maxBytes) {
-    var total = bytes;
+    var total = byteCount;
     var count = 0;
     while (total > maxBytes && count < _ids.length - 1) {
       total -= _sizes[_ids[count]] ?? 0;
@@ -463,7 +475,7 @@ class FileEventQueue {
   }
 
   void _forget(String id) {
-    _sizes.remove(id);
+    _untrack(id);
     if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
       _delete(File(_pathOf(id)));
     }

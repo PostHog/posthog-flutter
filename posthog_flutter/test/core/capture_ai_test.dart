@@ -179,7 +179,7 @@ void main() {
         5,
         6
       ]);
-      expect(storage.aiQueue.bytes, lessThanOrEqualTo(50 * 1024 * 1024));
+      expect(storage.aiQueue.byteCount, lessThanOrEqualTo(50 * 1024 * 1024));
     });
 
     test('flushes once 5 MiB of AI events are queued, below flushAt', () async {
@@ -266,6 +266,42 @@ void main() {
             {for (final r in api.aiRequests) r.headers['posthog-request-id']},
             hasLength(1));
         expect(api.batchRequests.single.headers['posthog-attempt'], '1');
+      });
+    });
+
+    test('the AI and analytics endpoints back off independently', () {
+      var batchStatus = HttpStatus.serviceUnavailable;
+      final api = InProcessPostHogApi()
+        ..respond = (request) => PostHogResponse(
+            request.isAi ? HttpStatus.serviceUnavailable : batchStatus);
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+
+        // AI fails at 0, 1 and 3 s: its next retry is 4 s later, at 7 s.
+        captureAi(client, r'$ai_generation');
+        client.flush().catchError((Object _) {});
+        async.elapse(const Duration(milliseconds: 3500));
+        expect(api.aiRequests, hasLength(3));
+
+        // Analytics starts its own backoff at 1 s, not at AI's 8 s.
+        client.capture('event');
+        client.flush().catchError((Object _) {});
+        async.flushMicrotasks();
+        expect(api.batchRequests, hasLength(1));
+        batchStatus = HttpStatus.ok;
+        async.elapse(const Duration(milliseconds: 900));
+        expect(api.batchRequests, hasLength(1));
+        async.elapse(const Duration(milliseconds: 200));
+        expect(api.batchRequests, hasLength(2));
+        expect(storage.queue.length, 0);
+
+        // The delivered analytics batch leaves AI's backoff where it was.
+        async.elapse(const Duration(milliseconds: 2300)); // 6.9 s
+        expect(api.aiRequests, hasLength(3));
+        async.elapse(const Duration(milliseconds: 200)); // 7.1 s
+        expect(api.aiRequests, hasLength(4));
+        expect(aiQueue(storage), hasLength(1));
       });
     });
   });

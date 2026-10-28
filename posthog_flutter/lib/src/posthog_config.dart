@@ -216,10 +216,10 @@ class PostHogConfig {
   /// Defaults to `null`, which keeps the SDK default.
   int? captureAiMaxQueueSize;
 
-  /// Timeout of a [Posthog.captureAi] request. On iOS, macOS and Android it
-  /// is sent to the native SDK in whole seconds (a positive value under one
-  /// second is sent as one second) and bounds the time without network
-  /// activity. On Windows and Linux it bounds the whole request.
+  /// Timeout of a [Posthog.captureAi] request: how long it may go without
+  /// network activity. On iOS, macOS and Android it is sent to the native SDK
+  /// in whole seconds (a positive value under one second is sent as one
+  /// second).
   ///
   /// AI requests can carry several MB, so the default (60 seconds) is
   /// longer than for other requests. [Duration.zero] or less uses the
