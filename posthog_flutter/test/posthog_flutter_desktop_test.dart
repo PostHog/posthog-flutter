@@ -528,6 +528,31 @@ void main() {
       expect(server.eventNames, isNot(contains('original event')));
     });
 
+    test('a callback editing a registered nested map leaves later events alone',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'mutate') {
+              final metadata = event.properties?['metadata'];
+              if (metadata is Map) metadata['plan'] = 'pro';
+            }
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      await platform.register('metadata', {'plan': 'free'});
+
+      await platform.capture(eventName: 'mutate');
+      await platform.capture(eventName: 'after');
+
+      final mutated = _propertiesOf(await server.waitForEvent('mutate'));
+      final after = _propertiesOf(await server.waitForEvent('after'));
+      expect(mutated['metadata'], {'plan': 'pro'});
+      expect(after['metadata'], {'plan': 'free'});
+    });
+
     test('a callback can rewrite the person properties', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)

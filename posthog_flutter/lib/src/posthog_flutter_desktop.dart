@@ -758,12 +758,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     );
   }
 
-  /// A copy of [map] without its null values, or null when it is not a map.
+  /// A deep copy of [map] without its null values, or null when it is not a
+  /// map. Registered properties share their nested maps and lists with
+  /// storage, so a callback editing them in place would change later events.
   static Map<String, Object>? _nonNull(Object? map) => map is Map
-      ? {
-          for (final MapEntry(:key, :value) in map.entries)
-            if (value != null) '$key': value,
-        }
+      ? Map<String, Object>.from(PropertyNormalizer.normalize({
+          for (final MapEntry(:key, :value) in map.entries) '$key': value,
+        }))
       : null;
 
   /// Applies the beforeSend callbacks to an event in order. Running them here
