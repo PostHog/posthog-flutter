@@ -11,6 +11,7 @@ import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
+import 'src/feature_flags_loaded.dart';
 import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_constants.dart';
@@ -129,10 +130,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       final dartCallback = config.onFeatureFlags!;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
-      // We ignore the JS parameters and just invoke the void callback
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        dartCallback();
+        dartCallback(featureFlagsLoadedFromMap({
+          'variants': jsFlagVariants.dartify(),
+          'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
+        }));
       }.toJS;
 
       ph.onFeatureFlags(jsCallback);
@@ -393,8 +396,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> reloadFeatureFlags() async {
-    return handleWebMethodCall(const MethodCall('reloadFeatureFlags'));
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
+    return featureFlagsLoadedFromMap(
+        await handleWebMethodCall(const MethodCall('reloadFeatureFlags')));
   }
 
   @override

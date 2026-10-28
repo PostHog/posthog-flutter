@@ -27,7 +27,7 @@ void main() {
     test(
       'setup passes config and onFeatureFlags callback to platform interface',
       () async {
-        void testCallback() {}
+        void testCallback(PostHogFeatureFlagsLoaded _) {}
 
         final config = PostHogConfig(
           'test_project_token',

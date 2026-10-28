@@ -6,6 +6,7 @@ import 'core/file_storage.dart';
 import 'core/utils/utils.dart';
 import 'error_tracking/dart_exception_processor.dart';
 import 'feature_flag_result.dart';
+import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
@@ -175,8 +176,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       projectToken: config.projectToken,
       host: removeTrailingSlash(config.host),
     );
-    _featureFlagsUnsubscribe =
-        client.onFeatureFlags(() => _config?.onFeatureFlags?.call());
+    _featureFlagsUnsubscribe = client.onFeatureFlags(
+        () => _config?.onFeatureFlags?.call(client.featureFlagsLoaded()));
 
     final stepsConfig = config.errorTrackingConfig.exceptionSteps;
     _exceptionSteps = stepsConfig.enabled
@@ -451,8 +452,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
               false);
 
   @override
-  Future<void> reloadFeatureFlags() => _guard(
-      'reloadFeatureFlags', (client) => client.reloadFeatureFlagsAsync());
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() => _guardWith(
+          'reloadFeatureFlags',
+          PostHogFeatureFlagsLoaded(variants: const {}, errorsLoading: true),
+          (client) async {
+        await client.reloadFeatureFlagsAsync();
+        return client.featureFlagsLoaded();
+      });
 
   @override
   Future<void> setPersonPropertiesForFlags(

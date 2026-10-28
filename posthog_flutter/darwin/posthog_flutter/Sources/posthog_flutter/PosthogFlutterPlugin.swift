@@ -62,8 +62,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     override init() {
         super.init()
-        featureFlagsSubscription = PostHogSDK.shared.onFeatureFlags { [weak self] _ in
-            self?.featureFlagsDidUpdate()
+        featureFlagsSubscription = PostHogSDK.shared.onFeatureFlags { [weak self] loaded in
+            self?.featureFlagsDidUpdate(loaded)
         }
     }
 
@@ -87,8 +87,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
     }
 
-    func featureFlagsDidUpdate() {
-        invokeFlutterMethod("onFeatureFlagsCallback", arguments: [String: Any]())
+    func featureFlagsDidUpdate(_ loaded: PostHogFeatureFlagsLoaded) {
+        invokeFlutterMethod("onFeatureFlagsCallback", arguments: Self.featureFlagsLoadedMap(loaded))
+    }
+
+    private static func featureFlagsLoadedMap(_ loaded: PostHogFeatureFlagsLoaded) -> [String: Any] {
+        ["variants": loaded.variants, "errorsLoading": loaded.errorsLoading]
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
@@ -1621,9 +1625,9 @@ extension PosthogFlutterPlugin {
     private func reloadFeatureFlags(_ result: @escaping FlutterResult) {
         // Resolve the Dart Future only once flags have actually finished loading.
         // The native callback fires on a background thread, so hop to main for Flutter.
-        PostHogSDK.shared.reloadFeatureFlags { _ in
+        PostHogSDK.shared.reloadFeatureFlags { loaded in
             DispatchQueue.main.async {
-                result(nil)
+                result(Self.featureFlagsLoadedMap(loaded))
             }
         }
     }
