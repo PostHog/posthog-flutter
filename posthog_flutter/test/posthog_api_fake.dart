@@ -255,6 +255,9 @@ class _InProcessHttpClient implements HttpClient {
       _InProcessRequest(_api, url);
 
   @override
+  Duration? connectionTimeout;
+
+  @override
   void close({bool force = false}) {}
 
   @override
@@ -282,6 +285,9 @@ class _InProcessRequest implements HttpClientRequest {
 
   @override
   void add(List<int> data) => _body.addAll(data);
+
+  @override
+  Future<void> addStream(Stream<List<int>> stream) => stream.forEach(add);
 
   @override
   void abort([Object? exception, StackTrace? stackTrace]) {

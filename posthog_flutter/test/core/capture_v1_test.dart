@@ -191,6 +191,38 @@ void main() {
     });
   });
 
+  group('captureRetryDelay', () {
+    Duration delay(int attempt, double unit, [int? retryAfterSeconds]) =>
+        captureRetryDelay(
+          attempt: attempt,
+          jitterUnit: unit,
+          retryAfter: retryAfterSeconds == null
+              ? null
+              : Duration(seconds: retryAfterSeconds),
+        );
+
+    test('doubles from 1 second up to 30 seconds', () {
+      expect([for (var a = 1; a <= 7; a++) delay(a, 0.5).inSeconds],
+          [1, 2, 4, 8, 16, 30, 30]);
+    });
+
+    test('jitters by up to 25 percent and stays under 30 seconds', () {
+      expect(delay(1, 0), const Duration(milliseconds: 750));
+      expect(delay(3, 0.75), const Duration(milliseconds: 4500));
+      expect(delay(6, 0), const Duration(milliseconds: 22500));
+      expect(delay(6, 0.999), const Duration(seconds: 30));
+      expect(delay(1, double.nan), const Duration(seconds: 1));
+      expect(delay(1, 1), const Duration(seconds: 1));
+    });
+
+    test('takes Retry-After as a floor after the jitter, at most 30 s', () {
+      expect(delay(1, 0, 5), const Duration(seconds: 5));
+      expect(delay(4, 0.5, 1), const Duration(seconds: 8));
+      expect(delay(4, 0, 7), const Duration(seconds: 7));
+      expect(delay(1, 0.5, 120), const Duration(seconds: 30));
+    });
+  });
+
   group('Capture v1 results', () {
     test('resends only the events the server asks to retry', () {
       final api = InProcessPostHogApi();
@@ -279,6 +311,43 @@ void main() {
       });
     });
 
+    test('a partial retry advances the backoff, a full delivery resets it', () {
+      final api = InProcessPostHogApi();
+      final storage = tempStorage();
+      var partial = 3;
+      api.respond = (request) => partial-- > 0
+          ? PostHogResponse.results(
+              request, (name) => name == 'later' ? 'retry' : null)
+          : PostHogResponse.results(request, (_) => 'ok');
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+        client.capture('now');
+        client.capture('later');
+        client.flush();
+        async.elapse(Duration.zero);
+
+        var now = Duration.zero;
+        var requests = 1;
+        for (final next in [1, 3, 7]) {
+          async.elapse(Duration(seconds: next) - now - _ms);
+          expect(api.batchRequests, hasLength(requests));
+          async.elapse(_ms);
+          expect(api.batchRequests, hasLength(++requests));
+          now = Duration(seconds: next);
+        }
+        expect(getQueue(storage), isEmpty);
+
+        api.respond = (_) => const PostHogResponse(HttpStatus.badGateway);
+        client.capture('next');
+        client.flush().catchError((Object _) {});
+        async.elapse(const Duration(seconds: 1) - _ms);
+        expect(api.batchRequests, hasLength(5));
+        async.elapse(_ms);
+        expect(api.batchRequests, hasLength(6),
+            reason: 'the backoff starts over at 1 second');
+      });
+    });
+
     test('starts a new request when new events join a retried batch', () {
       final api = InProcessPostHogApi();
       final storage = tempStorage();
@@ -313,7 +382,7 @@ void main() {
       fakeAsync((async) {
         final client = testClient(api);
         client.capture('evt');
-        client.flush();
+        client.flush().catchError((Object _) {});
         async.elapse(const Duration(seconds: 6));
 
         final requests = api.batchRequests;
@@ -353,20 +422,27 @@ void main() {
       expect(getQueue(storage), isEmpty);
     });
 
-    test('drops the batch on 404 without falling back to /batch', () async {
-      final server = await LocalPostHogServer.start();
+    test('retries a 404 without falling back to /batch', () {
+      final api = InProcessPostHogApi()
+        ..respond = (request) => request.isFlags
+            ? PostHogResponse.json({'flags': <String, Object?>{}})
+            : const PostHogResponse(HttpStatus.notFound);
       final storage = tempStorage();
-      final client = testClient(server, storage: storage);
-      server.respond = (request) => request.isFlags
-          ? PostHogResponse.json({'flags': <String, Object?>{}})
-          : const PostHogResponse(HttpStatus.notFound);
+      fakeAsync((async) {
+        final client = testClient(api, storage: storage);
+        Object? error;
 
-      client.capture('evt');
-      await expectLater(client.flush(), throwsA(isA<PostHogFetchHttpError>()));
+        client.capture('evt');
+        client.flush().catchError((Object e) {
+          error = e;
+        });
+        async.elapse(const Duration(seconds: 9));
 
-      expect([for (final r in server.requests) r.path],
-          ['/i/v1/analytics/events']);
-      expect(getQueue(storage), isEmpty);
+        expect(error, isA<PostHogFetchHttpError>());
+        expect([for (final r in api.requests) r.path],
+            List.filled(4, '/i/v1/analytics/events'));
+        expect(getQueue(storage), hasLength(1));
+      });
     });
   });
 
@@ -456,3 +532,5 @@ void main() {
     expect(Directory('${dir.path}/posthog_queue').listSync(), isEmpty);
   });
 }
+
+const _ms = Duration(milliseconds: 1);

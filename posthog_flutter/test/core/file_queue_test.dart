@@ -44,6 +44,32 @@ void main() {
         hasLength(1));
   });
 
+  test('counts the serialized bytes of the queued events', () {
+    int size(Map<String, Object?> event) =>
+        utf8.encode(jsonEncode(event)).length;
+    final first = {'event': 'first', 'padding': 'é' * 10};
+    final second = {'event': 'second'};
+    final third = {'event': 'third'};
+    final storage = FileStorage(dir.path);
+    final queue = storage.queue
+      ..add(first)
+      ..add(second)
+      ..add(third);
+    expect(queue.byteCount, size(first) + size(second) + size(third));
+
+    queue.removeOldest(1);
+    expect(queue.byteCount, size(second) + size(third));
+
+    // Read back from the files by the next process.
+    storage.close();
+    final next = FileStorage(dir.path);
+    addTearDown(next.close);
+    final restored = next.queue;
+    expect(restored.byteCount, size(second) + size(third));
+    restored.remove([restored.peek(1).single.id]);
+    expect(restored.byteCount, size(third));
+  });
+
   test('keeps the queue order across a restart', () async {
     final before = client();
     for (var i = 0; i < 50; i++) {
