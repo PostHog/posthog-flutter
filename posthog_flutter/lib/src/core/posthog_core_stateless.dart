@@ -631,31 +631,25 @@ abstract class PostHogCoreStateless {
     lane.clearFlushTimer();
 
     final queue = lane.queue;
-    final sentMessages = <Map<String, Object?>>[];
 
-    try {
-      while (!_closed) {
-        // Peeked again after every request, so events queued in the meantime
-        // go out with the same flush. The queue sizes the batch before
-        // reading it, so events past the batch are not decoded.
-        final batch =
-            queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
-        if (batch.isEmpty) {
-          if (queue.length > 0) _scheduleFlush(lane);
-          break;
-        }
-        if (!await _sendBatch(lane, batch, sentMessages)) break;
+    while (!_closed) {
+      // Peeked again after every request, so events queued in the meantime
+      // go out with the same flush. The queue sizes the batch before
+      // reading it, so events past the batch are not decoded.
+      final batch =
+          queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
+      if (batch.isEmpty) {
+        if (queue.length > 0) _scheduleFlush(lane);
+        break;
       }
-    } finally {
-      if (sentMessages.isNotEmpty) {
-        events.emit('flush', sentMessages);
-      }
+      if (!await _sendBatch(lane, batch)) break;
     }
   }
 
   /// Sends [batch] to capture v1 and removes from the queue the events that
-  /// are done: delivered, or dropped for good. Adds the delivered ones to
-  /// [sent].
+  /// are done: delivered, or dropped for good. Emits `flush` with the
+  /// delivered ones right away, so a long flush doesn't hold on to the
+  /// payloads of every batch it sent.
   ///
   /// Returns whether the flush goes on with the rest of the queue. It stops
   /// while events of [batch] wait for a later retry: the queue backs off,
@@ -664,7 +658,6 @@ abstract class PostHogCoreStateless {
   Future<bool> _sendBatch(
     _CaptureLane lane,
     List<PostHogQueuedEvent> batch,
-    List<Map<String, Object?>> sent,
   ) async {
     final queue = lane.queue;
     final Set<String> retryUuids;
@@ -718,7 +711,9 @@ abstract class PostHogCoreStateless {
     // Removed by id: the queue may have changed while the batch was in
     // flight, e.g. its oldest events dropped to make room.
     queue.remove([for (final queued in delivered) queued.id]);
-    sent.addAll([for (final queued in delivered) queued.event]);
+    if (delivered.isNotEmpty) {
+      events.emit('flush', [for (final queued in delivered) queued.event]);
+    }
     if (delivered.length == batch.length) {
       lane.failedFlushes = 0;
       return true;

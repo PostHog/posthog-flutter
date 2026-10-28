@@ -31,6 +31,34 @@ void main() {
       expect(getQueue(storage), isEmpty);
     });
 
+    test('emits each delivered batch as soon as it is sent', () async {
+      final client = testClient(server,
+          config: testConfig(maxBatchSize: 2), storage: tempStorage());
+      final emitted = <List<Object?>>[];
+      final requestsAtEmit = <int>[];
+      // ignore: invalid_use_of_protected_member
+      client.events.on('flush', (payload) {
+        emitted.add([
+          for (final event in payload! as List<Map<String, Object?>>)
+            event['event'],
+        ]);
+        requestsAtEmit.add(server.batchRequests.length);
+      });
+
+      client.capture('a');
+      client.capture('b');
+      client.capture('c');
+      await client.flush();
+
+      expect(emitted, [
+        ['a', 'b'],
+        ['c'],
+      ]);
+      // Emitted before the next request, so a long flush doesn't keep the
+      // payloads of every batch it sent.
+      expect(requestsAtEmit, [1, 2]);
+    });
+
     test('removes sent events by identity when the queue head shifts',
         () async {
       final storage = tempStorage();
