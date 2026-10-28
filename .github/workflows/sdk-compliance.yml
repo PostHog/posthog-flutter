@@ -14,8 +14,8 @@ on:
 jobs:
   compliance:
     name: PostHog SDK compliance tests
-    uses: PostHog/posthog-sdk-test-harness/.github/workflows/test-sdk-action.yml@27806196fa5c5ac74e9e7500bc46b74db1869f3a # main @ 2026-07-27
+    uses: PostHog/posthog-sdk-test-harness/.github/workflows/test-sdk-action.yml@2169494c96b6231c8188b64a3bf02ffc986ac83b # 1.25.0
     with:
       adapter-dockerfile: "sdk_compliance_adapter/Dockerfile"
       adapter-context: "."
-      test-harness-version: "0.9.0"
+      test-harness-version: "1.25.0"
