@@ -259,13 +259,16 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final distinctId = client.getDistinctId();
         final exceptionSteps = _exceptionSteps;
 
-        final hooked = _runBeforeSend(
+        final prepared = _prepare(
+          client,
           eventName,
           properties,
           userProperties: userProperties,
           userPropertiesSetOnce: userPropertiesSetOnce,
           options: options,
         );
+        if (prepared == null) return;
+        final hooked = _runBeforeSend(prepared.event);
         final processed =
             hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
@@ -275,7 +278,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         final current = _clientForContinuation('capture', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps);
+        _captureProcessed(
+            current, processed, exceptionSteps, prepared.timestamp);
       });
 
   /// AI events are not sent on desktop.
@@ -307,7 +311,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final distinctId = client.getDistinctId();
         final exceptionSteps = _exceptionSteps;
 
-        final hooked = _runBeforeSend(
+        final prepared = _prepare(
+          client,
           PostHogEventName.screen,
           <String, Object>{
             ...?properties,
@@ -315,6 +320,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           },
           options: options,
         );
+        if (prepared == null) return;
+        final hooked = _runBeforeSend(prepared.event);
         final processed =
             hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
@@ -328,7 +335,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          _captureProcessed(current, processed, exceptionSteps);
+          _captureProcessed(
+              current, processed, exceptionSteps, prepared.timestamp);
           return;
         }
 
@@ -349,7 +357,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           ...?processed.properties,
           PostHogPropertyName.screenName: finalScreenName,
         };
-        _captureProcessed(current, processed, exceptionSteps);
+        _captureProcessed(
+            current, processed, exceptionSteps, prepared.timestamp);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -583,11 +592,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
         );
 
-        final hooked = _runBeforeSend(
+        final prepared = _prepare(
+          client,
           PostHogEventName.exception,
           exceptionProps.cast<String, Object>(),
           options: options,
         );
+        if (prepared == null) return;
+        final hooked = _runBeforeSend(prepared.event);
         final processed =
             hooked is Future<PostHogEvent?> ? await hooked : hooked;
         if (processed == null) {
@@ -600,7 +612,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final current =
             _clientForContinuation('captureException', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps);
+        _captureProcessed(
+            current, processed, exceptionSteps, prepared.timestamp);
       });
 
   @override
@@ -677,10 +690,54 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   @override
   Future<bool> isSessionReplayActive() async => false;
 
+  /// Builds [eventName] on [client] as it would be sent, with the
+  /// properties and options the SDK adds, for the beforeSend callbacks.
+  /// The SDK's properties come first, then the registered ones, then the
+  /// event's own. Returns null when the client is closed or opted out.
+  ///
+  /// `$set` and `$set_once` are handed to the callbacks as
+  /// [PostHogEvent.userProperties] and [PostHogEvent.userPropertiesSetOnce].
+  /// The event's time is taken now, before the callbacks run.
+  ({PostHogEvent event, String timestamp})? _prepare(
+    DesktopPostHog client,
+    String eventName,
+    Map<String, Object>? properties, {
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) {
+    final prepared = client.prepareEvent(
+      eventName,
+      properties:
+          _mergeUserProps(properties, userProperties, userPropertiesSetOnce),
+      options: cleanEventOptions(options),
+    );
+    if (prepared == null) return null;
+    final eventProperties = _nonNull(prepared.properties)!;
+    final preparedOptions = prepared.options;
+    return (
+      event: PostHogEvent(
+        event: eventName,
+        properties: eventProperties,
+        userProperties: _nonNull(eventProperties.remove(r'$set')),
+        userPropertiesSetOnce: _nonNull(eventProperties.remove(r'$set_once')),
+        options: preparedOptions == null ? null : {...preparedOptions},
+      ),
+      timestamp: prepared.timestamp,
+    );
+  }
+
+  /// A copy of [map] without its null values, or null when it is not a map.
+  static Map<String, Object>? _nonNull(Object? map) => map is Map
+      ? {
+          for (final MapEntry(:key, :value) in map.entries)
+            if (value != null) '$key': value,
+        }
+      : null;
+
   /// Applies the beforeSend callbacks to an event in order. Running them here
   /// rather than in the client keeps SDK-internal events ($identify,
-  /// $feature_flag_called, ...) and the properties the SDK adds out of the
-  /// callbacks' sight.
+  /// $feature_flag_called, ...) out of the callbacks' sight.
   ///
   /// Returns the possibly modified event, or null if any callback drops it
   /// or throws.
@@ -689,20 +746,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// must not await it: an identify(), reset() or opt-out made right after
   /// an unawaited capture would otherwise run first, and the event would be
   /// dropped as belonging to another user.
-  FutureOr<PostHogEvent?> _runBeforeSend(
-    String eventName,
-    Map<String, Object>? properties, {
-    Map<String, Object>? userProperties,
-    Map<String, Object>? userPropertiesSetOnce,
-    Map<String, Object?>? options,
-  }) {
-    final event = PostHogEvent(
-      event: eventName,
-      properties: properties,
-      userProperties: userProperties,
-      userPropertiesSetOnce: userPropertiesSetOnce,
-      options: options == null ? null : {...options},
-    );
+  FutureOr<PostHogEvent?> _runBeforeSend(PostHogEvent event) {
     final callbacks = _config?.beforeSend ?? const <BeforeSendCallback>[];
     return callbacks.isEmpty ? event : _applyCallbacks(callbacks, event);
   }
@@ -720,28 +764,32 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return processed;
   }
 
+  /// Queues [event] as the beforeSend callbacks left it. The client adds
+  /// nothing to it; an `$exception` event gets the exception steps recorded
+  /// up to now.
   void _captureProcessed(
     DesktopPostHog client,
     PostHogEvent event,
     ExceptionStepsBuffer? exceptionSteps,
+    String timestamp,
   ) {
     if (!_hasName(event.event)) return;
-    final properties = _withExceptionSteps(
-      event.event,
-      exceptionSteps,
-      _mergeUserProps(
-        event.properties,
-        event.userProperties,
-        event.userPropertiesSetOnce,
-      ),
-    );
     // Options are sent as they are, unknown keys included. An option wins
     // over its legacy property on the event.
-    client.capture(
-      event.event,
-      properties: properties,
+    client.capturePrepared(event.event, (
+      properties: _withExceptionSteps(
+            event.event,
+            exceptionSteps,
+            _mergeUserProps(
+              event.properties,
+              event.userProperties,
+              event.userPropertiesSetOnce,
+            ),
+          ) ??
+          const {},
       options: cleanEventOptions(event.options),
-    );
+      timestamp: timestamp,
+    ));
   }
 
   /// Whether [event] has a name; an event without one is dropped.

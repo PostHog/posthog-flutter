@@ -96,6 +96,12 @@ Map<String, Object?> queuedProps(FileStorage storage, int index) {
   return queuedMessage(storage, index)['properties'] as Map<String, Object?>;
 }
 
+/// The capture v1 options of the queued event message at [index], empty
+/// when it has none.
+Map<String, Object?> queuedOptions(FileStorage storage, int index) =>
+    Map<String, Object?>.from(
+        (queuedMessage(storage, index)['options'] ?? const {}) as Map);
+
 /// The names of the queued events, oldest first.
 List<Object?> queuedEvents(FileStorage storage) =>
     [for (final message in getQueue(storage)) message['event']];

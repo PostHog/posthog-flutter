@@ -236,9 +236,10 @@ abstract class PostHogCoreStateless {
     required String event,
     required Map<String, Object?> properties,
   }) {
+    // The event's properties win over the SDK's.
     var eventProperties = {
-      ...properties,
       ...getCommonEventProperties(),
+      ...properties,
     };
     // Minimized once all SDK properties are in.
     if (event == r'$feature_flag_called' &&
@@ -284,6 +285,7 @@ abstract class PostHogCoreStateless {
     String event, {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
+    String? timestamp,
   }) {
     _enqueue(
       'capture',
@@ -293,6 +295,7 @@ abstract class PostHogCoreStateless {
         properties: properties,
       ),
       options: options,
+      timestamp: timestamp,
     );
   }
 
@@ -429,6 +432,7 @@ abstract class PostHogCoreStateless {
     String type,
     Map<String, Object?> message, {
     Map<String, Object?>? options,
+    String? timestamp,
   }) {
     final prepared = <String, Object?>{
       ...message,
@@ -439,7 +443,7 @@ abstract class PostHogCoreStateless {
       'type': type,
       'library': postHogFlutterSdkName,
       'library_version': postHogFlutterVersion,
-      'timestamp': currentISOTime(),
+      'timestamp': timestamp ?? currentISOTime(),
       'uuid': generateUuidV7(),
     };
     final queue = storage.queue;

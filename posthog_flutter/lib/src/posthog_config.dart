@@ -439,7 +439,8 @@ class PostHogConfig {
   ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
   /// - Only user-provided properties are available; system properties (like
   ///   `$device_type`, `$session_id`) are added by the native SDK at a later
-  ///   stage.
+  ///   stage. On Windows and Linux, the callbacks see the system properties
+  ///   and the options the SDK adds, and can change them for that event.
   ///
   /// **Note:**
   /// - Callbacks can be synchronous or asynchronous (via

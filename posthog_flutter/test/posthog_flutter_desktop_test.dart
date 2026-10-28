@@ -7,6 +7,7 @@ import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autoca
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_app_info.dart';
+import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_desktop.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
@@ -282,7 +283,8 @@ void main() {
       expect(flags, isNot(contains('timezone')));
     });
 
-    test(r'reports $recording_status disabled on every event', () async {
+    test(r'reports $recording_status disabled unless the event sets it',
+        () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
 
@@ -295,7 +297,7 @@ void main() {
       final identify = await server.waitForEvent(r'$identify');
       expect(_propertiesOf(identify)[r'$recording_status'], 'disabled');
       final captured = await server.waitForEvent('replay event');
-      expect(_propertiesOf(captured)[r'$recording_status'], 'disabled');
+      expect(_propertiesOf(captured)[r'$recording_status'], 'active');
     });
   });
 
@@ -576,17 +578,28 @@ void main() {
       expect(callOrder, ['transform', 'throw']);
     });
 
-    test('callbacks see user-provided properties only', () async {
+    test('callbacks see and change the properties and options the SDK adds',
+        () async {
       final server = await LocalPostHogServer.start();
-      Map<String, Object>? seenProperties;
+      PostHogEvent? seen;
       final config = configFor(server)
         ..beforeSend = [
           (event) {
-            seenProperties = event.properties;
+            seen = PostHogEvent(
+              event: event.event,
+              properties: {...?event.properties},
+              options: {...?event.options},
+            );
+            event.properties = {
+              ...?event.properties,
+              r'$device_type': 'Kiosk',
+            }..remove(r'$os_name');
+            event.options = null;
             return event;
           },
         ];
       final platform = await setUpPlatform(config);
+      await platform.register('plan', 'free');
 
       await platform.capture(
         eventName: 'context event',
@@ -594,13 +607,41 @@ void main() {
       );
 
       final event = await server.waitForEvent('context event');
-      // The whole map: no $session_id, $lib or other SDK enrichment is
-      // visible to the hook...
-      expect(seenProperties, {'plan': 'pro'});
-      // ...while the delivered event is still enriched after the hook ran.
+      final seenProperties = seen!.properties!;
+      expect(seenProperties, containsPair('plan', 'pro'),
+          reason: 'the event wins over a registered property');
+      expect(seenProperties, containsPair(r'$device_type', 'Desktop'));
+      expect(seenProperties, contains(r'$os_name'));
+      expect(seenProperties, contains(r'$session_id'));
+      expect(seenProperties, contains(r'$lib'));
+      expect(seen!.options, {'process_person_profile': false});
+      // The SDK adds nothing back after the hook ran.
       final properties = _propertiesOf(event);
-      expect(properties, containsPair(r'$device_type', 'Desktop'));
+      expect(properties, containsPair(r'$device_type', 'Kiosk'));
+      expect(properties, isNot(contains(r'$os_name')));
+      expect(event, isNot(contains('options')));
       expect(event['session_id'], isA<String>());
+    });
+
+    test('the event time is taken before the callbacks run', () async {
+      final server = await LocalPostHogServer.start();
+      late DateTime hookStarted;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) async {
+            hookStarted = DateTime.now().toUtc();
+            // Real wait: the event must not take the time it is queued.
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'slow hook');
+
+      final event = await server.waitForEvent('slow hook');
+      final timestamp = DateTime.parse(event['timestamp']! as String);
+      expect(timestamp.isAfter(hookStarted), isFalse);
     });
 
     test('SDK-internal events bypass the callbacks', () async {
@@ -1081,7 +1122,7 @@ void main() {
       ];
       expect(
         [for (final set in sets) set['process_person_profile']],
-        [isFalse, isTrue],
+        [isFalse, isNull],
       );
     });
 

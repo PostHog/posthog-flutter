@@ -8,8 +8,11 @@ class PostHogEvent {
 
   /// User-provided properties for this event.
   ///
-  /// Note: System properties (like $device_type, $session_id, etc.) are added
-  /// by the native SDK at a later stage and are not available in this map.
+  /// On iOS, macOS, Android and web, system properties (like $device_type,
+  /// $session_id, etc.) are added by the native SDK at a later stage and are
+  /// not available in this map. On Windows and Linux, the map already holds
+  /// them, then the registered properties, then the event's own, and the
+  /// event is sent as the callbacks leave it.
   Map<String, Object>? properties;
 
   /// User properties to set on the user profile ($set).

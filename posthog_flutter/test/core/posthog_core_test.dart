@@ -40,7 +40,7 @@ void main() {
     test('keeps an anonymous user personless', () {
       client.capture('test_event');
 
-      expect(queuedProps(storage, 0)[r'$process_person_profile'], isFalse);
+      expect(queuedOptions(storage, 0)['process_person_profile'], isFalse);
       expect(queuedProps(storage, 0)[r'$is_identified'], isFalse);
     });
 
@@ -52,9 +52,9 @@ void main() {
         });
         client.capture('next_event');
 
-        expect(queuedProps(storage, 0)[r'$process_person_profile'], isTrue,
+        expect(queuedOptions(storage, 0)['process_person_profile'], isNull,
             reason: 'sending person properties asks for a person profile');
-        expect(queuedProps(storage, 1)[r'$process_person_profile'], isTrue);
+        expect(queuedOptions(storage, 1)['process_person_profile'], isNull);
       });
     }
 
@@ -68,7 +68,7 @@ void main() {
         r'$set': {'plan': 'pro'},
       });
 
-      expect(queuedProps(storage, 0)[r'$process_person_profile'], isFalse);
+      expect(queuedOptions(storage, 0)['process_person_profile'], isFalse);
     });
 
     test(r'$groups apply to that event only', () async {
@@ -81,7 +81,7 @@ void main() {
 
       expect(queuedProps(storage, 0)[r'$groups'], {'company': 'acme'});
       expect(queuedProps(storage, 1).containsKey(r'$groups'), isFalse);
-      expect(queuedProps(storage, 1)[r'$process_person_profile'], isFalse);
+      expect(queuedOptions(storage, 1)['process_person_profile'], isFalse);
       expect(reloads, 0, reason: 'an event-level group is not a group change');
     });
 
@@ -103,8 +103,9 @@ void main() {
       expect(first[r'$sdk_debug_current_session_duration'],
           greaterThanOrEqualTo(10));
       expect(first[r'$sdk_debug_pending_queue_size'], 0);
-      expect(queuedProps(storage, 1)[r'$sdk_debug_pending_queue_size'], 1,
-          reason: 'SDK debug values win over a registered super property');
+      expect(queuedProps(storage, 1)[r'$sdk_debug_pending_queue_size'],
+          'registered',
+          reason: 'a registered super property wins over SDK values');
     });
   });
 
@@ -187,7 +188,7 @@ void main() {
       expect(queuedEvents(storage), [r'$set'],
           reason: r'there is no anonymous history to link, so no $identify');
       expect(queuedProps(storage, 0)[r'$is_identified'], isTrue);
-      expect(queuedProps(storage, 0)[r'$process_person_profile'], isTrue);
+      expect(queuedOptions(storage, 0)['process_person_profile'], isNull);
       expect(reloads, 0,
           reason: 'the identified state alone does not affect flags');
     });
@@ -253,7 +254,10 @@ void main() {
 
       for (final event in [r'$identify', r'$create_alias', r'$groupidentify']) {
         final props = queuedPropsOf(storage, event);
-        expect(props[r'$process_person_profile'], isTrue, reason: event);
+        final message = getQueue(storage)
+            .singleWhere((message) => message['event'] == event);
+        expect(message, isNot(contains('options')),
+            reason: '$event: person-processed events omit the option');
         expect(props[r'$is_identified'], isTrue, reason: event);
         expect(props, contains(r'$sdk_debug_session_start'), reason: event);
       }
@@ -367,14 +371,14 @@ void main() {
       client = testClient(server, storage: storage);
     });
 
-    test("win over registered properties, not over the event's own", () {
-      client.register({'screen': 'registered', 'plan': 'free'});
+    test("lose to registered properties and to the event's own", () {
+      client.register({'screen': 'registered'});
       client.registerForSession({'screen': 'Checkout', 'plan': 'trial'});
 
       client.capture('first');
       client.capture('second', properties: {'plan': 'pro'});
 
-      expect(queuedProps(storage, 0)['screen'], 'Checkout');
+      expect(queuedProps(storage, 0)['screen'], 'registered');
       expect(queuedProps(storage, 0)['plan'], 'trial');
       expect(queuedProps(storage, 1)['plan'], 'pro');
     });
@@ -425,7 +429,7 @@ void main() {
         client.capture('next_event');
 
         expect(queuedEvents(storage), ['next_event']);
-        expect(queuedProps(storage, 0)[r'$process_person_profile'], isFalse,
+        expect(queuedOptions(storage, 0)['process_person_profile'], isFalse,
             reason: 'an ignored alias does not turn on person processing');
         expect(lines, contains(contains('empty alias')));
       });

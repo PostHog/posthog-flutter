@@ -53,7 +53,7 @@ void main() {
     client.capture('purchase');
     await client.reloadFeatureFlagsAsync();
 
-    expect(queuedProps(storage, 0)[r'$process_person_profile'], isTrue);
+    expect(queuedOptions(storage, 0)['process_person_profile'], isNull);
     expect(server.flagsRequests.last.body['groups'], {'company': 'acme'});
   });
 
@@ -151,7 +151,7 @@ void main() {
   });
 
   test(
-      'session properties take precedence after caller properties and before registered properties',
+      'session properties lose to registered properties and to caller properties',
       () {
     final storage = tempStorage();
     final client = testClient(server, storage: storage);
@@ -159,6 +159,6 @@ void main() {
     client.registerForSession({'plan': 'session', 'screen': 'Checkout'});
     client.capture('purchase', properties: {'plan': 'event'});
     expect(queuedProps(storage, 0)['plan'], 'event');
-    expect(queuedProps(storage, 0)['screen'], 'Checkout');
+    expect(queuedProps(storage, 0)['screen'], 'registered');
   });
 }
