@@ -1,5 +1,12 @@
 ## Next
 
+## 5.58.0
+
+### Minor Changes
+
+- cabe336: Resolve obfuscated Flutter mobile stack frames with uploaded debug symbols.
+- a136696: Add `isolate.addPostHogErrorListener()` and `isolate.removePostHogErrorListener()` to capture uncaught background isolate errors and clean up their listeners, and clarify that `captureIsolateErrors` only monitors the setup isolate.
+
 ## 5.57.1
 
 ### Patch Changes
