@@ -251,6 +251,37 @@ void main() {
       });
     });
 
+    test('times out a response that trickles in for 30 seconds', () {
+      fakeAsync((async) {
+        final body =
+            StreamController<List<int>>(onCancel: () => Future<void>.value());
+        final http = _ControlledHttpClient((_) async => _ControlledRequest(
+            response: _ControlledResponse(body.stream,
+                statusCode: HttpStatus.serviceUnavailable)));
+        final storage = tempStorage();
+        late final client = HttpOverrides.runZoned(
+          () => testClient(server, storage: storage),
+          createHttpClient: (_) => http,
+        );
+        client.capture('evt');
+        Object? error;
+        client.flush().catchError((Object e) {
+          error = e;
+        });
+        for (var i = 0; i < 5; i++) {
+          async.elapse(const Duration(seconds: 6) - _ms);
+          body.add(utf8.encode(' '));
+        }
+        async.flushMicrotasks();
+        expect(error, isNull);
+        async.elapse(const Duration(seconds: 1));
+
+        expect(error, isA<PostHogFetchNetworkError>());
+        expect(getQueue(storage), hasLength(1));
+        client.close();
+      });
+    });
+
     test('counts a 2xx whose body times out as delivered', () {
       fakeAsync((async) {
         // Cancelled in this zone: fake_async does not run the root zone's
