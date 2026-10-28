@@ -545,6 +545,40 @@ void main() {
       expect(_propertiesOf(event)[r'$set'], {'plan': 'enterprise'});
     });
 
+    test('flag evaluation gets the person properties the callbacks keep',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..preloadFeatureFlags = false
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'dropped') return null;
+            return event
+              ..userProperties = {'email': 'redacted'}
+              ..userPropertiesSetOnce = null;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+        userPropertiesSetOnce: {'first_seen': 'secret'},
+      );
+      await platform.capture(
+        eventName: 'dropped',
+        userProperties: {'dropped': 'secret'},
+      );
+      await platform.reloadFeatureFlags();
+
+      final personProperties = Map<String, Object?>.from(
+        server.flagsRequests.single.body['person_properties']! as Map,
+      );
+      expect(personProperties, containsPair('email', 'redacted'));
+      expect(personProperties, isNot(contains('first_seen')));
+      expect(personProperties, isNot(contains('dropped')));
+    });
+
     test('a throwing callback drops the event and stops the chain', () async {
       final server = await LocalPostHogServer.start();
       final callOrder = <String>[];

@@ -429,8 +429,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// or opted out.
   ///
   /// Like [capture], person properties in [properties] ask for person
-  /// processing and feed flag evaluation, and the event starts or extends
-  /// the session.
+  /// processing, and the event starts or extends the session. They feed
+  /// flag evaluation only as [capturePrepared] queues the event.
   PostHogPreparedEvent? prepareEvent(
     String event, {
     Map<String, Object?>? properties,
@@ -440,7 +440,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
           () => _prepareEvent(event, properties: properties, options: options));
 
   /// Queues an event built by [prepareEvent], possibly changed since.
-  /// Unlike [capture], it adds nothing to it.
+  /// Unlike [capture], it adds nothing to it. Its `$set` / `$set_once`
+  /// feed flag evaluation.
   ///
   /// With [ai], the event goes to PostHog's AI endpoint from a queue of its
   /// own, which drops a serialized event over its size limit.
@@ -471,10 +472,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
             _isNonEmptyMap(userPropertiesSetOnce))) {
       _enablePersonProcessing();
     }
-    _setPersonPropertiesForFlagsIfNeeded(
-      _asPropertyMap(userProperties),
-      _asPropertyMap(userPropertiesSetOnce),
-    );
 
     final allProperties = _enrichProperties(properties);
     // Once an event is person-processed, all later ones are too. A value
@@ -495,6 +492,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
     bool ai = false,
   }) {
     final (:properties, :options, :timestamp) = prepared;
+    // Taken from the event as queued, after the beforeSend callbacks, so a
+    // value they removed or an event they dropped never reaches /flags.
+    _setPersonPropertiesForFlagsIfNeeded(
+      _asPropertyMap(properties[r'$set']),
+      _asPropertyMap(properties[r'$set_once']),
+    );
     final uuid = captureStateless(getDistinctId(), event,
         properties: properties, options: options, timestamp: timestamp, ai: ai);
     // PostHog drops an AI event that is not an `$ai_*` event, so it never
