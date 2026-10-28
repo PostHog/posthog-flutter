@@ -95,7 +95,13 @@ abstract class PostHogCoreStateless {
 
   final bool _defaultOptIn;
 
+  /// How long a request may go without progress: connecting, a chunk of
+  /// the body taken by the socket, the response headers, or a chunk of the
+  /// response body. A slow but moving upload never times out.
   static const _requestTimeout = Duration(seconds: 10);
+
+  /// The size of the body chunks handed to the socket, each one progress.
+  static const _bodyChunkSize = 64 * 1024;
 
   // A flags request is retried only after a network error or a gateway
   // timeout. A batch is not retried within a flush: the queue backs off.
@@ -149,7 +155,8 @@ abstract class PostHogCoreStateless {
   @protected
   final FileStorage storage;
 
-  final _httpClient = HttpClient();
+  final _httpClient = HttpClient()
+    ..connectionTimeout = PostHogCoreStateless._requestTimeout;
 
   PostHogCoreStateless(
     PostHogConfig config, {
@@ -780,10 +787,11 @@ abstract class PostHogCoreStateless {
     );
   }
 
-  /// Sends one request, bounded by [_requestTimeout]. A transport failure
-  /// is thrown as [PostHogFetchNetworkError], except, with
-  /// [deliveredOnBodyFailure], one that happens after a 2xx status arrived:
-  /// the response is then returned without a body.
+  /// Sends one request, aborted once it makes no progress for
+  /// [_requestTimeout]. A transport failure is thrown as
+  /// [PostHogFetchNetworkError], except, with [deliveredOnBodyFailure], one
+  /// that happens after a 2xx status arrived: the response is then returned
+  /// without a body.
   Future<
       ({
         int status,
@@ -796,15 +804,9 @@ abstract class PostHogCoreStateless {
     Map<String, String> headers = const {},
     bool deliveredOnBodyFailure = false,
   }) async {
-    final attempt = _FetchAttempt();
+    final attempt = _FetchAttempt(_requestTimeout);
     try {
-      return await _fetch(url, body, attempt, headers).timeout(
-        _requestTimeout,
-        onTimeout: () async {
-          await attempt.cancel();
-          throw attempt.timeout;
-        },
-      );
+      return await attempt.guard(_fetch(url, body, attempt, headers));
     } catch (e) {
       final status = attempt.status;
       if (deliveredOnBodyFailure &&
@@ -872,9 +874,18 @@ abstract class PostHogCoreStateless {
       payload = bytes;
     }
     request.contentLength = payload.length;
-    request.add(payload);
+    // In chunks, so the socket taking each one counts as progress: it stops
+    // taking them while its buffers are full.
+    await request.addStream(() async* {
+      for (var start = 0; start < payload.length; start += _bodyChunkSize) {
+        attempt.progress();
+        yield payload.sublist(
+            start, min(start + _bodyChunkSize, payload.length));
+      }
+    }());
 
     final response = await request.close();
+    attempt.progress();
     final retryAfter =
         _parseRetryAfter(response.headers.value(HttpHeaders.retryAfterHeader));
     attempt
@@ -904,7 +915,12 @@ abstract class PostHogCoreStateless {
 }
 
 class _FetchAttempt {
+  _FetchAttempt(this._idleTimeout);
+
+  final Duration _idleTimeout;
   final timeout = TimeoutException('PostHog request timed out');
+  Timer? _idleTimer;
+  void Function()? _onIdle;
 
   HttpClientRequest? _request;
 
@@ -915,7 +931,38 @@ class _FetchAttempt {
   Completer<String>? _responseBody;
   bool _cancelled = false;
 
+  /// Completes with [work], or fails with [timeout] once the request has
+  /// made no [progress] for the idle timeout. The request is cancelled
+  /// before that failure is reported, so a retry never overlaps it.
+  Future<T> guard<T>(Future<T> work) {
+    final result = Completer<T>();
+    var idle = false;
+    _onIdle = () async {
+      idle = true;
+      await cancel();
+      if (!result.isCompleted) result.completeError(timeout);
+    };
+    progress();
+    work.then((value) {
+      if (!idle && !result.isCompleted) result.complete(value);
+    }, onError: (Object error, StackTrace stackTrace) {
+      if (!idle && !result.isCompleted) {
+        result.completeError(error, stackTrace);
+      }
+    });
+    return result.future.whenComplete(() => _idleTimer?.cancel());
+  }
+
+  /// Restarts the idle timeout.
+  void progress() {
+    _idleTimer?.cancel();
+    if (_cancelled) return;
+    final onIdle = _onIdle;
+    if (onIdle != null) _idleTimer = Timer(_idleTimeout, onIdle);
+  }
+
   void attachRequest(HttpClientRequest request) {
+    progress();
     _request = request;
     if (_cancelled) {
       request.abort(timeout);
@@ -929,7 +976,10 @@ class _FetchAttempt {
     late final StreamSubscription<String> subscription;
     subscription =
         response.transform(const Utf8Decoder(allowMalformed: true)).listen(
-      contents.write,
+      (chunk) {
+        progress();
+        contents.write(chunk);
+      },
       onError: (Object error, StackTrace stackTrace) {
         if (!body.isCompleted) body.completeError(error, stackTrace);
       },
