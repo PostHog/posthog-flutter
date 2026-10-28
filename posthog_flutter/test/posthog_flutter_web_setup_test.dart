@@ -150,4 +150,58 @@ void main() {
 
     expect(received, isEmpty);
   });
+
+  test('close() during the synchronous flag replay removes the registration',
+      () async {
+    final listeners = <JSFunction>[];
+    globalContext.setProperty(
+        'posthog'.toJS,
+        JSObject()
+          ..setProperty(
+            'onFeatureFlags'.toJS,
+            ((JSFunction callback) {
+              listeners.add(callback);
+              // posthog-js calls back right away when flags are loaded.
+              callback.callAsFunction(
+                  null, ['on'].jsify(), {'on': true}.jsify(), null);
+              return (() => listeners.remove(callback)).toJS;
+            }).toJS,
+          ));
+    addTearDown(() => globalContext.delete('posthog'.toJS));
+    final web = PosthogFlutterWeb();
+
+    await web.setup(PostHogConfig('test_project_token',
+        onFeatureFlags: (_) => web.close()));
+
+    expect(listeners, isEmpty);
+  });
+
+  test('registrations queued by the posthog-js loader stop after close()',
+      () async {
+    // The loader snippet queues calls and returns undefined until it loads.
+    final queued = <JSFunction>[];
+    globalContext.setProperty(
+        'posthog'.toJS,
+        JSObject()
+          ..setProperty(
+            'onFeatureFlags'.toJS,
+            ((JSFunction callback) {
+              queued.add(callback);
+            }).toJS,
+          ));
+    addTearDown(() => globalContext.delete('posthog'.toJS));
+    FeatureFlagsListeners.instance.clear();
+    final received = <PostHogFeatureFlagsLoaded>[];
+    final subscription = FeatureFlagsListeners.instance.add(received.add);
+    addTearDown(subscription.unsubscribe);
+    final web = PosthogFlutterWeb();
+
+    await web.setup(PostHogConfig('test_project_token'));
+    await web.setup(PostHogConfig('test_project_token'));
+    loadFlags(queued);
+    await web.close();
+    loadFlags(queued);
+
+    expect(received.single.variants, {'on': true});
+  });
 }

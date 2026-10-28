@@ -67,7 +67,8 @@ extension PostHogExtension on PostHog {
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
-  external JSFunction onFeatureFlags(JSFunction callback);
+  // The loader snippet's stub returns undefined until posthog-js loads.
+  external JSFunction? onFeatureFlags(JSFunction callback);
   external void startSessionRecording();
   external void stopSessionRecording();
   external bool sessionRecordingStarted();
@@ -283,7 +284,7 @@ Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
       onTimeout: () => currentFlags(errorsLoading: true),
     );
   } finally {
-    unsubscribe.callAsFunction();
+    unsubscribe?.callAsFunction();
   }
 }
 

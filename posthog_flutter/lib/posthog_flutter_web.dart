@@ -38,6 +38,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   List<BeforeSendCallback> _beforeSendCallbacks = [];
   JSFunction? _featureFlagsUnsubscribe;
 
+  /// Bumped by each setup() and close(), so a posthog-js registration from an
+  /// earlier one stops delivering even when it can't be unsubscribed.
+  int _featureFlagsGeneration = 0;
+
   // posthog-js has no current screen, so the feature events get it from here
   // the way native SDKs stamp it: the last screen beforeSend accepted, under
   // its final name, until close().
@@ -132,10 +136,17 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     // Skipped for a posthog-js stub without onFeatureFlags.
     if (ph != null && (ph as JSObject).has('onFeatureFlags')) {
       final dartCallback = config.onFeatureFlags;
+      // Repeated setup would otherwise deliver each load twice.
+      _featureFlagsUnsubscribe?.callAsFunction();
+      _featureFlagsUnsubscribe = null;
+      final generation = ++_featureFlagsGeneration;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
+        // The posthog-js loader snippet queues the registration and returns
+        // no unsubscribe, so a later setup() or close() can't remove it.
+        if (generation != _featureFlagsGeneration) return;
         final loaded = featureFlagsLoadedFromMap({
           'variants': jsFlagVariants.dartify(),
           'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
@@ -146,9 +157,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         dartCallback?.call(loaded);
       }.toJS;
 
-      // Repeated setup would otherwise deliver each load twice.
-      _featureFlagsUnsubscribe?.callAsFunction();
-      _featureFlagsUnsubscribe = ph.onFeatureFlags(jsCallback);
+      // posthog-js replays loaded flags synchronously, and a callback may call
+      // close() or setup() before this returns the unsubscribe.
+      final unsubscribe = ph.onFeatureFlags(jsCallback);
+      if (generation == _featureFlagsGeneration) {
+        _featureFlagsUnsubscribe = unsubscribe;
+      } else {
+        unsubscribe?.callAsFunction();
+      }
     }
   }
 
@@ -514,6 +530,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     _currentScreen = null;
     _featureFlagsUnsubscribe?.callAsFunction();
     _featureFlagsUnsubscribe = null;
+    _featureFlagsGeneration++;
     return handleWebMethodCall(const MethodCall('close'));
   }
 
