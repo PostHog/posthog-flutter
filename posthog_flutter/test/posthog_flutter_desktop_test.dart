@@ -657,6 +657,40 @@ void main() {
       expect(event['session_id'], isA<String>());
     });
 
+    test('properties the callbacks remove stay removed', () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final flagsLoaded = Completer<void>();
+      Map<String, Object?>? seen;
+      final removed = [
+        r'$feature/variant-flag',
+        r'$active_feature_flags',
+        r'$recording_status',
+      ];
+      final config = configFor(server)
+        ..onFeatureFlags = () {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        }
+        ..beforeSend = [
+          (event) {
+            seen = {...?event.properties};
+            event.properties = {...?event.properties}
+              ..removeWhere((key, _) => removed.contains(key));
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+
+      await platform.capture(eventName: 'scrubbed');
+
+      final properties = _propertiesOf(await server.waitForEvent('scrubbed'));
+      expect(seen!.keys, containsAll(removed));
+      for (final key in removed) {
+        expect(properties, isNot(contains(key)));
+      }
+    });
+
     test('the event time is taken before the callbacks run', () async {
       final server = await LocalPostHogServer.start();
       late DateTime hookStarted;

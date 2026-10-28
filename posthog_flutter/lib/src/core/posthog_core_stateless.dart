@@ -293,12 +293,9 @@ abstract class PostHogCoreStateless {
     required String event,
     required Map<String, Object?> properties,
   }) {
-    // The event's properties win over the SDK's.
-    var eventProperties = {
-      ...getCommonEventProperties(),
-      ...properties,
-    };
-    // Minimized once all SDK properties are in.
+    // The properties come complete, the SDK's included: nothing is added
+    // here, so a property the beforeSend callbacks removed stays removed.
+    var eventProperties = {...properties};
     if (event == r'$feature_flag_called' &&
         eventProperties[r'$feature_flag_has_experiment'] == false &&
         isMinimalFlagCalledEventsEnabled()) {
