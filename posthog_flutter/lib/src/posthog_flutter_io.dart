@@ -3,6 +3,7 @@ import 'dart:async';
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
@@ -608,9 +609,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return featureFlagsLoadedFromMap(null);
     }
 
+    final generation = FeatureFlagsListeners.instance.generation;
     try {
-      return featureFlagsLoadedFromMap(
+      final loaded = featureFlagsLoadedFromMap(
           await _methodChannel.invokeMethod('reloadFeatureFlags'));
+      // posthog-android hands a manual reload only to its completion, not to
+      // the config callback that sends onFeatureFlagsCallback.
+      if (defaultTargetPlatform == TargetPlatform.android &&
+          generation == FeatureFlagsListeners.instance.generation) {
+        FeatureFlagsListeners.instance.deliver(loaded);
+      }
+      return loaded;
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reloadFeatureFlags: $exception');
       return featureFlagsLoadedFromMap(null);

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
@@ -363,6 +364,67 @@ void main() {
       await sendNativeFlags();
 
       expect(received.single.variants, {'old-user-only': true});
+    });
+
+    void mockReload(Future<Object?> Function() reload) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return call.method == 'reloadFeatureFlags' ? reload() : null;
+      });
+    }
+
+    const reloaded = {
+      'variants': {'manual': true},
+      'errorsLoading': false,
+    };
+
+    test('Android reload result reaches active and later listeners', () async {
+      FeatureFlagsListeners.instance.clear();
+      mockReload(() async => reloaded);
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+
+      await posthogFlutterIO.reloadFeatureFlags();
+      final late = <PostHogFeatureFlagsLoaded>[];
+      final lateSubscription = FeatureFlagsListeners.instance.add(late.add);
+      addTearDown(lateSubscription.unsubscribe);
+      await pumpEventQueue();
+
+      expect(received.single.variants, {'manual': true});
+      expect(late.single.variants, {'manual': true});
+    });
+
+    test('iOS reload result is left to the native notification', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      FeatureFlagsListeners.instance.clear();
+      mockReload(() async => reloaded);
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+
+      await posthogFlutterIO.reloadFeatureFlags();
+
+      expect(received, isEmpty);
+    });
+
+    test('drops an Android reload result that finishes after a reset',
+        () async {
+      PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+      final reply = Completer<Object?>();
+      mockReload(() => reply.future);
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+
+      final reload = posthogFlutterIO.reloadFeatureFlags();
+      await Posthog().reset();
+      reply.complete(reloaded);
+      await reload;
+
+      expect(received, isEmpty);
     });
 
     test('does not invoke callback when no callback is registered', () async {
