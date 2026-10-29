@@ -104,6 +104,19 @@ void main() {
     expect(calls, ['checkout', 'reset']);
   });
 
+  test('hooks that never finish hold later calls back for maxWait in total',
+      () {
+    fakeAsync((async) {
+      for (var i = 0; i < 5; i++) {
+        order.event(() => Completer<String>().future, record);
+      }
+      order.run(() => record('reset'));
+
+      async.elapse(CallOrder.maxWait);
+      expect(calls, ['reset']);
+    });
+  });
+
   test('stops holding calls back after maxWait, and still sends', () {
     fakeAsync((async) {
       final hook = Completer<String>();

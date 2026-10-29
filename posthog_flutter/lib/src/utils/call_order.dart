@@ -51,11 +51,12 @@ class CallOrder {
       if (hooked is! Future<E>) return send(hooked);
       return _hold(_take(), () => hooked, send);
     }
-    final turn = _take();
-    await turn.ahead;
-    return _hold(turn, () => _inZone(hook), send);
+    return _hold(_take(), () => _inZone(hook), send);
   }
 
+  // maxWait counts from the capture, not from when the hook starts, so hooks
+  // that never finish hold later calls back for maxWait in total rather than
+  // once per queued event.
   Future<void> _hold<E>(
     _Turn turn,
     FutureOr<E> Function() hook,
@@ -64,15 +65,16 @@ class CallOrder {
     final timer = Timer(maxWait, () {
       printIfDebug('[PostHog] beforeSend took longer than '
           '${maxWait.inSeconds}s; later calls no longer wait for it.');
-      turn.end();
+      turn.ahead.then((_) => turn.end());
     });
     try {
+      await turn.ahead;
       final hooked = hook();
       final processed = hooked is Future<E> ? await hooked : hooked;
       await _inZone(() => send(processed));
     } finally {
       timer.cancel();
-      turn.end();
+      turn.ahead.then((_) => turn.end());
     }
   }
 
