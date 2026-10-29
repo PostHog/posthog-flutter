@@ -430,6 +430,13 @@ class PostHogConfig {
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
+  /// - On every platform except Windows and Linux, PostHog calls made after a
+  ///   capture (including `reset()`, `identify()` and getters) wait until its
+  ///   callbacks finish, so the event keeps the user and consent it was
+  ///   captured under. A callback that runs longer than 10 seconds stops
+  ///   holding them back; its event is still sent. Calls made from inside a
+  ///   callback do not wait, but a callback that waits on a PostHog call made
+  ///   elsewhere stalls until that limit.
   List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, captureDeepLinks integrations

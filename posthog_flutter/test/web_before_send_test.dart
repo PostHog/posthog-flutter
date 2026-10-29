@@ -55,200 +55,178 @@ void main() {
     expect((captures.last['properties'] as Map)[r'$screen_name'], 'Basket');
   });
 
-  group('a reset() right after an un-awaited capture', () {
-    late List<String> sentAs;
-    late String distinctId;
+  group('calls made while an event is in flight', () {
+    late List<String> calls;
 
     setUp(() {
-      sentAs = [];
-      distinctId = 'old-user';
+      calls = [];
       final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
-      fake.setProperty('get_distinct_id'.toJS, (() => distinctId.toJS).toJS);
-      fake.setProperty('reset'.toJS, (() => distinctId = 'new-user').toJS);
-      for (final method in ['capture', 'captureException']) {
+      fake.setProperty(
+        'capture'.toJS,
+        ((JSString event, [JSAny? a, JSAny? b]) => calls.add(event.toDart))
+            .toJS,
+      );
+      for (final method in [
+        'captureException',
+        'reset',
+        'identify',
+        'alias',
+        'register',
+        'unregister',
+        'group',
+        'opt_in_capturing',
+        'opt_out_capturing',
+      ]) {
         fake.setProperty(
           method.toJS,
-          ((JSAny? a, JSAny? b, [JSAny? c]) {
-            final props = b.dartify() as Map?;
-            sentAs.add(props?['distinct_id'] as String? ?? distinctId);
-          }).toJS,
+          (([JSAny? a, JSAny? b, JSAny? c, JSAny? d]) => calls.add(method))
+              .toJS,
         );
       }
     });
 
-    test('sends the events as the old user without beforeSend', () async {
+    Future<PosthogFlutterWeb> setUpWeb({bool slowBeforeSend = true}) async {
       final web = PosthogFlutterWeb();
-      await web.setup(PostHogConfig('test_token'));
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        if (slowBeforeSend)
+          (event) async {
+            await Future<void>.delayed(Duration.zero);
+            return event;
+          },
+      ]));
+      return web;
+    }
+
+    List<Future<void>> captureAll(PosthogFlutterWeb web) => [
+          web.capture(eventName: 'checkout'),
+          web.screen(screenName: 'Cart'),
+          web.captureException(error: StateError('boom')),
+        ];
+
+    const captured = ['checkout', r'$screen', 'captureException'];
+
+    test('reach posthog-js first without beforeSend', () async {
+      final web = await setUpWeb(slowBeforeSend: false);
+
+      final sent = captureAll(web);
+      await web.reset();
+      await Future.wait(sent);
+
+      expect(calls, [...captured, 'reset']);
+    });
+
+    final followUps = <String, Future<void> Function(PosthogFlutterWeb)>{
+      'reset': (web) => web.reset(),
+      'identify': (web) => web.identify(userId: 'new-user'),
+      'alias': (web) => web.alias(alias: 'new-alias'),
+      'register': (web) => web.register('plan', 'pro'),
+      'unregister': (web) => web.unregister('plan'),
+      'group': (web) => web.group(groupType: 'company', groupKey: 'acme'),
+      'opt_in_capturing': (web) => web.enable(),
+      'opt_out_capturing': (web) => web.disable(),
+    };
+    for (final MapEntry(key: method, value: call) in followUps.entries) {
+      test('$method waits for events whose beforeSend is still running',
+          () async {
+        final web = await setUpWeb();
+
+        final sent = captureAll(web);
+        await call(web);
+        await Future.wait(sent);
+
+        expect(calls, [...captured, method]);
+      });
+    }
+
+    test('an account switch does not reach an earlier event', () async {
+      final web = await setUpWeb();
+
+      final sent = web.capture(eventName: 'checkout');
+      await web.reset();
+      await web.identify(userId: 'new-user');
+      await web.register('account_email', 'new@example.invalid');
+      await web.group(groupType: 'company', groupKey: 'new-company');
+      await sent;
+
+      expect(calls, ['checkout', 'reset', 'identify', 'register', 'group']);
+    });
+
+    test('a feature event waits for an earlier event', () async {
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) async {
+          if (event.event == 'checkout') {
+            await Future<void>.delayed(Duration.zero);
+          }
+          return event;
+        },
+      ]));
 
       final sent = [
         web.capture(eventName: 'checkout'),
-        web.screen(screenName: 'Cart'),
-        web.captureException(error: StateError('boom')),
+        web.captureFeatureView(flag: 'flag', flagVariant: 'a'),
       ];
       await web.reset();
       await Future.wait(sent);
 
-      expect(sentAs, ['old-user', 'old-user', 'old-user']);
+      expect(calls, ['checkout', r'$feature_view', 'reset']);
     });
 
-    test('keeps an event when posthog-js loads during beforeSend', () async {
-      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
-      // The loader snippet's stub returns undefined until posthog-js loads.
-      fake.setProperty('get_distinct_id'.toJS, (() => null).toJS);
-      final web = PosthogFlutterWeb();
-      await web.setup(PostHogConfig('test_token', beforeSend: [
-        (event) async {
-          fake.setProperty(
-              'get_distinct_id'.toJS, (() => distinctId.toJS).toJS);
-          return event;
-        },
-      ]));
-
-      await web.capture(eventName: 'app_started');
-
-      expect(sentAs, ['old-user']);
-    });
-
-    test('keeps the old user when beforeSend outlasts the reset', () async {
-      final web = PosthogFlutterWeb();
-      await web.setup(PostHogConfig('test_token', beforeSend: [
-        (event) async {
-          await Future<void>.delayed(Duration.zero);
-          return event;
-        },
-      ]));
-
-      final sent = [
-        web.capture(eventName: 'checkout'),
-        web.screen(screenName: 'Cart'),
-        web.captureException(error: StateError('boom')),
-      ];
-      await web.reset();
-      await Future.wait(sent);
-
-      expect(sentAs, ['old-user', 'old-user', 'old-user']);
-    });
-
-    test('does not pin the cookieless sentinel across an opt-in', () async {
-      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
-      distinctId = r'$posthog_cookieless';
-      fake.setProperty(
-          'opt_in_capturing'.toJS, (() => distinctId = 'new-user').toJS);
-      final web = PosthogFlutterWeb();
-      await web.setup(PostHogConfig('test_token', beforeSend: [
-        (event) async {
-          await Future<void>.delayed(Duration.zero);
-          return event;
-        },
-      ]));
-
-      final sent = [
-        web.capture(eventName: 'checkout'),
-        web.screen(screenName: 'Cart'),
-        web.captureException(error: StateError('boom')),
-      ];
-      await web.enable();
-      await Future.wait(sent);
-
-      expect(sentAs, ['new-user', 'new-user', 'new-user']);
-    });
-
-    test('does not pin the old user across a cookieless opt-out', () async {
-      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
-      fake.setProperty('opt_out_capturing'.toJS,
-          (() => distinctId = r'$posthog_cookieless').toJS);
-      final web = PosthogFlutterWeb();
-      await web.setup(PostHogConfig('test_token', beforeSend: [
-        (event) async {
-          await Future<void>.delayed(Duration.zero);
-          return event;
-        },
-      ]));
-
-      final sent = [
-        web.capture(eventName: 'checkout'),
-        web.screen(screenName: 'Cart'),
-        web.captureException(error: StateError('boom')),
-      ];
-      await web.disable();
-      await Future.wait(sent);
-
-      expect(sentAs, List.filled(3, r'$posthog_cookieless'));
-    });
-
-    test('does not pin the old user when reset() rejects consent', () async {
-      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
-      var rejected = false;
-      // opt_out_capturing_by_default: reset() clears consent, so posthog-js
-      // only swaps in the sentinel when it builds the event.
-      fake.setProperty(
+    for (final slow in [false, true]) {
+      test(
+          'a feature event looks its flag up after earlier calls '
+          '(${slow ? 'async' : 'no'} beforeSend)', () async {
+        final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+        var variant = 'old-user-variant';
+        fake.setProperty(
           'reset'.toJS,
           (() {
-            distinctId = 'reset-anonymous';
-            rejected = true;
-          }).toJS);
-      fake.setProperty(
-          'has_opted_out_capturing'.toJS, (() => rejected.toJS).toJS);
-      for (final method in ['capture', 'captureException']) {
-        fake.setProperty(
-          method.toJS,
-          ((JSAny? a, JSAny? b, [JSAny? c]) {
-            if (rejected) distinctId = r'$posthog_cookieless';
-            final props = b.dartify() as Map?;
-            sentAs.add(props?['distinct_id'] as String? ?? distinctId);
+            calls.add('reset');
+            variant = 'new-user-variant';
           }).toJS,
         );
-      }
+        fake.setProperty(
+          'getFeatureFlagResult'.toJS,
+          ((JSString key, [JSAny? options]) {
+            calls.add('lookup $variant');
+            return {'key': key.toDart, 'enabled': true, 'variant': variant}
+                .jsify();
+          }).toJS,
+        );
+        final web = await setUpWeb(slowBeforeSend: slow);
+
+        final sent = [
+          if (slow) web.capture(eventName: 'checkout'),
+          web.captureFeatureView(flag: 'flag'),
+        ];
+        await web.reset();
+        await Future.wait(sent);
+
+        expect(calls, [
+          if (slow) 'checkout',
+          'lookup old-user-variant',
+          r'$feature_view',
+          'reset',
+        ]);
+      });
+    }
+
+    test('beforeSend can capture without waiting for itself', () async {
       final web = PosthogFlutterWeb();
       await web.setup(PostHogConfig('test_token', beforeSend: [
         (event) async {
-          await Future<void>.delayed(Duration.zero);
+          if (event.event == 'checkout') {
+            await web.capture(eventName: 'from_hook');
+          }
           return event;
         },
       ]));
 
-      final sent = [
-        web.capture(eventName: 'checkout'),
-        web.screen(screenName: 'Cart'),
-        web.captureException(error: StateError('boom')),
-      ];
+      final sent = web.capture(eventName: 'checkout');
       await web.reset();
-      await Future.wait(sent);
+      await sent;
 
-      expect(sentAs, List.filled(3, r'$posthog_cookieless'));
-    });
-
-    test('does not pin a user captured under consent rejected elsewhere',
-        () async {
-      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
-      // Another tab rejected the shared consent; this tab's cached id is
-      // still the old user until opt-in resets it.
-      var rejected = true;
-      fake.setProperty(
-          'has_opted_out_capturing'.toJS, (() => rejected.toJS).toJS);
-      fake.setProperty(
-          'opt_in_capturing'.toJS,
-          (() {
-            distinctId = 'new-user';
-            rejected = false;
-          }).toJS);
-      final web = PosthogFlutterWeb();
-      await web.setup(PostHogConfig('test_token', beforeSend: [
-        (event) async {
-          await Future<void>.delayed(Duration.zero);
-          return event;
-        },
-      ]));
-
-      final sent = [
-        web.capture(eventName: 'checkout'),
-        web.screen(screenName: 'Cart'),
-        web.captureException(error: StateError('boom')),
-      ];
-      await web.enable();
-      await Future.wait(sent);
-
-      expect(sentAs, ['new-user', 'new-user', 'new-user']);
+      expect(calls, ['from_hook', 'checkout', 'reset']);
     });
   });
 
