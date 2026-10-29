@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 
@@ -85,9 +86,22 @@ Future<int> flagsRequestsFor(
   return api.flagsRequests.length - before - 1;
 }
 
+/// The value of [future], which an inline [QueueWorker] completes right
+/// away.
+T now<T>(Future<T> future) {
+  late T value;
+  var done = false;
+  future.then((result) {
+    value = result;
+    done = true;
+  });
+  if (!done) throw StateError('The future did not complete synchronously.');
+  return value;
+}
+
 /// The queued event messages, oldest first.
 List<Map<String, Object?>> getQueue(FileStorage storage) => [
-      for (final queued in storage.queue.peek(storage.queue.length))
+      for (final queued in now(storage.queue.peek(storage.queue.length)))
         queued.event,
     ];
 

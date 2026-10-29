@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:meta/meta.dart';
 
 import '../feature_flag_result.dart';
@@ -447,20 +448,43 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// Unlike [capture], it adds nothing to it. Its `$set` / `$set_once`
   /// feed flag evaluation.
   ///
-  /// With [ai], the event goes to PostHog's AI endpoint from a queue of its
-  /// own, which drops a serialized event over its size limit.
-  ///
   /// Returns the event's uuid, or null when it is not queued: the client
-  /// is closed or opted out, or the AI event is over the size limit.
-  String? capturePrepared(
-    String event,
-    PostHogPreparedEvent prepared, {
-    bool ai = false,
-  }) =>
+  /// is closed or opted out.
+  String? capturePrepared(String event, PostHogPreparedEvent prepared) =>
       wrap<String?>(() {
         if (_ignoredWhileOptedOut('posthog.capture')) return null;
-        return _queuePrepared(event, prepared, ai: ai);
+        return _queuePrepared(event, prepared);
       });
+
+  /// Queues an AI event built by [prepareEvent], like [capturePrepared], on
+  /// the queue of PostHog's AI endpoint, which drops a serialized event over
+  /// its size limit.
+  ///
+  /// Completes with the event's uuid, or null when it is not queued: the
+  /// client is closed or opted out, or the event is over the size limit.
+  /// Its person properties apply once it is queued, and only while the user
+  /// it was captured for is still the current one.
+  Future<String?> captureAiPrepared(
+    String event,
+    PostHogPreparedEvent prepared,
+  ) {
+    final queued = wrap<Future<String?>>(() {
+      if (_ignoredWhileOptedOut('posthog.capture')) {
+        return SynchronousFuture(null);
+      }
+      final (:properties, :options, :timestamp) = prepared;
+      final distinctId = getDistinctId();
+      return captureAiStateless(distinctId, event,
+              properties: properties, options: options, timestamp: timestamp)
+          .then((uuid) {
+        if (uuid != null && getDistinctId() == distinctId) {
+          _applyPersonProperties(properties);
+        }
+        return uuid;
+      });
+    });
+    return queued ?? SynchronousFuture(null);
+  }
 
   /// [options] with `process_person_profile: false` added when person
   /// processing is off and [properties] neither ask for it nor set
@@ -496,26 +520,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
     );
   }
 
-  String? _queuePrepared(
-    String event,
-    PostHogPreparedEvent prepared, {
-    bool ai = false,
-  }) {
+  String _queuePrepared(String event, PostHogPreparedEvent prepared) {
     final (:properties, :options, :timestamp) = prepared;
     final uuid = captureStateless(getDistinctId(), event,
-        properties: properties, options: options, timestamp: timestamp, ai: ai);
-    if (uuid == null) return null;
-    // Taken from the event as queued, after the beforeSend callbacks, so a
-    // value they removed or an event they or the size limit dropped neither
-    // reaches /flags nor turns on person processing for later events.
-    if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
-    _setPersonPropertiesForFlagsIfNeeded(
-      _asPropertyMap(properties[r'$set']),
-      _asPropertyMap(properties[r'$set_once']),
-    );
-    // PostHog drops an AI event that is not an `$ai_*` event, so it never
-    // updates the person.
-    if (!ai && (event == r'$set' || event == r'$identify')) {
+        properties: properties, options: options, timestamp: timestamp);
+    _applyPersonProperties(properties);
+    if (event == r'$set' || event == r'$identify') {
       final set = properties[r'$set'];
       final setOnce = properties[r'$set_once'];
       if ((set is Map || setOnce is Map) &&
@@ -525,6 +535,18 @@ abstract class PostHogCore extends PostHogCoreStateless {
       }
     }
     return uuid;
+  }
+
+  /// Applies the person properties of a queued event with [properties]:
+  /// taken from the event as queued, after the beforeSend callbacks, so a
+  /// value they removed or an event they or the size limit dropped neither
+  /// reaches /flags nor turns on person processing for later events.
+  void _applyPersonProperties(Map<String, Object?> properties) {
+    if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
+    _setPersonPropertiesForFlagsIfNeeded(
+      _asPropertyMap(properties[r'$set']),
+      _asPropertyMap(properties[r'$set_once']),
+    );
   }
 
   /// Creates an alias for a user. An empty [alias] is ignored.

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:meta/meta.dart';
@@ -15,6 +16,7 @@ import 'feature_flags.dart';
 import 'file_storage.dart';
 import 'logger.dart';
 import 'persistence.dart';
+import 'queue_worker.dart';
 import 'utils/utils.dart';
 import 'uuid.dart';
 
@@ -342,20 +344,39 @@ abstract class PostHogCoreStateless {
     );
   }
 
-  /// Queues [event] and returns its uuid, or null when it is not queued.
-  /// With [ai], the event goes to the AI queue, which drops an event over
-  /// its size limit.
+  /// Queues [event] and returns its uuid.
   @protected
-  String? captureStateless(
+  String captureStateless(
     String distinctId,
     String event, {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
-    bool ai = false,
+  }) =>
+      _enqueue(
+        _analytics,
+        'capture',
+        _buildPayload(
+          distinctId: distinctId,
+          event: event,
+          properties: properties,
+        ),
+        options: options,
+        timestamp: timestamp,
+      ).uuid;
+
+  /// Queues [event] on the AI queue, and completes with its uuid, or null
+  /// when it is over the AI event size limit and so not queued.
+  @protected
+  Future<String?> captureAiStateless(
+    String distinctId,
+    String event, {
+    required Map<String, Object?> properties,
+    Map<String, Object?>? options,
+    String? timestamp,
   }) {
-    return _enqueue(
-      ai ? _ai : _analytics,
+    final (:uuid, :queued) = _enqueue(
+      _ai,
       'capture',
       _buildPayload(
         distinctId: distinctId,
@@ -365,6 +386,7 @@ abstract class PostHogCoreStateless {
       options: options,
       timestamp: timestamp,
     );
+    return queued.then((kept) => kept ? uuid : null);
   }
 
   @protected
@@ -495,11 +517,11 @@ abstract class PostHogCoreStateless {
     });
   }
 
-  /// Queues [message] on [lane] and returns its uuid, or null when it is
-  /// over the lane's event size limit. Its capture v1 [options] are queued
-  /// with it; the legacy option properties are converted only when the
-  /// request is built, see [captureV1Event].
-  String? _enqueue(
+  /// Queues [message] on [lane] and returns its uuid, with whether the queue
+  /// keeps it: the AI queue drops an event over its size limit. Its capture
+  /// v1 [options] are queued with it; the legacy option properties are
+  /// converted only when the request is built, see [captureV1Event].
+  ({String uuid, Future<bool> queued}) _enqueue(
     _CaptureLane lane,
     String type,
     Map<String, Object?> message, {
@@ -519,45 +541,50 @@ abstract class PostHogCoreStateless {
       'uuid': generateUuidV7(),
     };
 
-    // Measured as queued, before compression.
-    String? json;
-    int? bytes;
-    final maxEventBytes = lane.maxEventBytes;
-    if (maxEventBytes != null) {
-      json = jsonEncode(prepared);
-      bytes = utf8.encode(json).length;
-      if (bytes > maxEventBytes) {
-        // Name and size only: AI properties can hold prompts and media.
-        logger.warn('Dropping AI event ${message['event']} of $bytes bytes, '
-            'over the $maxEventBytes byte limit.');
-        return null;
-      }
-    }
-
     final queue = lane.queue;
-    final overflow = queue.length - lane.maxQueueSize + 1;
+    final maxEventBytes = lane.maxEventBytes;
+    // An event that can still be dropped for its size makes room only once
+    // it is kept, so that it never displaces an older one for nothing.
+    if (maxEventBytes == null) _makeRoom(lane, incoming: 1);
+    // Measured by the worker as queued, before compression.
+    final queued = queue.add(prepared, maxBytes: maxEventBytes).then((result) {
+      if (result.tooLarge) {
+        // Name and size only: AI properties can hold prompts and media.
+        logger.warn('Dropping AI event ${message['event']} of '
+            '${result.bytes} bytes, over the $maxEventBytes byte limit.');
+        return false;
+      }
+      if (maxEventBytes != null) _makeRoom(lane, incoming: 0);
+      final maxQueueBytes = lane.maxQueueBytes;
+      if (maxQueueBytes != null && queue.removeOldestOver(maxQueueBytes) > 0) {
+        logger.warn('Queue is over $maxQueueBytes bytes, the oldest events '
+            'are dropped.');
+      }
+
+      events.emit(type, prepared);
+
+      // A full request's worth of bytes flushes like flushAt does, so large
+      // events go out before the queue starts dropping them.
+      if (queue.byteCount >= captureV1MaxBatchBytes) _flushBackground(lane);
+      return true;
+    }, onError: (Object e) {
+      logger.error('Failed to queue an event:', e);
+      return false;
+    });
+
+    if (queue.length >= lane.flushAt) _flushBackground(lane);
+    _scheduleFlush(lane);
+    return (uuid: prepared['uuid'] as String, queued: queued);
+  }
+
+  /// Drops the oldest events of [lane] so that its queue has room for
+  /// [incoming] more.
+  void _makeRoom(_CaptureLane lane, {required int incoming}) {
+    final overflow = lane.queue.length - lane.maxQueueSize + incoming;
     if (overflow > 0) {
-      queue.removeOldest(overflow);
+      lane.queue.removeOldest(overflow);
       logger.warn('Queue is full, the oldest event is dropped.');
     }
-    queue.add(prepared, json: json, bytes: bytes);
-    final maxQueueBytes = lane.maxQueueBytes;
-    if (maxQueueBytes != null && queue.removeOldestOver(maxQueueBytes) > 0) {
-      logger.warn('Queue is over $maxQueueBytes bytes, the oldest events are '
-          'dropped.');
-    }
-
-    events.emit(type, prepared);
-
-    // A full request's worth of bytes flushes like flushAt does, so large
-    // events go out before the queue starts dropping them.
-    if (queue.length >= lane.flushAt ||
-        queue.byteCount >= captureV1MaxBatchBytes) {
-      _flushBackground(lane);
-    }
-
-    _scheduleFlush(lane);
-    return prepared['uuid'] as String;
   }
 
   /// The event properties as they are queued and sent: values JSON cannot
@@ -645,7 +672,8 @@ abstract class PostHogCoreStateless {
       // go out with the same flush. The queue sizes the batch before
       // reading it, so events past the batch are not decoded.
       final batch =
-          queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
+          await queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
+      if (_closed) break;
       if (batch.isEmpty) {
         if (queue.length > 0) _scheduleFlush(lane);
         break;
@@ -762,12 +790,12 @@ abstract class PostHogCoreStateless {
           );
     lane.pendingIdentity = identity;
 
-    final body = jsonEncode({
+    final body = await storage.worker.encodeBody({
       'created_at': identity.createdAt,
       'batch': [
         for (final queued in batch) captureV1Event(queued.event, logger),
       ],
-    });
+    }, gzip: lane.compression == PostHogCompression.gzip);
     final headers = {
       HttpHeaders.authorizationHeader: 'Bearer $_apiKey',
       'PostHog-Sdk-Info': '$postHogFlutterSdkName/$postHogFlutterVersion',
@@ -812,7 +840,7 @@ abstract class PostHogCoreStateless {
   Future<({int status, String? body, Duration? retryAfter, String? location})>
       _fetchCaptureV1(
     _CaptureLane lane,
-    String body,
+    EncodedBody body,
     Map<String, String> headers,
   ) async {
     final origin = Uri.parse(_host);
@@ -847,14 +875,15 @@ abstract class PostHogCoreStateless {
     required Duration retryDelay,
     required bool Function(Object error) retryCheck,
   }) async {
+    final encoded = _encode(body, _compression);
     return retriable(
       () async {
-        final response = await _fetchOnce(Uri.parse(url), body);
+        final response = await _fetchOnce(Uri.parse(url), encoded);
         if (response.status < 200 || response.status >= 300) {
           throw PostHogFetchHttpError(
             response.status,
             response.body ?? '',
-            body.length,
+            encoded.length,
             retryAfter: response.retryAfter,
           );
         }
@@ -867,8 +896,8 @@ abstract class PostHogCoreStateless {
   }
 
   /// Sends one request, aborted once it makes no progress for [timeout],
-  /// [_requestTimeout] by default, and compressed with [compression], the
-  /// configured one by default. A transport failure is thrown as
+  /// [_requestTimeout] by default. [body] is compressed with [compression],
+  /// the configured one by default. A transport failure is thrown as
   /// [PostHogFetchNetworkError], except, with [deliveredOnBodyFailure], one
   /// that happens after a 2xx status arrived: the response is then returned
   /// without a body.
@@ -880,7 +909,7 @@ abstract class PostHogCoreStateless {
         String? location,
       })> _fetchOnce(
     Uri url,
-    String body, {
+    EncodedBody body, {
     Map<String, String> headers = const {},
     bool deliveredOnBodyFailure = false,
     Duration timeout = _requestTimeout,
@@ -889,8 +918,8 @@ abstract class PostHogCoreStateless {
     final attempt = _FetchAttempt(timeout,
         timeout > _responseBodyTimeout ? timeout : _responseBodyTimeout);
     try {
-      return await attempt.guard(
-          _fetch(url, body, attempt, headers, compression ?? _compression));
+      return await attempt.guard(_fetch(url, body, attempt, headers,
+          (compression ?? _compression) == PostHogCompression.gzip));
     } catch (e) {
       final status = attempt.status;
       if (deliveredOnBodyFailure &&
@@ -906,6 +935,18 @@ abstract class PostHogCoreStateless {
       }
       throw PostHogFetchNetworkError(e);
     }
+  }
+
+  /// [json] as a request body, encoded here: for the small `/flags`
+  /// requests, which don't wait for the queue's worker.
+  static EncodedBody _encode(String json, PostHogCompression compression) {
+    final bytes = utf8.encode(json);
+    return (
+      payload: compression == PostHogCompression.gzip
+          ? Uint8List.fromList(gzip.encode(bytes))
+          : bytes,
+      length: bytes.length,
+    );
   }
 
   static Duration? _parseRetryAfter(String? value) {
@@ -932,10 +973,10 @@ abstract class PostHogCoreStateless {
         String? location,
       })> _fetch(
     Uri url,
-    String body,
+    EncodedBody body,
     _FetchAttempt attempt,
     Map<String, String> headers,
-    PostHogCompression compression,
+    bool gzipped,
   ) async {
     final request = await _httpClient.postUrl(url);
     attempt.attachRequest(request);
@@ -950,14 +991,10 @@ abstract class PostHogCoreStateless {
           '$postHogFlutterSdkName/$postHogFlutterVersion')
       ..set(HttpHeaders.contentTypeHeader, 'application/json');
     headers.forEach(request.headers.set);
-    final bytes = utf8.encode(body);
-    final List<int> payload;
-    if (compression == PostHogCompression.gzip) {
+    if (gzipped) {
       request.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
-      payload = gzip.encode(bytes);
-    } else {
-      payload = bytes;
     }
+    final payload = body.payload;
     request.contentLength = payload.length;
     // In chunks, so the socket taking each one counts as progress: it stops
     // taking them while its buffers are full.
@@ -984,6 +1021,11 @@ abstract class PostHogCoreStateless {
       location: response.headers.value(HttpHeaders.locationHeader),
     );
   }
+
+  /// Completes once the queues have no file work left: every event queued
+  /// so far is on disk, and every event removed is deleted. A client opening
+  /// the same directory after that finds exactly the events still to send.
+  Future<void> get settled => storage.settled;
 
   /// Closes the client without sending anything: stops the periodic flush,
   /// aborts the requests in flight, ignores later calls and releases the

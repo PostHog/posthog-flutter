@@ -1560,6 +1560,42 @@ void main() {
       expect(await nextLaunch.isOptOut(), isTrue);
       expect(await nextLaunch.getDistinctId(), distinctId);
     });
+    test('an event left unsent at close is sent once after the next setup',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond =
+          (_) => const PostHogResponse(HttpStatus.serviceUnavailable);
+      final platform = createPlatform();
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'kept');
+      await platform.close();
+
+      // The server records the events of the refused requests too.
+      final refused = server.eventNames.length;
+      server.respond = (_) => const PostHogResponse(HttpStatus.ok);
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'sentinel');
+      await server.waitForEvent('sentinel');
+
+      expect(server.eventNames.skip(refused).where((name) => name == 'kept'),
+          hasLength(1));
+    });
+
+    test('an event sent before close is not sent again after the next setup',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = createPlatform();
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'once');
+      await server.waitForEvent('once');
+      await platform.close();
+
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'sentinel');
+      await server.waitForEvent('sentinel');
+
+      expect(server.eventNames.where((name) => name == 'once'), hasLength(1));
+    });
   });
 
   group('PosthogFlutterDesktop.setup', () {

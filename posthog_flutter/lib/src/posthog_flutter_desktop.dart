@@ -693,6 +693,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       printIfDebug('[PostHog] Events left unsent on close: $e');
     }
     client.close();
+    // The next client reads the directory only once this one's files are
+    // written and deleted, so it neither misses an event nor sends one again.
+    await client.settled;
   }
 
   @override
@@ -819,7 +822,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// with [ai], and returns its uuid, or null when it is not queued. The
   /// client adds nothing to it; an `$exception` event gets the exception
   /// steps recorded up to now.
-  String? _captureProcessed(
+  FutureOr<String?> _captureProcessed(
     DesktopPostHog client,
     PostHogEvent event,
     ExceptionStepsBuffer? exceptionSteps,
@@ -847,14 +850,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       options = client.personProcessingOptions(
           {...?options}..remove('process_person_profile'), properties);
     }
-    return client.capturePrepared(
-        event.event,
-        (
-          properties: properties,
-          options: options,
-          timestamp: prepared.timestamp,
-        ),
-        ai: ai);
+    final queued = (
+      properties: properties,
+      options: options,
+      timestamp: prepared.timestamp,
+    );
+    return ai
+        ? client.captureAiPrepared(event.event, queued)
+        : client.capturePrepared(event.event, queued);
   }
 
   /// Whether [event] has a name; an event without one is dropped.
