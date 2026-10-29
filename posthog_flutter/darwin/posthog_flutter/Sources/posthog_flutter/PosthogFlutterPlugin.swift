@@ -1610,11 +1610,9 @@ extension PosthogFlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ) {
-        guard let args = call.arguments as? [String: Any] else {
-            _badArgumentError(result)
-            return
-        }
-        guard let eventName = args["eventName"] as? String else {
+        guard let args = call.arguments as? [String: Any],
+              let eventName = args["eventName"] as? String
+        else {
             _badArgumentError(result)
             return
         }
