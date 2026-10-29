@@ -1409,8 +1409,13 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String
         {
-            let sendEvent = args["sendEvent"] as? Bool ?? true
-            let flagResult = PostHogSDK.shared.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+            // A missing sendEvent follows config.sendFeatureFlagEvent.
+            let flagResult: PostHogFeatureFlagResult?
+            if let sendEvent = args["sendEvent"] as? Bool {
+                flagResult = PostHogSDK.shared.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+            } else {
+                flagResult = PostHogSDK.shared.getFeatureFlagResult(featureFlagKey)
+            }
 
             if let flagResult {
                 result([

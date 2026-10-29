@@ -915,9 +915,10 @@ class Posthog {
   /// This is the canonical method for getting feature flag data.
   /// Returns `null` if the flag does not exist or cannot be loaded.
   ///
-  /// Set [sendFeatureFlagEvent] to `false` to suppress the
-  /// `$feature_flag_called` event. This is useful when you only need the
-  /// payload and do not want to emit the event.
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` when you only need the
+  /// payload, or `true` to capture the event even when the config turns it off.
   ///
   /// **Example:**
   /// ```dart
@@ -929,7 +930,7 @@ class Posthog {
   /// ```
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult(
     String key, {
-    bool sendFeatureFlagEvent = true,
+    bool? sendFeatureFlagEvent,
   }) =>
       _posthog.getFeatureFlagResult(
           key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);

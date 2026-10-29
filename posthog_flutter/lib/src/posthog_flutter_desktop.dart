@@ -585,7 +585,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendFeatureFlagEvent = true,
+    bool? sendFeatureFlagEvent,
   }) =>
       _guardWith(
           'getFeatureFlagResult',

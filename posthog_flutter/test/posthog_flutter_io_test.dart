@@ -80,7 +80,7 @@ void main() {
       expect(
           await posthogFlutterIO.getFeatureFlagResult(key: 'missing'), isNull);
       expect(log.single.method, 'getFeatureFlagResult');
-      expect(log.single.arguments, {'key': 'missing', 'sendEvent': true});
+      expect(log.single.arguments, {'key': 'missing'});
     });
   });
 

@@ -465,11 +465,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       return featureFlag?.dartify();
     case 'getFeatureFlagResult':
       final key = args['key'] as String;
-      final sendEvent = args['sendEvent'] as bool? ?? true;
+      final sendEvent = args['sendEvent'] as bool?;
 
       final result = posthog?.getFeatureFlagResult(
         stringToJSAny(key),
-        {'send_event': sendEvent}.jsify(),
+        {if (sendEvent != null) 'send_event': sendEvent}.jsify(),
       );
       return result?.dartify();
     case 'getAllFeatureFlags':

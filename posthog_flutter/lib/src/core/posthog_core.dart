@@ -900,10 +900,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   /// Gets the result for a specific feature flag, capturing
-  /// `$feature_flag_called` when [sendEvent] is true.
+  /// `$feature_flag_called` when [sendEvent] is true, or when it is null and
+  /// `sendFeatureFlagEvent` is enabled in the config.
   PostHogFeatureFlagResult? getFeatureFlagResult(
     String key, {
-    required bool sendEvent,
+    bool? sendEvent,
   }) {
     final storedDetails = _getStoredFlagDetails();
     final details = storedDetails?.toResponse();
@@ -912,7 +913,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         true;
     final featureFlag = details?.flags[key];
     final flagValue = getFeatureFlagValue(featureFlag);
-    final shouldSendEvent = sendEvent &&
+    final shouldSendEvent = (sendEvent ?? _sendFeatureFlagEvent) &&
         !optedOut &&
         !(_flagCallReported[key]?.contains(flagValue) ?? false);
 
