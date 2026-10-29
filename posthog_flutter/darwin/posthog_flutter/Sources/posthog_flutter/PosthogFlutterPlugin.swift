@@ -46,7 +46,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     // Events built for the Dart beforeSend callbacks, keyed by uuid, until Dart
     // sends or drops them. Main-thread confined, like the channel callbacks.
-    private var builtEvents: [String: PostHogEvent] = [:]
+    // An event whose callbacks haven't finished after builtEventTimeout is
+    // dropped on the next build, so a callback that never completes can't
+    // keep it in memory.
+    private var builtEvents: [String: (event: PostHogEvent, builtAt: Date)] = [:]
+    private static let builtEventTimeout: TimeInterval = 60
 
     private static let nativeBeforeSendLock = NSLock()
     private static var nativeBeforeSend: [BeforeSendBlock] = []
@@ -1631,7 +1635,9 @@ extension PosthogFlutterPlugin {
             return
         }
         let uuid = built.uuid.uuidString.lowercased()
-        builtEvents[uuid] = built
+        let now = Date()
+        builtEvents = builtEvents.filter { now.timeIntervalSince($0.value.builtAt) < Self.builtEventTimeout }
+        builtEvents[uuid] = (built, now)
         result([
             "event": built.event,
             "uuid": uuid,
@@ -1655,7 +1661,7 @@ extension PosthogFlutterPlugin {
             _badArgumentError(result)
             return
         }
-        guard let built = builtEvents.removeValue(forKey: uuid) else {
+        guard let built = builtEvents.removeValue(forKey: uuid)?.event else {
             result(nil)
             return
         }

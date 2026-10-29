@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.PixelCopy
 import android.view.SurfaceView
@@ -63,6 +64,8 @@ private const val END_DEBOUNCE_TICKS = 1
 
 private const val BRIDGE_FAILURE_STRIKE_LIMIT = 3
 
+private const val BUILT_EVENT_TIMEOUT_MS = 60_000L
+
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
     FlutterPlugin,
@@ -83,7 +86,10 @@ class PosthogFlutterPlugin :
 
     // Events built for the Dart beforeSend callbacks, keyed by uuid, until Dart
     // sends or drops them. Main-thread confined, like the channel callbacks.
-    private val builtEvents = mutableMapOf<String, PostHogEvent>()
+    // An event whose callbacks haven't finished after BUILT_EVENT_TIMEOUT_MS is
+    // dropped on the next build, so a callback that never completes can't keep
+    // it in memory.
+    private val builtEvents = mutableMapOf<String, Pair<PostHogEvent, Long>>()
 
     // Test seam: captures the built config even if setup() throws (mock Context in
     // unit tests). postHogConfig is only published on success, so production readers
@@ -1878,7 +1884,9 @@ class PosthogFlutterPlugin :
                 result.success(null)
                 return
             }
-            builtEvents[uuid] = built
+            val now = SystemClock.elapsedRealtime()
+            builtEvents.values.removeAll { (_, builtAt) -> now - builtAt >= BUILT_EVENT_TIMEOUT_MS }
+            builtEvents[uuid] = built to now
             result.success(
                 mapOf(
                     "event" to built.event,
@@ -1904,7 +1912,7 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val uuid: String = call.argument("uuid")!!
-            val built = builtEvents.remove(uuid)
+            val built = builtEvents.remove(uuid)?.first
             if (built == null) {
                 result.success(null)
                 return

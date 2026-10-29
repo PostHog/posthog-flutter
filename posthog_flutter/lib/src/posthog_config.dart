@@ -463,7 +463,8 @@ class PostHogConfig {
   ///   registered properties and the options the SDK adds, and can change
   ///   them for that event, except `$lib` and `$lib_version`, which PostHog
   ///   sets from the SDK. On iOS, macOS and Android, registering callbacks
-  ///   adds one more call to the native SDK per event. On web, only the event's own
+  ///   adds one more call to the native SDK per event, and an event whose
+  ///   callbacks take more than a minute can be dropped. On web, only the event's own
   ///   properties are available; posthog-js adds the rest later.
   ///
   /// **Note:**
