@@ -313,8 +313,24 @@ class PostHogConfig {
 
   /// Callback to be invoked when feature flags are loaded.
   ///
-  /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
-  /// callback to access the loaded flag values.
+  /// It receives the enabled flags and whether loading failed. It runs after
+  /// the flags load at startup, after [Posthog.reloadFeatureFlags], and after
+  /// calls that reload flags such as `identify()` or `group()`. When a load
+  /// fails, [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the flags
+  /// are the last known values. Defaults to `null`.
+  ///
+  /// **Android:** not called after [Posthog.reloadFeatureFlags]. Use the
+  /// flags that call returns instead.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('<project_token>')
+  ///   ..onFeatureFlags = (loaded) {
+  ///     if (loaded.variants['new-checkout'] == 'test') {
+  ///       // Show the test variant.
+  ///     }
+  ///   };
+  /// ```
   OnFeatureFlagsCallback? onFeatureFlags;
 
   /// Whether to automatically register this device's push token with PostHog.
