@@ -89,8 +89,13 @@ void main() {
     expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
 
     recordedCalls.clear();
+    final resetsBefore = PostHogInternalEvents.forceReplaySessionReset.value;
     await Posthog().optIn();
 
+    expect(
+      PostHogInternalEvents.forceReplaySessionReset.value,
+      greaterThan(resetsBefore),
+    );
     expect(methodsOf(recordedCalls), contains('enable'));
     expect(
       methodsOf(recordedCalls),
