@@ -502,16 +502,17 @@ abstract class PostHogCore extends PostHogCoreStateless {
     bool ai = false,
   }) {
     final (:properties, :options, :timestamp) = prepared;
+    final uuid = captureStateless(getDistinctId(), event,
+        properties: properties, options: options, timestamp: timestamp, ai: ai);
+    if (uuid == null) return null;
     // Taken from the event as queued, after the beforeSend callbacks, so a
-    // value they removed or an event they dropped neither reaches /flags
-    // nor turns on person processing for later events.
+    // value they removed or an event they or the size limit dropped neither
+    // reaches /flags nor turns on person processing for later events.
     if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
     _setPersonPropertiesForFlagsIfNeeded(
       _asPropertyMap(properties[r'$set']),
       _asPropertyMap(properties[r'$set_once']),
     );
-    final uuid = captureStateless(getDistinctId(), event,
-        properties: properties, options: options, timestamp: timestamp, ai: ai);
     // PostHog drops an AI event that is not an `$ai_*` event, so it never
     // updates the person.
     if (!ai && (event == r'$set' || event == r'$identify')) {

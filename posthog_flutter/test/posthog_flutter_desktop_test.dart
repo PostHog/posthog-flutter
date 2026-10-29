@@ -1372,6 +1372,27 @@ void main() {
       expect(uuid, isNull);
     });
 
+    test('an oversized event does not turn on person processing', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..captureAiMaxEventBytes = 4096);
+
+      final uuid = await platform.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_input': 'x' * 5000},
+        userProperties: {'email': 'user@example.com'},
+      );
+      await platform.capture(eventName: 'after drop');
+      await platform.reloadFeatureFlags();
+
+      expect(uuid, isNull);
+      final event = await server.waitForEvent('after drop');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+      expect(server.flagsRequests.single.body['person_properties'],
+          isNot(contains('email')));
+    });
+
     test('returns null while opted out', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
