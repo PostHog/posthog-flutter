@@ -1,4 +1,4 @@
-@_spi(PostHogInternal) @_spi(PostHogWrapper) import PostHog
+@_spi(PostHogInternal) import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
