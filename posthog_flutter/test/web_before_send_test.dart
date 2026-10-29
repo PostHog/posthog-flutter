@@ -217,6 +217,39 @@ void main() {
 
       expect(sentAs, List.filled(3, r'$posthog_cookieless'));
     });
+
+    test('does not pin a user captured under consent rejected elsewhere',
+        () async {
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      // Another tab rejected the shared consent; this tab's cached id is
+      // still the old user until opt-in resets it.
+      var rejected = true;
+      fake.setProperty(
+          'has_opted_out_capturing'.toJS, (() => rejected.toJS).toJS);
+      fake.setProperty(
+          'opt_in_capturing'.toJS,
+          (() {
+            distinctId = 'new-user';
+            rejected = false;
+          }).toJS);
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) async {
+          await Future<void>.delayed(Duration.zero);
+          return event;
+        },
+      ]));
+
+      final sent = [
+        web.capture(eventName: 'checkout'),
+        web.screen(screenName: 'Cart'),
+        web.captureException(error: StateError('boom')),
+      ];
+      await web.enable();
+      await Future.wait(sent);
+
+      expect(sentAs, ['new-user', 'new-user', 'new-user']);
+    });
   });
 
   test('beforeSend null drops capture on web', () async {

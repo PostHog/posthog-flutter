@@ -61,6 +61,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// property override the current one.
   Future<PostHogEvent?> _applyCallbacks(PostHogEvent event) async {
     final distinctId = _distinctId();
+    final wasOptedOut = _hasOptedOut();
     final processed = await applyBeforeSend(_beforeSendCallbacks, event);
     // Null while the posthog-js loader stub is active: loading is not a
     // change of user. Opting in or out of cookieless mode is not one either:
@@ -68,10 +69,13 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     // distinct_id, and pinning the old user after an opt-out would tie a
     // cookieless event to them. A reset() can also fall back to rejected
     // default consent before the id becomes the sentinel, so ask posthog-js
-    // whether this event will go out cookieless.
+    // whether this event will go out cookieless. Consent shared from another
+    // tab can be rejected while the cached id is still the old user, so an
+    // id captured under rejected consent is never pinned either.
     final currentId = _distinctId();
     if (processed != null &&
         distinctId != null &&
+        !wasOptedOut &&
         distinctId != _cookielessSentinel &&
         currentId != _cookielessSentinel &&
         currentId != distinctId &&
