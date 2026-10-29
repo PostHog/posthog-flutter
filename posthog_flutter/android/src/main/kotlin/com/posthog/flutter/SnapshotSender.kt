@@ -41,15 +41,16 @@ class SnapshotSender(
         quality: Int = DEFAULT_SCREENSHOT_COMPRESSION_QUALITY,
         masked: Boolean = false,
     ): RRFullSnapshotEvent {
-        val decoded = requireNotNull(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
         val bitmap =
             if (masked) {
-                Bitmap.createBitmap(decoded.width, decoded.height, Bitmap.Config.ARGB_8888).also {
-                    it.eraseColor(Color.BLACK)
-                    decoded.recycle()
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+                require(bounds.outWidth > 0 && bounds.outHeight > 0)
+                Bitmap.createBitmap(bounds.outWidth, bounds.outHeight, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(Color.BLACK)
                 }
             } else {
-                decoded
+                requireNotNull(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
             }
         try {
             val wireframe =

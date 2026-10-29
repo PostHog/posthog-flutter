@@ -646,6 +646,7 @@ class ScreenshotCapturer {
     // Cleared again in _resolveCaptureTarget, but that runs after the round trip
     // below — whose post-await check would veto this capture on a prior flag.
     _cancelled = false;
+    // Also arms Android's FLAG_SECURE masking for the frame captured below.
     final state = await _nativeCommunicator.getSessionReplayState();
     if (_cancelled) {
       return null;

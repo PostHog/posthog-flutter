@@ -472,9 +472,7 @@ class PosthogFlutterPlugin :
     // Dart reads this at the start of every capture, so it also records whether
     // the frame about to be captured shows a FLAG_SECURE window.
     private fun getSessionReplayState(): Map<String, Any?> {
-        if (isWindowSecure()) {
-            secureWindowSinceLastFrame = true
-        }
+        captureStartedOnSecureWindow = isWindowSecure()
         return mapOf(
             "isActive" to isSessionReplayActive(),
             "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
@@ -483,15 +481,15 @@ class PosthogFlutterPlugin :
 
     // Set when a capture starts on a FLAG_SECURE window, so the frame stays masked
     // even if the flag clears (e.g. the secure screen is popped) before it's sent.
-    private var secureWindowSinceLastFrame = false
+    private var captureStartedOnSecureWindow = false
 
     private fun isWindowSecure(): Boolean = ((activity?.window?.attributes?.flags ?: 0) and FLAG_SECURE) != 0
 
     /** Whether the frame being sent must be fully masked. Resets for the next frame. */
     @VisibleForTesting
     internal fun takeFrameMasked(): Boolean {
-        val masked = secureWindowSinceLastFrame || isWindowSecure()
-        secureWindowSinceLastFrame = false
+        val masked = captureStartedOnSecureWindow || isWindowSecure()
+        captureStartedOnSecureWindow = false
         return masked
     }
 

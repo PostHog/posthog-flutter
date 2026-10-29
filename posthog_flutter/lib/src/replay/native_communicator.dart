@@ -56,7 +56,9 @@ class NativeCommunicator {
   /// travel together so the capturer can key its per-session reset on the id the
   /// native SDK actually holds without a second round trip per tick.
   ///
-  /// Non-mutating on both platforms, so a rotation is observed one tick late.
+  /// Never rotates the session, so a rotation is observed one tick late. On
+  /// Android it also records whether the window has FLAG_SECURE, which masks
+  /// the next [sendFullSnapshot]; call it once per capture, before rendering.
   Future<({bool isActive, String? sessionId})> getSessionReplayState() async {
     if (kIsWeb) {
       // Flutter doesn't capture screenshots on web, JS SDK handles session replay

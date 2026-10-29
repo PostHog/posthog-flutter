@@ -397,6 +397,19 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun droppedCaptureOnSecureWindow_doesNotMaskTheNextFrame() {
+        val plugin = PosthogFlutterPlugin()
+        val attributes = attachActivityWithWindowFlags(plugin)
+        attributes.flags = WindowManager.LayoutParams.FLAG_SECURE
+        plugin.onMethodCall(MethodCall("getSessionReplayState", null), Mockito.mock(MethodChannel.Result::class.java))
+
+        attributes.flags = 0
+        plugin.onMethodCall(MethodCall("getSessionReplayState", null), Mockito.mock(MethodChannel.Result::class.java))
+
+        assertFalse(plugin.takeFrameMasked())
+    }
+
+    @Test
     fun frameOnNonSecureWindow_isNotMasked() {
         val plugin = PosthogFlutterPlugin()
         attachActivityWithWindowFlags(plugin)
