@@ -278,8 +278,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         final current = _clientForContinuation('capture', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(
-            current, processed, exceptionSteps, prepared.timestamp);
+        _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   @override
@@ -322,8 +321,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         final current = _clientForContinuation('captureAi', scope, distinctId);
         if (current == null) return null;
-        return _captureProcessed(
-            current, processed, exceptionSteps, prepared.timestamp,
+        return _captureProcessed(current, processed, exceptionSteps, prepared,
             ai: true);
       });
 
@@ -366,8 +364,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          _captureProcessed(
-              current, processed, exceptionSteps, prepared.timestamp);
+          _captureProcessed(current, processed, exceptionSteps, prepared);
           return;
         }
 
@@ -388,8 +385,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           ...?processed.properties,
           PostHogPropertyName.screenName: finalScreenName,
         };
-        _captureProcessed(
-            current, processed, exceptionSteps, prepared.timestamp);
+        _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -643,8 +639,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final current =
             _clientForContinuation('captureException', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(
-            current, processed, exceptionSteps, prepared.timestamp);
+        _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   @override
@@ -732,7 +727,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// maps in [properties] stay in [PostHogEvent.properties], so a callback
   /// that removes them there still keeps them off the event.
   /// The event's time is taken now, before the callbacks run.
-  ({PostHogEvent event, String timestamp})? _prepare(
+  _PreparedEvent? _prepare(
     DesktopPostHog client,
     String eventName,
     Map<String, Object>? properties, {
@@ -769,6 +764,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         options: preparedOptions == null ? null : {...preparedOptions},
       ),
       timestamp: prepared.timestamp,
+      implicitPersonProcessing:
+          preparedOptions?['process_person_profile'] == null,
     );
   }
 
@@ -818,27 +815,35 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     DesktopPostHog client,
     PostHogEvent event,
     ExceptionStepsBuffer? exceptionSteps,
-    String timestamp, {
+    _PreparedEvent prepared, {
     bool ai = false,
   }) {
     if (!_hasName(event.event)) return null;
+    final properties = _withExceptionSteps(
+          event.event,
+          exceptionSteps,
+          _mergeUserProps(
+            event.properties,
+            event.userProperties,
+            event.userPropertiesSetOnce,
+          ),
+        ) ??
+        const {};
     // Options are sent as they are, unknown keys included. An option wins
     // over its legacy property on the event.
+    Map<String, Object?>? options = cleanEventOptions(event.options);
+    // Person properties the callbacks removed no longer ask for person
+    // processing, unless a callback set the option itself.
+    if (prepared.implicitPersonProcessing &&
+        options?['process_person_profile'] == null) {
+      options = client.personProcessingOptions(options, properties);
+    }
     return client.capturePrepared(
         event.event,
         (
-          properties: _withExceptionSteps(
-                event.event,
-                exceptionSteps,
-                _mergeUserProps(
-                  event.properties,
-                  event.userProperties,
-                  event.userPropertiesSetOnce,
-                ),
-              ) ??
-              const {},
-          options: cleanEventOptions(event.options),
-          timestamp: timestamp,
+          properties: properties,
+          options: options,
+          timestamp: prepared.timestamp,
         ),
         ai: ai);
   }
@@ -894,3 +899,11 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return Map<String, Object>.from(PropertyNormalizer.normalize(properties));
   }
 }
+
+/// An event built for the beforeSend callbacks, with the time it happened
+/// and whether its person processing was left to its properties.
+typedef _PreparedEvent = ({
+  PostHogEvent event,
+  String timestamp,
+  bool implicitPersonProcessing,
+});

@@ -643,6 +643,41 @@ void main() {
       expect(_optionsOf(event)['process_person_profile'], isFalse);
     });
 
+    test('an event whose person properties are removed is personless',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [(event) => event..userProperties = null];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+      );
+
+      final event = await server.waitForEvent('redacted');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+    });
+
+    test('a callback can turn person processing back on', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event
+            ..userProperties = null
+            ..options = {'process_person_profile': true},
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+      );
+
+      final event = await server.waitForEvent('redacted');
+      expect(_optionsOf(event)['process_person_profile'], isTrue);
+    });
+
     test('a throwing callback drops the event and stops the chain', () async {
       final server = await LocalPostHogServer.start();
       final callOrder = <String>[];

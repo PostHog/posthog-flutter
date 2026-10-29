@@ -461,6 +461,16 @@ abstract class PostHogCore extends PostHogCoreStateless {
         return _queuePrepared(event, prepared, ai: ai);
       });
 
+  /// [options] with `process_person_profile: false` added when person
+  /// processing is off and [properties] neither ask for it nor set
+  /// `$process_person_profile`, as [prepareEvent] decides it.
+  Map<String, Object?>? personProcessingOptions(
+    Map<String, Object?>? options,
+    Map<String, Object?> properties,
+  ) =>
+      _personProcessingOptions(options, properties,
+          requested: _requestsPersonProcessing(properties));
+
   PostHogPreparedEvent? _prepareEvent(
     String event, {
     Map<String, Object?>? properties,
