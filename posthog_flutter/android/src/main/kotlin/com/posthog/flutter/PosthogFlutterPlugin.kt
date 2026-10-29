@@ -469,8 +469,6 @@ class PosthogFlutterPlugin :
     // peekSessionId(), not getSessionId(): the expiring accessor would rotate the
     // session from this read, moving where the idle and maximum-duration bounds
     // are applied. The send still resolves an expiring id, as it always has.
-    // Dart reads this at the start of every capture, so it also records whether
-    // the frame about to be captured shows a FLAG_SECURE window.
     private fun getSessionReplayState(): Map<String, Any?> {
         captureStartedOnSecureWindow = isWindowSecure()
         return mapOf(
@@ -479,8 +477,9 @@ class PosthogFlutterPlugin :
         )
     }
 
-    // Set when a capture starts on a FLAG_SECURE window, so the frame stays masked
-    // even if the flag clears (e.g. the secure screen is popped) before it's sent.
+    // Set by getSessionReplayState, which Dart calls once at the start of each
+    // capture, so a frame captured on a FLAG_SECURE window stays masked even if
+    // the flag clears (e.g. the secure screen is popped) before it's sent.
     private var captureStartedOnSecureWindow = false
 
     private fun isWindowSecure(): Boolean = ((activity?.window?.attributes?.flags ?: 0) and FLAG_SECURE) != 0
