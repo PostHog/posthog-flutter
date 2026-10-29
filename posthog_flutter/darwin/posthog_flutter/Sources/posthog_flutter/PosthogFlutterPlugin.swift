@@ -1,4 +1,4 @@
-@_spi(PostHogInternal) import PostHog
+@_spi(PostHogInternal) @_spi(PostHogWrapper) import PostHog
 #if os(iOS)
     import Flutter
     import UIKit
@@ -43,6 +43,13 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
 
     private static var instance: PosthogFlutterPlugin?
     private var channel: FlutterMethodChannel?
+
+    // Events built for the Dart beforeSend callbacks, keyed by uuid, until Dart
+    // sends or drops them. Main-thread confined, like the channel callbacks.
+    private var builtEvents: [String: PostHogEvent] = [:]
+
+    private static let nativeBeforeSendLock = NSLock()
+    private static var nativeBeforeSend: [BeforeSendBlock] = []
     private var featureFlagsSubscription: PostHogFeatureFlagsSubscription?
 
     // Mint route for pushIdentityProvider, anchored to the engine whose setup()
@@ -55,6 +62,32 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     // Channel callbacks already arrive there; detach does not, so it hops.
     private static var pushChannelCandidates: [FlutterMethodChannel] = []
     private static var pushChannel: FlutterMethodChannel?
+
+    /// Adds a native `beforeSend` block that runs on every event the PostHog iOS
+    /// or macOS SDK sends, including the ones Dart never sees.
+    ///
+    /// Dart `PostHogConfig.beforeSend` callbacks run only on events captured from
+    /// Dart. Events the native SDK captures itself, such as crashes, app
+    /// lifecycle events, `$feature_flag_called`, `$identify` and session replay,
+    /// reach only native blocks. Blocks run in the order they're added, after the
+    /// Dart callbacks. Return the event, changed or not, to send it, or `nil` to
+    /// drop it. No blocks are added by default.
+    ///
+    /// Add blocks before the SDK is set up: before `Posthog().setup()` runs in
+    /// Dart, or before the plugin registers when the SDK is set up from
+    /// `Info.plist`. Blocks added later apply from the next setup.
+    ///
+    /// ```swift
+    /// // AppDelegate.swift, before GeneratedPluginRegistrant.register(with: self)
+    /// PosthogFlutterPlugin.addBeforeSend { event in
+    ///     event.event == "Application Backgrounded" ? nil : event
+    /// }
+    /// ```
+    public static func addBeforeSend(_ block: @escaping BeforeSendBlock) {
+        nativeBeforeSendLock.lock()
+        defer { nativeBeforeSendLock.unlock() }
+        nativeBeforeSend.append(block)
+    }
 
     public static func getInstance() -> PosthogFlutterPlugin? {
         instance
@@ -465,8 +498,11 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
 
-        if let flutterVersionBeforeSend = flutterVersionBeforeSend(posthogConfig) {
-            config.setBeforeSend(flutterVersionBeforeSend)
+        nativeBeforeSendLock.lock()
+        let beforeSend = [flutterVersionBeforeSend(posthogConfig)].compactMap { $0 } + nativeBeforeSend
+        nativeBeforeSendLock.unlock()
+        if !beforeSend.isEmpty {
+            config.setBeforeSend(beforeSend)
         }
 
         // Update SDK name and version
@@ -504,6 +540,12 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             captureAi(call, result: result)
         case "screen":
             screen(call, result: result)
+        case "buildEvent":
+            buildEvent(call, result: result)
+        case "sendBuiltEvent":
+            sendBuiltEvent(call, result: result)
+        case "discardBuiltEvent":
+            discardBuiltEvent(call, result: result)
         case "captureLog":
             captureLog(call, result: result)
         case "alias":
@@ -1553,6 +1595,93 @@ extension PosthogFlutterPlugin {
         } else {
             _badArgumentError(result)
         }
+    }
+
+    /// Builds the event a capture, screen or captureException call would send,
+    /// for the Dart beforeSend callbacks, and returns it to Dart. Returns nil
+    /// when the SDK skips it.
+    private func buildEvent(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any] else {
+            _badArgumentError(result)
+            return
+        }
+        guard let eventName = args["eventName"] as? String else {
+            _badArgumentError(result)
+            return
+        }
+        let timestamp = (args["timestamp"] as? Int64).map {
+            Date(timeIntervalSince1970: TimeInterval($0) / 1000.0)
+        }
+        let built = PostHogSDK.shared.buildEventForWrapper(
+            event: eventName,
+            distinctId: nil,
+            properties: args["properties"] as? [String: Any],
+            userProperties: args["userProperties"] as? [String: Any],
+            userPropertiesSetOnce: args["userPropertiesSetOnce"] as? [String: Any],
+            groups: nil,
+            options: args["options"] as? [String: Any],
+            timestamp: timestamp,
+            ai: args["ai"] as? Bool ?? false
+        )
+        guard let built else {
+            result(nil)
+            return
+        }
+        let uuid = built.uuid.uuidString.lowercased()
+        builtEvents[uuid] = built
+        result([
+            "event": built.event,
+            "uuid": uuid,
+            "distinctId": built.distinctId,
+            "timestamp": Int64((built.timestamp.timeIntervalSince1970 * 1000).rounded()),
+            "properties": built.properties,
+            "options": built.options,
+        ])
+    }
+
+    /// Sends an event from `buildEvent` as the Dart beforeSend callbacks left
+    /// it. Returns its uuid once queued, or nil.
+    private func sendBuiltEvent(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+              let uuid = args["uuid"] as? String,
+              let eventName = args["event"] as? String
+        else {
+            _badArgumentError(result)
+            return
+        }
+        guard let built = builtEvents.removeValue(forKey: uuid) else {
+            result(nil)
+            return
+        }
+        built.event = eventName
+        built.properties = args["properties"] as? [String: Any] ?? [:]
+        built.options = args["options"] as? [String: Any] ?? [:]
+        if let distinctId = args["distinctId"] as? String,
+           !distinctId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            built.distinctId = distinctId
+        }
+        if let timestampMs = args["timestamp"] as? Int64 {
+            built.timestamp = Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
+        }
+        result(PostHogSDK.shared.sendBuiltEventForWrapper(built, ai: args["ai"] as? Bool ?? false))
+    }
+
+    /// Drops an event from `buildEvent` that a Dart beforeSend callback dropped.
+    private func discardBuiltEvent(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let uuid = (call.arguments as? [String: Any])?["uuid"] as? String {
+            builtEvents.removeValue(forKey: uuid)
+        }
+        result(nil)
     }
 
     private func captureLog(

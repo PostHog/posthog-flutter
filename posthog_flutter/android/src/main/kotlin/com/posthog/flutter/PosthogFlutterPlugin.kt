@@ -27,6 +27,7 @@ import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
+import com.posthog.PostHogEvent
 import com.posthog.PostHogFeatureFlagsCallback
 import com.posthog.PostHogFeatureFlagsLoaded
 import com.posthog.android.PostHogAndroid
@@ -79,6 +80,10 @@ class PosthogFlutterPlugin :
     private var application: Application? = null
 
     private var postHogConfig: PostHogAndroidConfig? = null
+
+    // Events built for the Dart beforeSend callbacks, keyed by uuid, until Dart
+    // sends or drops them. Main-thread confined, like the channel callbacks.
+    private val builtEvents = mutableMapOf<String, PostHogEvent>()
 
     // Test seam: captures the built config even if setup() throws (mock Context in
     // unit tests). postHogConfig is only published on success, so production readers
@@ -262,6 +267,18 @@ class PosthogFlutterPlugin :
 
             "screen" -> {
                 screen(call, result)
+            }
+
+            "buildEvent" -> {
+                buildEvent(call, result)
+            }
+
+            "sendBuiltEvent" -> {
+                sendBuiltEvent(call, result)
+            }
+
+            "discardBuiltEvent" -> {
+                discardBuiltEvent(call, result)
             }
 
             "captureLog" -> {
@@ -832,6 +849,7 @@ class PosthogFlutterPlugin :
                         )
                     }
                 }
+                nativeBeforeSendSnapshot().forEach { this.addBeforeSend(it) }
 
                 onFeatureFlags =
                     PostHogFeatureFlagsCallback { loaded ->
@@ -1835,6 +1853,89 @@ class PosthogFlutterPlugin :
         }
     }
 
+    /**
+     * Builds the event a capture, screen or captureException call would send, for the
+     * Dart beforeSend callbacks, and returns it to Dart. Returns null when the SDK skips it.
+     */
+    private fun buildEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val timestampMs: Long? = call.argument<Number>("timestamp")?.toLong()
+            val built =
+                PostHog.buildEventForWrapper(
+                    call.argument("eventName")!!,
+                    properties = call.argument("properties"),
+                    userProperties = call.argument("userProperties"),
+                    userPropertiesSetOnce = call.argument("userPropertiesSetOnce"),
+                    options = call.argument("options"),
+                    ai = call.argument("ai") ?: false,
+                    timestamp = timestampMs?.let { Date(it) },
+                )
+            val uuid = built?.uuid?.toString()
+            if (built == null || uuid == null) {
+                result.success(null)
+                return
+            }
+            builtEvents[uuid] = built
+            result.success(
+                mapOf(
+                    "event" to built.event,
+                    "uuid" to uuid,
+                    "distinctId" to built.distinctId,
+                    "timestamp" to built.timestamp.time,
+                    "properties" to built.properties?.let(::toChannelValue),
+                    "options" to built.options?.let(::toChannelValue),
+                ),
+            )
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    /**
+     * Sends an event from [buildEvent] as the Dart beforeSend callbacks left it.
+     * Returns its uuid once queued, or null.
+     */
+    private fun sendBuiltEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val uuid: String = call.argument("uuid")!!
+            val built = builtEvents.remove(uuid)
+            if (built == null) {
+                result.success(null)
+                return
+            }
+            val properties: Map<String, Any>? = call.argument("properties")
+            val options: Map<String, Any?>? = call.argument("options")
+            val timestampMs: Long? = call.argument<Number>("timestamp")?.toLong()
+            val event =
+                built.copy(
+                    event = call.argument("event")!!,
+                    distinctId = call.argument<String>("distinctId")?.takeIf { it.isNotBlank() } ?: built.distinctId,
+                    properties = properties?.toMutableMap() ?: mutableMapOf(),
+                    timestamp = timestampMs?.let { Date(it) } ?: built.timestamp,
+                    options = options?.toMutableMap() ?: mutableMapOf(),
+                )
+            val sent = PostHog.sendBuiltEventForWrapper(event, ai = call.argument("ai") ?: false)
+            result.success(sent?.toString())
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    /** Drops an event from [buildEvent] that a Dart beforeSend callback dropped. */
+    private fun discardBuiltEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        call.argument<String>("uuid")?.let { builtEvents.remove(it) }
+        result.success(null)
+    }
+
     private fun captureLog(
         call: MethodCall,
         result: Result,
@@ -2320,6 +2421,42 @@ class PosthogFlutterPlugin :
     }
 
     companion object {
+        private val nativeBeforeSend = mutableListOf<PostHogBeforeSend>()
+
+        /**
+         * Adds a native `beforeSend` hook that runs on every event the PostHog Android
+         * SDK sends, including the ones Dart never sees.
+         *
+         * Dart `PostHogConfig.beforeSend` callbacks run only on events captured from
+         * Dart. Events the native SDK captures itself, such as crashes, app lifecycle
+         * events, `$feature_flag_called`, `$identify` and session replay, reach only
+         * native hooks. Hooks run in the order they're added, after the Dart callbacks.
+         * Return the event, changed or not, to send it, or `null` to drop it. No hooks
+         * are added by default.
+         *
+         * Add hooks before the SDK is set up: before `Posthog().setup()` runs in Dart,
+         * or in `Application.onCreate` when the SDK is set up from the manifest
+         * (`com.posthog.posthog.AUTO_INIT`). Hooks added later apply from the next setup.
+         *
+         * ```kotlin
+         * // MainApplication.onCreate
+         * PosthogFlutterPlugin.addBeforeSend { event ->
+         *     if (event.event == "Application Backgrounded") null else event
+         * }
+         * ```
+         */
+        @JvmStatic
+        fun addBeforeSend(beforeSend: PostHogBeforeSend) {
+            synchronized(nativeBeforeSend) { nativeBeforeSend.add(beforeSend) }
+        }
+
+        private fun nativeBeforeSendSnapshot(): List<PostHogBeforeSend> = synchronized(nativeBeforeSend) { nativeBeforeSend.toList() }
+
+        @VisibleForTesting
+        internal fun resetNativeBeforeSendForTesting() {
+            synchronized(nativeBeforeSend) { nativeBeforeSend.clear() }
+        }
+
         // Mint route for pushIdentityProvider, anchored to the engine whose setup()
         // installed the provider. A live owner is never displaced; provider-enabled
         // engines stay candidates so detach promotes the most recent survivor instead
@@ -2362,6 +2499,20 @@ class PosthogFlutterPlugin :
         }
     }
 }
+
+/**
+ * Copies [value] into the types the Flutter channel codec can send. Values the
+ * codec can't send, such as a `Date` registered natively, are sent as strings.
+ */
+internal fun toChannelValue(value: Any?): Any? =
+    when (value) {
+        null, is String, is Boolean, is Int, is Long, is Double, is ByteArray -> value
+        is Number -> value.toDouble()
+        is Map<*, *> -> value.entries.associate { (k, v) -> k.toString() to toChannelValue(v) }
+        is Iterable<*> -> value.map(::toChannelValue)
+        is Array<*> -> value.map(::toChannelValue)
+        else -> value.toString()
+    }
 
 @Suppress("UNCHECKED_CAST")
 internal fun bootstrapConfigFromMap(bootstrap: Map<String, Any>): PostHogBootstrapConfig =

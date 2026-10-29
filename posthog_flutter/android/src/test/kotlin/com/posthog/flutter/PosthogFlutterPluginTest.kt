@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.BadParcelableException
 import com.google.firebase.FirebaseApp
+import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
 import com.posthog.PostHogEvent
@@ -40,6 +41,7 @@ internal class PosthogFlutterPluginTest {
     @BeforeTest
     fun resetSharedRoute() {
         PosthogFlutterPlugin.resetPushIdentityRouteForTesting()
+        PosthogFlutterPlugin.resetNativeBeforeSendForTesting()
     }
 
     @Test
@@ -288,6 +290,30 @@ internal class PosthogFlutterPluginTest {
         assertEquals("3.35.0", propertiesOf("Application Updated")?.get("\$flutter_version"))
         assertNull(propertiesOf("Application Opened")?.get("\$flutter_version"))
         assertNull(propertiesOf("custom")?.get("\$flutter_version"))
+    }
+
+    @Test
+    fun setup_addBeforeSend_runsAfterTheFlutterVersionHook() {
+        val seen = mutableListOf<Any?>()
+        PosthogFlutterPlugin.addBeforeSend { event ->
+            seen.add(event.properties?.get("\$flutter_version"))
+            null
+        }
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "flutterVersion" to "3.35.0")),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+        val beforeSend = assertNotNull(plugin.lastBuiltConfig).beforeSendList
+
+        val result =
+            beforeSend.fold<PostHogBeforeSend, PostHogEvent?>(
+                PostHogEvent("Application Installed", "id", properties = mutableMapOf()),
+            ) { event, hook -> event?.let { hook.run(it) } }
+
+        assertNull(result)
+        assertEquals(listOf<Any?>("3.35.0"), seen)
     }
 
     @Test

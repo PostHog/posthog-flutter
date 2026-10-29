@@ -451,13 +451,20 @@ class PostHogConfig {
   ///     `config.captureApplicationLifecycleEvents` is enabled
   ///   - Feature flag events (`$feature_flag_called`) when
   ///     `config.sendFeatureFlagEvent` is enabled
-  ///   - Identity events (`$set`) when `identify` is called
+  ///   - Identity events (`$identify`, `$set`, `$create_alias`,
+  ///     `$groupidentify`) from `identify`, `setPersonProperties`, `alias`
+  ///     and `group`
   ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
-  /// - Only user-provided properties are available; system properties (like
-  ///   `$device_type`, `$session_id`) are added by the native SDK at a later
-  ///   stage. On Windows and Linux, the callbacks see the system properties
-  ///   and the options the SDK adds, and can change them for that event,
-  ///   except `$lib` and `$lib_version`, which PostHog sets from the SDK.
+  ///   On iOS, macOS and Android, add a native hook with
+  ///   `PosthogFlutterPlugin.addBeforeSend` (Swift or Kotlin) to filter or
+  ///   edit those events.
+  /// - On iOS, macOS, Android, Windows and Linux, the callbacks see the
+  ///   system properties (like `$device_type` and `$session_id`), the
+  ///   registered properties and the options the SDK adds, and can change
+  ///   them for that event, except `$lib` and `$lib_version`, which PostHog
+  ///   sets from the SDK. On iOS, macOS and Android, registering callbacks
+  ///   adds one more call to the native SDK per event. On web, only the event's own
+  ///   properties are available; posthog-js adds the rest later.
   ///
   /// **Note:**
   /// - Callbacks can be synchronous or asynchronous (via
