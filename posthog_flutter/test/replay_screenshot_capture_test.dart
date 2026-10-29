@@ -116,6 +116,7 @@ void main() {
         expect(image.height, (99 * scale).ceil());
         expect(args['width'], 101);
         expect(args['height'], 99);
+        expect(args['secureAtCapture'], isFalse);
         expect(args['x'], 0);
         expect(args['y'], 0);
         final meta = calls.firstWhere((call) => call.method == 'sendMetaEvent');
