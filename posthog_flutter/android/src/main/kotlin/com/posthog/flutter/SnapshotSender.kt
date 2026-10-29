@@ -5,7 +5,6 @@ import com.posthog.android.internal.base64
 import com.posthog.internal.replay.RREvent
 import com.posthog.internal.replay.RRFullSnapshotEvent
 import com.posthog.internal.replay.RRMetaEvent
-import com.posthog.internal.replay.RRStyle
 import com.posthog.internal.replay.RRWireframe
 import com.posthog.internal.replay.capture
 
@@ -48,7 +47,6 @@ class SnapshotSender(
                     height = height ?: bitmap.height,
                     type = "screenshot",
                     base64 = bitmap.base64(quality = quality),
-                    style = RRStyle(),
                 )
             return RRFullSnapshotEvent(
                 listOf(wireframe),
