@@ -424,7 +424,6 @@ class Posthog {
       _installFlutterIntegrations(config);
     }
 
-    // Native opt-in restarts the replay the app wanted, in a new session.
     await _posthog.enable();
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
