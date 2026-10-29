@@ -73,39 +73,43 @@ void main() {
     expect(methodsOf(recordedCalls), isNot(contains('sendFullSnapshot')));
   });
 
-  test('optOut stops replay before opting out, optIn starts a new recording',
-      () async {
+  test('optOut and optIn leave the replay restart to native', () async {
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
     await Posthog().setup(replayConfig());
 
     recordedCalls.clear();
     await Posthog().optOut();
 
-    final disabled = methodsOf(recordedCalls);
-    expect(disabled, contains('stopSessionRecording'));
-    expect(disabled, contains('disable'));
+    expect(methodsOf(recordedCalls), contains('disable'));
     expect(
-      disabled.indexOf('stopSessionRecording'),
-      lessThan(disabled.indexOf('disable')),
-      reason: 'native stop is a no-op once the SDK is already opted out',
+      methodsOf(recordedCalls),
+      isNot(contains('stopSessionRecording')),
+      reason: 'a native stop while opted in keeps replay off after opt-in',
     );
     expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
 
     recordedCalls.clear();
     await Posthog().optIn();
 
-    final enabled = methodsOf(recordedCalls);
-    expect(enabled, contains('enable'));
-    expect(enabled, contains('startSessionRecording'));
+    expect(methodsOf(recordedCalls), contains('enable'));
     expect(
-      enabled.indexOf('enable'),
-      lessThan(enabled.indexOf('startSessionRecording')),
-      reason: 'startSessionRecording returns immediately while opted out',
+      methodsOf(recordedCalls),
+      isNot(contains('startSessionRecording')),
+      reason: 'native opt-in already starts a new session',
     );
-    final start = recordedCalls
-        .firstWhere((call) => call.method == 'startSessionRecording');
-    expect(start.arguments, isFalse);
     expect(PostHogInternalEvents.sessionRecordingActive.value, isTrue);
+  });
+
+  test('optIn leaves Flutter replay off when the app stopped it first',
+      () async {
+    PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
+    await Posthog().setup(replayConfig());
+    await Posthog().stopSessionRecording();
+
+    await Posthog().optOut();
+    await Posthog().optIn();
+
+    expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
   });
 
   test('capture after an un-awaited optOut reaches native after the opt-out',
