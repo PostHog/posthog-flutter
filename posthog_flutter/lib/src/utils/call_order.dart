@@ -34,8 +34,9 @@ class CallOrder {
     });
   }
 
-  /// Runs [hook] now, then hands its result to [send] after every earlier
-  /// call. Later calls wait for [send] to finish, so it may itself capture
+  /// Runs [hook] once every earlier call has been handed over, so it sees
+  /// the state the app left before capturing, then hands its result to
+  /// [send]. Later calls wait for [send] to finish, so it may itself capture
   /// (a beforeSend that renames a `$screen` does).
   Future<void> event<E>(
     FutureOr<E> Function() hook,
@@ -45,22 +46,33 @@ class CallOrder {
       final hooked = hook();
       return send(hooked is Future<E> ? await hooked : hooked);
     }
-    final hooked = _inZone(hook);
-    if (hooked is! Future<E> && _last == null) return send(hooked);
-
+    if (_last == null) {
+      final hooked = _inZone(hook);
+      if (hooked is! Future<E>) return send(hooked);
+      return _hold(_take(), () => hooked, send);
+    }
     final turn = _take();
+    await turn.ahead;
+    return _hold(turn, () => _inZone(hook), send);
+  }
+
+  Future<void> _hold<E>(
+    _Turn turn,
+    FutureOr<E> Function() hook,
+    Future<void> Function(E event) send,
+  ) async {
     final timer = Timer(maxWait, () {
       printIfDebug('[PostHog] beforeSend took longer than '
           '${maxWait.inSeconds}s; later calls no longer wait for it.');
-      turn.ahead.then((_) => turn.end());
+      turn.end();
     });
     try {
+      final hooked = hook();
       final processed = hooked is Future<E> ? await hooked : hooked;
-      await turn.ahead;
       await _inZone(() => send(processed));
     } finally {
       timer.cancel();
-      turn.ahead.then((_) => turn.end());
+      turn.end();
     }
   }
 

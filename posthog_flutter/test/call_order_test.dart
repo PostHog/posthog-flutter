@@ -49,6 +49,21 @@ void main() {
     expect(calls, ['slow', 'fast', 'sync']);
   });
 
+  test('a hook sees calls made before its event', () async {
+    var user = 'old-user';
+    final slow = Completer<String>();
+    final sent = [
+      order.event(() => slow.future, record),
+      order.run(() async => user = 'new-user'),
+      order.event(() => 'checkout as $user', record),
+    ];
+    await pumpEventQueue();
+    slow.complete('slow');
+    await Future.wait(sent);
+
+    expect(calls, ['slow', 'checkout as new-user']);
+  });
+
   test('a call made from the hook does not wait for its own event', () async {
     final sent = order.event(() async {
       await order.run(() => record('from_hook'));
@@ -83,8 +98,8 @@ void main() {
     );
     final reset = order.run(() => record('reset'));
 
-    await expectLater(sent, throwsStateError);
     earlier.complete('checkout');
+    await expectLater(sent, throwsStateError);
     await Future.wait([sentEarlier, reset]);
     expect(calls, ['checkout', 'reset']);
   });
