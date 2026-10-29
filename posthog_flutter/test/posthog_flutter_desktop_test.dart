@@ -674,6 +674,29 @@ void main() {
       expect(personProperties, isNot(contains('dropped')));
     });
 
+    test(
+        'person properties of an event a callback sends for another distinct '
+        'id stay out of flag evaluation', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..preloadFeatureFlags = false
+        ..beforeSend = [(event) => event..distinctId = 'other-user'];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'other',
+        userProperties: {'email': 'other@example.com'},
+      );
+      await platform.reloadFeatureFlags();
+
+      final event = await server.waitForEvent('other');
+      expect(event['distinct_id'], 'other-user');
+      final personProperties = Map<String, Object?>.from(
+        server.flagsRequests.single.body['person_properties']! as Map,
+      );
+      expect(personProperties, isNot(contains('email')));
+    });
+
     test('a dropped person update does not turn on person processing',
         () async {
       final server = await LocalPostHogServer.start();
