@@ -219,6 +219,26 @@ void main() {
       expect(_propertiesOf(event)[r'$set'], {'plan': 'pro', 'team': 'core'});
     });
 
+    test(r'a beforeSend that removes a legacy $set keeps it off the event',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event..properties?.remove(r'$set'),
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        properties: {
+          r'$set': {'email': 'a@b.c'},
+        },
+      );
+
+      final event = await server.waitForEvent('redacted');
+      expect(_propertiesOf(event), isNot(contains(r'$set')));
+    });
+
     test(r'reports the platform language as $locale', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));

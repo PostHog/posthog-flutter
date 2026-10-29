@@ -726,8 +726,11 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// The SDK's properties come first, then the registered ones, then the
   /// event's own. Returns null when the client is closed or opted out.
   ///
-  /// `$set` and `$set_once` are handed to the callbacks as
-  /// [PostHogEvent.userProperties] and [PostHogEvent.userPropertiesSetOnce].
+  /// [userProperties] and [userPropertiesSetOnce] are handed to the
+  /// callbacks as [PostHogEvent.userProperties] and
+  /// [PostHogEvent.userPropertiesSetOnce]. Legacy `$set` and `$set_once`
+  /// maps in [properties] stay in [PostHogEvent.properties], so a callback
+  /// that removes them there still keeps them off the event.
   /// The event's time is taken now, before the callbacks run.
   ({PostHogEvent event, String timestamp})? _prepare(
     DesktopPostHog client,
@@ -745,13 +748,24 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     );
     if (prepared == null) return null;
     final eventProperties = _nonNull(prepared.properties)!;
+    for (final (key, explicit) in [
+      (r'$set', userProperties),
+      (r'$set_once', userPropertiesSetOnce),
+    ]) {
+      final legacy = _nonNull(properties?[key]);
+      if (legacy != null) {
+        eventProperties[key] = legacy;
+      } else if (explicit != null) {
+        eventProperties.remove(key);
+      }
+    }
     final preparedOptions = prepared.options;
     return (
       event: PostHogEvent(
         event: eventName,
         properties: eventProperties,
-        userProperties: _nonNull(eventProperties.remove(r'$set')),
-        userPropertiesSetOnce: _nonNull(eventProperties.remove(r'$set_once')),
+        userProperties: _nonNull(userProperties),
+        userPropertiesSetOnce: _nonNull(userPropertiesSetOnce),
         options: preparedOptions == null ? null : {...preparedOptions},
       ),
       timestamp: prepared.timestamp,
