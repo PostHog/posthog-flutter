@@ -87,11 +87,14 @@ Duration captureRetryDelay({
 abstract class PostHogCoreStateless {
   final String _apiKey;
   final String _host;
-  int _flushAt;
-  int _maxBatchSize;
-  final int _maxQueueSize;
   final Duration _flushInterval;
   final PostHogCompression _compression;
+
+  /// Analytics events, sent to [captureV1Path].
+  late final _CaptureLane _analytics;
+
+  /// AI events, sent to [captureV1AiPath] from a queue of their own.
+  late final _CaptureLane _ai;
 
   final bool _defaultOptIn;
 
@@ -112,29 +115,16 @@ abstract class PostHogCoreStateless {
   static const _flagsRetryCount = 1;
   static const _flagsRetryDelay = Duration(milliseconds: 300);
 
-  /// The [_failedFlushes] at which the backoff reaches its 30 second cap.
+  /// The [_CaptureLane.failedFlushes] at which the backoff reaches its 30
+  /// second cap.
   static const _maxBackoffStep = 6;
 
   /// How many same-origin 307/308 redirects a capture request follows.
   static const _maxCaptureRedirects = 5;
 
-  /// The identity of the last capture request whose events are still to be
-  /// retried. Kept in memory: after a restart the retry is a new request.
-  CaptureV1Identity? _pendingCaptureIdentity;
-
-  /// Flushes in a row whose batch failed with a transient error or had
-  /// events the server asked to retry. Each one pauses the queue for longer,
-  /// see [captureRetryDelay], so a failure that lasts, like a missing
-  /// capture route, doesn't resend the batch with every capture. A delivered
-  /// or dropped batch resets it.
-  int _failedFlushes = 0;
-
   /// The source of the backoff jitter: a uniform value in `[0, 1)`.
   @visibleForTesting
   double Function() jitterUnit = Random().nextDouble;
-
-  /// Whether this client already warned that capture returned a 404.
-  bool _warnedCaptureNotFound = false;
 
   /// The latest consent decision made through this client. It wins over the
   /// stored one: [clearPersistedOptOut] removes the stored decision while
@@ -144,9 +134,6 @@ abstract class PostHogCoreStateless {
 
   @protected
   late final SimpleEventEmitter events;
-  Timer? _flushTimer;
-  Timer? _retryAfterTimer;
-  Future<void>? _flushFuture;
 
   /// Set by [close]: later calls are ignored, the periodic flush stops, and
   /// a failed request is not retried.
@@ -167,9 +154,6 @@ abstract class PostHogCoreStateless {
     required this.storage,
   })  : _apiKey = config.projectToken,
         _host = removeTrailingSlash(config.host),
-        _flushAt = config.flushAt < 1 ? 1 : config.flushAt,
-        _maxBatchSize = config.maxBatchSize < 1 ? 1 : config.maxBatchSize,
-        _maxQueueSize = config.maxQueueSize < 1 ? 1 : config.maxQueueSize,
         _flushInterval = config.flushInterval,
         _compression = config.compression,
         _defaultOptIn = !config.optOut {
@@ -181,16 +165,54 @@ abstract class PostHogCoreStateless {
       debug(true);
     }
 
-    final queue = storage.queue;
-    final overflow = queue.length - _maxQueueSize;
-    if (overflow > 0) {
-      queue.removeOldest(overflow);
+    final flushAt = config.flushAt < 1 ? 1 : config.flushAt;
+    final maxBatchSize = config.maxBatchSize < 1 ? 1 : config.maxBatchSize;
+    _analytics = _CaptureLane(
+      path: captureV1Path,
+      queue: storage.queue,
+      flushAt: flushAt,
+      maxBatchSize: maxBatchSize,
+      maxQueueSize: config.maxQueueSize < 1 ? 1 : config.maxQueueSize,
+      compression: config.compression,
+      timeout: _requestTimeout,
+    );
+    final aiMaxQueueSize = config.captureAiMaxQueueSize ?? 0;
+    final aiTimeout = config.captureAiTimeout ?? Duration.zero;
+    final aiMaxEventBytes = config.captureAiMaxEventBytes ?? 0;
+    if (aiMaxEventBytes > captureAiMaxEventBytes) {
+      logger.warn('captureAiMaxEventBytes $aiMaxEventBytes is over the '
+          '$captureAiMaxEventBytes byte ceiling, using the ceiling.');
     }
+    _ai = _CaptureLane(
+      path: captureV1AiPath,
+      queue: storage.aiQueue,
+      flushAt: flushAt,
+      maxBatchSize: maxBatchSize,
+      maxQueueSize:
+          aiMaxQueueSize > 0 ? aiMaxQueueSize : captureAiDefaultMaxQueueSize,
+      compression: config.captureAiCompression ?? PostHogCompression.gzip,
+      timeout: aiTimeout > Duration.zero ? aiTimeout : captureAiDefaultTimeout,
+      maxEventBytes:
+          aiMaxEventBytes > 0 && aiMaxEventBytes < captureAiMaxEventBytes
+              ? aiMaxEventBytes
+              : captureAiMaxEventBytes,
+      maxQueueBytes: captureAiMaxQueueBytes,
+    );
 
-    // Events left over from a previous run go out with the first periodic
-    // flush instead of waiting for the next capture.
-    if (queue.length > 0) {
-      _scheduleFlush();
+    for (final lane in [_analytics, _ai]) {
+      final queue = lane.queue;
+      final overflow = queue.length - lane.maxQueueSize;
+      if (overflow > 0) {
+        queue.removeOldest(overflow);
+      }
+      final maxQueueBytes = lane.maxQueueBytes;
+      if (maxQueueBytes != null) queue.removeOldestOver(maxQueueBytes);
+
+      // Events left over from a previous run go out with the first periodic
+      // flush instead of waiting for the next capture.
+      if (queue.length > 0) {
+        _scheduleFlush(lane);
+      }
     }
   }
 
@@ -279,11 +301,9 @@ abstract class PostHogCoreStateless {
     required String event,
     required Map<String, Object?> properties,
   }) {
-    var eventProperties = {
-      ...properties,
-      ...getCommonEventProperties(),
-    };
-    // Minimized once all SDK properties are in.
+    // The properties come complete, the SDK's included: nothing is added
+    // here, so a property the beforeSend callbacks removed stays removed.
+    var eventProperties = {...properties};
     if (event == r'$feature_flag_called' &&
         eventProperties[r'$feature_flag_has_experiment'] == false &&
         isMinimalFlagCalledEventsEnabled()) {
@@ -308,25 +328,34 @@ abstract class PostHogCoreStateless {
   void identifyStateless(
     String distinctId, {
     required Map<String, Object?> properties,
+    Map<String, Object?>? options,
   }) {
     _enqueue(
+      _analytics,
       'identify',
       _buildPayload(
         distinctId: distinctId,
         event: r'$identify',
         properties: properties,
       ),
+      options: options,
     );
   }
 
+  /// Queues [event] and returns its uuid, or null when it is not queued.
+  /// With [ai], the event goes to the AI queue, which drops an event over
+  /// its size limit.
   @protected
-  void captureStateless(
+  String? captureStateless(
     String distinctId,
     String event, {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
+    String? timestamp,
+    bool ai = false,
   }) {
-    _enqueue(
+    return _enqueue(
+      ai ? _ai : _analytics,
       'capture',
       _buildPayload(
         distinctId: distinctId,
@@ -334,6 +363,7 @@ abstract class PostHogCoreStateless {
         properties: properties,
       ),
       options: options,
+      timestamp: timestamp,
     );
   }
 
@@ -342,8 +372,10 @@ abstract class PostHogCoreStateless {
     String alias,
     String distinctId, {
     required Map<String, Object?> properties,
+    Map<String, Object?>? options,
   }) {
     _enqueue(
+      _analytics,
       'alias',
       _buildPayload(
         distinctId: distinctId,
@@ -354,6 +386,7 @@ abstract class PostHogCoreStateless {
           'alias': alias,
         },
       ),
+      options: options,
     );
   }
 
@@ -364,8 +397,10 @@ abstract class PostHogCoreStateless {
     required String distinctId,
     required Map<String, Object?> eventProperties,
     Map<String, Object?>? groupProperties,
+    Map<String, Object?>? options,
   }) {
     _enqueue(
+      _analytics,
       'capture',
       _buildPayload(
         distinctId: distinctId,
@@ -377,6 +412,7 @@ abstract class PostHogCoreStateless {
           ...eventProperties,
         },
       ),
+      options: options,
     );
   }
 
@@ -459,13 +495,16 @@ abstract class PostHogCoreStateless {
     });
   }
 
-  /// Queues [message]. Its capture v1 [options] are queued with it; the
-  /// legacy option properties are converted only when the request is built,
-  /// see [captureV1Event].
-  void _enqueue(
+  /// Queues [message] on [lane] and returns its uuid, or null when it is
+  /// over the lane's event size limit. Its capture v1 [options] are queued
+  /// with it; the legacy option properties are converted only when the
+  /// request is built, see [captureV1Event].
+  String? _enqueue(
+    _CaptureLane lane,
     String type,
     Map<String, Object?> message, {
     Map<String, Object?>? options,
+    String? timestamp,
   }) {
     final prepared = <String, Object?>{
       ...message,
@@ -476,26 +515,49 @@ abstract class PostHogCoreStateless {
       'type': type,
       'library': postHogFlutterSdkName,
       'library_version': postHogFlutterVersion,
-      'timestamp': currentISOTime(),
+      'timestamp': timestamp ?? currentISOTime(),
       'uuid': generateUuidV7(),
     };
-    final queue = storage.queue;
-    final overflow = queue.length - _maxQueueSize + 1;
+
+    // Measured as queued, before compression.
+    String? json;
+    int? bytes;
+    final maxEventBytes = lane.maxEventBytes;
+    if (maxEventBytes != null) {
+      json = jsonEncode(prepared);
+      bytes = utf8.encode(json).length;
+      if (bytes > maxEventBytes) {
+        // Name and size only: AI properties can hold prompts and media.
+        logger.warn('Dropping AI event ${message['event']} of $bytes bytes, '
+            'over the $maxEventBytes byte limit.');
+        return null;
+      }
+    }
+
+    final queue = lane.queue;
+    final overflow = queue.length - lane.maxQueueSize + 1;
     if (overflow > 0) {
       queue.removeOldest(overflow);
       logger.warn('Queue is full, the oldest event is dropped.');
     }
-    queue.add(prepared);
+    queue.add(prepared, json: json, bytes: bytes);
+    final maxQueueBytes = lane.maxQueueBytes;
+    if (maxQueueBytes != null && queue.removeOldestOver(maxQueueBytes) > 0) {
+      logger.warn('Queue is over $maxQueueBytes bytes, the oldest events are '
+          'dropped.');
+    }
 
     events.emit(type, prepared);
 
     // A full request's worth of bytes flushes like flushAt does, so large
     // events go out before the queue starts dropping them.
-    if (queue.length >= _flushAt || queue.byteCount >= captureV1MaxBatchBytes) {
-      _flushBackground();
+    if (queue.length >= lane.flushAt ||
+        queue.byteCount >= captureV1MaxBatchBytes) {
+      _flushBackground(lane);
     }
 
-    _scheduleFlush();
+    _scheduleFlush(lane);
+    return prepared['uuid'] as String;
   }
 
   /// The event properties as they are queued and sent: values JSON cannot
@@ -512,107 +574,104 @@ abstract class PostHogCoreStateless {
             '$key': converted,
       };
 
-  void _scheduleFlush() {
+  void _scheduleFlush(_CaptureLane lane) {
     if (!_closed &&
-        _retryAfterTimer == null &&
+        lane.retryAfterTimer == null &&
         _flushInterval > Duration.zero &&
-        _flushTimer == null) {
-      _flushTimer = Timer(_flushInterval, () {
+        lane.flushTimer == null) {
+      lane.flushTimer = Timer(_flushInterval, () {
         // Cleared first: a timer firing during a flush in flight only joins
         // that flush, and a stale reference would block every later re-arm.
-        _flushTimer = null;
-        _flushBackground();
+        lane.flushTimer = null;
+        _flushBackground(lane);
       });
     }
   }
 
-  void _clearFlushTimer() {
-    _flushTimer?.cancel();
-    _flushTimer = null;
+  /// Counts one more failed flush of [lane] and stops sending its events
+  /// for the backoff it calls for, at least the server's [retryAfter].
+  void _backOff(_CaptureLane lane, Duration? retryAfter) {
+    if (lane.failedFlushes < _maxBackoffStep) lane.failedFlushes++;
+    _pauseFlush(
+        lane,
+        captureRetryDelay(
+          attempt: lane.failedFlushes,
+          jitterUnit: jitterUnit(),
+          retryAfter: retryAfter,
+        ));
   }
 
-  /// Counts one more failed flush and stops sending events for the backoff
-  /// it calls for, at least the server's [retryAfter].
-  void _backOff(Duration? retryAfter) {
-    if (_failedFlushes < _maxBackoffStep) _failedFlushes++;
-    _pauseFlush(captureRetryDelay(
-      attempt: _failedFlushes,
-      jitterUnit: jitterUnit(),
-      retryAfter: retryAfter,
-    ));
-  }
-
-  /// Stops sending events for [delay].
-  void _pauseFlush(Duration delay) {
-    _clearFlushTimer();
-    _retryAfterTimer?.cancel();
-    _retryAfterTimer = Timer(delay, () {
-      _retryAfterTimer = null;
-      if (!_closed &&
-          _flushInterval > Duration.zero &&
-          storage.queue.length > 0) {
-        _flushBackground();
+  /// Stops sending the events of [lane] for [delay].
+  void _pauseFlush(_CaptureLane lane, Duration delay) {
+    lane.clearFlushTimer();
+    lane.retryAfterTimer?.cancel();
+    lane.retryAfterTimer = Timer(delay, () {
+      lane.retryAfterTimer = null;
+      if (!_closed && _flushInterval > Duration.zero && lane.queue.length > 0) {
+        _flushBackground(lane);
       }
     });
   }
 
-  void _flushBackground() {
-    flush().catchError((e) {
+  void _flushBackground(_CaptureLane lane) {
+    _flushLane(lane).catchError((e) {
       logger.error('Error while flushing PostHog', e);
     });
   }
 
-  /// Flushes the queue of pending events.
+  /// Flushes the queues of pending events and AI events.
   /// If a flush is already in progress, returns the existing future to avoid
   /// concurrent flushes sending duplicate events.
-  Future<void> flush() {
-    if (_flushFuture != null) return _flushFuture!;
-    if (_retryAfterTimer != null) return Future.value();
-    _flushFuture = _doFlush().whenComplete(() => _flushFuture = null);
-    return _flushFuture!;
+  Future<void> flush() async {
+    await Future.wait([_flushLane(_analytics), _flushLane(_ai)]);
   }
 
-  Future<void> _doFlush() async {
-    _clearFlushTimer();
+  Future<void> _flushLane(_CaptureLane lane) {
+    final inFlight = lane.flushFuture;
+    if (inFlight != null) return inFlight;
+    if (lane.retryAfterTimer != null) return Future.value();
+    final flush = _doFlush(lane).whenComplete(() => lane.flushFuture = null);
+    lane.flushFuture = flush;
+    return flush;
+  }
 
-    final queue = storage.queue;
-    final sentMessages = <Map<String, Object?>>[];
+  Future<void> _doFlush(_CaptureLane lane) async {
+    lane.clearFlushTimer();
 
-    try {
-      while (!_closed) {
-        // Peeked again after every request, so events queued in the meantime
-        // go out with the same flush.
-        final batch = takeCaptureV1Batch(queue.peek(_maxBatchSize));
-        if (batch.isEmpty) {
-          if (queue.length > 0) _scheduleFlush();
-          break;
-        }
-        if (!await _sendBatch(batch, sentMessages)) break;
+    final queue = lane.queue;
+
+    while (!_closed) {
+      // Peeked again after every request, so events queued in the meantime
+      // go out with the same flush. The queue sizes the batch before
+      // reading it, so events past the batch are not decoded.
+      final batch =
+          queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
+      if (batch.isEmpty) {
+        if (queue.length > 0) _scheduleFlush(lane);
+        break;
       }
-    } finally {
-      if (sentMessages.isNotEmpty) {
-        events.emit('flush', sentMessages);
-      }
+      if (!await _sendBatch(lane, batch)) break;
     }
   }
 
   /// Sends [batch] to capture v1 and removes from the queue the events that
-  /// are done: delivered, or dropped for good. Adds the delivered ones to
-  /// [sent].
+  /// are done: delivered, or dropped for good. Emits `flush` with the
+  /// delivered ones right away, so a long flush doesn't hold on to the
+  /// payloads of every batch it sent.
   ///
   /// Returns whether the flush goes on with the rest of the queue. It stops
   /// while events of [batch] wait for a later retry: the queue backs off,
   /// and sends them again once the pause is over. It also stops after a 413
   /// halves the batch size.
   Future<bool> _sendBatch(
+    _CaptureLane lane,
     List<PostHogQueuedEvent> batch,
-    List<Map<String, Object?>> sent,
   ) async {
-    final queue = storage.queue;
+    final queue = lane.queue;
     final Set<String> retryUuids;
     final Duration? retryAfter;
     try {
-      (:retryUuids, :retryAfter) = await _postCaptureV1(batch);
+      (:retryUuids, :retryAfter) = await _postCaptureV1(lane, batch);
     } catch (e) {
       if (_closed) rethrow;
       if (e is PostHogFetchHttpError &&
@@ -620,33 +679,34 @@ abstract class PostHogCoreStateless {
           batch.length > 1) {
         // flushAt stays within the batch size, so the queue doesn't pile up
         // more events than one batch can carry.
-        _maxBatchSize = (batch.length ~/ 2).clamp(1, _maxBatchSize);
-        _flushAt = (_flushAt ~/ 2).clamp(1, _maxBatchSize);
-        logger.warn('Received 413, reducing batch size to $_maxBatchSize');
+        lane.maxBatchSize = (batch.length ~/ 2).clamp(1, lane.maxBatchSize);
+        lane.flushAt = (lane.flushAt ~/ 2).clamp(1, lane.maxBatchSize);
+        logger
+            .warn('Received 413, reducing batch size to ${lane.maxBatchSize}');
         // The smaller batches go out with the next flush, not right away.
-        _scheduleFlush();
+        _scheduleFlush(lane);
         return false;
       }
       if (e is PostHogFetchHttpError &&
           e.status == HttpStatus.notFound &&
-          !_warnedCaptureNotFound) {
-        _warnedCaptureNotFound = true;
+          !lane.warnedNotFound) {
+        lane.warnedNotFound = true;
         // Printed even without debug: the events stay queued, and nothing
         // else tells the app that the route is missing.
-        debugPrint('[PostHog] [WARN] $captureV1Path returned 404. '
+        debugPrint('[PostHog] [WARN] ${lane.path} returned 404. '
             'Events stay queued and are retried. If you use a reverse '
             'proxy or self-host PostHog, make sure it serves '
-            '$captureV1Path.');
+            '${lane.path}.');
       }
       // The pause re-arms the periodic flush: otherwise queued events sit
       // until the next capture (forever in an idle app after an offline
       // failure).
       if (_isTransientCaptureError(e)) {
-        _backOff(e is PostHogFetchHttpError ? e.retryAfter : null);
+        _backOff(lane, e is PostHogFetchHttpError ? e.retryAfter : null);
       } else {
         queue.remove([for (final queued in batch) queued.id]);
-        _failedFlushes = 0;
-        _scheduleFlush();
+        lane.failedFlushes = 0;
+        _scheduleFlush(lane);
       }
       events.emit('error', e);
       rethrow;
@@ -659,16 +719,18 @@ abstract class PostHogCoreStateless {
     // Removed by id: the queue may have changed while the batch was in
     // flight, e.g. its oldest events dropped to make room.
     queue.remove([for (final queued in delivered) queued.id]);
-    sent.addAll([for (final queued in delivered) queued.event]);
+    if (delivered.isNotEmpty) {
+      events.emit('flush', [for (final queued in delivered) queued.event]);
+    }
     if (delivered.length == batch.length) {
-      _failedFlushes = 0;
+      lane.failedFlushes = 0;
       return true;
     }
 
     // Counts only: uuids and server details can identify users.
     logger.info('Capture asked to retry ${batch.length - delivered.length} '
         'of ${batch.length} events.');
-    _backOff(retryAfter);
+    _backOff(lane, retryAfter);
     return false;
   }
 
@@ -683,13 +745,14 @@ abstract class PostHogCoreStateless {
   /// Throws [PostHogFetchHttpError] for a non-2xx status and
   /// [PostHogFetchNetworkError] for a transport failure.
   Future<({Set<String> retryUuids, Duration? retryAfter})> _postCaptureV1(
+    _CaptureLane lane,
     List<PostHogQueuedEvent> batch,
   ) async {
     final uuids = {
       for (final queued in batch)
         if (queued.event['uuid'] case final String uuid) uuid,
     };
-    final pending = _pendingCaptureIdentity;
+    final pending = lane.pendingIdentity;
     final identity = pending != null && sameUuids(pending.uuids, uuids)
         ? pending.next()
         : CaptureV1Identity(
@@ -697,7 +760,7 @@ abstract class PostHogCoreStateless {
             requestId: generateUuidV7(),
             createdAt: currentISOTime(),
           );
-    _pendingCaptureIdentity = identity;
+    lane.pendingIdentity = identity;
 
     final body = jsonEncode({
       'created_at': identity.createdAt,
@@ -714,11 +777,11 @@ abstract class PostHogCoreStateless {
     };
 
     // A transport failure keeps the identity, so the resend reuses it.
-    final response = await _fetchCaptureV1(body, headers);
+    final response = await _fetchCaptureV1(lane, body, headers);
 
     if (response.status < 200 || response.status >= 300) {
       if (!isRetriableCaptureV1Status(response.status)) {
-        _pendingCaptureIdentity = null;
+        lane.pendingIdentity = null;
       }
       throw PostHogFetchHttpError(
         response.status,
@@ -737,7 +800,7 @@ abstract class PostHogCoreStateless {
           'events for good.');
     }
     final retryUuids = results?.retry ?? const <String>{};
-    _pendingCaptureIdentity =
+    lane.pendingIdentity =
         retryUuids.isEmpty ? null : identity.withUuids(retryUuids);
     return (retryUuids: retryUuids, retryAfter: response.retryAfter);
   }
@@ -748,14 +811,18 @@ abstract class PostHogCoreStateless {
   /// is, and is terminal.
   Future<({int status, String? body, Duration? retryAfter, String? location})>
       _fetchCaptureV1(
+    _CaptureLane lane,
     String body,
     Map<String, String> headers,
   ) async {
     final origin = Uri.parse(_host);
-    var url = Uri.parse('$_host$captureV1Path');
+    var url = Uri.parse('$_host${lane.path}');
     for (var redirects = 0;; redirects++) {
       final response = await _fetchOnce(url, body,
-          headers: headers, deliveredOnBodyFailure: true);
+          headers: headers,
+          deliveredOnBodyFailure: true,
+          timeout: lane.timeout,
+          compression: lane.compression);
       if (response.status != 307 && response.status != 308) return response;
       final location = response.location;
       final target = location == null ? null : url.resolve(location);
@@ -799,8 +866,9 @@ abstract class PostHogCoreStateless {
     );
   }
 
-  /// Sends one request, aborted once it makes no progress for
-  /// [_requestTimeout]. A transport failure is thrown as
+  /// Sends one request, aborted once it makes no progress for [timeout],
+  /// [_requestTimeout] by default, and compressed with [compression], the
+  /// configured one by default. A transport failure is thrown as
   /// [PostHogFetchNetworkError], except, with [deliveredOnBodyFailure], one
   /// that happens after a 2xx status arrived: the response is then returned
   /// without a body.
@@ -815,10 +883,14 @@ abstract class PostHogCoreStateless {
     String body, {
     Map<String, String> headers = const {},
     bool deliveredOnBodyFailure = false,
+    Duration timeout = _requestTimeout,
+    PostHogCompression? compression,
   }) async {
-    final attempt = _FetchAttempt(_requestTimeout, _responseBodyTimeout);
+    final attempt = _FetchAttempt(timeout,
+        timeout > _responseBodyTimeout ? timeout : _responseBodyTimeout);
     try {
-      return await attempt.guard(_fetch(url, body, attempt, headers));
+      return await attempt.guard(
+          _fetch(url, body, attempt, headers, compression ?? _compression));
     } catch (e) {
       final status = attempt.status;
       if (deliveredOnBodyFailure &&
@@ -863,6 +935,7 @@ abstract class PostHogCoreStateless {
     String body,
     _FetchAttempt attempt,
     Map<String, String> headers,
+    PostHogCompression compression,
   ) async {
     final request = await _httpClient.postUrl(url);
     attempt.attachRequest(request);
@@ -879,7 +952,7 @@ abstract class PostHogCoreStateless {
     headers.forEach(request.headers.set);
     final bytes = utf8.encode(body);
     final List<int> payload;
-    if (_compression == PostHogCompression.gzip) {
+    if (compression == PostHogCompression.gzip) {
       request.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
       payload = gzip.encode(bytes);
     } else {
@@ -918,11 +991,73 @@ abstract class PostHogCoreStateless {
   /// storage loses them.
   void close() {
     _closed = true;
-    _clearFlushTimer();
-    _retryAfterTimer?.cancel();
-    _retryAfterTimer = null;
+    for (final lane in [_analytics, _ai]) {
+      lane.clearFlushTimer();
+      lane.retryAfterTimer?.cancel();
+      lane.retryAfterTimer = null;
+    }
     _httpClient.close(force: true);
     storage.close();
+  }
+}
+
+/// A queue of events and the state of sending it to one capture v1
+/// endpoint.
+class _CaptureLane {
+  _CaptureLane({
+    required this.path,
+    required this.queue,
+    required this.flushAt,
+    required this.maxBatchSize,
+    required this.maxQueueSize,
+    required this.compression,
+    required this.timeout,
+    this.maxEventBytes,
+    this.maxQueueBytes,
+  });
+
+  final String path;
+  final FileEventQueue queue;
+
+  /// Lowered with [maxBatchSize] by a 413, and kept within it.
+  int flushAt;
+
+  /// Lowered by a 413.
+  int maxBatchSize;
+  final int maxQueueSize;
+  final PostHogCompression compression;
+
+  /// How long a request may go without progress. Connecting is also bounded
+  /// by the HTTP client's connection timeout, shared by every endpoint.
+  final Duration timeout;
+
+  /// The largest serialized event queued; null for no limit.
+  final int? maxEventBytes;
+
+  /// The most serialized event bytes kept queued; null for no limit.
+  final int? maxQueueBytes;
+
+  /// The identity of the last request whose events are still to be
+  /// retried. Kept in memory: after a restart the retry is a new request.
+  CaptureV1Identity? pendingIdentity;
+
+  /// Flushes in a row whose batch failed with a transient error or had
+  /// events the server asked to retry. Each one pauses the queue for longer,
+  /// see [captureRetryDelay], so a failure that lasts, like a missing
+  /// capture route, doesn't resend the batch with every capture. A delivered
+  /// or dropped batch resets it.
+  int failedFlushes = 0;
+
+  /// Whether this client already warned that [path] returned a 404.
+  bool warnedNotFound = false;
+
+  Timer? flushTimer;
+  Timer? retryAfterTimer;
+  Future<void>? flushFuture;
+
+  void clearFlushTimer() {
+    flushTimer?.cancel();
+    flushTimer = null;
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
@@ -162,7 +163,7 @@ void main() {
       'setup initializes method call handler and registers callback if provided',
       () async {
         bool callbackInvoked = false;
-        void testCallback() {
+        void testCallback(PostHogFeatureFlagsLoaded _) {
           callbackInvoked = true;
         }
 
@@ -212,94 +213,45 @@ void main() {
       },
     );
 
-    test(
-      'invokes callback when native sends onFeatureFlagsCallback event',
-      () async {
-        bool callbackInvoked = false;
+    test('passes the native flags to the callback', () async {
+      final received = <PostHogFeatureFlagsLoaded>[];
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', onFeatureFlags: received.add));
 
-        void testCallback() {
-          callbackInvoked = true;
-        }
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(const MethodCall(
+          'onFeatureFlagsCallback',
+          {
+            'variants': {'on': true, 'variant': 'test', 'off': false},
+            'errorsLoading': true,
+          },
+        )),
+        (ByteData? data) {},
+      );
 
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
+      expect(received.single.variants, {'on': true, 'variant': 'test'});
+      expect(received.single.flags, ['on', 'variant']);
+      expect(received.single.errorsLoading, isTrue);
+    });
 
-        // Native sends empty map (iOS/Android behavior)
-        final mockNativeArgs = <String, dynamic>{};
-
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-          ),
-          (ByteData? data) {},
-        );
-
-        expect(callbackInvoked, isTrue);
-      },
-    );
-
-    test(
-      'invokes callback when native sends onFeatureFlagsCallback with empty map (mobile behavior)',
-      () async {
-        bool callbackInvoked = false;
-
-        void testCallback() {
-          callbackInvoked = true;
-        }
-
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        // Simulate mobile sending an empty map
-        final mockNativeArgs = <String, dynamic>{};
-
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-          ),
-          (ByteData? data) {},
-        );
-
-        expect(callbackInvoked, isTrue);
-      },
-    );
-
-    test('invokes callback even with malformed native args', () async {
-      bool callbackInvoked = false;
-
-      void testCallback() {
-        callbackInvoked = true;
-      }
-
-      testConfig =
-          PostHogConfig('test_project_token', onFeatureFlags: testCallback);
-      await posthogFlutterIO.setup(testConfig);
-
-      // Simulate native sending malformed arguments - callback should still be invoked
-      final mockNativeArgsMalformed = {
-        'flags': 123, // Invalid type, but callback is void so it doesn't matter
-      };
+    test('passes empty flags to the callback for malformed native args',
+        () async {
+      final received = <PostHogFeatureFlagsLoaded>[];
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', onFeatureFlags: received.add));
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
-          MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed),
+          const MethodCall('onFeatureFlagsCallback', {'variants': 123}),
         ),
         (ByteData? data) {},
       );
 
-      expect(callbackInvoked, isTrue);
+      expect(received.single.variants, isEmpty);
     });
 
     test('does not invoke callback when no callback is registered', () async {
@@ -449,6 +401,133 @@ void main() {
           log.firstWhere((c) => c.method == 'resetGroupPropertiesForFlags');
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args.containsKey('groupType'), isFalse);
+    });
+  });
+
+  group('PosthogFlutterIO event options', () {
+    const options = <String, Object?>{
+      'process_person_profile': false,
+      'custom_key': 'kept',
+      'unset_key': null,
+    };
+    const sent = {'process_person_profile': false, 'custom_key': 'kept'};
+
+    Map<String, dynamic> argsOf(String method) => Map<String, dynamic>.from(
+          log.singleWhere((c) => c.method == method).arguments as Map,
+        );
+
+    setUp(() async {
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+    });
+
+    final callsByMethod = <String, Future<void> Function(PosthogFlutterIO)>{
+      'capture': (io) => io.capture(eventName: 'clicked', options: options),
+      'screen': (io) => io.screen(screenName: 'Home', options: options),
+      'captureException': (io) =>
+          io.captureException(error: StateError('boom'), options: options),
+      'identify': (io) => io.identify(userId: 'user-1', options: options),
+      'setPersonProperties': (io) => io.setPersonProperties(
+            userPropertiesToSet: {'plan': 'pro'},
+            options: options,
+          ),
+      'alias': (io) => io.alias(alias: 'alias-1', options: options),
+      'group': (io) =>
+          io.group(groupType: 'company', groupKey: 'acme', options: options),
+      'captureAi': (io) =>
+          io.captureAi(eventName: r'$ai_generation', options: options),
+    };
+
+    for (final entry in callsByMethod.entries) {
+      test('${entry.key} sends the options without unset keys', () async {
+        await entry.value(posthogFlutterIO);
+        expect(argsOf(entry.key)['options'], sent);
+      });
+    }
+
+    test('calls without options send no options argument', () async {
+      await posthogFlutterIO.capture(eventName: 'clicked');
+      await posthogFlutterIO.alias(alias: 'alias-1', options: {'k': null});
+      expect(argsOf('capture'), isNot(contains('options')));
+      expect(argsOf('alias'), isNot(contains('options')));
+    });
+
+    test('captureAi sends the event and returns the native uuid', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return call.method == 'captureAi' ? 'uuid-1' : null;
+      });
+
+      final uuid = await posthogFlutterIO.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_model': 'gpt-4o'},
+        userProperties: {'plan': 'pro'},
+      );
+
+      expect(uuid, 'uuid-1');
+      expect(argsOf('captureAi'), {
+        'eventName': r'$ai_generation',
+        'properties': {r'$ai_model': 'gpt-4o'},
+        'userProperties': {'plan': 'pro'},
+      });
+      expect(log.where((c) => c.method == 'capture'), isEmpty);
+    });
+
+    test('beforeSend sees and can change the options', () async {
+      final seen = <Map<String, Object?>?>[];
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            seen.add({...?event.options});
+            event.options = {...?event.options, 'product_tour_id': 'tour-1'}
+              ..remove('custom_key');
+            return event;
+          },
+        ],
+      ));
+
+      await posthogFlutterIO.captureAi(
+          eventName: r'$ai_span', options: options);
+      await posthogFlutterIO.screen(screenName: 'Home', options: options);
+
+      expect(seen, [options, options]);
+      const changed = {
+        'process_person_profile': false,
+        'product_tour_id': 'tour-1',
+      };
+      expect(argsOf('captureAi')['options'], changed);
+      expect(argsOf('screen')['options'], changed);
+    });
+
+    test('a screen renamed by beforeSend keeps its options', () async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            if (event.event == r'$screen') event.event = 'screen viewed';
+            return event;
+          },
+        ],
+      ));
+
+      await posthogFlutterIO.screen(screenName: 'Home', options: options);
+
+      expect(argsOf('capture')['eventName'], 'screen viewed');
+      expect(argsOf('capture')['options'], sent);
+    });
+
+    test('captureAi dropped by beforeSend returns null', () async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [(event) => null],
+      ));
+
+      expect(
+        await posthogFlutterIO.captureAi(eventName: r'$ai_generation'),
+        isNull,
+      );
+      expect(log.where((c) => c.method == 'captureAi'), isEmpty);
     });
   });
 

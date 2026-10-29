@@ -1,4 +1,5 @@
 import '../feature_flag_result.dart';
+import '../feature_flags_loaded.dart';
 import '../posthog_config.dart';
 import '../util/logging.dart';
 
@@ -21,6 +22,15 @@ extension PostHogConfigSerialization on PostHogConfig {
       'surveys': surveys,
       'personProfiles': personProfiles.name,
       'compression': compression.name,
+      // Unset AI lane settings are omitted so the native defaults apply.
+      if (captureAiCompression != null)
+        'captureAiCompression': captureAiCompression!.name,
+      if (captureAiMaxQueueSize != null)
+        'captureAiMaxQueueSize': captureAiMaxQueueSize,
+      if (captureAiTimeout != null)
+        'captureAiTimeoutSeconds': _captureAiTimeoutSeconds(captureAiTimeout!),
+      if (captureAiMaxEventBytes != null)
+        'captureAiMaxEventBytes': captureAiMaxEventBytes,
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
       'sessionReplayConfig': sessionReplayConfig.toMap(),
@@ -36,6 +46,11 @@ extension PostHogConfigSerialization on PostHogConfig {
       if (bootstrap != null) 'bootstrap': bootstrap!.toMap(),
     };
   }
+
+  /// Android takes whole seconds. A positive sub-second timeout is sent as 1s
+  /// instead of 0, which the native SDKs read as "use the default".
+  static int _captureAiTimeoutSeconds(Duration timeout) =>
+      timeout > Duration.zero && timeout.inSeconds < 1 ? 1 : timeout.inSeconds;
 }
 
 extension PostHogBootstrapConfigSerialization on PostHogBootstrapConfig {
@@ -168,5 +183,20 @@ PostHogFeatureFlagResult? featureFlagResultFromMap(
     enabled: result['enabled'] as bool? ?? false,
     variant: result['variant'] as String?,
     payload: result['payload'],
+  );
+}
+
+/// Reads a `{variants, errorsLoading}` map sent over the platform channel.
+/// A missing or malformed map reads as empty flags with `errorsLoading` set.
+PostHogFeatureFlagsLoaded featureFlagsLoadedFromMap(Object? map) {
+  if (map is! Map) {
+    return PostHogFeatureFlagsLoaded(variants: const {}, errorsLoading: true);
+  }
+  final variants = map['variants'];
+  return PostHogFeatureFlagsLoaded(
+    variants: variants is Map
+        ? {for (final e in variants.entries) '${e.key}': e.value}
+        : const {},
+    errorsLoading: map['errorsLoading'] as bool? ?? false,
   );
 }

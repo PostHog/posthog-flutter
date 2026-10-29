@@ -1,15 +1,17 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'feature_flag_result.dart';
+import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
 import 'posthog_flutter_io.dart';
 
 /// Defines the callback signature for when feature flags are loaded.
 ///
-/// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
-/// callback to access the loaded flag values.
-typedef OnFeatureFlagsCallback = void Function();
+/// The callback receives the enabled flags and whether loading failed. See
+/// [PostHogFeatureFlagsLoaded].
+typedef OnFeatureFlagsCallback = void Function(
+    PostHogFeatureFlagsLoaded loaded);
 
 abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PosthogFlutterPlatform.
@@ -47,6 +49,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
     throw UnimplementedError('identify() has not been implemented.');
   }
@@ -54,6 +57,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) {
     throw UnimplementedError('setPersonProperties() has not been implemented.');
   }
@@ -63,13 +67,27 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
     throw UnimplementedError('capture() has not been implemented.');
+  }
+
+  /// Captures an AI observability event on the AI lane. Returns the event's
+  /// UUID, or null when the event was not queued.
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) {
+    throw UnimplementedError('captureAi() has not been implemented.');
   }
 
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) {
     throw UnimplementedError('screen() has not been implemented.');
   }
@@ -117,7 +135,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     );
   }
 
-  Future<void> alias({required String alias}) {
+  Future<void> alias({required String alias, Map<String, Object?>? options}) {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
@@ -173,7 +191,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');
   }
 
-  Future<void> reloadFeatureFlags() {
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() {
     throw UnimplementedError('reloadFeatureFlags() has not been implemented.');
   }
 
@@ -212,6 +230,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
   }) {
     throw UnimplementedError('group() has not been implemented.');
   }
@@ -244,6 +263,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) {
     throw UnimplementedError('captureException() has not been implemented.');
   }

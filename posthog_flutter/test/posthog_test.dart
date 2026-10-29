@@ -27,7 +27,7 @@ void main() {
     test(
       'setup passes config and onFeatureFlags callback to platform interface',
       () async {
-        void testCallback() {}
+        void testCallback(PostHogFeatureFlagsLoaded _) {}
 
         final config = PostHogConfig(
           'test_project_token',
@@ -212,6 +212,50 @@ void main() {
         }
       },
     );
+  });
+
+  group('Posthog event options', () {
+    late PosthogFlutterPlatformFake fake;
+    const options = {'process_person_profile': false};
+
+    setUp(() async {
+      fake = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fake;
+      await Posthog().close();
+    });
+
+    test('each event method passes its options to the platform', () async {
+      final posthog = Posthog();
+      await posthog.capture(eventName: 'clicked', options: options);
+      await posthog.screen(screenName: 'Home', options: options);
+      await posthog.identify(userId: 'user-1', options: options);
+      await posthog.alias(alias: 'alias-1', options: options);
+      await posthog.group(
+          groupType: 'company', groupKey: 'acme', options: options);
+      await posthog.captureAi(eventName: r'$ai_span', options: options);
+      await posthog.captureException(
+          error: StateError('boom'), options: options);
+      await posthog.setPersonProperties(
+        userPropertiesToSet: {'plan': 'pro'},
+        options: options,
+      );
+
+      expect(fake.optionsCalls, [
+        ('capture', options),
+        ('screen', options),
+        ('identify', options),
+        ('alias', options),
+        ('group', options),
+        ('captureAi', options),
+      ]);
+      expect(fake.capturedExceptions.single.options, options);
+      expect(fake.setPersonPropertiesCalls.single['options'], options);
+    });
+
+    test('captureAi returns the platform result', () async {
+      fake.captureAiResult = 'uuid-1';
+      expect(await Posthog().captureAi(eventName: r'$ai_trace'), 'uuid-1');
+    });
   });
 
   group('PostHogConfig', () {

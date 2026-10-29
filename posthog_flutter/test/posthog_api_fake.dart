@@ -37,6 +37,9 @@ class PostHogRequest {
   /// Whether this is a capture v1 request for analytics events.
   bool get isBatch => path == '/i/v1/analytics/events';
 
+  /// Whether this is a capture v1 request for AI events.
+  bool get isAi => path == '/i/v1/ai/events';
+
   bool get isFlags => path == '/flags/';
 
   /// The events of a capture request, oldest first.
@@ -119,6 +122,21 @@ abstract class PostHogApiFake {
         for (final request in requests)
           if (request.isBatch) request
       ];
+
+  List<PostHogRequest> get aiRequests => [
+        for (final request in requests)
+          if (request.isAi) request
+      ];
+
+  /// Every AI event received, oldest first.
+  List<Map<String, Object?>> get aiEvents =>
+      [for (final request in aiRequests) ...request.events];
+
+  /// Completes with the first AI event named [name] once it has arrived.
+  Future<Map<String, Object?>> waitForAiEvent(String name) async {
+    await _waitUntil(() => aiEvents.any((event) => event['event'] == name));
+    return aiEvents.firstWhere((event) => event['event'] == name);
+  }
 
   List<PostHogRequest> get flagsRequests => [
         for (final request in requests)

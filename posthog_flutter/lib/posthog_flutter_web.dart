@@ -11,6 +11,7 @@ import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
+import 'src/feature_flags_loaded.dart';
 import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_constants.dart';
@@ -20,6 +21,7 @@ import 'src/posthog_flutter_web_handler.dart';
 import 'src/utils/before_send.dart';
 import 'src/replay/web/web_canvas_mask_provider.dart';
 import 'src/utils/capture_utils.dart';
+import 'src/utils/event_options.dart';
 import 'src/utils/feature_event.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
@@ -44,6 +46,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
     return applyBeforeSend(
       _beforeSendCallbacks,
@@ -52,8 +55,20 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         properties: properties,
         userProperties: userProperties,
         userPropertiesSetOnce: userPropertiesSetOnce,
+        options: options == null ? null : {...options},
       ),
     );
+  }
+
+  /// posthog-js sends these calls' events without event properties, so
+  /// options can't be attached.
+  static void _logUnsupportedOptions(
+    String method,
+    Map<String, Object?>? options,
+  ) {
+    if (cleanEventOptions(options) == null) return;
+    printIfDebug('[PostHog] $method options are not supported on web and '
+        'were dropped.');
   }
 
   static void registerWith(Registrar registrar) {
@@ -129,10 +144,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       final dartCallback = config.onFeatureFlags!;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
-      // We ignore the JS parameters and just invoke the void callback
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        dartCallback();
+        dartCallback(featureFlagsLoadedFromMap({
+          'variants': jsFlagVariants.dartify(),
+          'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
+        }));
       }.toJS;
 
       ph.onFeatureFlags(jsCallback);
@@ -144,7 +161,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) async {
+    _logUnsupportedOptions('identify', options);
     return handleWebMethodCall(
       MethodCall('identify', {
         'userId': userId,
@@ -159,7 +178,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) async {
+    _logUnsupportedOptions('setPersonProperties', options);
     if ((userPropertiesToSet?.isEmpty ?? true) &&
         (userPropertiesToSetOnce?.isEmpty ?? true)) {
       return;
@@ -181,12 +202,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) async {
     final processedEvent = await _runBeforeSend(
       eventName,
       properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
     );
     if (processedEvent == null) {
       printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
@@ -199,7 +222,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
     );
 
-    final extractedProperties = extracted.properties;
+    final extractedProperties = _withOptionProperties(
+      extracted.properties,
+      processedEvent.options,
+      processedEvent.event,
+    );
     final extractedUserProperties = extracted.userProperties;
     final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
 
@@ -224,6 +251,33 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
           'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
       }),
     );
+  }
+
+  /// posthog-js has no AI capture, so AI events are not sent on web.
+  @override
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    printIfDebug('[PostHog] captureAi is not supported on web. '
+        'The event "$eventName" was not sent.');
+    return null;
+  }
+
+  /// posthog-js has no options for these keys, so they are sent as their
+  /// legacy properties, winning over a legacy property set on the event.
+  static Map<String, Object>? _withOptionProperties(
+    Map<String, Object>? properties,
+    Map<String, Object?>? options,
+    String eventName,
+  ) {
+    final optionProperties =
+        eventOptionsToLegacyProperties(options, method: eventName);
+    if (optionProperties.isEmpty) return properties;
+    return {...?properties, ...optionProperties};
   }
 
   @override
@@ -255,6 +309,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     // The screen name argument wins over a properties `$screen_name`.
     // beforeSend still runs after this and can change the name.
@@ -266,6 +321,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final processedEvent = await _runBeforeSend(
       PostHogEventName.screen,
       propsWithScreenName,
+      options: options,
     );
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
@@ -276,6 +332,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       await capture(
         eventName: processedEvent.event,
         properties: processedEvent.properties?.cast<String, Object>(),
+        options: processedEvent.options,
       );
       return;
     }
@@ -285,7 +342,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
             screenName;
     _currentScreen = finalScreenName;
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
-    final remaining = processedEvent.properties;
+    final remaining = _withOptionProperties(
+      processedEvent.properties,
+      processedEvent.options,
+      PostHogEventName.screen,
+    );
 
     return handleWebMethodCall(
       MethodCall('screen', {
@@ -296,7 +357,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> alias({required String alias}) async {
+  Future<void> alias({
+    required String alias,
+    Map<String, Object?>? options,
+  }) async {
+    _logUnsupportedOptions('alias', options);
     return handleWebMethodCall(MethodCall('alias', {'alias': alias}));
   }
 
@@ -393,8 +458,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> reloadFeatureFlags() async {
-    return handleWebMethodCall(const MethodCall('reloadFeatureFlags'));
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
+    return featureFlagsLoadedFromMap(
+        await handleWebMethodCall(const MethodCall('reloadFeatureFlags')));
   }
 
   @override
@@ -442,7 +508,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
   }) async {
+    _logUnsupportedOptions('group', options);
     return handleWebMethodCall(
       MethodCall('group', {
         'groupType': groupType,
@@ -544,6 +612,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     try {
       final exceptionData = DartExceptionProcessor.processException(
@@ -558,6 +627,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       final processedEvent = await _runBeforeSend(
         PostHogEventName.exception,
         exceptionData.cast<String, Object>(),
+        options: options,
       );
       if (processedEvent == null) {
         printIfDebug(
@@ -570,12 +640,18 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         await capture(
           eventName: processedEvent.event,
           properties: processedEvent.properties?.cast<String, Object>(),
+          options: processedEvent.options,
         );
         return;
       }
 
       final normalizedData = PropertyNormalizer.normalize(
-        processedEvent.properties?.cast<String, Object>() ?? <String, Object>{},
+        _withOptionProperties(
+              processedEvent.properties?.cast<String, Object>(),
+              processedEvent.options,
+              PostHogEventName.exception,
+            ) ??
+            <String, Object>{},
       );
 
       return await handleWebMethodCall(
