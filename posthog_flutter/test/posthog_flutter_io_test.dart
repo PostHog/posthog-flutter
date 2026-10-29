@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
@@ -99,6 +101,89 @@ void main() {
           {'flag': 'b', 'flagVariant': 'control'}
         ],
       ]);
+    });
+  });
+
+  group('PosthogFlutterIO exception events', () {
+    test('passes AOT debug images and addresses through the native channel',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await posthogFlutterIO.captureException(
+        error: StateError('sample failure'),
+        stackTrace: StackTrace.fromString('''
+build_id: 'b718850999efbed01ab80642060ddbf3'
+isolate_dso_base: 7000000000
+#0 abs 7000205218 _kDartIsolateSnapshotInstructions+0x20
+'''),
+      );
+
+      final call = log.singleWhere((item) => item.method == 'captureException');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      final properties = Map<String, dynamic>.from(args['properties'] as Map);
+      final images = properties['\$debug_images'] as List;
+      expect(images.single, {
+        'debug_id': '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+        'image_addr': '0x7000000000',
+        'type': 'elf',
+      });
+      final exception = (properties['\$exception_list'] as List).single as Map;
+      final frames = (exception['stacktrace'] as Map)['frames'] as List;
+      expect((frames.single as Map)['instruction_addr'], '0x7000205218');
+    });
+  });
+
+  group('PosthogFlutterIO sendFeatureFlagEvent', () {
+    for (final sendFeatureFlagEvent in [null, true, false]) {
+      final expected = {
+        'key': 'flag',
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      };
+
+      test('getFeatureFlag sends $expected', () async {
+        await posthogFlutterIO.getFeatureFlag(
+            key: 'flag', sendFeatureFlagEvent: sendFeatureFlagEvent);
+        expect(log.single.method, 'getFeatureFlag');
+        expect(log.single.arguments, expected);
+      });
+
+      test('isFeatureEnabled sends $expected', () async {
+        await posthogFlutterIO.isFeatureEnabled('flag',
+            sendFeatureFlagEvent: sendFeatureFlagEvent);
+        expect(log.single.method, 'isFeatureEnabled');
+        expect(log.single.arguments, expected);
+      });
+    }
+  });
+
+  group('PosthogFlutterIO getAllFeatureFlags', () {
+    test('decodes the native results', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'getAllFeatureFlags');
+        return [
+          {'key': 'on', 'enabled': true, 'variant': null, 'payload': null},
+          {
+            'key': 'multi',
+            'enabled': true,
+            'variant': 'control',
+            'payload': {'discount': 10}
+          },
+        ];
+      });
+
+      final results = await posthogFlutterIO.getAllFeatureFlags();
+      expect(results, [
+        const PostHogFeatureFlagResult(key: 'on', enabled: true),
+        const PostHogFeatureFlagResult(
+            key: 'multi', enabled: true, variant: 'control'),
+      ]);
+      expect(results![1].payload, {'discount': 10});
+    });
+
+    test('preserves a missing native result', () async {
+      expect(await posthogFlutterIO.getAllFeatureFlags(), isNull);
+      expect(log.single.method, 'getAllFeatureFlags');
     });
   });
 

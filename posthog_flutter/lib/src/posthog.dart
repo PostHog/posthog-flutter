@@ -481,8 +481,23 @@ class Posthog {
   ///
   /// The [key] is the feature flag key.
   ///
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
+  /// this call, or `true` to capture it even when the config turns it off.
+  ///
   /// Returns `false` when the flag is disabled, missing, or not a boolean flag.
-  Future<bool> isFeatureEnabled(String key) => _posthog.isFeatureEnabled(key);
+  ///
+  /// **Example:**
+  /// ```dart
+  /// if (await Posthog().isFeatureEnabled('new-checkout',
+  ///     sendFeatureFlagEvent: false)) {
+  ///   // show the new checkout without recording a flag exposure
+  /// }
+  /// ```
+  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
+      _posthog.isFeatureEnabled(key,
+          sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Reloads feature flags for the current user.
   ///
@@ -761,8 +776,23 @@ class Posthog {
   /// Returns `null` if the flag does not exist or cannot be loaded. For boolean
   /// flags, returns `true` or `false`. For multivariate flags, returns the
   /// variant key.
-  Future<Object?> getFeatureFlag(String key) =>
-      _posthog.getFeatureFlag(key: key);
+  ///
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
+  /// this call, or `true` to capture it even when the config turns it off.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final variant = await Posthog().getFeatureFlag('button-color',
+  ///     sendFeatureFlagEvent: false);
+  /// if (variant == 'red') {
+  ///   // show the red button without recording a flag exposure
+  /// }
+  /// ```
+  Future<Object?> getFeatureFlag(String key, {bool? sendFeatureFlagEvent}) =>
+      _posthog.getFeatureFlag(
+          key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Returns the full feature flag result for [key], including value and
   /// payload.
@@ -787,6 +817,29 @@ class Posthog {
     bool sendEvent = true,
   }) =>
       _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
+
+  /// Returns the results of all currently loaded feature flags.
+  ///
+  /// Each [PostHogFeatureFlagResult] carries the flag's key, enabled state,
+  /// variant (for multivariate flags), and payload. This reads the flags from
+  /// the last load without a network request; call [reloadFeatureFlags] first
+  /// to refresh them. Unlike [getFeatureFlag], it never captures the
+  /// `$feature_flag_called` event.
+  ///
+  /// Returns `null` when no flags have been loaded yet or the SDK is disabled.
+  /// On web, posthog-js returns an empty list before flags load, and this
+  /// returns `null` when the loaded posthog-js predates `getAllFeatureFlags`
+  /// (1.395.0).
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final flags = await Posthog().getAllFeatureFlags() ?? [];
+  /// for (final flag in flags) {
+  ///   print('${flag.key}: ${flag.variant ?? flag.enabled}');
+  /// }
+  /// ```
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() =>
+      _posthog.getAllFeatureFlags();
 
   /// Returns the payload for the feature flag [key].
   ///

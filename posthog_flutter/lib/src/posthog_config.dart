@@ -1230,9 +1230,11 @@ class PostHogErrorTrackingConfig {
 
   /// Enable automatic capture of isolate errors.
   ///
-  /// Controls whether errors from the current isolate are captured.
-  /// This includes errors from the main isolate and any isolates spawned
-  /// without explicit error handling.
+  /// Only captures errors from the isolate where `Posthog().setup()` runs,
+  /// normally the main isolate. Errors from spawned background isolates are
+  /// not captured automatically. To capture them, call
+  /// `isolate.addPostHogErrorListener()` from the main isolate before resuming
+  /// an isolate spawned paused.
   ///
   /// **Note:**
   /// - Flutter web: Not supported

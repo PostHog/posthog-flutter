@@ -19,7 +19,7 @@ import 'uuid.dart';
 /// It extends [PostHogCoreStateless] with state management for sessions,
 /// identity, feature flags, and person profiles.
 abstract class PostHogCore extends PostHogCoreStateless {
-  final bool _sendFeatureFlagEvents;
+  final bool _sendFeatureFlagEvent;
   final PostHogPersonProfiles _personProfiles;
   final List<String>? _evaluationContexts;
 
@@ -56,7 +56,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   bool _flagsRequestAnnounced = false;
 
   PostHogCore(PostHogConfig config, {required super.storage})
-      : _sendFeatureFlagEvents = config.sendFeatureFlagEvents,
+      : _sendFeatureFlagEvent = config.sendFeatureFlagEvent,
         _personProfiles = config.personProfiles,
         _evaluationContexts = config.evaluationContexts == null
             ? null
@@ -603,6 +603,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
           requestError: result.error,
           // A failed request says nothing about the minimal events gate.
           minimalFlagCalledEvents: stored?.minimalFlagCalledEvents,
+          notLoaded: stored?.notLoaded ?? true,
         ));
         return;
       }
@@ -623,6 +624,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
           errorsWhileComputingFlags: stored?.errorsWhileComputingFlags,
           quotaLimited: res.quotaLimited,
           minimalFlagCalledEvents: stored?.minimalFlagCalledEvents,
+          notLoaded: stored?.notLoaded ?? true,
         ));
         logger.warn('[FEATURE FLAGS] Feature flags quota limit exceeded.');
         return;
@@ -844,6 +846,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
       capture(r'$feature_flag_called', properties: captureProperties);
     }
 
+    return _toFlagResult(key, featureFlag);
+  }
+
+  PostHogFeatureFlagResult? _toFlagResult(
+      String key, PostHogFeatureFlagDetail? featureFlag) {
+    final flagValue = getFeatureFlagValue(featureFlag);
     if (flagValue == null) return null;
 
     // Payloads only accompany enabled flags.
@@ -864,21 +872,40 @@ abstract class PostHogCore extends PostHogCoreStateless {
     );
   }
 
-  /// Gets a feature flag value.
+  /// Gets the results of all loaded feature flags without capturing
+  /// `$feature_flag_called`. Returns null when no flags have been loaded.
+  List<PostHogFeatureFlagResult>? getAllFeatureFlagResults() {
+    final flags = _getLoadedFlagDetails()?.toResponse().flags;
+    if (flags == null) return null;
+    return [
+      for (final MapEntry(:key, :value) in flags.entries)
+        if (_toFlagResult(key, value) case final result?) result,
+    ];
+  }
+
+  /// Gets a feature flag value, capturing `$feature_flag_called` when
+  /// [sendEvent] is true, or when it is null and `sendFeatureFlagEvent` is
+  /// enabled in the config.
   ///
   /// Returns null if the flag does not exist or has not been loaded.
-  PostHogFeatureFlagValue? getFeatureFlag(String key) {
-    final result = getFeatureFlagResult(key, sendEvent: _sendFeatureFlagEvents);
+  PostHogFeatureFlagValue? getFeatureFlag(String key, {bool? sendEvent}) {
+    final result = getFeatureFlagResult(key,
+        sendEvent: sendEvent ?? _sendFeatureFlagEvent);
     if (result == null) return null;
     return result.variant ?? result.enabled;
   }
 
   Map<String, PostHogFeatureFlagValue>? _getFeatureFlags() =>
-      _getStoredFlagDetails()?.toResponse().featureFlags;
+      _getLoadedFlagDetails()?.toResponse().featureFlags;
+
+  PostHogFlagsStorageFormat? _getLoadedFlagDetails() {
+    final stored = _getStoredFlagDetails();
+    return stored == null || stored.notLoaded ? null : stored;
+  }
 
   /// Checks if a feature flag is enabled.
-  bool? isFeatureEnabled(String key) {
-    final response = getFeatureFlag(key);
+  bool? isFeatureEnabled(String key, {bool? sendEvent}) {
+    final response = getFeatureFlag(key, sendEvent: sendEvent);
     if (response == null) return null;
     if (response is bool) return response;
     return true; // String variants are truthy

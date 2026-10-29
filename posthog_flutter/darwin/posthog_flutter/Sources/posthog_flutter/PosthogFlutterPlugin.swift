@@ -486,6 +486,8 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             getFeatureFlagPayload(call, result: result)
         case "getFeatureFlagResult":
             getFeatureFlagResult(call, result: result)
+        case "getAllFeatureFlags":
+            getAllFeatureFlags(result)
         case "identify":
             identify(call, result: result)
         case "setPersonProperties":
@@ -1360,7 +1362,13 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String
         {
-            let value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
+            // A missing sendEvent follows config.sendFeatureFlagEvent.
+            let value: Any?
+            if let sendEvent = args["sendEvent"] as? Bool {
+                value = PostHogSDK.shared.getFeatureFlag(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+            } else {
+                value = PostHogSDK.shared.getFeatureFlag(featureFlagKey)
+            }
             result(value)
         } else {
             _badArgumentError(result)
@@ -1374,7 +1382,12 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let featureFlagKey = args["key"] as? String
         {
-            let value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
+            let value: Bool
+            if let sendEvent = args["sendEvent"] as? Bool {
+                value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey, sendFeatureFlagEvent: sendEvent)
+            } else {
+                value = PostHogSDK.shared.isFeatureEnabled(featureFlagKey)
+            }
             result(value)
         } else {
             _badArgumentError(result)
@@ -1418,6 +1431,18 @@ extension PosthogFlutterPlugin {
         } else {
             _badArgumentError(result)
         }
+    }
+
+    private func getAllFeatureFlags(_ result: @escaping FlutterResult) {
+        let flagResults = PostHogSDK.shared.getAllFeatureFlags()?.map { flagResult -> [String: Any] in
+            [
+                "key": flagResult.key,
+                "enabled": flagResult.enabled,
+                "variant": flagResult.variant as Any,
+                "payload": flagResult.payload as Any,
+            ]
+        }
+        result(flagResults)
     }
 
     private func identify(

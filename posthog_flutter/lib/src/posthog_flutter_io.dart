@@ -587,7 +587,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<bool> isFeatureEnabled(String key) async {
+  Future<bool> isFeatureEnabled(String key,
+      {bool? sendFeatureFlagEvent}) async {
     if (!isSupportedPlatform()) {
       return false;
     }
@@ -595,6 +596,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       return await _invoke('isFeatureEnabled', {
         'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on isFeatureEnabled: $exception');
@@ -712,13 +714,19 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlag({required String key}) async {
+  Future<Object?> getFeatureFlag({
+    required String key,
+    bool? sendFeatureFlagEvent,
+  }) async {
     if (!isSupportedPlatform()) {
       return null;
     }
 
     try {
-      return await _invoke('getFeatureFlag', {'key': key});
+      return await _invoke('getFeatureFlag', {
+        'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on getFeatureFlag: $exception');
       return null;
@@ -760,6 +768,24 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return PostHogFeatureFlagResult.fromMap(result, key);
     } on PlatformException catch (exception) {
       printIfDebug('Exception on getFeatureFlagResult: $exception');
+      return null;
+    }
+  }
+
+  @override
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() async {
+    if (!isSupportedPlatform()) {
+      return null;
+    }
+
+    try {
+      final results = await _invoke('getAllFeatureFlags') as List<Object?>?;
+      return results
+          ?.map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+          .nonNulls
+          .toList();
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on getAllFeatureFlags: $exception');
       return null;
     }
   }

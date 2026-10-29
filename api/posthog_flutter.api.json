@@ -778,6 +778,15 @@
                                 "name": "key",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -961,6 +970,15 @@
                                 "name": "key",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1018,6 +1036,18 @@
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<PostHogFeatureFlagResult?>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "getAllFeatureFlags",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<List<PostHogFeatureFlagResult>?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -1823,6 +1853,15 @@
                                 "name": "key",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2006,6 +2045,15 @@
                                 "name": "key",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2063,6 +2111,18 @@
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<PostHogFeatureFlagResult?>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "getAllFeatureFlags",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<List<PostHogFeatureFlagResult>?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -4665,6 +4725,15 @@
                                 "name": "key",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -4964,6 +5033,15 @@
                                 "name": "key",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -4999,6 +5077,18 @@
                         ],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<PostHogFeatureFlagResult?>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "getAllFeatureFlags",
+                        "parameters": [],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<List<PostHogFeatureFlagResult>?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -6184,6 +6274,56 @@
                 "superTypeNames": [
                     "Object"
                 ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "addPostHogErrorListener",
+                        "parameters": [],
+                        "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                        "returnTypeName": "RawReceivePort",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "removePostHogErrorListener",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": false,
+                                "isRequired": true,
+                                "name": "listener",
+                                "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                                "typeName": "RawReceivePort"
+                            }
+                        ],
+                        "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                        "returnTypeName": "void",
+                        "type": "method",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogIsolateExtension",
+                "relativePath": "lib/src/error_tracking/posthog_isolate_extension.dart",
+                "superTypeNames": [],
                 "typeParameterNames": []
             }
         ],
