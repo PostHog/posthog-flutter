@@ -9,7 +9,7 @@ services:
       - test-network
 
   test-harness:
-    image: ghcr.io/posthog/sdk-test-harness:1.25.0
+    image: ghcr.io/posthog/sdk-test-harness:1.26.0
     command:
       [
         "run",
