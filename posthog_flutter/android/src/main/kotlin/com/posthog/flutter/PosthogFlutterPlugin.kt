@@ -2517,7 +2517,8 @@ class PosthogFlutterPlugin :
  */
 internal fun toChannelValue(value: Any?): Any? =
     when (value) {
-        null, is String, is Boolean, is Int, is Long, is Double, is ByteArray -> value
+        null, is String, is Boolean, is Int, is Long, is Double -> value
+        is ByteArray, is IntArray, is LongArray, is FloatArray, is DoubleArray -> value
         is Number -> value.toDouble()
         is Map<*, *> -> value.entries.associate { (k, v) -> k.toString() to toChannelValue(v) }
         is Iterable<*> -> value.map(::toChannelValue)

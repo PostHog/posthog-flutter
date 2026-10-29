@@ -1014,4 +1014,11 @@ internal class PosthogFlutterPluginTest {
             .verify(backgroundMessenger, Mockito.never())
             .send(Mockito.any(), Mockito.any(), Mockito.any())
     }
+
+    @Test
+    fun `toChannelValue keeps primitive arrays the codec can send`() {
+        val values = listOf(intArrayOf(1), longArrayOf(2L), floatArrayOf(3f), doubleArrayOf(4.0), byteArrayOf(5))
+
+        values.forEach { assertSame(it, toChannelValue(it)) }
+    }
 }
