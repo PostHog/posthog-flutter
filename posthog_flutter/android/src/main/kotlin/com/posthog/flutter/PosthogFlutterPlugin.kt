@@ -19,6 +19,7 @@ import android.view.PixelCopy
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager.LayoutParams.FLAG_SECURE
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
@@ -468,11 +469,31 @@ class PosthogFlutterPlugin :
     // peekSessionId(), not getSessionId(): the expiring accessor would rotate the
     // session from this read, moving where the idle and maximum-duration bounds
     // are applied. The send still resolves an expiring id, as it always has.
-    private fun getSessionReplayState(): Map<String, Any?> =
-        mapOf(
+    // Dart reads this at the start of every capture, so it also records whether
+    // the frame about to be captured shows a FLAG_SECURE window.
+    private fun getSessionReplayState(): Map<String, Any?> {
+        if (isWindowSecure()) {
+            secureWindowSinceLastFrame = true
+        }
+        return mapOf(
             "isActive" to isSessionReplayActive(),
             "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
         )
+    }
+
+    // Set when a capture starts on a FLAG_SECURE window, so the frame stays masked
+    // even if the flag clears (e.g. the secure screen is popped) before it's sent.
+    private var secureWindowSinceLastFrame = false
+
+    private fun isWindowSecure(): Boolean = ((activity?.window?.attributes?.flags ?: 0) and FLAG_SECURE) != 0
+
+    /** Whether the frame being sent must be fully masked. Resets for the next frame. */
+    @VisibleForTesting
+    internal fun takeFrameMasked(): Boolean {
+        val masked = secureWindowSinceLastFrame || isWindowSecure()
+        secureWindowSinceLastFrame = false
+        return masked
+    }
 
     private fun startSessionRecording(
         call: MethodCall,
@@ -1322,8 +1343,9 @@ class PosthogFlutterPlugin :
                 val timestampMs = replayTimeMillis()
                 val replayConfig = postHogConfig?.sessionReplayConfig
                 val quality = replayConfig?.screenshotCompressionQuality ?: DEFAULT_SCREENSHOT_COMPRESSION_QUALITY
+                val masked = takeFrameMasked()
                 submitSnapshotWork(result) {
-                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)
+                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality, masked)
                 }
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)

@@ -1,6 +1,8 @@
 package com.posthog.flutter
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import com.posthog.android.internal.base64
 import com.posthog.internal.replay.RREvent
 import com.posthog.internal.replay.RRFullSnapshotEvent
@@ -23,8 +25,9 @@ class SnapshotSender(
         width: Int? = null,
         height: Int? = null,
         quality: Int = DEFAULT_SCREENSHOT_COMPRESSION_QUALITY,
+        masked: Boolean = false,
     ) {
-        listOf(buildFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)).capture()
+        listOf(buildFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality, masked)).capture()
     }
 
     internal fun buildFullSnapshot(
@@ -36,8 +39,18 @@ class SnapshotSender(
         width: Int? = null,
         height: Int? = null,
         quality: Int = DEFAULT_SCREENSHOT_COMPRESSION_QUALITY,
+        masked: Boolean = false,
     ): RRFullSnapshotEvent {
-        val bitmap = requireNotNull(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
+        val decoded = requireNotNull(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
+        val bitmap =
+            if (masked) {
+                Bitmap.createBitmap(decoded.width, decoded.height, Bitmap.Config.ARGB_8888).also {
+                    it.eraseColor(Color.BLACK)
+                    decoded.recycle()
+                }
+            } else {
+                decoded
+            }
         try {
             val wireframe =
                 RRWireframe(

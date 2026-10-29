@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.BadParcelableException
+import android.view.Window
+import android.view.WindowManager
 import com.google.firebase.FirebaseApp
 import com.posthog.PostHogCompression
 import com.posthog.PostHogEvent
@@ -356,6 +358,52 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, mockResult)
 
         Mockito.verify(mockResult).success(emptyList<ByteArray?>())
+    }
+
+    private fun attachActivityWithWindowFlags(plugin: PosthogFlutterPlugin): WindowManager.LayoutParams {
+        val attributes = Mockito.mock(WindowManager.LayoutParams::class.java)
+        val window = Mockito.mock(Window::class.java)
+        Mockito.`when`(window.attributes).thenReturn(attributes)
+        val activity = Mockito.mock(Activity::class.java)
+        Mockito.`when`(activity.window).thenReturn(window)
+        val binding = Mockito.mock(ActivityPluginBinding::class.java)
+        Mockito.`when`(binding.activity).thenReturn(activity)
+        plugin.onAttachedToActivity(binding)
+        return attributes
+    }
+
+    @Test
+    fun frameCapturedOnSecureWindow_staysMaskedAfterTheFlagClears() {
+        val plugin = PosthogFlutterPlugin()
+        val attributes = attachActivityWithWindowFlags(plugin)
+        attributes.flags = WindowManager.LayoutParams.FLAG_SECURE
+
+        plugin.onMethodCall(MethodCall("getSessionReplayState", null), Mockito.mock(MethodChannel.Result::class.java))
+        attributes.flags = 0
+
+        assertTrue(plugin.takeFrameMasked())
+        assertFalse(plugin.takeFrameMasked())
+    }
+
+    @Test
+    fun frameSentOnSecureWindow_isMasked() {
+        val plugin = PosthogFlutterPlugin()
+        val attributes = attachActivityWithWindowFlags(plugin)
+
+        plugin.onMethodCall(MethodCall("getSessionReplayState", null), Mockito.mock(MethodChannel.Result::class.java))
+        attributes.flags = WindowManager.LayoutParams.FLAG_SECURE
+
+        assertTrue(plugin.takeFrameMasked())
+    }
+
+    @Test
+    fun frameOnNonSecureWindow_isNotMasked() {
+        val plugin = PosthogFlutterPlugin()
+        attachActivityWithWindowFlags(plugin)
+
+        plugin.onMethodCall(MethodCall("getSessionReplayState", null), Mockito.mock(MethodChannel.Result::class.java))
+
+        assertFalse(plugin.takeFrameMasked())
     }
 
     @Test
