@@ -121,6 +121,16 @@ void main() {
     expect(queuedEvents(storage), [r'$set']);
   });
 
+  test('a personless identify does not update the marker', () {
+    final storage = tempStorage();
+    final client = testClient(server, storage: storage);
+    client.register({r'$process_person_profile': false});
+    client.identify('user', userProperties: {'plan': 'A'});
+    client.unregister(r'$process_person_profile');
+    client.setPersonProperties(userPropertiesToSet: {'plan': 'A'});
+    expect(queuedEvents(storage), [r'$identify', r'$set']);
+  });
+
   test('opt-out does not update the marker for the latest person update', () {
     final storage = tempStorage();
     final client = testClient(server, storage: storage);

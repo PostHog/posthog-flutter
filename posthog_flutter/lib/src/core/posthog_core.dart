@@ -363,18 +363,19 @@ abstract class PostHogCore extends PostHogCoreStateless {
         _setPersonPropertiesForFlagsIfNeeded(
             userProperties, userPropertiesSetOnce);
 
+        final identifyProperties = _enrichProperties({
+          'distinct_id': distinctId,
+          r'$anon_distinct_id': previousDistinctId,
+          ...maybeAdd(r'$set', userProperties),
+          ...maybeAdd(r'$set_once', userPropertiesSetOnce),
+        });
         identifyStateless(
           distinctId,
-          properties: _enrichProperties({
-            'distinct_id': distinctId,
-            r'$anon_distinct_id': previousDistinctId,
-            ...maybeAdd(r'$set', userProperties),
-            ...maybeAdd(r'$set_once', userPropertiesSetOnce),
-          }),
+          properties: identifyProperties,
           options: options,
         );
         if ((userProperties != null || userPropertiesSetOnce != null) &&
-            !_isPersonless(null, options)) {
+            !_isPersonless(identifyProperties, options)) {
           _cachedPersonProperties = _personPropertiesHash(
               distinctId, userProperties, userPropertiesSetOnce);
         }
