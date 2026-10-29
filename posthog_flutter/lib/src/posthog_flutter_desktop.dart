@@ -741,11 +741,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userPropertiesSetOnce,
     Map<String, Object?>? options,
   }) {
+    final callerOptions = cleanEventOptions(options);
     final prepared = client.prepareEvent(
       eventName,
       properties:
           _mergeUserProps(properties, userProperties, userPropertiesSetOnce),
-      options: cleanEventOptions(options),
+      options: callerOptions,
     );
     if (prepared == null) return null;
     final eventProperties = _nonNull(prepared.properties)!;
@@ -771,7 +772,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       ),
       timestamp: prepared.timestamp,
       implicitPersonProcessing:
-          preparedOptions?['process_person_profile'] == null,
+          callerOptions?['process_person_profile'] == null,
+      sdkPersonProcessing: preparedOptions?['process_person_profile'],
     );
   }
 
@@ -838,11 +840,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     // Options are sent as they are, unknown keys included. An option wins
     // over its legacy property on the event.
     Map<String, Object?>? options = cleanEventOptions(event.options);
-    // Person properties the callbacks removed no longer ask for person
-    // processing, unless a callback set the option itself.
+    // Person properties the callbacks added or removed decide person
+    // processing again, unless a callback changed the SDK's option.
     if (prepared.implicitPersonProcessing &&
-        options?['process_person_profile'] == null) {
-      options = client.personProcessingOptions(options, properties);
+        options?['process_person_profile'] == prepared.sdkPersonProcessing) {
+      options = client.personProcessingOptions(
+          {...?options}..remove('process_person_profile'), properties);
     }
     return client.capturePrepared(
         event.event,
@@ -906,10 +909,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   }
 }
 
-/// An event built for the beforeSend callbacks, with the time it happened
-/// and whether its person processing was left to its properties.
+/// An event built for the beforeSend callbacks, with the time it happened,
+/// whether its person processing was left to its properties, and the
+/// `process_person_profile` option the SDK gave it.
 typedef _PreparedEvent = ({
   PostHogEvent event,
   String timestamp,
   bool implicitPersonProcessing,
+  Object? sdkPersonProcessing,
 });

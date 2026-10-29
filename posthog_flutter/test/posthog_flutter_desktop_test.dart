@@ -660,6 +660,22 @@ void main() {
       expect(_optionsOf(event)['process_person_profile'], isFalse);
     });
 
+    test('person properties a callback adds turn on person processing',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event..userProperties = {'email': 'user@example.com'},
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'signed up');
+
+      final event = await server.waitForEvent('signed up');
+      expect(_optionsOf(event), isNot(contains('process_person_profile')));
+      expect(_propertiesOf(event)[r'$set'], {'email': 'user@example.com'});
+    });
+
     test('a callback can turn person processing back on', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
