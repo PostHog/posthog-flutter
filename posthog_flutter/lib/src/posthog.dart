@@ -5,6 +5,7 @@ import 'package:meta/meta.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'feature_flag_result.dart';
+import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_record.dart';
 import 'logs/posthog_log_severity.dart';
 import 'logs/posthog_logger.dart';
@@ -58,7 +59,7 @@ class Posthog {
   /// ```dart
   /// final config = PostHogConfig('YOUR_PROJECT_TOKEN');
   /// config.host = 'YOUR_POSTHOG_HOST';
-  /// config.onFeatureFlags = () {
+  /// config.onFeatureFlags = (loaded) {
   ///   // Feature flags are now loaded, you can read flag values here
   /// };
   /// await Posthog().setup(config);
@@ -588,8 +589,30 @@ class Posthog {
 
   /// Reloads feature flags for the current user.
   ///
-  /// Returns a [Future] that completes when the reload request has been queued.
-  Future<void> reloadFeatureFlags() => _posthog.reloadFeatureFlags();
+  /// Returns a [Future] that completes when the reload finishes, with the
+  /// enabled flags and whether loading failed. When it failed,
+  /// [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the flags are the
+  /// last known values.
+  ///
+  /// **Flutter web:** with posthog-js 1.438.2 or later, completes once this
+  /// reload's request settles; if posthog-js skips it (flags disabled,
+  /// reloading paused, or after repeated network failures), it completes right
+  /// away with the current flags and `errorsLoading: true`. Older posthog-js
+  /// completes with the next flags it reports, and when it skips the request,
+  /// with `errorsLoading: true` once every request attempt posthog-js may
+  /// make could have timed out: `feature_flag_request_max_retries + 2` times
+  /// its `feature_flag_request_timeout_ms`, plus 500 ms per retry (9.5 s with
+  /// the defaults; right away when flags are disabled).
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final loaded = await Posthog().reloadFeatureFlags();
+  /// if (!loaded.errorsLoading && loaded.flags.contains('new-checkout')) {
+  ///   // The flag is enabled.
+  /// }
+  /// ```
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() =>
+      _posthog.reloadFeatureFlags();
 
   /// Sets person properties that are used only for feature flag evaluation.
   ///
@@ -605,9 +628,9 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing; on iOS and Android this means flags
-  /// have finished loading, so the next [getFeatureFlag] / [getFeatureFlagResult]
-  /// reflects the updated properties. On web the reload is best-effort.
+  /// awaits the reload before completing, so the next [getFeatureFlag] /
+  /// [getFeatureFlagResult] reflects the updated properties. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   ///
   /// **Example:**
   /// ```dart
@@ -635,8 +658,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   Future<void> resetPersonPropertiesForFlags({
     bool reloadFeatureFlags = true,
   }) async {
@@ -659,8 +682,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   ///
   /// **Example:**
   /// ```dart
@@ -691,8 +714,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   Future<void> resetGroupPropertiesForFlags({
     String? groupType,
     bool reloadFeatureFlags = true,

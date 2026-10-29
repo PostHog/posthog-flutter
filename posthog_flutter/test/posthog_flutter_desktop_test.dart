@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_app_info.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
@@ -767,7 +768,7 @@ void main() {
         r'$recording_status',
       ];
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         }
         ..beforeSend = [
@@ -817,7 +818,7 @@ void main() {
       final flagsLoaded = Completer<void>();
       final seenEventNames = <String>[];
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         }
         ..beforeSend = [
@@ -2151,7 +2152,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -2181,7 +2182,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -2217,7 +2218,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -2236,7 +2237,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -2263,7 +2264,7 @@ void main() {
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..sendFeatureFlagEvent = false
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -2314,6 +2315,27 @@ void main() {
       expect(server.eventNames, isNot(contains(r'$feature_flag_called')));
     });
 
+    test(
+        'reloadFeatureFlags returns the loaded flags, and the last known ones when loading fails',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final announced = <PostHogFeatureFlagsLoaded>[];
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = announced.add);
+
+      final loaded = await platform.reloadFeatureFlags();
+      expect(loaded.variants, {'variant-flag': 'test-variant'});
+      expect(loaded.errorsLoading, isFalse);
+
+      server.respond = (_) => const PostHogResponse(HttpStatus.badRequest);
+      final failed = await platform.reloadFeatureFlags();
+      expect(failed.variants, {'variant-flag': 'test-variant'});
+      expect(failed.errorsLoading, isTrue);
+      expect(announced.last.errorsLoading, isTrue);
+    });
+
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();
@@ -2330,7 +2352,7 @@ void main() {
       final announced = Completer<void>();
       await platform.setup(configFor(server)
         ..preloadFeatureFlags = false
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           payloads.add(platform
               .getFeatureFlagResult(
                   key: 'variant-flag', sendFeatureFlagEvent: false)

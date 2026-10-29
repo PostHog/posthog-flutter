@@ -18,6 +18,7 @@ import 'utils/flutter_version.dart';
 import 'utils/property_normalizer.dart';
 
 import 'feature_flag_result.dart';
+import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
 import 'posthog_constants.dart';
@@ -76,7 +77,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         await cleanupSurveys();
         return null;
       case 'onFeatureFlagsCallback':
-        _onFeatureFlagsCallback?.call();
+        _onFeatureFlagsCallback
+            ?.call(featureFlagsLoadedFromMap(call.arguments));
         break;
       case 'pushIdentityProvider':
         // Returning a value here is the reply the native SDK awaits.
@@ -652,15 +654,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> reloadFeatureFlags() async {
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
     if (!isSupportedPlatform()) {
-      return;
+      return featureFlagsLoadedFromMap(null);
     }
 
     try {
-      await _methodChannel.invokeMethod('reloadFeatureFlags');
+      return featureFlagsLoadedFromMap(
+          await _methodChannel.invokeMethod('reloadFeatureFlags'));
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reloadFeatureFlags: $exception');
+      return featureFlagsLoadedFromMap(null);
     }
   }
 

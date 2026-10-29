@@ -1,4 +1,5 @@
 import '../feature_flag_result.dart';
+import '../feature_flags_loaded.dart';
 import '../posthog_config.dart';
 import '../util/logging.dart';
 
@@ -182,5 +183,20 @@ PostHogFeatureFlagResult? featureFlagResultFromMap(
     enabled: result['enabled'] as bool? ?? false,
     variant: result['variant'] as String?,
     payload: result['payload'],
+  );
+}
+
+/// Reads a `{variants, errorsLoading}` map sent over the platform channel.
+/// A missing or malformed map reads as empty flags with `errorsLoading` set.
+PostHogFeatureFlagsLoaded featureFlagsLoadedFromMap(Object? map) {
+  if (map is! Map) {
+    return PostHogFeatureFlagsLoaded(variants: const {}, errorsLoading: true);
+  }
+  final variants = map['variants'];
+  return PostHogFeatureFlagsLoaded(
+    variants: variants is Map
+        ? {for (final e in variants.entries) '${e.key}': e.value}
+        : const {},
+    errorsLoading: map['errorsLoading'] as bool? ?? false,
   );
 }
