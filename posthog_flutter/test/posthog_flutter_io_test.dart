@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
@@ -162,7 +163,7 @@ void main() {
       'setup initializes method call handler and registers callback if provided',
       () async {
         bool callbackInvoked = false;
-        void testCallback() {
+        void testCallback(PostHogFeatureFlagsLoaded _) {
           callbackInvoked = true;
         }
 
@@ -212,94 +213,45 @@ void main() {
       },
     );
 
-    test(
-      'invokes callback when native sends onFeatureFlagsCallback event',
-      () async {
-        bool callbackInvoked = false;
+    test('passes the native flags to the callback', () async {
+      final received = <PostHogFeatureFlagsLoaded>[];
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', onFeatureFlags: received.add));
 
-        void testCallback() {
-          callbackInvoked = true;
-        }
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(const MethodCall(
+          'onFeatureFlagsCallback',
+          {
+            'variants': {'on': true, 'variant': 'test', 'off': false},
+            'errorsLoading': true,
+          },
+        )),
+        (ByteData? data) {},
+      );
 
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
+      expect(received.single.variants, {'on': true, 'variant': 'test'});
+      expect(received.single.flags, ['on', 'variant']);
+      expect(received.single.errorsLoading, isTrue);
+    });
 
-        // Native sends empty map (iOS/Android behavior)
-        final mockNativeArgs = <String, dynamic>{};
-
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-          ),
-          (ByteData? data) {},
-        );
-
-        expect(callbackInvoked, isTrue);
-      },
-    );
-
-    test(
-      'invokes callback when native sends onFeatureFlagsCallback with empty map (mobile behavior)',
-      () async {
-        bool callbackInvoked = false;
-
-        void testCallback() {
-          callbackInvoked = true;
-        }
-
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        // Simulate mobile sending an empty map
-        final mockNativeArgs = <String, dynamic>{};
-
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-          ),
-          (ByteData? data) {},
-        );
-
-        expect(callbackInvoked, isTrue);
-      },
-    );
-
-    test('invokes callback even with malformed native args', () async {
-      bool callbackInvoked = false;
-
-      void testCallback() {
-        callbackInvoked = true;
-      }
-
-      testConfig =
-          PostHogConfig('test_project_token', onFeatureFlags: testCallback);
-      await posthogFlutterIO.setup(testConfig);
-
-      // Simulate native sending malformed arguments - callback should still be invoked
-      final mockNativeArgsMalformed = {
-        'flags': 123, // Invalid type, but callback is void so it doesn't matter
-      };
+    test('passes empty flags to the callback for malformed native args',
+        () async {
+      final received = <PostHogFeatureFlagsLoaded>[];
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', onFeatureFlags: received.add));
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
-          MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed),
+          const MethodCall('onFeatureFlagsCallback', {'variants': 123}),
         ),
         (ByteData? data) {},
       );
 
-      expect(callbackInvoked, isTrue);
+      expect(received.single.variants, isEmpty);
     });
 
     test('does not invoke callback when no callback is registered', () async {

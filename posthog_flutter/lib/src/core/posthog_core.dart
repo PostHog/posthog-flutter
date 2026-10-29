@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:meta/meta.dart';
 
 import '../feature_flag_result.dart';
+import '../feature_flags_loaded.dart';
 import '../posthog_config.dart';
 import 'feature_flag_utils.dart';
 import 'feature_flags.dart';
@@ -923,6 +924,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
   Future<void> reloadFeatureFlagsAsync() async {
     await wrap(_flagsAsync);
   }
+
+  /// The enabled flags currently served, and whether the latest load failed.
+  PostHogFeatureFlagsLoaded featureFlagsLoaded() => PostHogFeatureFlagsLoaded(
+        variants: _getFeatureFlags() ?? const {},
+        errorsLoading: _getStoredFlagDetails()?.requestError != null,
+      );
 
   /// Registers a callback for when feature flags are loaded. A callback
   /// registered right after the client is created also hears about the flags

@@ -802,7 +802,7 @@
                         "name": "reloadFeatureFlags",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                        "returnTypeName": "Future<void>",
+                        "returnTypeName": "Future<PostHogFeatureFlagsLoaded>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -1855,7 +1855,7 @@
                         "name": "reloadFeatureFlags",
                         "parameters": [],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
-                        "returnTypeName": "Future<void>",
+                        "returnTypeName": "Future<PostHogFeatureFlagsLoaded>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -2301,7 +2301,7 @@
                                 "isRequired": false,
                                 "name": "onFeatureFlags",
                                 "relativePath": "lib/src/posthog_config.dart",
-                                "typeName": "void Function()?"
+                                "typeName": "void Function(PostHogFeatureFlagsLoaded)?"
                             },
                             {
                                 "isDeprecated": false,
@@ -2582,7 +2582,7 @@
                         "isWriteable": true,
                         "name": "onFeatureFlags",
                         "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "void Function()?"
+                        "typeName": "void Function(PostHogFeatureFlagsLoaded)?"
                     },
                     {
                         "entryPoints": [],
@@ -4522,7 +4522,7 @@
                         "name": "reloadFeatureFlags",
                         "parameters": [],
                         "relativePath": "lib/src/posthog.dart",
-                        "returnTypeName": "Future<void>",
+                        "returnTypeName": "Future<PostHogFeatureFlagsLoaded>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -6022,6 +6022,89 @@
                 "isSealed": false,
                 "name": "PostHogTextMaskPolicies",
                 "relativePath": "lib/src/replay/mask/posthog_text_mask.dart",
+                "superTypeNames": [
+                    "Object"
+                ],
+                "typeParameterNames": []
+            },
+            {
+                "entryPoints": [
+                    "posthog_flutter.dart"
+                ],
+                "executableDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "new",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "variants",
+                                "relativePath": "lib/src/feature_flags_loaded.dart",
+                                "typeName": "Map<String, Object?>"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "errorsLoading",
+                                "relativePath": "lib/src/feature_flags_loaded.dart",
+                                "typeName": "bool"
+                            }
+                        ],
+                        "relativePath": "lib/src/feature_flags_loaded.dart",
+                        "returnTypeName": "PostHogFeatureFlagsLoaded",
+                        "type": "constructor",
+                        "typeParameterNames": []
+                    }
+                ],
+                "fieldDeclarations": [
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "flags",
+                        "relativePath": "lib/src/feature_flags_loaded.dart",
+                        "typeName": "List<String>"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "variants",
+                        "relativePath": "lib/src/feature_flags_loaded.dart",
+                        "typeName": "Map<String, Object>"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "errorsLoading",
+                        "relativePath": "lib/src/feature_flags_loaded.dart",
+                        "typeName": "bool"
+                    }
+                ],
+                "isDeprecated": false,
+                "isExperimental": false,
+                "isRequired": false,
+                "isSealed": false,
+                "name": "PostHogFeatureFlagsLoaded",
+                "relativePath": "lib/src/feature_flags_loaded.dart",
                 "superTypeNames": [
                     "Object"
                 ],
