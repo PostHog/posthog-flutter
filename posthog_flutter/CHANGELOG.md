@@ -1,5 +1,11 @@
 ## Next
 
+## 5.58.1
+
+### Patch Changes
+
+- 50c2c3e: Mask Android session replay frames while the app window has `FLAG_SECURE` set, instead of recording the secure screen.
+
 ## 5.58.0
 
 ### Minor Changes
