@@ -14,9 +14,9 @@ import 'replay/mask/posthog_text_mask.dart';
 /// that are about to be captured. Return a possibly modified event to send it,
 /// or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+/// Callbacks are synchronous, as in the native SDKs, so the event is sent
+/// with the user and properties it was captured under.
+typedef BeforeSendCallback = PostHogEvent? Function(
   PostHogEvent event,
 );
 
@@ -27,9 +27,8 @@ typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
 /// attributes that are about to be captured. Return a possibly modified record
 /// to send it, or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogLogRecord?>`).
-typedef BeforeSendLogCallback = FutureOr<PostHogLogRecord?> Function(
+/// Callbacks are synchronous, as in the native SDKs.
+typedef BeforeSendLogCallback = PostHogLogRecord? Function(
   PostHogLogRecord record,
 );
 
@@ -361,23 +360,6 @@ class PostHogConfig {
   /// ];
   /// ```
   ///
-  /// **Example (async callback):**
-  /// ```dart
-  /// config.beforeSend = [
-  ///   (event) async {
-  ///     // Perform async operations
-  ///     final shouldSend = await checkIfEventAllowed(event.event);
-  ///     if (!shouldSend) {
-  ///       return null; // Drop the event
-  ///     }
-  ///     // Enrich event with async data
-  ///     final extraData = await fetchExtraContext();
-  ///     event.properties = {...?event.properties, ...extraData};
-  ///     return event;
-  ///   },
-  /// ];
-  /// ```
-  ///
   /// **Limitations:**
   /// - These callbacks do NOT intercept native-initiated events such as:
   ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is
@@ -393,8 +375,8 @@ class PostHogConfig {
   ///   stage.
   ///
   /// **Note:**
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogEvent?>`)
+  /// - Callbacks are synchronous. Load anything they need (such as remote
+  ///   config) ahead of time.
   /// - If a callback throws, the event is dropped and later callbacks are not
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
@@ -574,8 +556,7 @@ class PostHogLogsConfig {
   ///   native SDKs' own `beforeSend`. Dart callbacks cannot cross the platform
   ///   channel, and running it here gives identical behavior everywhere
   ///   (including web). This mirrors the event [PostHogConfig.beforeSend].
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogLogRecord?>`).
+  /// - Callbacks are synchronous.
   /// - A callback that throws is logged, and the record is dropped.
   /// - The W3C trace fields (`traceId`, `spanId`, `traceFlags`) are **not**
   ///   part of [PostHogLogRecord] and are not visible here. They pass straight

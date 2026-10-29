@@ -39,7 +39,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   // its final name, until close().
   String? _currentScreen;
 
-  Future<PostHogEvent?> _runBeforeSend(
+  PostHogEvent? _runBeforeSend(
     String eventName,
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
@@ -182,7 +182,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) async {
-    final processedEvent = await _runBeforeSend(
+    final processedEvent = _runBeforeSend(
       eventName,
       properties,
       userProperties: userProperties,
@@ -263,7 +263,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       PostHogPropertyName.screenName: screenName,
     };
 
-    final processedEvent = await _runBeforeSend(
+    final processedEvent = _runBeforeSend(
       PostHogEventName.screen,
       propsWithScreenName,
     );
@@ -557,7 +557,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-      final processedEvent = await _runBeforeSend(
+      final processedEvent = _runBeforeSend(
         PostHogEventName.exception,
         exceptionData.cast<String, Object>(),
       );

@@ -13,7 +13,6 @@ import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
 import 'replay/mask/posthog_mask_controller.dart';
-import 'utils/before_send.dart';
 
 /// Entry point for the PostHog Flutter SDK.
 ///
@@ -320,7 +319,7 @@ class Posthog {
         _config?.logsConfig.beforeSend ?? const <BeforeSendLogCallback>[];
     for (final callback in callbacks) {
       try {
-        final result = await runBeforeSend<PostHogLogRecord>(callback, record);
+        final result = callback(record);
         if (result == null) {
           debugPrint('[PostHog] Log dropped by beforeSend');
           return;

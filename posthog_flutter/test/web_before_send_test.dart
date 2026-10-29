@@ -55,6 +55,38 @@ void main() {
     expect((captures.last['properties'] as Map)[r'$screen_name'], 'Basket');
   });
 
+  for (final hooked in [false, true]) {
+    test(
+        'events reach posthog-js before a reset made right after them '
+        '(${hooked ? 'with' : 'without'} beforeSend)', () async {
+      final calls = <String>[];
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty(
+        'capture'.toJS,
+        ((JSString event, [JSAny? a, JSAny? b]) => calls.add(event.toDart))
+            .toJS,
+      );
+      fake.setProperty(
+        'captureException'.toJS,
+        (([JSAny? a, JSAny? b]) => calls.add('captureException')).toJS,
+      );
+      fake.setProperty('reset'.toJS, (([JSAny? a]) => calls.add('reset')).toJS);
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token',
+          beforeSend: [if (hooked) (event) => event]));
+
+      final sent = [
+        web.capture(eventName: 'checkout'),
+        web.screen(screenName: 'Cart'),
+        web.captureException(error: StateError('boom')),
+      ];
+      await web.reset();
+      await Future.wait(sent);
+
+      expect(calls, ['checkout', r'$screen', 'captureException', 'reset']);
+    });
+  }
+
   test('beforeSend null drops capture on web', () async {
     final web = PosthogFlutterWeb();
     await web.setup(

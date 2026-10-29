@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
@@ -808,220 +806,6 @@ void main() {
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
       expect(args.containsKey('userProperties'), isFalse);
     });
-
-    test('async beforeSend can modify event', () async {
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) async {
-            await Future.delayed(const Duration(milliseconds: 10));
-            event.event = 'async_modified_event';
-            return event;
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
-
-      await posthogFlutterIO.capture(eventName: 'original_event');
-
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
-      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'async_modified_event');
-    });
-
-    test('async beforeSend can drop event by returning null', () async {
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) async {
-            await Future.delayed(const Duration(milliseconds: 100));
-            return null;
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
-
-      await posthogFlutterIO.capture(eventName: 'dropped_event');
-
-      final captureCalls = log.where((c) => c.method == 'capture');
-      expect(captureCalls, isEmpty);
-    });
-
-    test('mixed sync and async beforeSend callbacks work correctly', () async {
-      final callOrder = <String>[];
-
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) {
-            callOrder.add('sync1');
-            event.event = '${event.event}_sync1';
-            return event;
-          },
-          (event) async {
-            await Future.delayed(const Duration(milliseconds: 100));
-            callOrder.add('async1');
-            event.event = '${event.event}_async1';
-            return event;
-          },
-          (event) {
-            callOrder.add('sync2');
-            event.event = '${event.event}_sync2';
-            return event;
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
-
-      await posthogFlutterIO.capture(eventName: 'original');
-
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
-      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'original_sync1_async1_sync2');
-      expect(callOrder, ['sync1', 'async1', 'sync2']);
-    });
-
-    test('async beforeSend exception drops event without throwing', () async {
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) async {
-            await Future<void>.delayed(Duration.zero);
-            throw Exception('Async error');
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
-      log.clear();
-
-      await expectLater(
-        posthogFlutterIO.capture(
-          eventName: 'test_event',
-          properties: {'key': 'value'},
-        ),
-        completes,
-      );
-
-      expect(log, isEmpty);
-    });
-
-    test(
-      'async beforeSend drops event and stops chain when returning null',
-      () async {
-        final callOrder = <int>[];
-
-        testConfig = PostHogConfig(
-          'test_project_token',
-          beforeSend: [
-            (event) async {
-              callOrder.add(1);
-              await Future.delayed(const Duration(milliseconds: 100));
-              return null; // Drop event
-            },
-            (event) {
-              callOrder.add(2); // Should not be called
-              return event;
-            },
-          ],
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        await posthogFlutterIO.capture(eventName: 'test_event');
-
-        final captureCalls = log.where((c) => c.method == 'capture');
-        expect(captureCalls, isEmpty);
-        expect(callOrder, [1]); // Only first callback should have been called
-      },
-    );
-
-    test(
-      'multiple events with async beforeSend are captured in order when capture is awaited',
-      () async {
-        testConfig = PostHogConfig(
-          'test_project_token',
-          beforeSend: [
-            (event) async {
-              // Add delay only for second event
-              if (event.event == 'event_2') {
-                await Future.delayed(const Duration(milliseconds: 500));
-              }
-              return event;
-            },
-          ],
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        await posthogFlutterIO.capture(eventName: 'event_1');
-        await posthogFlutterIO.capture(eventName: 'event_2');
-        await posthogFlutterIO.capture(eventName: 'event_3');
-
-        final captureCalls = log.where((c) => c.method == 'capture').toList();
-        expect(captureCalls.length, 3);
-
-        final event1Args = Map<String, dynamic>.from(
-          captureCalls[0].arguments as Map,
-        );
-        final event2Args = Map<String, dynamic>.from(
-          captureCalls[1].arguments as Map,
-        );
-        final event3Args = Map<String, dynamic>.from(
-          captureCalls[2].arguments as Map,
-        );
-
-        final eventOrder = [
-          event1Args['eventName'],
-          event2Args['eventName'],
-          event3Args['eventName'],
-        ];
-        expect(eventOrder, ['event_1', 'event_2', 'event_3']);
-      },
-    );
-
-    test(
-      'multiple events with async beforeSend are captured out of order when capture is NOT awaited',
-      () async {
-        final releaseFirst = Completer<void>();
-        testConfig = PostHogConfig(
-          'test_project_token',
-          beforeSend: [
-            (event) async {
-              if (event.event == 'event_1') {
-                await releaseFirst.future;
-              }
-              return event;
-            },
-          ],
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        final first = posthogFlutterIO.capture(eventName: 'event_1');
-        await posthogFlutterIO.capture(eventName: 'event_2');
-        await posthogFlutterIO.capture(eventName: 'event_3');
-        expect(log.where((c) => c.method == 'capture'), hasLength(2));
-        releaseFirst.complete();
-        await first;
-
-        final captureCalls = log.where((c) => c.method == 'capture').toList();
-        expect(captureCalls.length, 3);
-
-        final event1Args = Map<String, dynamic>.from(
-          captureCalls[0].arguments as Map,
-        );
-        final event2Args = Map<String, dynamic>.from(
-          captureCalls[1].arguments as Map,
-        );
-        final event3Args = Map<String, dynamic>.from(
-          captureCalls[2].arguments as Map,
-        );
-
-        final eventOrder = [
-          event1Args['eventName'],
-          event2Args['eventName'],
-          event3Args['eventName'],
-        ];
-        expect(eventOrder, ['event_2', 'event_3', 'event_1']);
-      },
-    );
   });
 
   group('PosthogFlutterIO captureLog', () {
@@ -1104,6 +888,29 @@ void main() {
       expect(args.containsKey('traceId'), isFalse);
       expect(args.containsKey('spanId'), isFalse);
     });
+  });
+
+  group('PosthogFlutterIO calls made right after an event', () {
+    for (final hooked in [false, true]) {
+      test(
+          'reach native after the event '
+          '(${hooked ? 'with' : 'without'} beforeSend)', () async {
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token',
+            beforeSend: [if (hooked) (event) => event]));
+        log.clear();
+
+        final sent = [
+          posthogFlutterIO.capture(eventName: 'checkout'),
+          posthogFlutterIO.screen(screenName: 'Cart'),
+          posthogFlutterIO.captureException(error: StateError('boom')),
+        ];
+        await posthogFlutterIO.reset();
+        await Future.wait(sent);
+
+        expect(log.map((c) => c.method),
+            ['capture', 'screen', 'captureException', 'reset']);
+      });
+    }
   });
 
   group('PosthogFlutterIO addExceptionStep', () {
