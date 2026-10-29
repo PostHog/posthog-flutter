@@ -469,28 +469,19 @@ class PosthogFlutterPlugin :
     // peekSessionId(), not getSessionId(): the expiring accessor would rotate the
     // session from this read, moving where the idle and maximum-duration bounds
     // are applied. The send still resolves an expiring id, as it always has.
-    private fun getSessionReplayState(): Map<String, Any?> {
-        captureStartedOnSecureWindow = isWindowSecure()
-        return mapOf(
+    private fun getSessionReplayState(): Map<String, Any?> =
+        mapOf(
             "isActive" to isSessionReplayActive(),
             "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
+            "secure" to isWindowSecure(),
         )
-    }
-
-    // Set by getSessionReplayState, which Dart calls once at the start of each
-    // capture, so a frame captured on a FLAG_SECURE window stays masked even if
-    // the flag clears (e.g. the secure screen is popped) before it's sent.
-    private var captureStartedOnSecureWindow = false
 
     private fun isWindowSecure(): Boolean = ((activity?.window?.attributes?.flags ?: 0) and FLAG_SECURE) != 0
 
-    /** Whether the frame being sent must be fully masked. Resets for the next frame. */
+    // Dart's capture-time value plus a send-time re-check, so a frame stays masked
+    // if FLAG_SECURE clears (e.g. the secure screen is popped) before it's sent.
     @VisibleForTesting
-    internal fun takeFrameMasked(): Boolean {
-        val masked = captureStartedOnSecureWindow || isWindowSecure()
-        captureStartedOnSecureWindow = false
-        return masked
-    }
+    internal fun isFrameMasked(secureAtCapture: Boolean): Boolean = secureAtCapture || isWindowSecure()
 
     private fun startSessionRecording(
         call: MethodCall,
@@ -1340,7 +1331,7 @@ class PosthogFlutterPlugin :
                 val timestampMs = replayTimeMillis()
                 val replayConfig = postHogConfig?.sessionReplayConfig
                 val quality = replayConfig?.screenshotCompressionQuality ?: DEFAULT_SCREENSHOT_COMPRESSION_QUALITY
-                val masked = takeFrameMasked()
+                val masked = isFrameMasked(call.argument<Boolean>("secureAtCapture") == true)
                 submitSnapshotWork(result) {
                     snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality, masked)
                 }

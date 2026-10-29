@@ -14,6 +14,7 @@ class NativeCommunicator {
     required int y,
     int? width,
     int? height,
+    bool secureAtCapture = false,
   }) async {
     try {
       await _channel.invokeMethod('sendFullSnapshot', {
@@ -23,6 +24,7 @@ class NativeCommunicator {
         'y': y,
         if (width != null) 'width': width,
         if (height != null) 'height': height,
+        'secureAtCapture': secureAtCapture,
       });
       return true;
     } catch (e) {
@@ -56,13 +58,14 @@ class NativeCommunicator {
   /// travel together so the capturer can key its per-session reset on the id the
   /// native SDK actually holds without a second round trip per tick.
   ///
-  /// Never rotates the session, so a rotation is observed one tick late. On
-  /// Android it also records whether the window has FLAG_SECURE, which masks
-  /// the next [sendFullSnapshot]; call it once per capture, before rendering.
-  Future<({bool isActive, String? sessionId})> getSessionReplayState() async {
+  /// Non-mutating on both platforms, so a rotation is observed one tick late.
+  /// `secure` reports whether the Android window has FLAG_SECURE; it is always
+  /// false elsewhere.
+  Future<({bool isActive, String? sessionId, bool secure})>
+      getSessionReplayState() async {
     if (kIsWeb) {
       // Flutter doesn't capture screenshots on web, JS SDK handles session replay
-      return (isActive: false, sessionId: null);
+      return (isActive: false, sessionId: null, secure: false);
     }
     try {
       final state = await _channel.invokeMapMethod<String, Object?>(
@@ -71,10 +74,11 @@ class NativeCommunicator {
       return (
         isActive: state?['isActive'] as bool? ?? false,
         sessionId: state?['sessionId'] as String?,
+        secure: state?['secure'] as bool? ?? false,
       );
     } catch (e) {
       printIfDebug('Error checking session replay status: $e');
-      return (isActive: false, sessionId: null);
+      return (isActive: false, sessionId: null, secure: false);
     }
   }
 

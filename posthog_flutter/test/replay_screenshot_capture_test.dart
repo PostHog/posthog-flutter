@@ -19,16 +19,18 @@ void main() {
   final calls = <MethodCall>[];
   late PosthogFlutterPlatformInterface previousPlatform;
   var sessionId = 'session-a';
+  var secure = false;
 
   setUp(() {
     previousPlatform = PosthogFlutterPlatformInterface.instance;
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
     calls.clear();
     sessionId = 'session-a';
+    secure = false;
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       if (call.method == 'getSessionReplayState') {
-        return {'isActive': true, 'sessionId': sessionId};
+        return {'isActive': true, 'sessionId': sessionId, 'secure': secure};
       }
       return null;
     });
@@ -175,6 +177,17 @@ void main() {
     expect(args['width'], 411);
     expect(args['height'], 99);
     image.dispose();
+    await unmount(tester);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('a frame captured on a secure window is sent as secureAtCapture',
+      (tester) async {
+    secure = true;
+    await mount(tester, 1.0);
+    final args = calls
+        .firstWhere((call) => call.method == 'sendFullSnapshot')
+        .arguments as Map;
+    expect(args['secureAtCapture'], isTrue);
     await unmount(tester);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
