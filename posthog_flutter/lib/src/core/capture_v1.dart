@@ -170,10 +170,11 @@ class CaptureV1Identity {
     return null;
   }
   if (results is! Map) return null;
+  final batch = uuids.toList(growable: false);
   final retry = <String>{};
   var rejected = 0;
   var duplicates = 0;
-  for (final uuid in uuids) {
+  for (final uuid in batch) {
     final result = results[uuid];
     switch (result) {
       case {'result': 'retry'}:
@@ -181,9 +182,9 @@ class CaptureV1Identity {
       case {'result': 'drop' || 'limited'}:
         rejected++;
     }
-    if (result case {'duplicates_dropped': final int dropped}
-        when dropped > 0) {
-      duplicates += dropped;
+    // Clamped so a malformed count can't exceed the batch.
+    if (result case {'duplicates_dropped': final int dropped}) {
+      duplicates += dropped.clamp(0, batch.length);
     }
   }
   return (retry: retry, rejected: rejected, duplicates: duplicates);

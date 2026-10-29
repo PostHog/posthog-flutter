@@ -374,6 +374,18 @@ void main() {
       expect(results.retry, {'b'});
     });
 
+    test('clamps malformed duplicates_dropped to the batch size', () {
+      final body = jsonEncode({
+        'results': {
+          'a': {'result': 'ok', 'duplicates_dropped': 9007199254740991},
+          'b': {'result': 'ok', 'duplicates_dropped': -5},
+          'c': {'result': 'ok', 'duplicates_dropped': '2'},
+        },
+      });
+
+      expect(captureV1Results(body, ['a', 'b', 'c'])!.duplicates, 3);
+    });
+
     test('counts a 2xx without readable results as delivered', () async {
       final server = await LocalPostHogServer.start();
       final storage = tempStorage();
