@@ -16,11 +16,14 @@ import 'utils/utils.dart';
 import 'uuid.dart';
 
 /// An event built by [PostHogCore.prepareEvent]: its properties, its
-/// capture v1 options and the time it happened, as an ISO 8601 string.
+/// capture v1 options, the time it happened as an ISO 8601 string, its uuid
+/// and the id of the person it is captured for.
 typedef PostHogPreparedEvent = ({
   Map<String, Object?> properties,
   Map<String, Object?>? options,
   String timestamp,
+  String uuid,
+  String distinctId,
 });
 
 /// Stateful PostHog client with session management, identity, and feature flags.
@@ -493,6 +496,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
         requested: _requestsPersonProcessing(properties),
       ),
       timestamp: currentISOTime(),
+      uuid: generateUuidV7(),
+      distinctId: getDistinctId(),
     );
   }
 
@@ -501,10 +506,14 @@ abstract class PostHogCore extends PostHogCoreStateless {
     PostHogPreparedEvent prepared, {
     bool ai = false,
   }) {
-    final (:properties, :options, :timestamp) = prepared;
-    final uuid = captureStateless(getDistinctId(), event,
-        properties: properties, options: options, timestamp: timestamp, ai: ai);
-    if (uuid == null) return null;
+    final (:properties, :options, :timestamp, :uuid, :distinctId) = prepared;
+    final queuedUuid = captureStateless(distinctId, event,
+        properties: properties,
+        options: options,
+        timestamp: timestamp,
+        uuid: uuid,
+        ai: ai);
+    if (queuedUuid == null) return null;
     // Taken from the event as queued, after the beforeSend callbacks, so a
     // value they removed or an event they or the size limit dropped neither
     // reaches /flags nor turns on person processing for later events.
@@ -524,7 +533,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
             _personPropertiesHash(getDistinctId(), set, setOnce);
       }
     }
-    return uuid;
+    return queuedUuid;
   }
 
   /// Creates an alias for a user. An empty [alias] is ignored.

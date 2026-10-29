@@ -352,6 +352,7 @@ abstract class PostHogCoreStateless {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
+    String? uuid,
     bool ai = false,
   }) {
     return _enqueue(
@@ -364,6 +365,7 @@ abstract class PostHogCoreStateless {
       ),
       options: options,
       timestamp: timestamp,
+      uuid: uuid,
     );
   }
 
@@ -495,8 +497,8 @@ abstract class PostHogCoreStateless {
     });
   }
 
-  /// Queues [message] on [lane] and returns its uuid, or null when it is
-  /// over the lane's event size limit. Its capture v1 [options] are queued
+  /// Queues [message] on [lane], with [uuid] or a new one, and returns its
+  /// uuid, or null when it is over the lane's event size limit. Its capture v1 [options] are queued
   /// with it; the legacy option properties are converted only when the
   /// request is built, see [captureV1Event].
   String? _enqueue(
@@ -505,6 +507,7 @@ abstract class PostHogCoreStateless {
     Map<String, Object?> message, {
     Map<String, Object?>? options,
     String? timestamp,
+    String? uuid,
   }) {
     final prepared = <String, Object?>{
       ...message,
@@ -516,7 +519,7 @@ abstract class PostHogCoreStateless {
       'library': postHogFlutterSdkName,
       'library_version': postHogFlutterVersion,
       'timestamp': timestamp ?? currentISOTime(),
-      'uuid': generateUuidV7(),
+      'uuid': uuid ?? generateUuidV7(),
     };
 
     // Measured as queued, before compression.

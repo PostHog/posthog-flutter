@@ -5,8 +5,7 @@
 ///
 /// On iOS, macOS, Android, Windows and Linux the callbacks get the event the
 /// SDK is about to send, with its system and registered properties already
-/// added. On iOS, macOS and Android it also carries its [uuid], [distinctId]
-/// and [timestamp].
+/// added. It also carries its [uuid], [distinctId] and [timestamp].
 ///
 /// ```dart
 /// config.beforeSend = [
@@ -51,21 +50,21 @@ class PostHogEvent {
 
   /// The event's unique id, a lowercase UUID v7.
   ///
-  /// Set on iOS, macOS and Android, where the native SDK builds the event
-  /// before the callbacks run. `null` on web, Windows and Linux. The id is
-  /// kept even when a callback returns another [PostHogEvent].
+  /// Set on iOS, macOS, Android, Windows and Linux, where the SDK builds the
+  /// event before the callbacks run. `null` on web. The id is kept even when
+  /// a callback returns another [PostHogEvent].
   final String? uuid;
 
   /// The id of the person the event is captured for.
   ///
-  /// Set on iOS, macOS and Android, where a callback can change it. `null` on
-  /// web, Windows and Linux.
+  /// Set on iOS, macOS, Android, Windows and Linux, where a callback can
+  /// change it. `null` on web.
   String? distinctId;
 
   /// When the event happened.
   ///
-  /// Set on iOS, macOS and Android, where a callback can change it. `null` on
-  /// web, Windows and Linux.
+  /// Set on iOS, macOS, Android, Windows and Linux, where a callback can
+  /// change it. `null` on web.
   DateTime? timestamp;
 
   /// Creates an event passed to a before-send callback.
@@ -83,7 +82,7 @@ class PostHogEvent {
   /// The optional [options] are the event's per-event options.
   ///
   /// The optional [uuid], [distinctId] and [timestamp] are set by the SDK on
-  /// iOS, macOS and Android.
+  /// every platform but web.
   PostHogEvent({
     required this.event,
     this.properties,

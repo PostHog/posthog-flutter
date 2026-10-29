@@ -525,6 +525,55 @@ void main() {
       expect(server.eventNames, isNot(contains('dropped event')));
     });
 
+    test(
+        'a callback sees the uuid, distinct id and timestamp, and can change '
+        'the distinct id and timestamp but not the uuid', () async {
+      final server = await LocalPostHogServer.start();
+      PostHogEvent? seen;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen = PostHogEvent(
+              event: event.event,
+              uuid: event.uuid,
+              distinctId: event.distinctId,
+              timestamp: event.timestamp,
+            );
+            return PostHogEvent(
+              event: event.event,
+              properties: event.properties,
+              distinctId: 'changed-user',
+              timestamp: DateTime.utc(2025, 1, 2, 3, 4, 5, 678),
+            );
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      final distinctId = await platform.getDistinctId();
+
+      await platform.capture(eventName: 'identity');
+
+      final event = await server.waitForEvent('identity');
+      expect(seen!.uuid, isNotNull);
+      expect(seen!.distinctId, distinctId);
+      expect(seen!.timestamp, isNotNull);
+      expect(event['uuid'], seen!.uuid);
+      expect(event['distinct_id'], 'changed-user');
+      expect(event['timestamp'], '2025-01-02T03:04:05.678Z');
+    });
+
+    test('a blank distinct id from a callback keeps the current one', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [(event) => event..distinctId = '  '];
+      final platform = await setUpPlatform(config);
+      final distinctId = await platform.getDistinctId();
+
+      await platform.capture(eventName: 'blank');
+
+      final event = await server.waitForEvent('blank');
+      expect(event['distinct_id'], distinctId);
+    });
+
     test('modifications made by a callback are delivered', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -1032,13 +1081,19 @@ void main() {
           await pending;
 
           final event = await server.waitForEvent(r'$exception');
-          expect(stepMessagesOf(event), enabled ? ['original client'] : null);
+          // Steps are attached as the event is built, before beforeSend, as
+          // on iOS and Android: an event renamed to `$exception` by a
+          // callback gets none.
+          expect(
+              stepMessagesOf(event),
+              enabled && call == 'captureException'
+                  ? ['original client']
+                  : null);
         });
       }
     }
 
-    test('includes steps recorded while the same client awaits beforeSend',
-        () async {
+    test('attaches the steps recorded before beforeSend runs', () async {
       final server = await LocalPostHogServer.start();
       final entered = Completer<void>();
       final release = Completer<void>();
@@ -1058,7 +1113,26 @@ void main() {
       await pending;
 
       expect(stepMessagesOf(await server.waitForEvent(r'$exception')),
-          ['before capture', 'during beforeSend']);
+          ['before capture']);
+    });
+
+    test('are seen by beforeSend, which can remove them', () async {
+      final server = await LocalPostHogServer.start();
+      Object? seen;
+      final platform = await setUpPlatform(configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen = event.properties?[r'$exception_steps'];
+            event.properties?.remove(r'$exception_steps');
+            return event;
+          },
+        ]);
+      await platform.addExceptionStep('step');
+      await platform.captureException(error: StateError('error'));
+
+      final event = await server.waitForEvent(r'$exception');
+      expect(seen, isA<List>());
+      expect(_propertiesOf(event), isNot(contains(r'$exception_steps')));
     });
 
     test('normalize non-finite step and event properties identically',
