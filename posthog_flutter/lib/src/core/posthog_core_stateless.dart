@@ -750,10 +750,11 @@ abstract class PostHogCoreStateless {
     _CaptureLane lane,
     List<PostHogQueuedEvent> batch,
   ) async {
-    final uuids = {
+    final eventUuids = [
       for (final queued in batch)
         if (queued.event['uuid'] case final String uuid) uuid,
-    };
+    ];
+    final uuids = eventUuids.toSet();
     final pending = lane.pendingIdentity;
     final identity = pending != null && sameUuids(pending.uuids, uuids)
         ? pending.next()
@@ -793,7 +794,7 @@ abstract class PostHogCoreStateless {
       );
     }
 
-    final results = captureV1Results(response.body, uuids);
+    final results = captureV1Results(response.body, eventUuids);
     if (results == null) {
       logger.info('Capture returned ${response.status} without readable '
           'per-event results; ${uuids.length} events count as delivered.');

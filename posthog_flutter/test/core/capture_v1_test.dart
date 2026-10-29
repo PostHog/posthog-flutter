@@ -386,6 +386,19 @@ void main() {
       expect(captureV1Results(body, ['a', 'b', 'c'])!.duplicates, 3);
     });
 
+    test('clamps duplicates_dropped against every copy sent', () {
+      final body = jsonEncode({
+        'results': {
+          'a': {'result': 'drop', 'duplicates_dropped': 2},
+        },
+      });
+
+      final results = captureV1Results(body, ['a', 'a', 'a'])!;
+
+      expect(results.duplicates, 2);
+      expect(results.rejected, 1);
+    });
+
     test('counts a 2xx without readable results as delivered', () async {
       final server = await LocalPostHogServer.start();
       final storage = tempStorage();

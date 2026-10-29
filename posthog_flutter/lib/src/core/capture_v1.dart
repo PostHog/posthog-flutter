@@ -155,6 +155,8 @@ class CaptureV1Identity {
 /// many repeated copies of them it dropped (`duplicates_dropped`), or null
 /// when the body has no readable per-event results.
 ///
+/// [uuids] holds one entry per event sent, repeats included.
+///
 /// `ok`, `warning`, `drop`, `limited` and any unknown result are final.
 /// An event missing from the results counts as delivered.
 ({Set<String> retry, int rejected, int duplicates})? captureV1Results(
@@ -174,7 +176,7 @@ class CaptureV1Identity {
   final retry = <String>{};
   var rejected = 0;
   var duplicates = 0;
-  for (final uuid in batch) {
+  for (final uuid in batch.toSet()) {
     final result = results[uuid];
     switch (result) {
       case {'result': 'retry'}:
