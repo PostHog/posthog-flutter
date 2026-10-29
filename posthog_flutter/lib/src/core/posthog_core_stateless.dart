@@ -741,11 +741,12 @@ abstract class PostHogCoreStateless {
   /// delivered or dropped for good.
   ///
   /// A 2xx whose per-event results cannot be read, also when the response
-  /// fails after its status arrived, counts as delivered: the server stored
-  /// the events, and sending them again would store them twice.
+  /// fails after its status arrived, fails the whole batch for good. It
+  /// isn't retried: the server may have stored some of the events, and
+  /// sending them again would store them twice.
   ///
-  /// Throws [PostHogFetchHttpError] for a non-2xx status and
-  /// [PostHogFetchNetworkError] for a transport failure.
+  /// Throws [PostHogFetchHttpError] for a non-2xx status or an unreadable
+  /// 2xx, and [PostHogFetchNetworkError] for a transport failure.
   Future<({Set<String> retryUuids, Duration? retryAfter})> _postCaptureV1(
     _CaptureLane lane,
     List<PostHogQueuedEvent> batch,
@@ -785,6 +786,12 @@ abstract class PostHogCoreStateless {
     if (response.status < 200 || response.status >= 300) {
       if (!isRetriableCaptureV1Status(response.status)) {
         lane.pendingIdentity = null;
+        // A multi-event 413 halves the batch and resends it instead.
+        if (response.status != HttpStatus.requestEntityTooLarge ||
+            batch.length == 1) {
+          logger.warn('Capture ${lane.path} returned ${response.status}: '
+              '${batch.length} events dropped for good.');
+        }
       }
       throw PostHogFetchHttpError(
         response.status,
@@ -796,19 +803,27 @@ abstract class PostHogCoreStateless {
 
     final results = captureV1Results(response.body, eventUuids);
     if (results == null) {
-      logger.info('Capture returned ${response.status} without readable '
-          'per-event results; ${uuids.length} events count as delivered.');
-    } else {
-      if (results.rejected > 0) {
-        logger.warn('Capture dropped ${results.rejected} of ${uuids.length} '
-            'events for good.');
-      }
-      if (results.duplicates > 0) {
-        logger.warn('Capture dropped ${results.duplicates} copies of events '
-            'with a repeated uuid.');
-      }
+      lane.pendingIdentity = null;
+      // Status and count only: the body may name event uuids.
+      logger.warn('Capture ${lane.path} returned ${response.status} without '
+          'readable per-event results: ${batch.length} events dropped for '
+          'good.');
+      throw PostHogFetchHttpError(response.status, '', body.length);
     }
-    final retryUuids = results?.retry ?? const <String>{};
+    // Counts and the server's opaque reasons only, one line per batch:
+    // uuids and event content can identify users.
+    final dropped = results.drops.values.fold(0, (sum, n) => sum + n);
+    if (dropped > 0 || results.duplicates > 0) {
+      final reasons = [
+        for (final MapEntry(:key, :value) in results.drops.entries)
+          '$key: $value',
+      ].join(', ');
+      logger.warn('Capture ${lane.path} dropped $dropped of '
+          '${batch.length} events for good'
+          '${reasons.isEmpty ? '' : ' ($reasons)'}'
+          ' and ${results.duplicates} repeated-uuid copies.');
+    }
+    final retryUuids = results.retry;
     lane.pendingIdentity =
         retryUuids.isEmpty ? null : identity.withUuids(retryUuids);
     return (retryUuids: retryUuids, retryAfter: response.retryAfter);

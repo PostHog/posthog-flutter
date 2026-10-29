@@ -154,6 +154,16 @@ void main() {
       expect(lines.single, contains('number'));
       expect(lines.single, isNot(contains('42')));
     });
+
+    test('names the JSON type of a boolean session id', () {
+      final lines = <String>[];
+      captureV1Event({
+        'event': 'e',
+        'properties': {r'$window_id': true},
+      }, CoreLogger((log) => lines.addAll(printedLines(log))));
+
+      expect(lines.single, contains('a boolean value'));
+    });
   });
 
   group('captureRetryDelay', () {
@@ -228,8 +238,10 @@ void main() {
         final uuids = [
           for (final event in api.batchRequests.single.events) event['uuid'],
         ];
-        final rejection =
-            lines.singleWhere((line) => line.contains('dropped 2 of 7'));
+        // `limited` and unknown results count as delivered, like `ok`.
+        final rejection = lines.singleWhere((line) => line
+            .contains('/i/v1/analytics/events dropped 1 of 7 events for good '
+                '(detail: 1)'));
         for (final uuid in uuids) {
           expect(rejection, isNot(contains('$uuid')));
         }
@@ -396,21 +408,56 @@ void main() {
       final results = captureV1Results(body, ['a', 'a', 'a'])!;
 
       expect(results.duplicates, 2);
-      expect(results.rejected, 1);
+      expect(results.drops, {'no details': 1});
     });
 
-    test('counts a 2xx without readable results as delivered', () async {
+    test('drops a 2xx without readable results without retrying it', () async {
       final server = await LocalPostHogServer.start();
       final storage = tempStorage();
       final client = testClient(server, storage: storage);
       server.respond =
           (_) => const PostHogResponse(HttpStatus.ok, body: 'not json');
+      final errors = <Object?>[];
+      // ignore: invalid_use_of_protected_member
+      client.events.on('error', errors.add);
+      final flushed = <Object?>[];
+      // ignore: invalid_use_of_protected_member
+      client.events.on('flush', flushed.add);
 
       client.capture('evt');
-      await client.flush();
+      await expectLater(client.flush(), throwsA(isA<PostHogFetchHttpError>()));
 
       expect(server.batchRequests, hasLength(1));
       expect(getQueue(storage), isEmpty);
+      expect(errors, hasLength(1));
+      expect(flushed, isEmpty);
+    });
+
+    test('logs the endpoint and count of a batch lost to a terminal status',
+        () {
+      final api = InProcessPostHogApi();
+      final storage = tempStorage();
+      fakeAsync((async) {
+        final client =
+            testClient(api, config: testConfig(debug: true), storage: storage);
+        api.respond = (request) => request.isFlags
+            ? PostHogResponse.json({'flags': <String, Object?>{}})
+            : const PostHogResponse(HttpStatus.badRequest);
+        client.capture('one');
+        client.capture('two');
+
+        final lines = printedLines(() {
+          client.flush().catchError((_) {});
+          async.elapse(Duration.zero);
+        });
+
+        expect(api.batchRequests, hasLength(1));
+        expect(queuedEvents(storage), isEmpty);
+        expect(
+            lines,
+            contains(contains('Capture /i/v1/analytics/events returned 400: '
+                '2 events dropped for good.')));
+      });
     });
 
     test('drops a single event that is still too large', () async {
@@ -459,7 +506,7 @@ void main() {
       server.respond = (request) => request.path == '/i/v1/analytics/events'
           ? PostHogResponse(HttpStatus.temporaryRedirect,
               location: '${server.url}/moved/events')
-          : const PostHogResponse(HttpStatus.ok);
+          : PostHogResponse.results(request, (_) => 'ok');
 
       client.capture('evt');
       await client.flush();

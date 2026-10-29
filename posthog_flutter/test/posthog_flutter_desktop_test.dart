@@ -775,7 +775,7 @@ void main() {
 
     test('properties the callbacks remove stay removed', () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       Map<String, Object?>? seen;
       final removed = [
@@ -830,7 +830,7 @@ void main() {
 
     test('SDK-internal events bypass the callbacks', () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final seenEventNames = <String>[];
       final config = configFor(server)
@@ -2186,7 +2186,7 @@ void main() {
         r'getFeatureFlagResult with sendFeatureFlagEvent false does not capture $feature_flag_called',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..onFeatureFlags = (_) {
@@ -2216,7 +2216,7 @@ void main() {
         'captureFeatureView and captureFeatureInteraction match the native event shape',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..onFeatureFlags = (_) {
@@ -2252,7 +2252,7 @@ void main() {
     test('captureFeatureView keeps the user it was called for across reset',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..onFeatureFlags = (_) {
@@ -2271,7 +2271,7 @@ void main() {
 
     test(r'sendFeatureFlagEvent false skips $feature_flag_called', () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..onFeatureFlags = (_) {
@@ -2297,7 +2297,7 @@ void main() {
         r'getFeatureFlag follows config.sendFeatureFlagEvent unless overridden',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..sendFeatureFlagEvent = false
@@ -2323,12 +2323,12 @@ void main() {
         r'getAllFeatureFlags returns every loaded flag without capturing $feature_flag_called',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json({
-            'flags': {
-              ..._variantFlagResponse()['flags']! as Map,
-              'off-flag': {'key': 'off-flag', 'enabled': false},
-            },
-          });
+      server.respond = _answerFlags({
+        'flags': {
+          ..._variantFlagResponse()['flags']! as Map,
+          'off-flag': {'key': 'off-flag', 'enabled': false},
+        },
+      });
       final platform = await setUpPlatform(
         configFor(server)..preloadFeatureFlags = false,
       );
@@ -2356,7 +2356,7 @@ void main() {
         'reloadFeatureFlags returns the loaded flags, and the last known ones when loading fails',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final announced = <PostHogFeatureFlagsLoaded>[];
       final platform = await setUpPlatform(configFor(server)
         ..preloadFeatureFlags = false
@@ -2377,7 +2377,7 @@ void main() {
         r'getFeatureFlagResult follows config.sendFeatureFlagEvent unless overridden',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..sendFeatureFlagEvent = false
@@ -2403,7 +2403,7 @@ void main() {
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();
-      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      server.respond = _answerFlags(_variantFlagResponse());
       final appDirectory = createAppDirectory();
       final previousLaunch = createPlatform(appDirectory: appDirectory);
       await previousLaunch
@@ -2467,3 +2467,9 @@ Map<String, Object?> _variantFlagResponse() => {
         },
       },
     };
+
+/// Answers `/flags/` with [flags], and every other request with a success.
+PostHogResponder _answerFlags(Map<String, Object?> flags) =>
+    (request) => request.isFlags
+        ? PostHogResponse.json(flags)
+        : const PostHogResponse(HttpStatus.ok);

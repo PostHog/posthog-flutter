@@ -109,7 +109,7 @@ String? _liftString(
 }
 
 String _jsonType(Object value) => switch (value) {
-      bool() => 'bool',
+      bool() => 'boolean',
       num() => 'number',
       Map() => 'object',
       List() => 'array',
@@ -151,15 +151,16 @@ class CaptureV1Identity {
 }
 
 /// The uuids among [uuids] that a capture v1 response [body] asks to
-/// retry, with how many of them it rejected (`drop` or `limited`) and how
-/// many repeated copies of them it dropped (`duplicates_dropped`), or null
-/// when the body has no readable per-event results.
+/// retry, with how many of them it dropped (`drop`) by `details` tag and
+/// how many repeated copies of them it dropped (`duplicates_dropped`), or
+/// null when the body has no readable per-event results.
 ///
 /// [uuids] holds one entry per event sent, repeats included.
 ///
-/// `ok`, `warning`, `drop`, `limited` and any unknown result are final.
-/// An event missing from the results counts as delivered.
-({Set<String> retry, int rejected, int duplicates})? captureV1Results(
+/// `ok`, `warning`, `drop` and any unknown result are final; only `drop`
+/// counts as dropped. An event missing from the results counts as
+/// delivered.
+({Set<String> retry, Map<String, int> drops, int duplicates})? captureV1Results(
   String? body,
   Iterable<String> uuids,
 ) {
@@ -174,22 +175,27 @@ class CaptureV1Identity {
   if (results is! Map) return null;
   final batch = uuids.toList(growable: false);
   final retry = <String>{};
-  var rejected = 0;
+  final drops = <String, int>{};
   var duplicates = 0;
   for (final uuid in batch.toSet()) {
     final result = results[uuid];
     switch (result) {
       case {'result': 'retry'}:
         retry.add(uuid);
-      case {'result': 'drop' || 'limited'}:
-        rejected++;
+      case {'result': 'drop'}:
+        // The server's reason, an opaque tag.
+        final details = switch (result['details']) {
+          final String tag => tag,
+          _ => 'no details',
+        };
+        drops[details] = (drops[details] ?? 0) + 1;
     }
     // Clamped so a malformed count can't exceed the batch.
     if (result case {'duplicates_dropped': final int dropped}) {
       duplicates += dropped.clamp(0, batch.length);
     }
   }
-  return (retry: retry, rejected: rejected, duplicates: duplicates);
+  return (retry: retry, drops: drops, duplicates: duplicates);
 }
 
 /// Whether two `Set`s hold the same elements.
