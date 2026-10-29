@@ -89,6 +89,7 @@ class PosthogFlutterPlugin :
     // An event whose callbacks haven't finished after BUILT_EVENT_TIMEOUT_MS is
     // dropped on the next build, so a callback that never completes can't keep
     // it in memory.
+    // setup and close clear it, so a build can't be sent through a reconfigured SDK.
     private val builtEvents = mutableMapOf<String, Pair<PostHogEvent, Long>>()
 
     // Test seam: captures the built config even if setup() throws (mock Context in
@@ -568,6 +569,7 @@ class PosthogFlutterPlugin :
                 return
             }
 
+            builtEvents.clear()
             setupPostHog(args)
 
             result.success(null)
@@ -2327,6 +2329,7 @@ class PosthogFlutterPlugin :
 
     private fun close(result: Result) {
         try {
+            builtEvents.clear()
             PostHog.close()
             result.success(null)
         } catch (e: Throwable) {

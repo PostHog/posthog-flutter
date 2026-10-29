@@ -49,6 +49,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     // An event whose callbacks haven't finished after builtEventTimeout is
     // dropped on the next build, so a callback that never completes can't
     // keep it in memory.
+    // setup and close clear it, so a build can't be sent through a reconfigured SDK.
     private var builtEvents: [String: (event: PostHogEvent, builtAt: Date)] = [:]
     private static let builtEventTimeout: TimeInterval = 60
 
@@ -1402,6 +1403,7 @@ extension PosthogFlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any] {
+            builtEvents.removeAll()
             PosthogFlutterPlugin.setupPostHog(args, anchor: self)
             result(nil)
         } else {
@@ -2016,6 +2018,7 @@ extension PosthogFlutterPlugin {
     }
 
     private func close(_ result: @escaping FlutterResult) {
+        builtEvents.removeAll()
         PostHogSDK.shared.close()
         result(nil)
     }
