@@ -109,6 +109,11 @@ void main() {
       expect(await platform.isFeatureEnabled('flag'), isFalse);
     });
 
+    test('isFeatureEnabled returns the default', () async {
+      expect(
+          await platform.isFeatureEnabled('flag', defaultValue: true), isTrue);
+    });
+
     test('isOptOut reports opted out', () async {
       expect(await platform.isOptOut(), isTrue);
     });
@@ -1806,6 +1811,63 @@ void main() {
 
       final view = await server.waitForEvent(r'$feature_view');
       expect(view['distinct_id'], distinctId);
+    });
+
+    test('isFeatureEnabled defaultValue only applies to flags with no value',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json({
+            'flags': {
+              ..._variantFlagResponse()['flags']! as Map<String, Object?>,
+              'off-flag': {'key': 'off-flag', 'enabled': false},
+            },
+          });
+      final flagsLoaded = Completer<void>();
+      final config = configFor(server)
+        ..onFeatureFlags = () {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        };
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+
+      expect(await platform.isFeatureEnabled('missing', defaultValue: true),
+          isTrue);
+      expect(await platform.isFeatureEnabled('missing', defaultValue: false),
+          isFalse);
+      expect(await platform.isFeatureEnabled('off-flag', defaultValue: true),
+          isFalse);
+      expect(
+          await platform.isFeatureEnabled('variant-flag', defaultValue: false),
+          isTrue);
+    });
+
+    test(r'$feature_flag_called does not report the defaultValue', () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final flagsLoaded = Completer<void>();
+      final config = configFor(server)
+        ..onFeatureFlags = () {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        };
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+
+      await platform.isFeatureEnabled('missing', defaultValue: true);
+
+      final called = await server.waitForEvent(r'$feature_flag_called');
+      expect(_propertiesOf(called)[r'$feature_flag_response'], isNull);
+    });
+
+    test(
+        'isFeatureEnabled returns the defaultValue after a failed flags request',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => const PostHogResponse(500);
+      final platform = await setUpPlatform(configFor(server));
+      await platform.reloadFeatureFlags();
+
+      expect(await platform.isFeatureEnabled('missing', defaultValue: true),
+          isTrue);
     });
 
     test(r'sendFeatureFlagEvent false skips $feature_flag_called', () async {

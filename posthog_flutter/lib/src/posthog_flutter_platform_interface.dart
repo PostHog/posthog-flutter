@@ -169,7 +169,8 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('unregister() has not been implemented.');
   }
 
-  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) {
+  Future<bool> isFeatureEnabled(String key,
+      {bool? sendFeatureFlagEvent, bool? defaultValue}) {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');
   }
 

@@ -413,11 +413,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key,
-      {bool? sendFeatureFlagEvent}) async {
+      {bool? sendFeatureFlagEvent, bool? defaultValue}) async {
     final result = await _call(
       MethodCall('isFeatureEnabled', {
         'key': key,
         if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+        if (defaultValue != null) 'defaultValue': defaultValue,
       }),
     );
     return result as bool? ?? false;

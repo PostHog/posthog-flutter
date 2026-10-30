@@ -156,6 +156,61 @@ isolate_dso_base: 7000000000
     }
   });
 
+  group('PosthogFlutterIO isFeatureEnabled defaultValue', () {
+    void respondToFlagResult(Object? Function() respond) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return respond();
+      });
+    }
+
+    for (final (name, native, defaultValue, expected)
+        in <(String, Map<String, Object?>?, bool, bool)>[
+      ('missing flag returns default true', null, true, true),
+      ('missing flag returns default false', null, false, false),
+      (
+        'false flag beats default true',
+        {'key': 'flag', 'enabled': false, 'variant': null},
+        true,
+        false,
+      ),
+      (
+        'variant beats default false',
+        {'key': 'flag', 'enabled': true, 'variant': 'test'},
+        false,
+        true,
+      ),
+    ]) {
+      test(name, () async {
+        respondToFlagResult(() => native);
+
+        expect(
+            await posthogFlutterIO.isFeatureEnabled('flag',
+                defaultValue: defaultValue),
+            expected);
+      });
+    }
+
+    test('forwards sendFeatureFlagEvent and never sends the default', () async {
+      respondToFlagResult(() => null);
+
+      await posthogFlutterIO.isFeatureEnabled('flag',
+          sendFeatureFlagEvent: false, defaultValue: true);
+
+      expect(log.single.method, 'getFeatureFlagResult');
+      expect(log.single.arguments, {'key': 'flag', 'sendEvent': false});
+    });
+
+    test('native failure returns the default', () async {
+      respondToFlagResult(() => throw PlatformException(code: 'failed'));
+
+      expect(
+          await posthogFlutterIO.isFeatureEnabled('flag', defaultValue: true),
+          isTrue);
+    });
+  });
+
   group('PosthogFlutterIO getAllFeatureFlags', () {
     test('decodes the native results', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
