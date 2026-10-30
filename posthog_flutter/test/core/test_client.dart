@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/core/logger.dart';
 import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
@@ -135,6 +136,9 @@ Map<String, Object?> queuedPropsOf(FileStorage storage, String event) {
 /// Runs jobs like [QueueWorker.inline], except that writes and deletes wait
 /// for [writeGate] and [deleteGate] while those are set.
 class GatedWorker implements QueueWorker {
+  @override
+  CoreLogger? logger;
+
   final _inline = QueueWorker.inline();
   Completer<void>? writeGate;
   Completer<void>? deleteGate;

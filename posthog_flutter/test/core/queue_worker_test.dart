@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/core/logger.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
 import 'package:posthog_flutter/src/core/queue_worker.dart';
 
@@ -115,6 +117,20 @@ void main() {
 
     test('ignores a file that is already deleted', () async {
       expect(await worker.delete([pathOf('missing.json')]), isEmpty);
+    });
+
+    test('logs when the work moves back to the calling isolate', () async {
+      final lines = <String>[];
+      final previous = debugPrint;
+      debugPrint = (message, {wrapWidth}) => lines.add(message ?? '');
+      addTearDown(() => debugPrint = previous);
+      worker.logger = CoreLogger((log) => log());
+      await worker.write(pathOf('before.json'), {'i': 0});
+
+      worker.kill();
+      await worker.write(pathOf('after.json'), {'i': 1});
+
+      expect(lines, contains(contains('background isolate stopped')));
     });
 
     test('encodes and gzips a request body', () async {

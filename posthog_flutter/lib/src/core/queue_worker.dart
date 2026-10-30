@@ -7,6 +7,8 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:meta/meta.dart';
 
+import 'logger.dart';
+
 /// What [QueueWorker.write] did with an event: its serialized size in
 /// bytes, null when it cannot be encoded; whether it was over the size limit
 /// and so not written; and the error that kept its file from being written.
@@ -72,6 +74,10 @@ abstract class QueueWorker {
 
   /// Encodes [body] to JSON and compresses it with gzip when [gzip] is set.
   Future<EncodedBody> encodeBody(Object? body, {required bool gzip});
+
+  /// Told when the jobs move back to the calling isolate. The worker is
+  /// shared, so this is the logger of the client created last.
+  CoreLogger? logger;
 
   /// Whether the jobs run on another isolate.
   @visibleForTesting
@@ -203,6 +209,9 @@ final class _EncodeBody extends _Job {
 
 /// Turns the [QueueWorker] calls into jobs for [submit].
 abstract class _JobRunner implements QueueWorker {
+  @override
+  CoreLogger? logger;
+
   Future<Object?> submit(_Job job);
 
   Future<T> _submit<T>(_Job job) => submit(job).then((result) => result as T);
@@ -302,7 +311,11 @@ final class _IsolateQueueWorker extends _JobRunner {
     try {
       _isolate = await Isolate.spawn(_workerMain, _results.sendPort,
           debugName: 'PostHog queue', onExit: exit.sendPort);
-    } catch (_) {
+    } catch (e) {
+      logger?.warn(
+          'Cannot start the background isolate, the queue work runs on the '
+          'UI isolate:',
+          e);
       exit.close();
       _inline = true;
       return null;
@@ -340,6 +353,8 @@ final class _IsolateQueueWorker extends _JobRunner {
   }
 
   void _fallBack() {
+    logger?.warn('The background isolate stopped, the queue work runs on the '
+        'UI isolate.');
     _inline = true;
     _port = Future.value(null);
     for (final id in _pending.keys.toList()..sort()) {

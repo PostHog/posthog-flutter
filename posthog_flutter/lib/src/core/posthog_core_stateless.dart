@@ -163,6 +163,7 @@ abstract class PostHogCoreStateless {
     events = SimpleEventEmitter(
         onListenerError: (e) => logger.warn('Error in event listener:', e));
     storage.logger = logger;
+    storage.worker.logger = logger;
     if (config.debug) {
       debug(true);
     }
