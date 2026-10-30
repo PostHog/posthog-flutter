@@ -19,6 +19,25 @@ class DartExceptionProcessor {
   /// error's cause chain (outermost error plus its causes).
   static const maxExceptionChainLength = 10;
 
+  static final _aotBuildId = RegExp(
+    r"^[ \t]*build_id[:=][ \t]*'([0-9a-fA-F]+)'",
+    multiLine: true,
+  );
+  static final _aotImageBase = RegExp(
+    r'^[ \t]*isolate_dso_base[:=][ \t]*(?:0x)?([0-9a-fA-F]+)',
+    multiLine: true,
+  );
+  static final _aotFrame = RegExp(
+    r'^[ \t]*#[0-9]+[ \t]+abs[ \t]+([0-9a-fA-F]+)(?:[ \t]|$)',
+  );
+  static final _aotLoadingUnitFrame = RegExp(
+    r'^[ \t]*#[0-9]+[ \t]+abs[ \t]+[0-9a-fA-F]+[ \t]+unit(?:[ \t]|$)',
+  );
+  static final _firstFrame = RegExp(
+    r'^[ \t]*#[0-9]+[ \t]+',
+    multiLine: true,
+  );
+
   /// Converts Dart error/exception and stack trace to PostHog exception format
   static Map<String, dynamic> processException({
     required Object error,
@@ -59,7 +78,7 @@ class DartExceptionProcessor {
     final hasValidStackTrace = effectiveStackTrace.toString().trim().isNotEmpty;
 
     // Process primary exception
-    final frames = hasValidStackTrace
+    final parsedTrace = hasValidStackTrace
         ? _parseStackTrace(
             effectiveStackTrace,
             inAppIncludes: inAppIncludes,
@@ -67,7 +86,12 @@ class DartExceptionProcessor {
             inAppByDefault: inAppByDefault,
             removeTopPostHogFrames: isGeneratedStackTrace,
           )
-        : <Map<String, dynamic>>[];
+        : null;
+    final frames = parsedTrace?.frames ?? <Map<String, Object?>>[];
+    final debugImages = <Map<String, Object?>>[];
+    if (parsedTrace?.debugImage case final image?) {
+      debugImages.add(image);
+    }
 
     final errorType = _getExceptionType(currentError);
 
@@ -78,7 +102,7 @@ class DartExceptionProcessor {
     final isSynthetic =
         errorType == null || isGeneratedStackTrace || !hasValidStackTrace;
 
-    final exceptionData = <String, dynamic>{
+    final exceptionData = <String, Object?>{
       'type': errorType ?? 'Error',
       'mechanism': {
         'handled': handled,
@@ -106,7 +130,7 @@ class DartExceptionProcessor {
 
     // Walk the error's cause chain into additional exception items,
     // outermost-first (wrapper first, root cause last)
-    final exceptionList = <Map<String, dynamic>>[exceptionData];
+    final exceptionList = <Map<String, Object?>>[exceptionData];
     _appendCauses(
       exceptionList,
       currentError,
@@ -116,6 +140,7 @@ class DartExceptionProcessor {
       inAppIncludes: inAppIncludes,
       inAppExcludes: inAppExcludes,
       inAppByDefault: inAppByDefault,
+      debugImages: debugImages,
     );
 
     // Final result, merging system properties with user properties (user properties take precedence)
@@ -124,6 +149,10 @@ class DartExceptionProcessor {
       '\$exception_list': exceptionList,
       if (properties != null) ...properties,
     };
+    result.remove('\$debug_images');
+    if (debugImages.isNotEmpty) {
+      result['\$debug_images'] = debugImages;
+    }
 
     return result;
   }
@@ -132,7 +161,7 @@ class DartExceptionProcessor {
   /// outermost-first, guarding against cycles and capping the chain at
   /// [maxExceptionChainLength] items.
   static void _appendCauses(
-    List<Map<String, dynamic>> exceptionList,
+    List<Map<String, Object?>> exceptionList,
     Object error, {
     required bool handled,
     required String mechanismType,
@@ -140,6 +169,7 @@ class DartExceptionProcessor {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
+    required List<Map<String, Object?>> debugImages,
   }) {
     final seen = Set<Object>.identity()..add(error);
     _appendCauseItems(
@@ -152,11 +182,12 @@ class DartExceptionProcessor {
       inAppIncludes: inAppIncludes,
       inAppExcludes: inAppExcludes,
       inAppByDefault: inAppByDefault,
+      debugImages: debugImages,
     );
   }
 
   static void _appendCauseItems(
-    List<Map<String, dynamic>> exceptionList,
+    List<Map<String, Object?>> exceptionList,
     Iterable<Object> causes,
     Set<Object> seen, {
     required bool handled,
@@ -165,6 +196,7 @@ class DartExceptionProcessor {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
+    required List<Map<String, Object?>> debugImages,
   }) {
     for (final cause in causes) {
       if (exceptionList.length >= maxExceptionChainLength || !seen.add(cause)) {
@@ -172,7 +204,7 @@ class DartExceptionProcessor {
       }
 
       final causeType = _getExceptionType(cause);
-      final causeData = <String, dynamic>{
+      final causeData = <String, Object?>{
         'type': causeType ?? 'Error',
         'mechanism': {
           'handled': handled,
@@ -189,14 +221,26 @@ class DartExceptionProcessor {
       // Only use the cause's own stack trace; never generate one for causes
       final causeStackTrace = _extractOwnStackTrace(cause);
       if (causeStackTrace != null) {
-        final frames = _parseStackTrace(
+        final parsedTrace = _parseStackTrace(
           causeStackTrace,
           inAppIncludes: inAppIncludes,
           inAppExcludes: inAppExcludes,
           inAppByDefault: inAppByDefault,
         );
-        if (frames.isNotEmpty) {
-          causeData['stacktrace'] = {'frames': frames, 'type': 'raw'};
+        if (parsedTrace.frames.isNotEmpty) {
+          causeData['stacktrace'] = {
+            'frames': parsedTrace.frames,
+            'type': 'raw',
+          };
+        }
+        if (parsedTrace.debugImage case final image?) {
+          if (!debugImages.any(
+            (existing) =>
+                existing['debug_id'] == image['debug_id'] &&
+                existing['image_addr'] == image['image_addr'],
+          )) {
+            debugImages.add(image);
+          }
         }
       }
 
@@ -215,6 +259,7 @@ class DartExceptionProcessor {
         inAppIncludes: inAppIncludes,
         inAppExcludes: inAppExcludes,
         inAppByDefault: inAppByDefault,
+        debugImages: debugImages,
       );
     }
   }
@@ -280,7 +325,7 @@ class DartExceptionProcessor {
   }
 
   /// Asynchronous gap frame for separating async traces
-  static const _asynchronousGapFrame = <String, dynamic>{
+  static const _asynchronousGapFrame = <String, Object?>{
     'platform': 'dart',
     'abs_path': '<asynchronous suspension>',
     'in_app': false,
@@ -291,16 +336,24 @@ class DartExceptionProcessor {
   ///
   /// Approach inspired by Sentry's stack trace factory implementation:
   /// https://github.com/getsentry/sentry-dart/blob/a69a51fd1695dd93024be80a50ad05dd990b2b82/packages/dart/lib/src/sentry_stack_trace_factory.dart#L29-L53
-  static List<Map<String, dynamic>> _parseStackTrace(
+  static ({List<Map<String, Object?>> frames, Map<String, Object?>? debugImage})
+      _parseStackTrace(
     StackTrace stackTrace, {
     List<String>? inAppIncludes,
     List<String>? inAppExcludes,
     bool inAppByDefault = true,
     bool removeTopPostHogFrames = false,
   }) {
-    final chain = Chain.forTrace(stackTrace);
-    final frames = <Map<String, dynamic>>[];
+    final traceText = stackTrace.toString();
+    final aotImage = _parseAotImage(traceText);
+    final firstFrame =
+        aotImage == null ? null : _firstFrame.firstMatch(traceText);
+    final chain = firstFrame == null
+        ? Chain.forTrace(stackTrace)
+        : Chain.parse(traceText.substring(firstFrame.start));
+    final frames = <Map<String, Object?>>[];
     final chunkIdMap = getPosthogChunkIds() ?? {};
+    var hasNativeFrame = false;
 
     for (final (index, trace) in chain.traces.indexed) {
       bool skipNextPostHogFrame = removeTopPostHogFrames;
@@ -314,13 +367,39 @@ class DartExceptionProcessor {
           skipNextPostHogFrame = false;
         }
 
-        final processedFrame = _convertFrameToPostHog(
-          frame,
-          chunkIdMap,
-          inAppIncludes: inAppIncludes,
-          inAppExcludes: inAppExcludes,
-          inAppByDefault: inAppByDefault,
-        );
+        // A deferred loading unit needs its own build ID and image base.
+        final nativeAddress = aotImage != null &&
+                frame is UnparsedFrame &&
+                !_aotLoadingUnitFrame.hasMatch(frame.member)
+            ? _aotFrame.firstMatch(frame.member)?.group(1)
+            : null;
+        final instructionAddress = nativeAddress == null
+            ? null
+            : int.tryParse(nativeAddress, radix: 16);
+        final imageBase = aotImage == null
+            ? null
+            : int.parse(aotImage.imageAddr.substring(2), radix: 16);
+        final Map<String, Object?>? processedFrame;
+        if (instructionAddress != null &&
+            imageBase != null &&
+            instructionAddress >= imageBase) {
+          processedFrame = {
+            'platform': 'native',
+            'lang': 'dart',
+            'instruction_addr': '0x${instructionAddress.toRadixString(16)}',
+            'image_addr': aotImage!.imageAddr,
+            'in_app': inAppByDefault,
+          };
+          hasNativeFrame = true;
+        } else {
+          processedFrame = _convertFrameToPostHog(
+            frame,
+            chunkIdMap,
+            inAppIncludes: inAppIncludes,
+            inAppExcludes: inAppExcludes,
+            inAppByDefault: inAppByDefault,
+          );
+        }
         if (processedFrame != null) {
           frames.add(processedFrame);
         }
@@ -337,11 +416,67 @@ class DartExceptionProcessor {
     // frames[0] is the outermost/entry point and the last frame is the crash
     // site. Reverse to match; this also keeps async gap frames positioned
     // correctly between their surrounding traces.
-    return frames.reversed.toList();
+    return (
+      frames: frames.reversed.toList(),
+      debugImage: hasNativeFrame
+          ? <String, Object?>{
+              'debug_id': aotImage!.debugId,
+              'image_addr': aotImage.imageAddr,
+              'type': aotImage.imageType,
+            }
+          : null,
+    );
+  }
+
+  static ({String debugId, String imageAddr, String imageType})? _parseAotImage(
+    String traceText,
+  ) {
+    if (kIsWeb) {
+      return null;
+    }
+    final buildId = _aotBuildId.firstMatch(traceText)?.group(1);
+    final base = _aotImageBase.firstMatch(traceText)?.group(1);
+    if (buildId == null || base == null || buildId.length < 32) {
+      return null;
+    }
+    final imageBase = int.tryParse(base, radix: 16);
+    if (imageBase == null) {
+      return null;
+    }
+
+    String debugId;
+    String imageType;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        final normalizedId = buildId.toLowerCase();
+        final bytes = [
+          for (var i = 0; i < 32; i += 2) normalizedId.substring(i, i + 2),
+        ];
+        debugId = '${bytes[3]}${bytes[2]}${bytes[1]}${bytes[0]}-'
+            '${bytes[5]}${bytes[4]}-${bytes[7]}${bytes[6]}-'
+            '${bytes[8]}${bytes[9]}-${bytes.skip(10).join()}';
+        imageType = 'elf';
+      case TargetPlatform.iOS:
+        if (buildId.length != 32) {
+          return null;
+        }
+        debugId = ('${buildId.substring(0, 8)}-${buildId.substring(8, 12)}-'
+                '${buildId.substring(12, 16)}-${buildId.substring(16, 20)}-'
+                '${buildId.substring(20)}')
+            .toUpperCase();
+        imageType = 'macho';
+      default:
+        return null;
+    }
+    return (
+      debugId: debugId,
+      imageAddr: '0x${imageBase.toRadixString(16)}',
+      imageType: imageType,
+    );
   }
 
   /// Converts a Frame from stack_trace package to PostHog format
-  static Map<String, dynamic>? _convertFrameToPostHog(
+  static Map<String, Object?>? _convertFrameToPostHog(
     Frame frame,
     Map<String, String> chunkIdMap, {
     List<String>? inAppIncludes,
@@ -349,7 +484,7 @@ class DartExceptionProcessor {
     bool inAppByDefault = true,
   }) {
     final absPath = '$eventOrigin${_extractAbsolutePath(frame)}';
-    final frameData = <String, dynamic>{
+    final frameData = <String, Object?>{
       'platform': kIsWeb ? 'web:javascript' : 'dart',
       'abs_path': absPath,
       'in_app': _isInAppFrame(
