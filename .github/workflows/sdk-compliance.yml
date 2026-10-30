@@ -19,3 +19,4 @@ jobs:
       adapter-dockerfile: "sdk_compliance_adapter/Dockerfile"
       adapter-context: "."
       test-harness-version: "1.26.0"
+      continue-on-error: false
