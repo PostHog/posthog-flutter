@@ -3,18 +3,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/core/capture_v1.dart';
+import 'package:posthog_flutter/src/core/feature_flags.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/core/persistence.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
 const _adapterVersion = '1.0.0';
 const _defaultFlushAt = 100;
 const _defaultFlushIntervalMs = 500;
-const _defaultMaxRetries = 3;
 // The longest the SDK waits on any lane; it gives up on shorter lanes itself.
 const _upstreamTimeout = captureAiDefaultTimeout;
 
@@ -82,7 +82,6 @@ class ComplianceAdapter {
       final flushAt = _readInt(body['flush_at']) ?? _defaultFlushAt;
       final flushIntervalMs =
           _readInt(body['flush_interval_ms']) ?? _defaultFlushIntervalMs;
-      final maxRetries = _readInt(body['max_retries']) ?? _defaultMaxRetries;
       final enableCompression = body['enable_compression'] == true;
 
       final compression =
@@ -111,7 +110,6 @@ class ComplianceAdapter {
       await platform.configure(
         config,
         host: host,
-        maxRetries: maxRetries,
       );
 
       await _sendJson(request, {'success': true});
@@ -231,9 +229,10 @@ class ComplianceAdapter {
   }
 }
 
-/// The real capture client, so the harness tests the SDK's own queue, retries
-/// and requests. `captureStateless` is the only entry point that takes the
-/// per-event distinct id the harness sends.
+/// The real client, so the harness tests the SDK's own event building, queue,
+/// flags and requests. The harness sends a distinct id per call, which the SDK
+/// only takes from identify(), and that would add `$identify` events to the
+/// batches the suites count.
 class _CaptureClient extends DesktopPostHog {
   _CaptureClient(super.config)
       : super(
@@ -242,6 +241,13 @@ class _CaptureClient extends DesktopPostHog {
           timezone: null,
         );
 
+  Map<String, Object?> _flagsRequestFields = const {};
+
+  void _actAs(String distinctId) {
+    setPersistedProperty(PostHogPersistedProperty.distinctId, distinctId);
+    setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
+  }
+
   String? captureFor(
     String distinctId,
     String event,
@@ -249,14 +255,63 @@ class _CaptureClient extends DesktopPostHog {
     Map<String, Object?>? options,
     String? timestamp,
     bool ai = false,
+  }) {
+    _actAs(distinctId);
+    final prepared =
+        prepareEvent(event, properties: properties, options: options);
+    if (prepared == null) return null;
+    return capturePrepared(
+      event,
+      (
+        properties: prepared.properties,
+        options: prepared.options,
+        timestamp: timestamp ?? prepared.timestamp,
+      ),
+      ai: ai,
+    );
+  }
+
+  Future<PostHogFeatureFlagResult?> evaluateFlag(
+    String key, {
+    required String distinctId,
+    required Map<String, Object?> personProperties,
+    required Map<String, Object?> groups,
+    required Map<String, Map<String, Object?>> groupProperties,
+    required bool disableGeoip,
+  }) async {
+    _actAs(distinctId);
+    if (groups.isEmpty) {
+      unregister(r'$groups');
+    } else {
+      register({r'$groups': groups});
+    }
+    resetPersonPropertiesForFlags();
+    setPersonPropertiesForFlags(personProperties);
+    resetGroupPropertiesForFlags();
+    setGroupPropertiesForFlags(groupProperties);
+    _flagsRequestFields = {
+      'geoip_disable': disableGeoip,
+      'flag_keys_to_evaluate': [key],
+    };
+    await reloadFeatureFlagsAsync();
+    return getFeatureFlagResult(key, sendEvent: true);
+  }
+
+  // The harness tests these server-SDK fields, which the client doesn't send.
+  @override
+  Future<GetFlagsResult> getFlags(
+    String distinctId, {
+    required Map<String, Object> groups,
+    required Map<String, Object?> personProperties,
+    required Map<String, Map<String, Object?>> groupProperties,
+    required Map<String, Object?> extraPayload,
   }) =>
-      captureStateless(
+      super.getFlags(
         distinctId,
-        event,
-        properties: properties,
-        options: options,
-        timestamp: timestamp,
-        ai: ai,
+        groups: groups,
+        personProperties: personProperties,
+        groupProperties: groupProperties,
+        extraPayload: {...extraPayload, ..._flagsRequestFields},
       );
 
   @override
@@ -395,16 +450,12 @@ class _CompliancePlatform {
 
   _CaptureClient? _client;
   _RecordingProxy? _proxy;
-  String? _apiKey;
-  String? _host;
-  int _maxRetries = _defaultMaxRetries;
 
   bool get isInitialized => _client != null;
 
   Future<void> configure(
     PostHogConfig config, {
     required String host,
-    required int maxRetries,
   }) async {
     final proxy = await _RecordingProxy.start(host, state);
     config.host = proxy.url;
@@ -414,9 +465,6 @@ class _CompliancePlatform {
     client.onError((error) => clientState.lastError = error.toString());
     _proxy = proxy;
     _client = client;
-    _apiKey = config.projectToken;
-    _host = host;
-    _maxRetries = max(0, maxRetries);
   }
 
   String? capture({
@@ -460,138 +508,18 @@ class _CompliancePlatform {
     Map<String, Map<String, Object?>>? groupProperties,
     required bool disableGeoip,
   }) async {
-    final payload = <String, Object?>{
-      'api_key': _apiKey,
-      'distinct_id': distinctId,
-      'person_properties': <String, Object?>{
-        ...?personProperties,
-        'distinct_id': distinctId,
-      },
-      'groups': groups ?? <String, Object?>{},
-      'group_properties': groupProperties ?? <String, Map<String, Object?>>{},
-      'geoip_disable': disableGeoip,
-      'flag_keys_to_evaluate': [key],
-    };
-
-    final client = HttpClient();
-    Object? value = false;
-    bool? hasExperiment;
-    var minimalFlagCalledEvents = false;
-    try {
-      final uri = Uri.parse(_host!).resolve('/flags/?v=2');
-      for (var attempt = 0; attempt <= _maxRetries; attempt++) {
-        final request = await client.postUrl(uri);
-        request.headers.contentType = ContentType.json;
-        request.write(jsonEncode(payload));
-        final response = await request.close();
-        final retryAfterMs = _retryAfterMs(response.headers);
-        final body = await utf8.decoder.bind(response).join();
-        final statusCode = response.statusCode;
-        if (attempt > 0) {
-          state.totalRetries++;
-        }
-        if (statusCode < 200 || statusCode >= 300) {
-          if (attempt < _maxRetries && _shouldRetryFlags(statusCode)) {
-            await Future<void>.delayed(
-              Duration(milliseconds: retryAfterMs ?? 100),
-            );
-            continue;
-          }
-          state.lastError = 'Feature flag request failed with HTTP $statusCode';
-          throw HttpException(state.lastError!, uri: uri);
-        }
-        final decoded = body.isEmpty ? null : jsonDecode(body);
-        if (decoded is Map) {
-          final flags = decoded['featureFlags'] ?? decoded['flags'];
-          if (flags is Map && flags.containsKey(key)) {
-            final flag = flags[key];
-            value = flag is Map ? flag['variant'] ?? flag['enabled'] : flag;
-          }
-          hasExperiment = _flagHasExperiment(decoded['flags'], key);
-          minimalFlagCalledEvents = decoded['minimalFlagCalledEvents'] == true;
-        }
-        break;
-      }
-    } finally {
-      client.close(force: true);
-    }
-
-    capture(
+    final client = _client!;
+    final queuedBefore = client.queuedEventCount;
+    final result = await client.evaluateFlag(
+      key,
       distinctId: distinctId,
-      event: r'$feature_flag_called',
-      properties: _featureFlagCalledProperties(
-        key: key,
-        value: value,
-        hasExperiment: hasExperiment,
-        minimalFlagCalledEvents: minimalFlagCalledEvents,
-      ),
+      personProperties: personProperties ?? const {},
+      groups: groups ?? const {},
+      groupProperties: groupProperties ?? const {},
+      disableGeoip: disableGeoip,
     );
-
-    return value;
-  }
-
-  /// Builds the `$feature_flag_called` properties.
-  ///
-  /// When the `/flags?v=2` response carries top-level
-  /// `minimalFlagCalledEvents == true` and the flag is not linked to an
-  /// experiment (`has_experiment == false`), only the cross-SDK minimal
-  /// allowlist is sent. Any missing signal (either field absent, a legacy
-  /// response shape, or `has_experiment` unreported) falls back to the full
-  /// legacy shape.
-  Map<String, Object?> _featureFlagCalledProperties({
-    required String key,
-    required Object? value,
-    required bool? hasExperiment,
-    required bool minimalFlagCalledEvents,
-  }) {
-    final allowlisted = <String, Object?>{
-      r'$feature_flag': key,
-      r'$feature_flag_response': value,
-    };
-    if (minimalFlagCalledEvents && hasExperiment == false) {
-      return <String, Object?>{
-        ...allowlisted,
-        r'$feature_flag_has_experiment': false,
-      };
-    }
-    return <String, Object?>{
-      ...allowlisted,
-      if (hasExperiment != null) r'$feature_flag_has_experiment': hasExperiment,
-      r'$feature/' + key: value,
-    };
-  }
-
-  /// Reads `metadata.has_experiment` from the `/flags?v=2` entry for [key].
-  ///
-  /// Returns `null` when the server does not report it (e.g. legacy
-  /// `featureFlags` responses or metadata without a boolean value).
-  bool? _flagHasExperiment(Object? flags, String key) {
-    if (flags is! Map) return null;
-    final details = flags[key];
-    if (details is! Map) return null;
-    final metadata = details['metadata'];
-    if (metadata is! Map) return null;
-    final hasExperiment = metadata['has_experiment'];
-    return hasExperiment is bool ? hasExperiment : null;
-  }
-
-  bool _shouldRetryFlags(int statusCode) =>
-      statusCode == 502 || statusCode == 504;
-
-  int? _retryAfterMs(HttpHeaders headers) {
-    final value = headers.value(HttpHeaders.retryAfterHeader);
-    if (value == null) {
-      return null;
-    }
-    final seconds = int.tryParse(value);
-    if (seconds != null) {
-      return seconds * 1000;
-    }
-    final date = HttpDate.parse(value);
-    return date
-        .difference(DateTime.now().toUtc())
-        .inMilliseconds
-        .clamp(0, 60000);
+    state.totalEventsCaptured += client.queuedEventCount - queuedBefore;
+    return result?.variant ?? result?.enabled ?? false;
   }
 
   Future<void> resetAdapterState() async {
@@ -599,8 +527,6 @@ class _CompliancePlatform {
     _client = null;
     await _proxy?.close();
     _proxy = null;
-    _apiKey = null;
-    _host = null;
     state = _AdapterState();
   }
 }
