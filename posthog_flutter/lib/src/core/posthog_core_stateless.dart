@@ -545,7 +545,7 @@ abstract class PostHogCoreStateless {
     final maxEventBytes = lane.maxEventBytes;
     // An event that can still be dropped for its size makes room only once
     // it is kept, so that it never displaces an older one for nothing.
-    if (maxEventBytes == null) _makeRoom(lane, incoming: 1);
+    if (maxEventBytes == null) _makeRoom(lane, queued: queue.length + 1);
     // Measured by the worker as queued, before compression.
     final queued = queue.add(prepared, maxBytes: maxEventBytes).then((result) {
       if (result.tooLarge) {
@@ -554,7 +554,7 @@ abstract class PostHogCoreStateless {
             '${result.bytes} bytes, over the $maxEventBytes byte limit.');
         return false;
       }
-      if (maxEventBytes != null) _makeRoom(lane, incoming: 0);
+      if (maxEventBytes != null) _makeRoom(lane, queued: queue.measuredLength);
       final maxQueueBytes = lane.maxQueueBytes;
       if (maxQueueBytes != null && queue.removeOldestOver(maxQueueBytes) > 0) {
         logger.warn('Queue is over $maxQueueBytes bytes, the oldest events '
@@ -577,10 +577,10 @@ abstract class PostHogCoreStateless {
     return (uuid: prepared['uuid'] as String, queued: queued);
   }
 
-  /// Drops the oldest events of [lane] so that its queue has room for
-  /// [incoming] more.
-  void _makeRoom(_CaptureLane lane, {required int incoming}) {
-    final overflow = lane.queue.length - lane.maxQueueSize + incoming;
+  /// Drops the oldest events of [lane] when [queued] events are over its
+  /// limit.
+  void _makeRoom(_CaptureLane lane, {required int queued}) {
+    final overflow = queued - lane.maxQueueSize;
     if (overflow > 0) {
       lane.queue.removeOldest(overflow);
       logger.warn('Queue is full, the oldest event is dropped.');

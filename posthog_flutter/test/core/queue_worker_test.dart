@@ -300,6 +300,28 @@ void main() {
           isEmpty);
     });
 
+    test('an AI event still being measured does not evict a kept one',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final storage = FileStorage(dir.path, worker: worker);
+      final client = testClient(server,
+          config: testConfig()
+            ..captureAiMaxQueueSize = 1
+            ..captureAiMaxEventBytes = 1000,
+          storage: storage);
+
+      final kept = client.captureAiPrepared(
+          r'$ai_span', client.prepareEvent(r'$ai_span')!);
+      final oversized = client.captureAiPrepared(r'$ai_span',
+          client.prepareEvent(r'$ai_span', properties: {'input': 'x' * 2000})!);
+
+      final uuid = await kept;
+      expect(uuid, isNotNull);
+      expect(await oversized, isNull);
+      expect(storage.aiQueue.length, 1);
+      expect((await storage.aiQueue.peek(1)).single.event['uuid'], uuid);
+    });
+
     test('an AI event applies its person properties only to its own user',
         () async {
       final server = await LocalPostHogServer.start();

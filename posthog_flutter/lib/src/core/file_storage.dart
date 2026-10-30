@@ -414,6 +414,10 @@ class FileEventQueue {
   /// The number of queued events.
   int get length => _ids.length;
 
+  /// The number of queued events the worker has measured. The others come
+  /// after them, and can still be dropped for their size.
+  int get measuredLength => _ids.length - _writing.length;
+
   /// The serialized size of the measured events, in bytes.
   int get byteCount {
     _ids; // Loads the queue, and the sizes, on first use.
@@ -558,12 +562,12 @@ class FileEventQueue {
   }
 
   /// Removes the oldest events until the measured ones hold at most
-  /// [maxBytes], always keeping the newest event. Returns how many were
-  /// removed.
+  /// [maxBytes], always keeping the newest measured event. Returns how many
+  /// were removed.
   int removeOldestOver(int maxBytes) {
     var total = byteCount;
     var count = 0;
-    while (total > maxBytes && count < _ids.length - 1) {
+    while (total > maxBytes && count < measuredLength - 1) {
       total -= _sizes[_ids[count]] ?? 0;
       count++;
     }
@@ -575,6 +579,7 @@ class FileEventQueue {
     final paths = <String>[];
     for (final id in ids) {
       _untrack(id);
+      _writing.remove(id);
       if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
         paths.add(_pathOf(id));
       }
