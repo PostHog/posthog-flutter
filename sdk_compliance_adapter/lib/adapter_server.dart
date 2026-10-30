@@ -15,6 +15,7 @@ const _adapterVersion = '1.0.0';
 const _defaultFlushAt = 100;
 const _defaultFlushIntervalMs = 500;
 const _defaultMaxRetries = 3;
+const _upstreamTimeout = Duration(seconds: 30);
 
 class ComplianceAdapter {
   final _CompliancePlatform platform = _CompliancePlatform();
@@ -320,7 +321,13 @@ class _RecordingProxy {
       upstream.followRedirects = false;
       upstream.contentLength = body.length;
       upstream.add(body);
-      final result = await upstream.close();
+      final result = await upstream.close().timeout(
+        _upstreamTimeout,
+        onTimeout: () {
+          upstream.abort();
+          throw TimeoutException('No response from the harness');
+        },
+      );
       _record(request, body, result.statusCode);
 
       response.statusCode = result.statusCode;
