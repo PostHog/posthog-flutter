@@ -324,35 +324,53 @@ void main() {
     });
   });
 
-  test('an awaited capture completes once the event is on disk', () async {
-    final server = await LocalPostHogServer.start();
-    final worker = GatedWorker();
-    final defaultWorker = QueueWorker.defaultWorker;
-    QueueWorker.defaultWorker = () => worker;
-    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
-    final platform = await setUpPlatform(configFor(server));
-    worker.writeGate = Completer();
+  <String, Future<void> Function(PosthogFlutterDesktop)>{
+    'capture': (platform) => platform.capture(eventName: 'event'),
+    'screen': (platform) => platform.screen(screenName: 'screen'),
+    'captureException': (platform) =>
+        platform.captureException(error: StateError('error')),
+    'identify': (platform) => platform.identify(userId: 'user'),
+    'alias': (platform) => platform.alias(alias: 'alias'),
+    'group': (platform) =>
+        platform.group(groupType: 'company', groupKey: 'acme'),
+    'setPersonProperties': (platform) =>
+        platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'}),
+  }.forEach((name, call) {
+    test('an awaited $name completes once the event is on disk', () async {
+      final server = await LocalPostHogServer.start();
+      final worker = GatedWorker();
+      final defaultWorker = QueueWorker.defaultWorker;
+      QueueWorker.defaultWorker = () => worker;
+      addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+      final platform = await setUpPlatform(configFor(server));
+      worker.writeGate = Completer();
 
-    var captured = false;
-    final capture =
-        platform.capture(eventName: 'durable').then((_) => captured = true);
-    await pumpEventQueue();
-    expect(captured, isFalse);
+      var done = false;
+      final completed = call(platform).then((_) => done = true);
+      await pumpEventQueue();
+      expect(done, isFalse);
 
-    worker.writeGate!.complete();
-    await capture;
+      worker.writeGate!.complete();
+      await completed;
+    });
   });
 
   test('a queue file job failing on close does not stop the next setup',
       () async {
     final server = await LocalPostHogServer.start();
-    final worker = _FailingDeletes();
+    final worker = _LateFailingDeletes();
     final defaultWorker = QueueWorker.defaultWorker;
     QueueWorker.defaultWorker = () => worker;
     addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
     final platform = await setUpPlatform(configFor(server));
     await platform.capture(eventName: 'first');
-    await platform.close();
+    await server.waitForEvent('first');
+
+    // Fails only once close() has given up on the flush and awaits settled.
+    final closed = platform.close();
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    worker.gate.complete();
+    await closed;
 
     worker.fail = false;
     await platform.setup(configFor(server));
@@ -2580,10 +2598,12 @@ Map<String, Object?> _variantFlagResponse() => {
       },
     };
 
-class _FailingDeletes extends GatedWorker {
+class _LateFailingDeletes extends GatedWorker {
+  final gate = Completer<void>();
   var fail = true;
 
   @override
-  Future<List<String>> delete(List<String> paths) =>
-      fail ? Future.error(StateError('job failed')) : super.delete(paths);
+  Future<List<String>> delete(List<String> paths) => fail
+      ? gate.future.then((_) => throw StateError('job failed'))
+      : super.delete(paths);
 }

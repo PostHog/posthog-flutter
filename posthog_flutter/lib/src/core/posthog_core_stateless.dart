@@ -1050,6 +1050,9 @@ abstract class PostHogCoreStateless {
   /// the same directory after that finds exactly the events still to send.
   Future<void> get settled => storage.settled;
 
+  /// Completes once the analytics events queued so far are on disk.
+  Future<void> get written => storage.written;
+
   /// Closes the client without sending anything: stops the periodic flush,
   /// aborts the requests in flight, ignores later calls and releases the
   /// storage. Queued events stay on disk for the next client; an in-memory

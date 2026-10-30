@@ -41,8 +41,9 @@ import 'uuid.dart';
 /// Files are replaced through a temporary file and a rename, without syncing
 /// them to disk: a crash can lose the latest writes but never leaves a file
 /// half-written. Queued events are written by a [QueueWorker] off the UI
-/// isolate: an event is on disk once its capture call completes, and one not
-/// awaited can be lost to a crash or `exit()` in the moments that follow.
+/// isolate: an event is on disk once the call that queued it completes, and
+/// one not awaited can be lost to a crash or `exit()` in the moments that
+/// follow.
 class FileStorage {
   /// A storage in [_directory]. Its queues give their file work to [worker],
   /// a background isolate by default.
@@ -129,6 +130,9 @@ class FileStorage {
     await _queue?.settled;
     await _aiQueue?.settled;
   }
+
+  /// Completes once the analytics events queued so far are on disk.
+  Future<void> get written => _queue?._submitted ?? SynchronousFuture(null);
 
   /// Decides, on first use, whether this storage writes the snapshot.
   _Role _open() {

@@ -228,6 +228,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           userPropertiesSetOnce: _normalize(userPropertiesSetOnce),
           options: cleanEventOptions(options),
         );
+        return client.written;
       });
 
   @override
@@ -242,6 +243,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           userPropertiesToSetOnce: _normalize(userPropertiesToSetOnce),
           options: cleanEventOptions(options),
         );
+        return client.written;
       });
 
   @override
@@ -423,10 +425,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   Future<void> alias({required String alias, Map<String, Object?>? options}) =>
       _guard(
         'alias',
-        (client) => client.alias(
-          alias,
-          options: cleanEventOptions(options),
-        ),
+        (client) {
+          client.alias(alias, options: cleanEventOptions(options));
+          return client.written;
+        },
       );
 
   @override
@@ -564,6 +566,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           groupProperties: _normalize(groupProperties),
           options: cleanEventOptions(options),
         );
+        return client.written;
       });
 
   @override
