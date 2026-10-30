@@ -162,8 +162,7 @@ jobs:
       - name: Test
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./posthog_flutter
-        timeout-minutes: 7
-        run: timeout -s KILL 360 flutter test -r expanded
+        run: flutter test
 
       - name: Test compliance adapter
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
