@@ -1136,6 +1136,45 @@ isolate_dso_base: 7000000000
     });
   });
 
+  group('PosthogFlutterIO calls made while an event is in flight', () {
+    List<String> sentAfterSetup() =>
+        log.map((c) => c.method).where((m) => m != 'setup').toList();
+
+    for (final slow in [false, true]) {
+      test(
+          'reach native after events captured before them '
+          '(${slow ? 'async' : 'no'} beforeSend)', () async {
+        await posthogFlutterIO
+            .setup(PostHogConfig('test_project_token', beforeSend: [
+          if (slow)
+            (event) async {
+              await Future<void>.delayed(Duration.zero);
+              return event;
+            },
+        ]));
+
+        final sent = [
+          posthogFlutterIO.capture(eventName: 'checkout'),
+          posthogFlutterIO.screen(screenName: 'Cart'),
+          posthogFlutterIO.captureException(error: StateError('boom')),
+        ];
+        await posthogFlutterIO.reset();
+        await posthogFlutterIO.identify(userId: 'new-user');
+        await posthogFlutterIO.register('plan', 'pro');
+        await Future.wait(sent);
+
+        expect(sentAfterSetup(), [
+          'capture',
+          'screen',
+          'captureException',
+          'reset',
+          'identify',
+          'register',
+        ]);
+      });
+    }
+  });
+
   group('PosthogFlutterIO addExceptionStep', () {
     test('sends message and normalized properties', () async {
       await posthogFlutterIO.addExceptionStep(
