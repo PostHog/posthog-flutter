@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
@@ -45,6 +46,7 @@ void main() {
       expect(result, isA<Map<String, dynamic>>());
       expect(result.containsKey('\$exception_level'), isTrue);
       expect(result.containsKey('\$exception_list'), isTrue);
+      expect(result.containsKey('\$debug_images'), isFalse);
       expect(
         result.containsKey('custom_key'),
         isTrue,
@@ -441,6 +443,178 @@ void main() {
         equals('crashSite'),
         reason: 'the last frame must be the crash site',
       );
+    });
+
+    test('emits native frames and matching debug images for mobile AOT traces',
+        () {
+      const builds = [
+        (
+          platform: TargetPlatform.android,
+          buildId: 'b718850999efbed01ab80642060ddbf3',
+          debugId: '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+          base: '7000000000',
+          address: '7000205218',
+          imageType: 'elf',
+          inAppByDefault: false,
+        ),
+        (
+          platform: TargetPlatform.android,
+          buildId: 'B718850999EFbed01ab80642060DDBF3',
+          debugId: '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+          base: '7000000000',
+          address: '7000205218',
+          imageType: 'elf',
+          inAppByDefault: true,
+        ),
+        (
+          platform: TargetPlatform.iOS,
+          buildId: '0c7143a358ff03cf387ae6f2f9d95b9e',
+          debugId: '0C7143A3-58FF-03CF-387A-E6F2F9D95B9E',
+          base: '10fa20000',
+          address: '10fb6f1f8',
+          imageType: 'macho',
+          inAppByDefault: true,
+        ),
+      ];
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      for (final build in builds) {
+        debugDefaultTargetPlatformOverride = build.platform;
+        final stackTrace = StackTrace.fromString('''
+*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+build_id: '${build.buildId}'
+isolate_dso_base: ${build.base}, vm_dso_base: ${build.base}
+#0 abs ${build.address} _kDartIsolateSnapshotInstructions+0x20
+#1      caller (package:my_app/main.dart:4:3)
+''');
+        final result = DartExceptionProcessor.processException(
+          error: StateError('sample failure'),
+          stackTrace: stackTrace,
+          properties: {'\$debug_images': 'untrusted'},
+          inAppByDefault: build.inAppByDefault,
+        );
+
+        expect(result['\$debug_images'], [
+          {
+            'debug_id': build.debugId,
+            'image_addr': '0x${build.base}',
+            'type': build.imageType,
+          },
+        ]);
+        final exceptions =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+        final frames = exceptions.first['stacktrace']['frames']
+            as List<Map<String, dynamic>>;
+        expect(frames, hasLength(2));
+        expect(frames.first['function'], 'caller');
+        expect(frames.last, {
+          'platform': 'native',
+          'lang': 'dart',
+          'instruction_addr': '0x${build.address}',
+          'image_addr': '0x${build.base}',
+          'in_app': build.inAppByDefault,
+        });
+      }
+    });
+
+    test('preserves ordinary frames when AOT metadata is incomplete', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      for (final input in [
+        (
+          header: "build_id: 'not-a-build-id'\nisolate_dso_base: 7000000000",
+          address: '7000205218',
+        ),
+        (
+          header: "build_id: 'b718850999efbed01ab80642060ddbf3'",
+          address: '7000205218',
+        ),
+        (
+          header:
+              "build_id: 'b718850999efbed01ab80642060ddbf3'\nisolate_dso_base: 7000000000",
+          address: '6000205218',
+        ),
+      ]) {
+        final result = DartExceptionProcessor.processException(
+          error: StateError('sample failure'),
+          stackTrace: StackTrace.fromString('''
+${input.header}
+#0 abs ${input.address} _kDartIsolateSnapshotInstructions+0x20
+#1      caller (package:my_app/main.dart:4:3)
+'''),
+        );
+
+        expect(result, isNot(contains('\$debug_images')));
+        final exceptions =
+            result['\$exception_list'] as List<Map<String, dynamic>>;
+        final frames = exceptions.first['stacktrace']['frames']
+            as List<Map<String, dynamic>>;
+        expect(frames, isNotEmpty);
+        expect(frames.every((frame) => frame['platform'] == 'dart'), isTrue);
+      }
+    });
+
+    test('does not attribute a deferred loading-unit frame to the root image',
+        () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final result = DartExceptionProcessor.processException(
+        error: StateError('sample failure'),
+        stackTrace: StackTrace.fromString('''
+build_id: 'b718850999efbed01ab80642060ddbf3'
+loading_unit: 2, build_id: '1234567890abcdef1234567890abcdef', dso_base: 7000400000, instructions: 7000401000
+isolate_dso_base: 7000000000, vm_dso_base: 7000000000
+#0 abs 7000505218 unit 2 virt 0000000000205218 _kDartIsolateSnapshotInstructions+0x20
+#1 abs 7000205218 _kDartIsolateSnapshotInstructions+0x20
+'''),
+      );
+
+      final exceptions =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+      final frames = exceptions.first['stacktrace']['frames']
+          as List<Map<String, dynamic>>;
+      expect(frames, hasLength(2));
+      expect(frames.first['platform'], 'native');
+      expect(frames.last['platform'], 'dart');
+      expect(frames.last['function'], contains('unit 2'));
+      expect(result['\$debug_images'], [
+        {
+          'debug_id': '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+          'image_addr': '0x7000000000',
+          'type': 'elf',
+        },
+      ]);
+    });
+
+    test('includes a debug image for an AOT cause stack', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final cause = AsyncError(
+        StateError('inner'),
+        StackTrace.fromString('''
+build_id: 'b718850999efbed01ab80642060ddbf3'
+isolate_dso_base: 7000000000
+#0 abs 7000205218 _kDartIsolateSnapshotInstructions+0x20
+'''),
+      );
+      final result = DartExceptionProcessor.processException(
+        error: _ChainedException('outer', cause),
+        stackTrace:
+            StackTrace.fromString('#0 outer (package:my_app/main.dart:4:3)'),
+      );
+
+      final exceptions =
+          result['\$exception_list'] as List<Map<String, dynamic>>;
+      final frames =
+          exceptions[1]['stacktrace']['frames'] as List<Map<String, dynamic>>;
+      expect(frames.single['platform'], 'native');
+      expect(result['\$debug_images'], [
+        {
+          'debug_id': '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+          'image_addr': '0x7000000000',
+          'type': 'elf',
+        },
+      ]);
     });
 
     test('marks generated stack frames as synthetic', () {
