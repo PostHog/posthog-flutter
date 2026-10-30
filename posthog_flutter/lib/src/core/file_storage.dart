@@ -373,6 +373,7 @@ class FileEventQueue {
   /// Events waiting for a free write, oldest first. Eviction can still cancel
   /// them, unlike a job the worker was given.
   final Map<String, _UnsentWrite> _unsent = {};
+  int _unsentBytes = 0;
 
   /// The most writes the worker holds at once, so that captures outpacing it
   /// keep only the events the queue limits allow in memory.
@@ -480,6 +481,7 @@ class FileEventQueue {
     if (_writesInFlight >= maxWritesInFlight) {
       final unsent = _UnsentWrite(event, maxBytes);
       _unsent[id] = unsent;
+      _unsentBytes += unsent.estimatedBytes;
       return _job(unsent.result.future);
     }
     return _job(_write(id, event, maxBytes));
@@ -526,6 +528,7 @@ class FileEventQueue {
     while (_writesInFlight < maxWritesInFlight && _unsent.isNotEmpty) {
       final id = _unsent.keys.first;
       final unsent = _unsent.remove(id)!;
+      _unsentBytes -= unsent.estimatedBytes;
       unsent.result.complete(_write(id, unsent.event, unsent.maxBytes));
     }
   }
@@ -638,10 +641,7 @@ class FileEventQueue {
   /// them: this is what bounds a queue with a size limit on its events.
   int removeOldestUnsentOver(int maxCount, {int? maxBytes}) {
     var waiting = _unsent.length;
-    var bytes = 0;
-    for (final unsent in _unsent.values) {
-      bytes += unsent.estimatedBytes;
-    }
+    var bytes = _unsentBytes;
     final evicted = <String>[];
     for (final MapEntry(key: id, value: unsent) in _unsent.entries) {
       final overBytes = maxBytes != null && bytes > maxBytes && waiting > 1;
@@ -674,6 +674,7 @@ class FileEventQueue {
       _untrack(id);
       _writing.remove(id);
       if (_unsent.remove(id) case final unsent?) {
+        _unsentBytes -= unsent.estimatedBytes;
         unsent.result.complete(queueWriteEvicted);
       } else if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
         paths.add(_pathOf(id));

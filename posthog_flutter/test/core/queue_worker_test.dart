@@ -370,6 +370,31 @@ void main() {
         expect(queue.removeOldestUnsentOver(100, maxBytes: 1), 0);
       });
 
+      test('keeps the estimated size of unsent events as they leave', () async {
+        final queue = gatedStorage.queue;
+        void addTwo() {
+          for (var i = 0; i < 2; i++) {
+            queue.add({'p': 'x' * 100});
+          }
+        }
+
+        // Evicted ones leave the total.
+        addTwo();
+        queue.removeOldestUnsentOver(2);
+        expect(queue.removeOldestUnsentOver(100, maxBytes: 250), 0);
+
+        // So do the ones sent to the worker.
+        gated.writeGate!.complete();
+        await gatedStorage.settled;
+        gated.writeGate = Completer<void>();
+        for (var i = 0; i < inFlight; i++) {
+          queue.add({'i': i});
+        }
+        addTwo();
+        expect(queue.removeOldestUnsentOver(100, maxBytes: 250), 0);
+        gated.writeGate!.complete();
+      });
+
       test('counts the containers of unsent events in their estimated size',
           () async {
         final queue = gatedStorage.queue;
