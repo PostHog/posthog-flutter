@@ -211,8 +211,7 @@ class PostHogConfig {
   /// [maxQueueSize]. The queue also keeps at most 50 MiB of AI events,
   /// whatever this is set to. A value of `0` or less uses the default.
   ///
-  /// When it is full, the oldest events are dropped, including events still
-  /// waiting to be measured against the size limit.
+  /// When it is full, the oldest events are dropped.
   ///
   /// Not applied on web, where [Posthog.captureAi] sends nothing.
   ///

@@ -245,7 +245,7 @@ final class _InlineQueueWorker extends _JobRunner {
 }
 
 /// Runs the jobs on a background isolate of the same isolate group, so
-/// events go there without being copied in depth, strings included. Falls
+/// the strings of an event go there without being copied. Falls
 /// back to the calling isolate for good when the isolate cannot be started
 /// or exits, running again the jobs it had not answered: every job can run
 /// twice without harm.

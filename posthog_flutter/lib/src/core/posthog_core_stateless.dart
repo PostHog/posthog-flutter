@@ -551,7 +551,6 @@ abstract class PostHogCoreStateless {
     // An event that can still be dropped for its size makes room only once
     // it is kept, so that it never displaces an older one for nothing.
     if (maxEventBytes == null) _makeRoom(lane, queued: queue.length + 1);
-    // Measured by the worker as queued, before compression.
     final queued = queue.add(prepared, maxBytes: maxEventBytes).then((result) {
       if (result.tooLarge) {
         // Name and size only: AI properties can hold prompts and media.

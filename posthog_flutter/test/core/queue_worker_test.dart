@@ -149,7 +149,6 @@ void main() {
       for (var i = 0; i < 5; i++) {
         expect(File(pathOf('$i.json')).existsSync(), isTrue);
       }
-      // Later jobs run on the calling isolate too.
       await worker.delete([pathOf('0.json')]);
       expect(File(pathOf('0.json')).existsSync(), isFalse);
     });
