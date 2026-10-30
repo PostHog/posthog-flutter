@@ -1060,6 +1060,8 @@ abstract class PostHogCoreStateless {
       lane.retryAfterTimer = null;
     }
     _httpClient.close(force: true);
+    // The worker is shared and outlives this client, which its logger retains.
+    if (identical(storage.worker.logger, logger)) storage.worker.logger = null;
     storage.close();
   }
 }

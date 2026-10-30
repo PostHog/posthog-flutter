@@ -408,6 +408,21 @@ void main() {
   });
 
   group('PostHogCore with a background worker', () {
+    test('a closed client leaves the logger of a newer client on the worker',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final older = testClient(server,
+          storage: FileStorage(pathOf('older'), worker: worker));
+      final newer = testClient(server,
+          storage: FileStorage(pathOf('newer'), worker: worker));
+
+      older.close();
+      expect(worker.logger, same(newer.logger));
+
+      newer.close();
+      expect(worker.logger, isNull);
+    });
+
     test('sends and deletes the events it queued', () async {
       final server = await LocalPostHogServer.start();
       final storage = FileStorage(dir.path, worker: worker);
