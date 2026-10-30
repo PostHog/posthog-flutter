@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
@@ -322,6 +323,24 @@ void main() {
 
       expect(lines, contains(allOf(contains('capture'), contains('sign_in'))));
       expect(printedLines(() => client.capture('sign_out')), isEmpty);
+    });
+
+    test('logs events without their properties', () async {
+      final client = testClient(server);
+
+      client.debug(true);
+      final lines = <String>[];
+      final previous = debugPrint;
+      debugPrint = (message, {wrapWidth}) => lines.add(message ?? '');
+      try {
+        client.capture('sign_in', properties: {'prompt': 'secret'});
+        await client.flush();
+      } finally {
+        debugPrint = previous;
+      }
+
+      expect(lines, contains(allOf(contains('flush'), contains('sign_in'))));
+      expect(lines.join(), isNot(contains('secret')));
     });
   });
 
