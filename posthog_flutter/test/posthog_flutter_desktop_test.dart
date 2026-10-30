@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
@@ -12,6 +13,7 @@ import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_desktop.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
+import 'core/test_client.dart';
 import 'posthog_api_fake.dart';
 
 // No TestWidgetsFlutterBinding here: the test binding replaces dart:io's
@@ -320,6 +322,28 @@ void main() {
       final captured = await server.waitForEvent('replay event');
       expect(_propertiesOf(captured)[r'$recording_status'], 'active');
     });
+  });
+
+  test('close gives up on stalled file work, and the next setup waits for it',
+      () async {
+    final server = await LocalPostHogServer.start();
+    final worker = GatedWorker();
+    final defaultWorker = QueueWorker.defaultWorker;
+    QueueWorker.defaultWorker = () => worker;
+    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+    final platform = await setUpPlatform(configFor(server));
+
+    worker.writeGate = Completer();
+    await platform.capture(eventName: 'stalled');
+    await platform.close();
+
+    var ready = false;
+    final setup = platform.setup(configFor(server)).then((_) => ready = true);
+    await pumpEventQueue();
+    expect(ready, isFalse);
+
+    worker.writeGate!.complete();
+    await setup;
   });
 
   group('PosthogFlutterDesktop.screen', () {

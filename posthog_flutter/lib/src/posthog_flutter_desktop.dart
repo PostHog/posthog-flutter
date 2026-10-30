@@ -668,14 +668,22 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _featureFlagsUnsubscribe?.call();
       _featureFlagsUnsubscribe = null;
 
-      return _previousClose = _closeClient(client);
+      _previousClose = _closeClient(client);
     });
-    // A repeated close() also waits until the queue is sent.
-    await _previousClose;
+    // A repeated close() also waits until the queue is sent. Stalled storage
+    // doesn't hold up the app's shutdown, only the next setup().
+    try {
+      await _previousClose.timeout(_closeTimeout);
+    } catch (e) {
+      printIfDebug('[PostHog] Queue file work left unfinished on close: $e');
+    }
   }
 
   /// How long close() waits for the queue to be sent.
   static const _closeFlushTimeout = Duration(seconds: 2);
+
+  /// How long close() waits in all, with the queue's file work.
+  static const _closeTimeout = Duration(seconds: 4);
 
   /// Makes one bounded attempt to send the queue, then closes [client].
   /// Events left unsent stay on disk for the next client, or are lost when
