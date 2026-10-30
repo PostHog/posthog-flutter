@@ -28,8 +28,8 @@ class Posthog {
   PostHogConfig? _config;
 
   /// Set when [optOut] stops an in-progress Flutter replay. [optIn] consumes
-  /// it so opt-in starts a new recording, and a replay the caller already
-  /// stopped is left stopped.
+  /// it to re-arm Flutter capture for the recording native opt-in restarts,
+  /// and a replay the caller already stopped is left stopped.
   bool _restartSessionReplayOnEnable = false;
 
   /// Returns the singleton PostHog client instance.
@@ -399,19 +399,17 @@ class Posthog {
   Future<void> optOut() async {
     // Uninstall Flutter-specific integrations when opting out
     _uninstallFlutterIntegrations();
-    Future<void>? stopReplay;
     // Skipped on web: posthog-js drops replay while opted out, and restarting
     // it on optIn would override a replay disabled in posthog.init.
     if (!kIsWeb && PostHogInternalEvents.sessionRecordingActive.value) {
       _restartSessionReplayOnEnable = true;
       PostHogInternalEvents.sessionRecordingActive.value = false;
-      // Native stopSessionRecording is a no-op once the SDK is already opted
-      // out, so it is sent first. Not awaited before disable, so a capture()
-      // right after an un-awaited optOut() still reaches native after it.
-      stopReplay = _posthog.stopSessionRecording();
     }
 
-    await Future.wait([if (stopReplay != null) stopReplay, _posthog.disable()]);
+    // Native opt-out stops replay itself. A native stopSessionRecording() here
+    // would record that the app stopped replay, so native opt-in would not
+    // restart it.
+    await _posthog.disable();
   }
 
   /// Opts the current user back in to data collection.
@@ -430,9 +428,8 @@ class Posthog {
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
     if (restartReplay) {
-      // On iOS, startSessionRecording is ignored while the SDK is still opted
-      // out, so the platform opt-in has to finish first.
-      await startSessionRecording(resumeCurrent: false);
+      PostHogInternalEvents.requestReplaySessionReset();
+      PostHogInternalEvents.sessionRecordingActive.value = true;
     }
   }
 
