@@ -80,7 +80,8 @@ abstract class QueueWorker {
   Future<EncodedBody> encodeBody(Object? body, {required bool gzip});
 
   /// Told when the jobs move back to the calling isolate. The worker is
-  /// shared, so this is the logger of the client created last.
+  /// shared, so this is the logger of the client created last, while it is
+  /// open.
   CoreLogger? logger;
 
   /// Whether the jobs run on another isolate.
