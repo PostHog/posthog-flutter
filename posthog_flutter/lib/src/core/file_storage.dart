@@ -122,10 +122,11 @@ class FileStorage {
   /// Completes once both queues have no file work left, so that another
   /// storage of the directory finds every event this one queued, and none it
   /// removed.
-  Future<void> get settled => Future.wait([
-        for (final queue in [_queue, _aiQueue])
-          if (queue != null) queue.settled,
-      ]);
+  Future<void> get settled async {
+    // Not Future.wait, which throws on the SynchronousFuture of an idle queue.
+    await _queue?.settled;
+    await _aiQueue?.settled;
+  }
 
   /// Decides, on first use, whether this storage writes the snapshot.
   _Role _open() {

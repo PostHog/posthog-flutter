@@ -306,6 +306,16 @@ void main() {
       expect(stored(), 'after');
     });
 
+    test('settled waits for one queue while the other is idle', () async {
+      final both = storage();
+      both.aiQueue;
+      both.queue.add({'event': 'a'});
+
+      await both.settled;
+
+      expect(queueFiles(), hasLength(1));
+    });
+
     test('settled waits for the deletions', () async {
       final queue = storage().queue;
       for (var i = 0; i < 5; i++) {
