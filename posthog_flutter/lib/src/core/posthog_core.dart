@@ -142,9 +142,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   bool isMinimalFlagCalledEventsEnabled() =>
       _getStoredFlagDetails()?.minimalFlagCalledEvents == true;
 
-  /// Platform context (OS, app, device) attached to every event. It wins
-  /// over registered and event properties of the same name: it describes
-  /// the environment the SDK runs in.
+  /// Platform context (OS, app, device) attached to every event. Registered
+  /// and event properties of the same name override it.
   @protected
   Map<String, Object?> getContextProperties();
 

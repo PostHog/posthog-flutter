@@ -430,7 +430,7 @@ void main() {
       expect(_propertiesOf(event)[r'$set'], {'source': 'screen hook'});
     });
 
-    test('keeps the screen name when a callback rebuilds the properties',
+    test('a callback that removes the screen name keeps it off the events',
         () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -443,13 +443,28 @@ void main() {
       final platform = await setUpPlatform(config);
 
       await platform.screen(screenName: 'Home Screen');
+      await platform.capture(eventName: 'after screen');
 
       final event = await server.waitForEvent(r'$screen');
       final properties = _propertiesOf(event);
-      expect(properties[r'$screen_name'], 'Home Screen',
-          reason: 'the screen name is re-added after the callbacks, so one '
-              'dropping the key must not lose it');
+      expect(properties, isNot(contains(r'$screen_name')));
       expect(properties['scrubbed'], isTrue);
+      final after = await server.waitForEvent('after screen');
+      expect(_propertiesOf(after), isNot(contains(r'$screen_name')));
+    });
+
+    test('sends a non-string screen name a callback leaves', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event..properties?[r'$screen_name'] = 42,
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.screen(screenName: 'Home Screen');
+
+      final event = await server.waitForEvent(r'$screen');
+      expect(_propertiesOf(event)[r'$screen_name'], 42);
     });
 
     test('later events carry the last screen name', () async {

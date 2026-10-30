@@ -369,23 +369,18 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        // Re-added after the callbacks, so one that rebuilds the property map
-        // cannot drop the screen name.
         final finalScreenName =
-            processed.properties?[PostHogPropertyName.screenName] as String? ??
-                screenName;
-        if (finalScreenName.isEmpty) {
+            processed.properties?[PostHogPropertyName.screenName];
+        if (finalScreenName == '') {
           printIfDebug('[PostHog] Screen event dropped: empty screen name');
           return;
         }
 
         // Later events that set no `$screen_name` of their own carry this one.
-        current.registerForSession(
-            {PostHogPropertyName.screenName: finalScreenName});
-        processed.properties = <String, Object>{
-          ...?processed.properties,
-          PostHogPropertyName.screenName: finalScreenName,
-        };
+        if (finalScreenName is String) {
+          current.registerForSession(
+              {PostHogPropertyName.screenName: finalScreenName});
+        }
         _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
