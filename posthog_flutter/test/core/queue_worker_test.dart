@@ -206,6 +206,7 @@ void main() {
       keepAdding();
       final events = await queue.peek(1);
       peeked = true;
+      await queue.settled;
 
       expect(events.single.event['i'], 0);
     });
@@ -316,6 +317,10 @@ void main() {
         gated = GatedWorker()..writeGate = Completer();
         gatedStorage = FileStorage(dir.path, worker: gated);
         addTearDown(gatedStorage.close);
+        addTearDown(() async {
+          if (!gated.writeGate!.isCompleted) gated.writeGate!.complete();
+          await gatedStorage.settled;
+        });
         for (var i = 0; i < burst; i++) {
           gatedStorage.queue.add({'i': i});
         }
@@ -487,6 +492,7 @@ void main() {
       expect(await uuid, isNotNull);
 
       await client.reloadFeatureFlagsAsync();
+      await client.settled;
 
       expect(server.flagsRequests.last.body['person_properties'],
           allOf(containsPair('plan', 'new'), containsPair('coins', 1)));
