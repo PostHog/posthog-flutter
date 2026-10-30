@@ -158,6 +158,54 @@ void main() {
     final ungated = await harness.captureFeatureFlagCalled('plain-flag');
     expect(ungated, contains(r'$feature/plain-flag'));
   });
+
+  group('switching users', () {
+    late _MockPostHogServer mockServer;
+    late _AdapterHarness harness;
+
+    setUp(() async {
+      mockServer = await _MockPostHogServer.start({
+        'featureFlags': {'plain-flag': true},
+      });
+      harness = await _AdapterHarness.start(mockServer);
+    });
+
+    tearDown(() async {
+      await harness.close();
+      await mockServer.close();
+    });
+
+    test('reports the flag call of each user', () async {
+      await harness.captureFeatureFlagCalled('plain-flag');
+      await harness.captureFeatureFlagCalled('plain-flag',
+          distinctId: 'next-user');
+
+      expect(mockServer.batchedEvents.last['distinct_id'], 'next-user');
+    });
+
+    test('does not serve the flags of the previous user', () async {
+      await harness.captureFeatureFlagCalled('plain-flag');
+      mockServer.flagsStatus = HttpStatus.badRequest;
+
+      final response = await harness.evaluate('plain-flag', 'next-user');
+
+      expect(response['value'], isFalse);
+    });
+  });
+
+  test('counts each captured flag call once', () async {
+    final mockServer = await _MockPostHogServer.start({
+      'featureFlags': {'plain-flag': true},
+    });
+    addTearDown(mockServer.close);
+    final harness = await _AdapterHarness.start(mockServer);
+    addTearDown(harness.close);
+
+    await harness.captureFeatureFlagCalled('plain-flag');
+
+    final state = await harness.state();
+    expect(state['total_events_captured'], 1);
+  });
 }
 
 /// Runs a [ComplianceAdapter] against a [_MockPostHogServer].
@@ -182,14 +230,32 @@ class _AdapterHarness {
 
   Future<void> close() => _adapter.close();
 
+  Future<Map<String, Object?>> evaluate(String key, String distinctId) =>
+      _postJson('$_baseUrl/get_feature_flag', {
+        'key': key,
+        'distinct_id': distinctId,
+      });
+
+  Future<Map<String, Object?>> state() async {
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(Uri.parse('$_baseUrl/state'));
+      final response = await request.close();
+      final body = await utf8.decoder.bind(response).join();
+      return Map<String, Object?>.from(jsonDecode(body) as Map);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   /// Evaluates [key], flushes, and returns the properties of the
   /// `$feature_flag_called` event it produced.
-  Future<Map<String, Object?>> captureFeatureFlagCalled(String key) async {
+  Future<Map<String, Object?>> captureFeatureFlagCalled(
+    String key, {
+    String distinctId = 'test-user',
+  }) async {
     final alreadyBatched = _mockServer.batchedEvents.length;
-    final response = await _postJson('$_baseUrl/get_feature_flag', {
-      'key': key,
-      'distinct_id': 'test-user',
-    });
+    final response = await evaluate(key, distinctId);
     expect(response['success'], isTrue);
 
     await _postJson('$_baseUrl/flush', {});
@@ -228,6 +294,7 @@ class _MockPostHogServer {
 
   final HttpServer _server;
   Map<String, Object?> flagsResponse;
+  int flagsStatus = HttpStatus.ok;
   final List<Map<String, Object?>> batchedEvents = [];
 
   String get url => 'http://127.0.0.1:${_server.port}';
@@ -249,6 +316,7 @@ class _MockPostHogServer {
       if (request.method == 'POST' &&
           request.uri.path == '/flags/' &&
           request.uri.queryParameters['v'] == '2') {
+        request.response.statusCode = flagsStatus;
         request.response.headers.contentType = ContentType.json;
         request.response.write(jsonEncode(flagsResponse));
         await request.response.close();

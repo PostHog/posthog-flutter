@@ -69,12 +69,20 @@ class ComplianceAdapter {
       final apiKey = body['api_key'] as String?;
       final host = body['host'] as String?;
       if (apiKey == null || apiKey.isEmpty) {
-        await _sendJson(request, {'error': 'api_key is required'},
+        await _sendJson(
+            request,
+            {
+              'error': 'api_key is required',
+            },
             statusCode: 400);
         return;
       }
       if (host == null || host.isEmpty) {
-        await _sendJson(request, {'error': 'host is required'},
+        await _sendJson(
+            request,
+            {
+              'error': 'host is required',
+            },
             statusCode: 400);
         return;
       }
@@ -101,16 +109,14 @@ class ComplianceAdapter {
           distinctId: bootstrap['distinct_id'] as String?,
           isIdentifiedId: bootstrap['is_identified_id'] == true,
           featureFlags: _readObjectMap(bootstrap['feature_flags']),
-          featureFlagPayloads:
-              _readNullableObjectMap(bootstrap['feature_flag_payloads']),
+          featureFlagPayloads: _readNullableObjectMap(
+            bootstrap['feature_flag_payloads'],
+          ),
         );
       }
 
       await platform.resetAdapterState();
-      await platform.configure(
-        config,
-        host: host,
-      );
+      await platform.configure(config, host: host);
 
       await _sendJson(request, {'success': true});
       return;
@@ -119,10 +125,11 @@ class ComplianceAdapter {
     if (method == 'POST' && (path == '/capture' || path == '/capture_ai')) {
       if (!platform.isInitialized) {
         await _sendJson(
-          request,
-          {'error': 'SDK not initialized'},
-          statusCode: 400,
-        );
+            request,
+            {
+              'error': 'SDK not initialized',
+            },
+            statusCode: 400);
         return;
       }
 
@@ -131,14 +138,19 @@ class ComplianceAdapter {
       final event = body['event'] as String?;
       if (distinctId == null || distinctId.isEmpty) {
         await _sendJson(
-          request,
-          {'error': 'distinct_id is required'},
-          statusCode: 400,
-        );
+            request,
+            {
+              'error': 'distinct_id is required',
+            },
+            statusCode: 400);
         return;
       }
       if (event == null || event.isEmpty) {
-        await _sendJson(request, {'error': 'event is required'},
+        await _sendJson(
+            request,
+            {
+              'error': 'event is required',
+            },
             statusCode: 400);
         return;
       }
@@ -159,10 +171,11 @@ class ComplianceAdapter {
     if (method == 'POST' && path == '/get_feature_flag') {
       if (!platform.isInitialized) {
         await _sendJson(
-          request,
-          {'error': 'SDK not initialized'},
-          statusCode: 400,
-        );
+            request,
+            {
+              'error': 'SDK not initialized',
+            },
+            statusCode: 400);
         return;
       }
 
@@ -175,10 +188,11 @@ class ComplianceAdapter {
       }
       if (distinctId == null || distinctId.isEmpty) {
         await _sendJson(
-          request,
-          {'error': 'distinct_id is required'},
-          statusCode: 400,
-        );
+            request,
+            {
+              'error': 'distinct_id is required',
+            },
+            statusCode: 400);
         return;
       }
 
@@ -198,10 +212,11 @@ class ComplianceAdapter {
     if (method == 'POST' && path == '/flush') {
       if (!platform.isInitialized) {
         await _sendJson(
-          request,
-          {'error': 'SDK not initialized'},
-          statusCode: 400,
-        );
+            request,
+            {
+              'error': 'SDK not initialized',
+            },
+            statusCode: 400);
         return;
       }
 
@@ -242,6 +257,29 @@ class _CaptureClient extends DesktopPostHog {
         );
 
   Map<String, Object?> _flagsRequestFields = const {};
+  String? _flagsUser;
+  void Function()? onCaptured;
+
+  @override
+  String? captureStateless(
+    String distinctId,
+    String event, {
+    required Map<String, Object?> properties,
+    Map<String, Object?>? options,
+    String? timestamp,
+    bool ai = false,
+  }) {
+    final uuid = super.captureStateless(
+      distinctId,
+      event,
+      properties: properties,
+      options: options,
+      timestamp: timestamp,
+      ai: ai,
+    );
+    if (uuid != null) onCaptured?.call();
+    return uuid;
+  }
 
   void _actAs(String distinctId) {
     setPersistedProperty(PostHogPersistedProperty.distinctId, distinctId);
@@ -257,18 +295,20 @@ class _CaptureClient extends DesktopPostHog {
     bool ai = false,
   }) {
     _actAs(distinctId);
-    final prepared =
-        prepareEvent(event, properties: properties, options: options);
+    final prepared = prepareEvent(
+      event,
+      properties: properties,
+      options: options,
+    );
     if (prepared == null) return null;
     return capturePrepared(
-      event,
-      (
-        properties: prepared.properties,
-        options: prepared.options,
-        timestamp: timestamp ?? prepared.timestamp,
-      ),
-      ai: ai,
-    );
+        event,
+        (
+          properties: prepared.properties,
+          options: prepared.options,
+          timestamp: timestamp ?? prepared.timestamp,
+        ),
+        ai: ai);
   }
 
   Future<PostHogFeatureFlagResult?> evaluateFlag(
@@ -279,6 +319,9 @@ class _CaptureClient extends DesktopPostHog {
     required Map<String, Map<String, Object?>> groupProperties,
     required bool disableGeoip,
   }) async {
+    // A user's cached flags and reported flag calls must not serve the next.
+    if (_flagsUser != null && _flagsUser != distinctId) reset();
+    _flagsUser = distinctId;
     _actAs(distinctId);
     if (groups.isEmpty) {
       unregister(r'$groups');
@@ -358,8 +401,10 @@ class _RecordingProxy {
     final response = request.response;
     var headersSent = false;
     try {
-      final body = await request
-          .fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
+      final body = await request.fold<List<int>>(
+        <int>[],
+        (bytes, chunk) => bytes..addAll(chunk),
+      );
       final upstream = await _client.openUrl(
         request.method,
         _target.replace(
@@ -435,13 +480,15 @@ class _RecordingProxy {
     if (statusCode < 200 || statusCode >= 300) {
       _state.lastError = 'Capture request failed with HTTP $statusCode';
     }
-    _state.requestsMade.add(_RequestRecord(
-      timestampMs: DateTime.now().millisecondsSinceEpoch,
-      statusCode: statusCode,
-      retryAttempt: attempt - 1,
-      eventCount: batch.length,
-      uuidList: [for (final event in batch) (event as Map)['uuid'] as String],
-    ));
+    _state.requestsMade.add(
+      _RequestRecord(
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+        statusCode: statusCode,
+        retryAttempt: attempt - 1,
+        eventCount: batch.length,
+        uuidList: [for (final event in batch) (event as Map)['uuid'] as String],
+      ),
+    );
   }
 }
 
@@ -453,14 +500,12 @@ class _CompliancePlatform {
 
   bool get isInitialized => _client != null;
 
-  Future<void> configure(
-    PostHogConfig config, {
-    required String host,
-  }) async {
+  Future<void> configure(PostHogConfig config, {required String host}) async {
     final proxy = await _RecordingProxy.start(host, state);
     config.host = proxy.url;
     final client = _CaptureClient(config);
     final clientState = state;
+    client.onCaptured = () => clientState.totalEventsCaptured++;
     client.onSent((count) => clientState.totalEventsSent += count);
     client.onError((error) => clientState.lastError = error.toString());
     _proxy = proxy;
@@ -477,7 +522,7 @@ class _CompliancePlatform {
   }) {
     final parsedTimestamp =
         timestamp == null ? null : DateTime.tryParse(timestamp);
-    final uuid = _client!.captureFor(
+    return _client!.captureFor(
       distinctId,
       event,
       properties ?? const {},
@@ -485,8 +530,6 @@ class _CompliancePlatform {
       timestamp: parsedTimestamp?.toUtc().toIso8601String(),
       ai: ai,
     );
-    if (uuid != null) state.totalEventsCaptured++;
-    return uuid;
   }
 
   Map<String, Object?> stateJson() =>
@@ -508,9 +551,7 @@ class _CompliancePlatform {
     Map<String, Map<String, Object?>>? groupProperties,
     required bool disableGeoip,
   }) async {
-    final client = _client!;
-    final queuedBefore = client.queuedEventCount;
-    final result = await client.evaluateFlag(
+    final result = await _client!.evaluateFlag(
       key,
       distinctId: distinctId,
       personProperties: personProperties ?? const {},
@@ -518,7 +559,6 @@ class _CompliancePlatform {
       groupProperties: groupProperties ?? const {},
       disableGeoip: disableGeoip,
     );
-    state.totalEventsCaptured += client.queuedEventCount - queuedBefore;
     return result?.variant ?? result?.enabled ?? false;
   }
 
