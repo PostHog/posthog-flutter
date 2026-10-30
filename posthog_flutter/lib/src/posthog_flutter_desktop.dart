@@ -775,9 +775,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         timestamp: DateTime.parse(prepared.timestamp),
       ),
       prepared: prepared,
-      implicitPersonProcessing:
-          callerOptions?['process_person_profile'] == null,
-      sdkPersonProcessing: preparedOptions?['process_person_profile'],
     );
   }
 
@@ -839,14 +836,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         const {};
     // Options are sent as they are, unknown keys included. An option wins
     // over its legacy property on the event.
-    Map<String, Object?>? options = cleanEventOptions(event.options);
-    // Person properties the callbacks added or removed decide person
-    // processing again, unless a callback changed the SDK's option.
-    if (prepared.implicitPersonProcessing &&
-        options?['process_person_profile'] == prepared.sdkPersonProcessing) {
-      options = client.personProcessingOptions(
-          {...?options}..remove('process_person_profile'), properties);
-    }
+    final options = cleanEventOptions(event.options);
     final base = prepared.prepared;
     final distinctId = event.distinctId;
     final timestamp = event.timestamp;
@@ -905,12 +895,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   }
 }
 
-/// An event built for the beforeSend callbacks, with the time it happened,
-/// whether its person processing was left to its properties, and the
-/// `process_person_profile` option the SDK gave it.
+/// An event built for the beforeSend callbacks, and what it was built from.
 typedef _PreparedEvent = ({
   PostHogEvent event,
   PostHogPreparedEvent prepared,
-  bool implicitPersonProcessing,
-  Object? sdkPersonProcessing,
 });

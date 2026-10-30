@@ -731,7 +731,7 @@ void main() {
       expect(_optionsOf(event)['process_person_profile'], isFalse);
     });
 
-    test('an event whose person properties are removed is personless',
+    test('removing person properties leaves person processing as prepared',
         () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -744,10 +744,10 @@ void main() {
       );
 
       final event = await server.waitForEvent('redacted');
-      expect(_optionsOf(event)['process_person_profile'], isFalse);
+      expect(_optionsOf(event), isNot(contains('process_person_profile')));
     });
 
-    test('person properties a callback adds turn on person processing',
+    test('person properties a callback adds leave the event personless',
         () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -759,7 +759,7 @@ void main() {
       await platform.capture(eventName: 'signed up');
 
       final event = await server.waitForEvent('signed up');
-      expect(_optionsOf(event), isNot(contains('process_person_profile')));
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
       expect(_propertiesOf(event)[r'$set'], {'email': 'user@example.com'});
     });
 
