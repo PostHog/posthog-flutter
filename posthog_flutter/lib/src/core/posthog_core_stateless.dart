@@ -349,9 +349,9 @@ abstract class PostHogCoreStateless {
     );
   }
 
-  /// Queues [event] and returns its uuid.
+  /// Queues [event] and returns its uuid, with whether the queue keeps it.
   @protected
-  String captureStateless(
+  ({String uuid, Future<bool> queued}) captureStateless(
     String distinctId,
     String event, {
     required Map<String, Object?> properties,
@@ -368,7 +368,7 @@ abstract class PostHogCoreStateless {
         ),
         options: options,
         timestamp: timestamp,
-      ).uuid;
+      );
 
   /// Queues [event] on the AI queue, and completes with its uuid, or null
   /// when it is over the AI event size limit and so not queued.
@@ -694,6 +694,8 @@ abstract class PostHogCoreStateless {
           await queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
       if (_closed) break;
       if (batch.isEmpty) {
+        // The next peek waits for the event still being written.
+        if (queue.measuredLength < queue.length) continue;
         if (queue.length > 0) _scheduleFlush(lane);
         break;
       }

@@ -279,7 +279,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         final current = _clientForContinuation('capture', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   @override
@@ -365,7 +365,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          _captureProcessed(current, processed, exceptionSteps, prepared);
+          await _captureProcessed(current, processed, exceptionSteps, prepared);
           return;
         }
 
@@ -381,7 +381,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           current.registerForSession(
               {PostHogPropertyName.screenName: finalScreenName});
         }
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -640,7 +640,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final current =
             _clientForContinuation('captureException', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   @override
@@ -696,9 +696,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       printIfDebug('[PostHog] Events left unsent on close: $e');
     }
     client.close();
-    // The next client reads the directory only once this one's files are
-    // written and deleted, so it neither misses an event nor sends one again.
-    await client.settled;
+    try {
+      // The next client reads the directory only once this one's files are
+      // written and deleted, so it neither misses an event nor sends one again.
+      await client.settled;
+    } catch (e) {
+      printIfDebug('[PostHog] Queue file work failed on close: $e');
+    }
   }
 
   @override

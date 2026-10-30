@@ -324,6 +324,43 @@ void main() {
     });
   });
 
+  test('an awaited capture completes once the event is on disk', () async {
+    final server = await LocalPostHogServer.start();
+    final worker = GatedWorker();
+    final defaultWorker = QueueWorker.defaultWorker;
+    QueueWorker.defaultWorker = () => worker;
+    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+    final platform = await setUpPlatform(configFor(server));
+    worker.writeGate = Completer();
+
+    var captured = false;
+    final capture =
+        platform.capture(eventName: 'durable').then((_) => captured = true);
+    await pumpEventQueue();
+    expect(captured, isFalse);
+
+    worker.writeGate!.complete();
+    await capture;
+  });
+
+  test('a queue file job failing on close does not stop the next setup',
+      () async {
+    final server = await LocalPostHogServer.start();
+    final worker = _FailingDeletes();
+    final defaultWorker = QueueWorker.defaultWorker;
+    QueueWorker.defaultWorker = () => worker;
+    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+    final platform = await setUpPlatform(configFor(server));
+    await platform.capture(eventName: 'first');
+    await platform.close();
+
+    worker.fail = false;
+    await platform.setup(configFor(server));
+    await platform.capture(eventName: 'second');
+
+    await server.waitForEvent('second');
+  });
+
   test('close gives up on stalled file work, and the next setup waits for it',
       () async {
     final server = await LocalPostHogServer.start();
@@ -334,7 +371,7 @@ void main() {
     final platform = await setUpPlatform(configFor(server));
 
     worker.writeGate = Completer();
-    await platform.capture(eventName: 'stalled');
+    unawaited(platform.capture(eventName: 'stalled'));
     await platform.close();
 
     var ready = false;
@@ -2542,3 +2579,11 @@ Map<String, Object?> _variantFlagResponse() => {
         },
       },
     };
+
+class _FailingDeletes extends GatedWorker {
+  var fail = true;
+
+  @override
+  Future<List<String>> delete(List<String> paths) =>
+      fail ? Future.error(StateError('job failed')) : super.delete(paths);
+}

@@ -41,8 +41,8 @@ import 'uuid.dart';
 /// Files are replaced through a temporary file and a rename, without syncing
 /// them to disk: a crash can lose the latest writes but never leaves a file
 /// half-written. Queued events are written by a [QueueWorker] off the UI
-/// isolate, so an event captured in the last moments before a crash can be
-/// lost, as on Android, where the SDK also writes events in the background.
+/// isolate: an event is on disk once its capture call completes, and one not
+/// awaited can be lost to a crash or `exit()` in the moments that follow.
 class FileStorage {
   /// A storage in [_directory]. Its queues give their file work to [worker],
   /// a background isolate by default.
@@ -488,7 +488,7 @@ class FileEventQueue {
   ) {
     _writesInFlight++;
     final path = _directory.isEmpty ? null : _pathOf(id);
-    return _worker.write(path, event, maxBytes: maxBytes).then((result) {
+    QueueWriteResult done(QueueWriteResult result) {
       _writesInFlight--;
       _writeNext();
       _writing.remove(id);
@@ -509,7 +509,13 @@ class FileEventQueue {
             error);
       }
       return result;
-    });
+    }
+
+    return _worker.write(path, event, maxBytes: maxBytes).then(
+          done,
+          onError: (Object e) =>
+              done((bytes: null, tooLarge: false, error: '$e')),
+        );
   }
 
   void _writeNext() {

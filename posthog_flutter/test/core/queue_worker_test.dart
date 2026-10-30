@@ -454,6 +454,44 @@ void main() {
       ]);
     });
 
+    test('a flush waits for an event still being written', () async {
+      final server = await LocalPostHogServer.start();
+      final gated = GatedWorker()..deleteGate = Completer();
+      final client = testClient(server,
+          config: testConfig(flushInterval: Duration.zero),
+          storage: FileStorage(dir.path, worker: gated));
+
+      client.capture('a');
+      final first = client.flush();
+      await server.waitForEvent('a');
+      while (gated.deletes == 0) {
+        await pumpEventQueue();
+      }
+      gated.writeGate = Completer();
+      client.capture('b');
+      final joined = client.flush();
+      gated.deleteGate!.complete();
+      await pumpEventQueue();
+      gated.writeGate!.complete();
+      await first;
+      await joined;
+
+      expect(server.eventNames, ['a', 'b']);
+    });
+
+    test('a write job that fails keeps the event and the queue going',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server,
+          storage: FileStorage(dir.path, worker: _FailingFirstWrite()));
+
+      client.capture('a');
+      client.capture('b');
+      await client.flush();
+
+      expect(server.eventNames, ['a', 'b']);
+    });
+
     test('an AI event still being measured does not evict a kept one',
         () async {
       final server = await LocalPostHogServer.start();
@@ -532,4 +570,19 @@ void main() {
       expect((next['options']! as Map)['process_person_profile'], isFalse);
     });
   });
+}
+
+class _FailingFirstWrite extends GatedWorker {
+  var failed = false;
+
+  @override
+  Future<QueueWriteResult> write(
+    String? path,
+    Map<String, Object?> event, {
+    int? maxBytes,
+  }) {
+    if (failed) return super.write(path, event, maxBytes: maxBytes);
+    failed = true;
+    return Future.error(StateError('job failed'));
+  }
 }

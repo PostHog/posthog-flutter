@@ -457,11 +457,16 @@ abstract class PostHogCore extends PostHogCoreStateless {
   ///
   /// Returns the event's uuid, or null when it is not queued: the client
   /// is closed or opted out.
-  String? capturePrepared(String event, PostHogPreparedEvent prepared) =>
-      wrap<String?>(() {
-        if (_ignoredWhileOptedOut('posthog.capture')) return null;
-        return _queuePrepared(event, prepared);
-      });
+  Future<String?> capturePrepared(String event, PostHogPreparedEvent prepared) {
+    final queued = wrap<Future<String?>>(() {
+      if (_ignoredWhileOptedOut('posthog.capture')) {
+        return SynchronousFuture(null);
+      }
+      final (:uuid, :queued) = _queuePrepared(event, prepared);
+      return queued.then((kept) => kept ? uuid : null);
+    });
+    return queued ?? SynchronousFuture(null);
+  }
 
   /// Queues an AI event built by [prepareEvent], like [capturePrepared], on
   /// the queue of PostHog's AI endpoint, which drops a serialized event over
@@ -528,9 +533,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
     );
   }
 
-  String _queuePrepared(String event, PostHogPreparedEvent prepared) {
+  ({String uuid, Future<bool> queued}) _queuePrepared(
+    String event,
+    PostHogPreparedEvent prepared,
+  ) {
     final (:properties, :options, :timestamp) = prepared;
-    final uuid = captureStateless(getDistinctId(), event,
+    final queued = captureStateless(getDistinctId(), event,
         properties: properties, options: options, timestamp: timestamp);
     _applyPersonProperties(properties);
     if (event == r'$set' || event == r'$identify') {
@@ -542,7 +550,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
             _personPropertiesHash(getDistinctId(), set, setOnce);
       }
     }
-    return uuid;
+    return queued;
   }
 
   /// Applies the person properties of a queued event with [properties]:
