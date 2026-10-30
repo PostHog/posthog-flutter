@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.BadParcelableException
+import android.view.Window
+import android.view.WindowManager
 import com.google.firebase.FirebaseApp
 import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogCompression
@@ -334,7 +336,7 @@ internal class PosthogFlutterPluginTest {
             )
 
             val replay = assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig
-            assertEquals(1f, replay.screenshotScale)
+            assertNull(replay.screenshotScale)
             assertEquals(30, replay.screenshotCompressionQuality)
             assertEquals(PostHogScreenshotColorMode.ARGB_8888, replay.screenshotColorMode)
         } finally {
@@ -425,6 +427,54 @@ internal class PosthogFlutterPluginTest {
         plugin.onMethodCall(call, mockResult)
 
         Mockito.verify(mockResult).success(emptyList<ByteArray?>())
+    }
+
+    private fun attachActivityWithWindowFlags(plugin: PosthogFlutterPlugin): WindowManager.LayoutParams {
+        val attributes = Mockito.mock(WindowManager.LayoutParams::class.java)
+        val window = Mockito.mock(Window::class.java)
+        Mockito.`when`(window.attributes).thenReturn(attributes)
+        val activity = Mockito.mock(Activity::class.java)
+        Mockito.`when`(activity.window).thenReturn(window)
+        val binding = Mockito.mock(ActivityPluginBinding::class.java)
+        Mockito.`when`(binding.activity).thenReturn(activity)
+        plugin.onAttachedToActivity(binding)
+        return attributes
+    }
+
+    private fun reportedSecure(plugin: PosthogFlutterPlugin): Any? {
+        val result = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("getSessionReplayState", null), result)
+        val captor = ArgumentCaptor.forClass(Map::class.java)
+        Mockito.verify(result).success(captor.capture())
+        return captor.value["secure"]
+    }
+
+    @Test
+    fun getSessionReplayState_reportsTheWindowSecureFlag() {
+        val plugin = PosthogFlutterPlugin()
+        val attributes = attachActivityWithWindowFlags(plugin)
+
+        assertEquals(false, reportedSecure(plugin))
+        attributes.flags = WindowManager.LayoutParams.FLAG_SECURE
+        assertEquals(true, reportedSecure(plugin))
+    }
+
+    @Test
+    fun frameCapturedOnSecureWindow_isMaskedAfterTheFlagClears() {
+        val plugin = PosthogFlutterPlugin()
+        attachActivityWithWindowFlags(plugin)
+
+        assertTrue(plugin.isFrameMasked(secureAtCapture = true))
+    }
+
+    @Test
+    fun frameSentOnSecureWindow_isMaskedOnlyWhileTheFlagIsSet() {
+        val plugin = PosthogFlutterPlugin()
+        val attributes = attachActivityWithWindowFlags(plugin)
+
+        assertFalse(plugin.isFrameMasked(secureAtCapture = false))
+        attributes.flags = WindowManager.LayoutParams.FLAG_SECURE
+        assertTrue(plugin.isFrameMasked(secureAtCapture = false))
     }
 
     @Test

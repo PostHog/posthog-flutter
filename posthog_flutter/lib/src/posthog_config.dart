@@ -474,6 +474,14 @@ class PostHogConfig {
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
+  /// - On every platform except Windows and Linux, PostHog calls made after a
+  ///   capture (including `reset()`, `identify()` and getters) wait until its
+  ///   callbacks finish, so the event keeps the user and consent it was
+  ///   captured under. A callback that runs longer than 10 seconds stops
+  ///   holding them back; its event is still sent when it finishes, with the
+  ///   user, super properties, groups and consent current by then. Calls made
+  ///   from inside a callback do not wait, but a callback that waits on a
+  ///   PostHog call made elsewhere stalls until that limit.
   List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, captureDeepLinks integrations
@@ -1129,9 +1137,11 @@ class PostHogErrorTrackingConfig {
 
   /// Enable automatic capture of isolate errors.
   ///
-  /// Controls whether errors from the current isolate are captured.
-  /// This includes errors from the main isolate and any isolates spawned
-  /// without explicit error handling.
+  /// Only captures errors from the isolate where `Posthog().setup()` runs,
+  /// normally the main isolate. Errors from spawned background isolates are
+  /// not captured automatically. To capture them, call
+  /// `isolate.addPostHogErrorListener()` from the main isolate before resuming
+  /// an isolate spawned paused.
   ///
   /// **Note:**
   /// - Flutter web: Not supported
