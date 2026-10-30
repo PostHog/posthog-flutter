@@ -568,6 +568,50 @@ void main() {
       final next = server.batchRequests.single.events.single;
       expect((next['options']! as Map)['process_person_profile'], isFalse);
     });
+
+    test('an AI event keeps its person properties when identify follows it',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client =
+          testClient(server, storage: FileStorage(dir.path, worker: worker));
+      final prepared = client.prepareEvent(r'$ai_generation', properties: {
+        r'$set': {'plan': 'pro'},
+      })!;
+
+      // The worker measures the event only after identify() has run.
+      final uuid = client.captureAiPrepared(r'$ai_generation', prepared);
+      client.identify('user');
+      expect(await uuid, isNotNull);
+
+      await client.reloadFeatureFlagsAsync();
+      await client.settled;
+
+      expect(server.flagsRequests.last.body['person_properties'],
+          containsPair('plan', 'pro'));
+    });
+
+    test('an AI event from before reset does not apply to the same id again',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client =
+          testClient(server, storage: FileStorage(dir.path, worker: worker));
+      client.identify('user');
+      final prepared = client.prepareEvent(r'$ai_generation', properties: {
+        r'$set': {'email': 'user@example.com'},
+      })!;
+
+      // The worker measures the event only after the same id is back.
+      final uuid = client.captureAiPrepared(r'$ai_generation', prepared);
+      client.reset();
+      client.identify('user');
+      expect(await uuid, isNotNull);
+
+      await client.reloadFeatureFlagsAsync();
+      await client.settled;
+
+      expect((server.flagsRequests.last.body['person_properties'] ?? {}) as Map,
+          isNot(contains('email')));
+    });
   });
 }
 

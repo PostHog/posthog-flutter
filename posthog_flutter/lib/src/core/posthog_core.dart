@@ -42,8 +42,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// The reload that waits for the /flags request in flight.
   Completer<void>? _pendingFlagsReload;
 
-  /// Changes when reset invalidates responses requested for the previous user.
-  int _featureFlagsGeneration = 0;
+  /// Changes when reset ends the current user, invalidating what was requested
+  /// or captured for them but has not come back yet.
+  int _resetGeneration = 0;
 
   final _session = PostHogSessionManager();
 
@@ -99,7 +100,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// the configured default; this client keeps the current consent decision.
   void reset() {
     wrap(() {
-      _featureFlagsGeneration++;
+      _resetGeneration++;
       _sessionProps.clear();
       _flagCallReported.clear();
       _cachedPersonProperties = null;
@@ -474,8 +475,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   ///
   /// Completes with the event's uuid, or null when it is not queued: the
   /// client is closed or opted out, or the event is over the size limit.
-  /// Its person properties apply once it is queued, and only while the user
-  /// it was captured for is still the current one.
+  /// Its person properties apply once it is queued, unless [reset] ran since
+  /// it was captured.
   Future<String?> captureAiPrepared(
     String event,
     PostHogPreparedEvent prepared,
@@ -485,12 +486,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
         return SynchronousFuture(null);
       }
       final (:properties, :options, :timestamp) = prepared;
-      final distinctId = getDistinctId();
+      final generation = _resetGeneration;
       final capturedAt = ++_personPropertyClock;
-      return captureAiStateless(distinctId, event,
+      return captureAiStateless(getDistinctId(), event,
               properties: properties, options: options, timestamp: timestamp)
           .then((uuid) {
-        if (uuid != null && getDistinctId() == distinctId) {
+        if (uuid != null && generation == _resetGeneration) {
           _applyPersonProperties(properties, capturedAt: capturedAt);
         }
         return uuid;
@@ -752,7 +753,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   Future<void> _doFlagsAsync() async {
     _loadingFlags = true;
-    final generation = _featureFlagsGeneration;
+    final generation = _resetGeneration;
     try {
       final distinctId = getDistinctId();
       final groupsMap = _getGroups();
@@ -784,7 +785,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         extraPayload: extraProperties,
       );
 
-      if (generation != _featureFlagsGeneration) return;
+      if (generation != _resetGeneration) return;
 
       if (result is GetFlagsFailure) {
         final stored = _getStoredFlagDetails();
