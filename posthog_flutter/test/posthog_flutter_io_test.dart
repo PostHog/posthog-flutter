@@ -1401,6 +1401,27 @@ isolate_dso_base: 7000000000
         ]);
       });
     }
+
+    final lifecycleCalls = <String, Future<void> Function()>{
+      'disable': () => posthogFlutterIO.optOut(),
+      'close': () => posthogFlutterIO.close(),
+      'setup': () =>
+          posthogFlutterIO.setup(PostHogConfig('test_project_token')),
+    };
+    lifecycleCalls.forEach((method, call) {
+      test('$method waits for an event between its build and send', () async {
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token',
+            beforeSend: [(event) => event]));
+        log.clear();
+
+        final sent = posthogFlutterIO.capture(eventName: 'checkout');
+        await call();
+        await sent;
+
+        expect(
+            log.map((c) => c.method), ['buildEvent', 'sendBuiltEvent', method]);
+      });
+    });
   });
 
   group('PosthogFlutterIO addExceptionStep', () {
