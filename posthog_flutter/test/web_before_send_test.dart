@@ -87,6 +87,32 @@ void main() {
     });
   }
 
+  test('a feature event looks up its flag and captures before a reset',
+      () async {
+    final calls = <String>[];
+    final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+    fake.setProperty(
+      'getFeatureFlagResult'.toJS,
+      ((JSString key, [JSAny? options]) {
+        calls.add('getFeatureFlagResult');
+        return {'key': key.toDart, 'enabled': true}.jsify();
+      }).toJS,
+    );
+    fake.setProperty(
+      'capture'.toJS,
+      ((JSString event, [JSAny? a, JSAny? b]) => calls.add(event.toDart)).toJS,
+    );
+    fake.setProperty('reset'.toJS, (([JSAny? a]) => calls.add('reset')).toJS);
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token'));
+
+    final sent = web.captureFeatureView(flag: 'checkout');
+    await web.reset();
+    await sent;
+
+    expect(calls, ['getFeatureFlagResult', r'$feature_view', 'reset']);
+  });
+
   test('beforeSend null drops capture on web', () async {
     final web = PosthogFlutterWeb();
     await web.setup(

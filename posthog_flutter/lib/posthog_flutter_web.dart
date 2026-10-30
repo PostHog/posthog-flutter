@@ -320,6 +320,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }) =>
       _captureFeatureEvent(r'$feature_interaction', flag, flagVariant);
 
+  // Looks up the flag and starts the capture without an await in between, so
+  // a reset() right after the call cannot move the event to the next user.
   Future<void> _captureFeatureEvent(
     String event,
     String flag,
@@ -327,7 +329,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   ) async {
     final screenName = _currentScreen;
     final result = flagVariant == null
-        ? await getFeatureFlagResult(key: flag, sendFeatureFlagEvent: false)
+        ? featureFlagResultFromMap(
+            readFeatureFlagResult(flag, sendEvent: false),
+            flag,
+          )
         : null;
     final captured = featureEvent(
         event, flag, flagVariant ?? result?.variant ?? result?.enabled);
