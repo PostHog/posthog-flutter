@@ -90,6 +90,41 @@ void main() {
     expect(arguments['compression'], 'none');
   });
 
+  test('captureAi settings are omitted when unset', () async {
+    await Posthog().setup(PostHogConfig('snapshot_project_token'));
+
+    final arguments = calls.single.arguments as Map;
+    expect(
+      arguments.keys.where((key) => '$key'.startsWith('captureAi')),
+      isEmpty,
+    );
+  });
+
+  test('captureAi settings are sent to native setup when set', () async {
+    final config = PostHogConfig('snapshot_project_token')
+      ..captureAiCompression = PostHogCompression.none
+      ..captureAiMaxQueueSize = 7
+      ..captureAiTimeout = const Duration(seconds: 90)
+      ..captureAiMaxEventBytes = 1024;
+
+    await Posthog().setup(config);
+
+    final arguments = calls.single.arguments as Map;
+    expect(arguments['captureAiCompression'], 'none');
+    expect(arguments['captureAiMaxQueueSize'], 7);
+    expect(arguments['captureAiTimeoutSeconds'], 90);
+    expect(arguments['captureAiMaxEventBytes'], 1024);
+  });
+
+  test('a sub-second captureAi timeout is sent as one second', () async {
+    final config = PostHogConfig('snapshot_project_token')
+      ..captureAiTimeout = const Duration(milliseconds: 500);
+
+    await Posthog().setup(config);
+
+    expect((calls.single.arguments as Map)['captureAiTimeoutSeconds'], 1);
+  });
+
   test('snapshots event and identity channel shapes', () async {
     final config = PostHogConfig(
       'snapshot_project_token',

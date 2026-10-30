@@ -14,6 +14,7 @@ import 'utils/before_send.dart';
 import 'utils/call_order.dart';
 import 'utils/capture_utils.dart';
 import 'utils/channel_serialization.dart';
+import 'utils/event_options.dart';
 import 'utils/flutter_version.dart';
 import 'utils/property_normalizer.dart';
 
@@ -59,12 +60,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
     final event = PostHogEvent(
       event: eventName,
       properties: properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options == null ? null : {...options},
     );
     return _beforeSendCallbacks.isEmpty
         ? event
@@ -245,12 +248,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) async {
     if (!isSupportedPlatform()) {
       return;
     }
 
     try {
+      final cleanedOptions = cleanEventOptions(options);
       final normalizedUserProperties = userProperties != null
           ? PropertyNormalizer.normalize(userProperties)
           : null;
@@ -264,6 +269,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           'userProperties': normalizedUserProperties,
         if (normalizedUserPropertiesSetOnce != null)
           'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
+        if (cleanedOptions != null) 'options': cleanedOptions,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on identify: $exception');
@@ -274,12 +280,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) async {
     if (!isSupportedPlatform()) {
       return;
     }
 
     try {
+      final cleanedOptions = cleanEventOptions(options);
       final normalizedUserPropertiesToSet = userPropertiesToSet != null
           ? PropertyNormalizer.normalize(userPropertiesToSet)
           : null;
@@ -292,6 +300,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           'userPropertiesToSet': normalizedUserPropertiesToSet,
         if (normalizedUserPropertiesToSetOnce != null)
           'userPropertiesToSetOnce': normalizedUserPropertiesToSetOnce,
+        if (cleanedOptions != null) 'options': cleanedOptions,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exception on setPersonProperties: $exception');
@@ -304,29 +313,76 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    await _captureEvent(
+      'capture',
+      eventName: eventName,
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
+    );
+  }
+
+  @override
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    final uuid = await _captureEvent(
+      'captureAi',
+      eventName: eventName,
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
+    );
+    return uuid is String ? uuid : null;
+  }
+
+  /// Runs beforeSend and sends the event through [method], `capture` or
+  /// `captureAi`. Returns what the native SDK returned, or null when the
+  /// event was dropped.
+  Future<Object?> _captureEvent(
+    String method, {
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) async {
     if (!isSupportedPlatform()) {
-      return;
+      return null;
     }
 
-    return _order.event(
+    Object? result;
+    await _order.event(
       () => _runBeforeSend(
         eventName,
         properties,
         userProperties: userProperties,
         userPropertiesSetOnce: userPropertiesSetOnce,
+        options: options,
       ),
-      (processedEvent) => _sendCapture(eventName, processedEvent),
+      (processedEvent) async {
+        result = await _sendCapture(method, eventName, processedEvent);
+      },
     );
+    return result;
   }
 
-  Future<void> _sendCapture(
+  Future<Object?> _sendCapture(
+    String method,
     String eventName,
     PostHogEvent? processedEvent,
   ) async {
     if (processedEvent == null) {
       printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
-      return;
+      return null;
     }
 
     try {
@@ -351,17 +407,20 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           extractedUserPropertiesSetOnce != null
               ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
               : null;
+      final cleanedOptions = cleanEventOptions(processedEvent.options);
 
-      await _invoke('capture', {
+      return await _invoke(method, {
         'eventName': processedEvent.event,
         if (normalizedProperties != null) 'properties': normalizedProperties,
         if (normalizedUserProperties != null)
           'userProperties': normalizedUserProperties,
         if (normalizedUserPropertiesSetOnce != null)
           'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
+        if (cleanedOptions != null) 'options': cleanedOptions,
       });
     } on PlatformException catch (exception) {
-      printIfDebug('Exeption on capture: $exception');
+      printIfDebug('Exeption on $method: $exception');
+      return null;
     }
   }
 
@@ -369,6 +428,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     if (!isSupportedPlatform()) {
       return;
@@ -383,7 +443,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     // Apply beforeSend callback - screen events are captured as $screen
     return _order.event(
-      () => _runBeforeSend(PostHogEventName.screen, propsWithScreenName),
+      () => _runBeforeSend(
+        PostHogEventName.screen,
+        propsWithScreenName,
+        options: options,
+      ),
       (processedEvent) => _sendScreen(screenName, processedEvent),
     );
   }
@@ -402,6 +466,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       await capture(
         eventName: processedEvent.event,
         properties: processedEvent.properties?.cast<String, Object>(),
+        options: processedEvent.options,
       );
       return;
     }
@@ -420,9 +485,12 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
             )
           : null;
 
+      final cleanedOptions = cleanEventOptions(processedEvent.options);
+
       await _invoke('screen', {
         'screenName': finalScreenName,
         if (normalizedProperties != null) 'properties': normalizedProperties,
+        if (cleanedOptions != null) 'options': cleanedOptions,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on screen: $exception');
@@ -463,13 +531,20 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> alias({required String alias}) async {
+  Future<void> alias({
+    required String alias,
+    Map<String, Object?>? options,
+  }) async {
     if (!isSupportedPlatform()) {
       return;
     }
 
     try {
-      await _invoke('alias', {'alias': alias});
+      final cleanedOptions = cleanEventOptions(options);
+      await _invoke('alias', {
+        'alias': alias,
+        if (cleanedOptions != null) 'options': cleanedOptions,
+      });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on alias: $exception');
     }
@@ -696,12 +771,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
   }) async {
     if (!isSupportedPlatform()) {
       return;
     }
 
     try {
+      final cleanedOptions = cleanEventOptions(options);
       final normalizedGroupProperties = groupProperties != null
           ? PropertyNormalizer.normalize(groupProperties)
           : null;
@@ -711,6 +788,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         'groupKey': groupKey,
         if (normalizedGroupProperties != null)
           'groupProperties': normalizedGroupProperties,
+        if (cleanedOptions != null) 'options': cleanedOptions,
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on group: $exception');
@@ -825,6 +903,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     if (!isSupportedPlatform()) {
       return;
@@ -845,6 +924,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         () => _runBeforeSend(
           PostHogEventName.exception,
           exceptionProps.cast<String, Object>(),
+          options: options,
         ),
         (processedEvent) => _sendException(error, processedEvent),
       );
@@ -869,6 +949,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       await capture(
         eventName: processedEvent.event,
         properties: processedEvent.properties?.cast<String, Object>(),
+        options: processedEvent.options,
       );
       return;
     }
@@ -881,9 +962,12 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
           )
         : <String, Object>{};
 
+    final cleanedOptions = cleanEventOptions(processedEvent.options);
+
     await _invoke('captureException', {
       'timestamp': timestamp,
       'properties': normalizedData,
+      if (cleanedOptions != null) 'options': cleanedOptions,
     });
   }
 

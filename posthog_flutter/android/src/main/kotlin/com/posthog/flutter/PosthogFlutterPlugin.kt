@@ -249,6 +249,10 @@ class PosthogFlutterPlugin :
                 capture(call, result)
             }
 
+            "captureAi" -> {
+                captureAi(call, result)
+            }
+
             "captureFeatureView" -> {
                 captureFeatureView(call, result)
             }
@@ -617,6 +621,21 @@ class PosthogFlutterPlugin :
                         "gzip" -> compression = PostHogCompression.GZIP
                         "none" -> compression = PostHogCompression.NONE
                     }
+                }
+                posthogConfig.getIfNotNull<String>("captureAiCompression") {
+                    when (it) {
+                        "gzip" -> captureAiCompression = PostHogCompression.GZIP
+                        "none" -> captureAiCompression = PostHogCompression.NONE
+                    }
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiMaxQueueSize") {
+                    captureAiMaxQueueSize = it
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiTimeoutSeconds") {
+                    captureAiTimeout = it
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiMaxEventBytes") {
+                    captureAiMaxEventBytes = it
                 }
                 posthogConfig.getIfNotNull<Boolean>("sessionReplay") {
                     sessionReplay = it
@@ -1741,7 +1760,8 @@ class PosthogFlutterPlugin :
             val userId: String = call.argument("userId")!!
             val userProperties: Map<String, Any>? = call.argument("userProperties")
             val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
-            PostHog.identify(userId, userProperties, userPropertiesSetOnce)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.identify(userId, userProperties, userPropertiesSetOnce, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1755,7 +1775,8 @@ class PosthogFlutterPlugin :
         try {
             val userPropertiesToSet: Map<String, Any>? = call.argument("userPropertiesToSet")
             val userPropertiesToSetOnce: Map<String, Any>? = call.argument("userPropertiesToSetOnce")
-            PostHog.setPersonProperties(userPropertiesToSet, userPropertiesToSetOnce)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.setPersonProperties(userPropertiesToSet, userPropertiesToSetOnce, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1771,13 +1792,39 @@ class PosthogFlutterPlugin :
             val properties: Map<String, Any>? = call.argument("properties")
             val userProperties: Map<String, Any>? = call.argument("userProperties")
             val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
+            val options: Map<String, Any?>? = call.argument("options")
             PostHog.capture(
                 eventName,
                 properties = properties,
                 userProperties = userProperties,
                 userPropertiesSetOnce = userPropertiesSetOnce,
+                options = options,
             )
             result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureAi(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val eventName: String = call.argument("eventName")!!
+            val properties: Map<String, Any>? = call.argument("properties")
+            val userProperties: Map<String, Any>? = call.argument("userProperties")
+            val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
+            val options: Map<String, Any?>? = call.argument("options")
+            val uuid =
+                PostHog.captureAi(
+                    eventName,
+                    properties = properties,
+                    userProperties = userProperties,
+                    userPropertiesSetOnce = userPropertiesSetOnce,
+                    options = options,
+                )
+            result.success(uuid?.toString())
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -1790,7 +1837,8 @@ class PosthogFlutterPlugin :
         try {
             val screenName: String = call.argument("screenName")!!
             val properties: Map<String, Any>? = call.argument("properties")
-            PostHog.screen(screenName, properties)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.screen(screenName, properties, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1831,7 +1879,8 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val alias: String = call.argument("alias")!!
-            PostHog.alias(alias)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.alias(alias, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -2009,7 +2058,8 @@ class PosthogFlutterPlugin :
             val groupType: String = call.argument("groupType")!!
             val groupKey: String = call.argument("groupKey")!!
             val groupProperties: Map<String, Any>? = call.argument("groupProperties")
-            PostHog.group(groupType, groupKey, groupProperties)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.group(groupType, groupKey, groupProperties, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -2141,6 +2191,9 @@ class PosthogFlutterPlugin :
             val properties = arguments["properties"] as? Map<String, Any>
             val timestampMs = arguments["timestamp"] as? Long
 
+            @Suppress("UNCHECKED_CAST")
+            val options = arguments["options"] as? Map<String, Any?>
+
             // Extract timestamp from Flutter
             val timestamp: Date? =
                 timestampMs?.let {
@@ -2148,7 +2201,7 @@ class PosthogFlutterPlugin :
                     Date(timestampMs)
                 }
 
-            PostHog.capture("\$exception", properties = properties, timestamp = timestamp)
+            PostHog.capture("\$exception", properties = properties, timestamp = timestamp, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)

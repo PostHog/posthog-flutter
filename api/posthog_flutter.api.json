@@ -236,6 +236,15 @@
                                 "name": "userPropertiesSetOnce",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -267,6 +276,15 @@
                                 "name": "userPropertiesToSetOnce",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -316,10 +334,77 @@
                                 "name": "userPropertiesSetOnce",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureAi",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "eventName",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "properties",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "userProperties",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "userPropertiesSetOnce",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<String?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -347,6 +432,15 @@
                                 "name": "properties",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -559,6 +653,15 @@
                                 "name": "alias",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -948,6 +1051,15 @@
                                 "name": "groupProperties",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1074,6 +1186,15 @@
                                 "name": "properties",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1289,6 +1410,15 @@
                                 "name": "userPropertiesSetOnce",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1320,6 +1450,15 @@
                                 "name": "userPropertiesToSetOnce",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1369,10 +1508,77 @@
                                 "name": "userPropertiesSetOnce",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                         "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureAi",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "eventName",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "properties",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "userProperties",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "userPropertiesSetOnce",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                        "returnTypeName": "Future<String?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -1400,6 +1606,15 @@
                                 "name": "properties",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -1612,6 +1827,15 @@
                                 "name": "alias",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2001,6 +2225,15 @@
                                 "name": "groupProperties",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2127,6 +2360,15 @@
                                 "name": "properties",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2484,6 +2726,50 @@
                         "name": "compression",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "PostHogCompression"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiCompression",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "PostHogCompression?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiMaxQueueSize",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiTimeout",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "Duration?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "captureAiMaxEventBytes",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int?"
                     },
                     {
                         "entryPoints": [],
@@ -4141,6 +4427,15 @@
                                 "name": "userPropertiesSetOnce",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -4172,6 +4467,15 @@
                                 "name": "userPropertiesToSetOnce",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -4221,10 +4525,77 @@
                                 "name": "userPropertiesSetOnce",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
                         "returnTypeName": "Future<void>",
+                        "type": "method",
+                        "typeParameterNames": []
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isStatic": false,
+                        "name": "captureAi",
+                        "parameters": [
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": true,
+                                "name": "eventName",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "properties",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "userProperties",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "userPropertiesSetOnce",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
+                            }
+                        ],
+                        "relativePath": "lib/src/posthog.dart",
+                        "returnTypeName": "Future<String?>",
                         "type": "method",
                         "typeParameterNames": []
                     },
@@ -4252,6 +4623,15 @@
                                 "name": "properties",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -4341,6 +4721,15 @@
                                 "name": "alias",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "String"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -4683,6 +5072,15 @@
                                 "name": "groupProperties",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -4972,6 +5370,15 @@
                                 "name": "properties",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog.dart",
@@ -5226,6 +5633,15 @@
                                 "name": "userPropertiesSetOnce",
                                 "relativePath": "lib/src/posthog_event.dart",
                                 "typeName": "Map<String, Object>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "options",
+                                "relativePath": "lib/src/posthog_event.dart",
+                                "typeName": "Map<String, Object?>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_event.dart",
@@ -5278,6 +5694,17 @@
                         "name": "userPropertiesSetOnce",
                         "relativePath": "lib/src/posthog_event.dart",
                         "typeName": "Map<String, Object>?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "options",
+                        "relativePath": "lib/src/posthog_event.dart",
+                        "typeName": "Map<String, Object?>?"
                     }
                 ],
                 "isDeprecated": false,

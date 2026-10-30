@@ -287,6 +287,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) async {
     if (!isInitialized) {
       throw StateError('SDK not initialized');

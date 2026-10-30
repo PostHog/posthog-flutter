@@ -278,4 +278,45 @@ void main() {
 
     expect(captures, isEmpty);
   });
+
+  test('event options are sent as their legacy properties on web', () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token', beforeSend: [
+      (event) {
+        event.options = {...?event.options, 'cookieless_mode': true};
+        return event;
+      },
+    ]));
+    const options = {
+      'disable_skew_correction': true,
+      'product_tour_id': 'tour-1',
+      'unknown_option': 'dropped',
+    };
+
+    await web.capture(
+      eventName: 'tour step',
+      properties: {r'$product_tour_id': 'from-property'},
+      options: options,
+    );
+    await web.screen(screenName: 'Home', options: options);
+    await web.captureException(error: StateError('boom'), options: options);
+
+    expect(captures.map((c) => c['event']),
+        ['tour step', r'$screen', r'$exception']);
+    for (final capture in captures) {
+      final properties = capture['properties'] as Map;
+      expect(properties[r'$ignore_sent_at'], isTrue);
+      expect(properties[r'$product_tour_id'], 'tour-1');
+      expect(properties[r'$cookieless_mode'], isTrue);
+      expect(properties, isNot(contains('unknown_option')));
+    }
+  });
+
+  test('captureAi sends nothing on web and returns null', () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token'));
+
+    expect(await web.captureAi(eventName: r'$ai_generation'), isNull);
+    expect(captures, isEmpty);
+  });
 }
