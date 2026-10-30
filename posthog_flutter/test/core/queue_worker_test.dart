@@ -306,6 +306,61 @@ void main() {
       expect(stored(), 'after');
     });
 
+    group('while the worker is behind', () {
+      const inFlight = FileEventQueue.maxWritesInFlight;
+      const burst = inFlight + 12;
+      late GatedWorker gated;
+      late FileStorage gatedStorage;
+
+      setUp(() {
+        gated = GatedWorker()..writeGate = Completer();
+        gatedStorage = FileStorage(dir.path, worker: gated);
+        addTearDown(gatedStorage.close);
+        for (var i = 0; i < burst; i++) {
+          gatedStorage.queue.add({'i': i});
+        }
+      });
+
+      test('gives it a bounded number of writes', () {
+        expect(gated.writes, inFlight);
+        expect(gatedStorage.queue.length, burst);
+      });
+
+      test('never writes an evicted event that was not sent', () async {
+        gatedStorage.queue.removeOldest(inFlight + 7);
+        gated.writeGate!.complete();
+        await gatedStorage.settled;
+
+        expect(gated.writes, inFlight + 5);
+        expect(queueFiles(), hasLength(5));
+        expect(gatedStorage.queue.length, 5);
+      });
+
+      test('removes the oldest unsent events over a count', () async {
+        expect(gatedStorage.queue.removeOldestUnsentOver(3), 9);
+        gated.writeGate!.complete();
+
+        final events = await gatedStorage.queue.peek(burst);
+
+        expect([
+          for (final queued in events) queued.event['i']
+        ], [
+          ...List.generate(inFlight, (i) => i),
+          burst - 3,
+          burst - 2,
+          burst - 1
+        ]);
+      });
+
+      test('writes the unsent events after close', () async {
+        gatedStorage.close();
+        gated.writeGate!.complete();
+        await gatedStorage.settled;
+
+        expect(queueFiles(), hasLength(burst));
+      });
+    });
+
     test('settled waits for one queue while the other is idle', () async {
       final both = storage();
       both.aiQueue;
@@ -367,6 +422,31 @@ void main() {
       gated.writeGate!.complete();
 
       await server.waitForEvent('b');
+    });
+
+    test('AI captures outpacing the worker keep the newest events', () async {
+      final server = await LocalPostHogServer.start();
+      final gated = GatedWorker()..writeGate = Completer();
+      final storage = FileStorage(dir.path, worker: gated);
+      final client = testClient(server,
+          config: testConfig()..captureAiMaxQueueSize = 2, storage: storage);
+
+      const burst = FileEventQueue.maxWritesInFlight + 20;
+      for (var i = 0; i < burst; i++) {
+        client.captureAiPrepared(r'$ai_span',
+            client.prepareEvent(r'$ai_span', properties: {'i': i})!);
+      }
+      expect(gated.writes, FileEventQueue.maxWritesInFlight);
+      gated.writeGate!.complete();
+      await storage.settled;
+
+      final events = await storage.aiQueue.peek(burst);
+      expect([
+        for (final queued in events) (queued.event['properties']! as Map)['i']
+      ], [
+        burst - 2,
+        burst - 1
+      ]);
     });
 
     test('an AI event still being measured does not evict a kept one',

@@ -584,6 +584,13 @@ abstract class PostHogCoreStateless {
       return false;
     });
 
+    // Events over the limit before they are even measured would be evicted
+    // once they are, unless enough of the newer ones turn out too large.
+    if (maxEventBytes != null &&
+        queue.removeOldestUnsentOver(lane.maxQueueSize) > 0) {
+      logger.warn('Queue is full, the oldest event is dropped.');
+    }
+
     if (queue.length >= lane.flushAt) _flushBackground(lane);
     _scheduleFlush(lane);
     return (uuid: prepared['uuid'] as String, queued: queued);

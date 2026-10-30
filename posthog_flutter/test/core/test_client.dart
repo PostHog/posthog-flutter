@@ -138,6 +138,7 @@ class GatedWorker implements QueueWorker {
   final _inline = QueueWorker.inline();
   Completer<void>? writeGate;
   Completer<void>? deleteGate;
+  var writes = 0;
   var deletes = 0;
 
   @override
@@ -146,6 +147,7 @@ class GatedWorker implements QueueWorker {
     Map<String, Object?> event, {
     int? maxBytes,
   }) {
+    writes++;
     final gate = writeGate;
     return gate == null
         ? _inline.write(path, event, maxBytes: maxBytes)
@@ -156,10 +158,11 @@ class GatedWorker implements QueueWorker {
   @override
   Future<List<String>> delete(List<String> paths) {
     deletes++;
-    final gate = deleteGate;
-    return gate == null
+    // Like the real worker, a delete never overtakes an earlier write.
+    final gates = [writeGate, deleteGate].nonNulls.map((gate) => gate.future);
+    return gates.isEmpty
         ? _inline.delete(paths)
-        : gate.future.then((_) => _inline.delete(paths));
+        : Future.wait(gates).then((_) => _inline.delete(paths));
   }
 
   @override

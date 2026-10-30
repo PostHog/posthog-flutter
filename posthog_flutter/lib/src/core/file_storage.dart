@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show SynchronousFuture;
+import 'package:flutter/foundation.dart'
+    show SynchronousFuture, visibleForTesting;
 
 import 'logger.dart';
 import 'persistence.dart';
@@ -364,6 +366,17 @@ class FileEventQueue {
   /// for later: the worker can still drop one for its size.
   final Set<String> _writing = {};
 
+  /// Events waiting for a free write, oldest first. Eviction can still cancel
+  /// them, unlike a job the worker was given.
+  final Map<String, _UnsentWrite> _unsent = {};
+
+  /// The most writes the worker holds at once, so that captures outpacing it
+  /// keep only the events the queue limits allow in memory.
+  @visibleForTesting
+  static const maxWritesInFlight = 8;
+
+  var _writesInFlight = 0;
+
   /// The worker jobs not done yet.
   final Set<Future<void>> _jobs = {};
 
@@ -460,8 +473,24 @@ class FileEventQueue {
     final id = generateUuidV7();
     ids.add(id);
     _writing.add(id);
+    if (_writesInFlight >= maxWritesInFlight) {
+      final unsent = _UnsentWrite(event, maxBytes);
+      _unsent[id] = unsent;
+      return _job(unsent.result.future);
+    }
+    return _job(_write(id, event, maxBytes));
+  }
+
+  Future<QueueWriteResult> _write(
+    String id,
+    Map<String, Object?> event,
+    int? maxBytes,
+  ) {
+    _writesInFlight++;
     final path = _directory.isEmpty ? null : _pathOf(id);
-    return _job(_worker.write(path, event, maxBytes: maxBytes).then((result) {
+    return _worker.write(path, event, maxBytes: maxBytes).then((result) {
+      _writesInFlight--;
+      _writeNext();
       _writing.remove(id);
       if (result.tooLarge) {
         _ids.remove(id);
@@ -480,7 +509,15 @@ class FileEventQueue {
             error);
       }
       return result;
-    }));
+    });
+  }
+
+  void _writeNext() {
+    while (_writesInFlight < maxWritesInFlight && _unsent.isNotEmpty) {
+      final id = _unsent.keys.first;
+      final unsent = _unsent.remove(id)!;
+      unsent.result.complete(_write(id, unsent.event, unsent.maxBytes));
+    }
   }
 
   /// Returns up to [count] events from the front of the queue, oldest
@@ -583,6 +620,18 @@ class FileEventQueue {
     _forget(oldest);
   }
 
+  /// Removes the oldest events still waiting to be written until at most
+  /// [maxCount] wait. Returns how many were removed.
+  ///
+  /// Their size is unknown, so eviction by [removeOldestOver] can't reach
+  /// them: this is what bounds a queue with a size limit on its events.
+  int removeOldestUnsentOver(int maxCount) {
+    final overflow = _unsent.length - maxCount;
+    if (overflow <= 0) return 0;
+    remove(_unsent.keys.take(overflow).toList());
+    return overflow;
+  }
+
   /// Removes the oldest events until the measured ones hold at most
   /// [maxBytes], always keeping the newest measured event. Returns how many
   /// were removed.
@@ -602,7 +651,9 @@ class FileEventQueue {
     for (final id in ids) {
       _untrack(id);
       _writing.remove(id);
-      if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
+      if (_unsent.remove(id) case final unsent?) {
+        unsent.result.complete((bytes: null, tooLarge: false, error: null));
+      } else if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
         paths.add(_pathOf(id));
       }
     }
@@ -614,4 +665,12 @@ class FileEventQueue {
       }
     }).ignore();
   }
+}
+
+final class _UnsentWrite {
+  _UnsentWrite(this.event, this.maxBytes);
+
+  final Map<String, Object?> event;
+  final int? maxBytes;
+  final result = Completer<QueueWriteResult>();
 }
