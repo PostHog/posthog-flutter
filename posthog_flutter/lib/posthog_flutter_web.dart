@@ -404,7 +404,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reset() async {
-    return _call(const MethodCall('reset'));
+    return _order.run(() {
+      // Posthog.reset() cleared this when the app called it, but a load can
+      // still arrive while the reset waits behind an async beforeSend.
+      // posthog-js sends no empty load on reset, so nothing else would replace
+      // that load for listeners added later.
+      FeatureFlagsListeners.instance.clear();
+      return handleWebMethodCall(const MethodCall('reset'));
+    });
   }
 
   @override

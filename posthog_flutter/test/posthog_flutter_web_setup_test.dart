@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
 import 'package:posthog_flutter/src/feature_flags_listeners.dart';
+import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/replay/web/web_canvas_mask_provider.dart';
 
 /// posthog-js is initialized by the host app on web, so options the plugin
@@ -116,6 +117,64 @@ void main() {
       listener.callAsFunction(null, ['on'].jsify(), {'on': true}.jsify(), null);
     }
   }
+
+  group('a load arriving while reset waits behind an async beforeSend', () {
+    late List<JSFunction> listeners;
+    late List<String> calls;
+    late Completer<void> release;
+    late Future<void> resetting;
+
+    setUp(() async {
+      FeatureFlagsListeners.instance.clear();
+      listeners = stubPosthogJs();
+      calls = [];
+      globalContext.getProperty<JSObject>('posthog'.toJS)
+        ..setProperty(
+          'capture'.toJS,
+          ((JSString event, [JSAny? a, JSAny? b]) => calls.add('capture')).toJS,
+        )
+        ..setProperty('reset'.toJS, (() => calls.add('reset')).toJS);
+      release = Completer<void>();
+      final web = PosthogFlutterWeb();
+      PosthogFlutterPlatformInterface.instance = web;
+      await web.setup(PostHogConfig('test_project_token', beforeSend: [
+        (event) async {
+          await release.future;
+          return event;
+        },
+      ]));
+
+      final capturing = Posthog().capture(eventName: 'Logout clicked');
+      resetting = Future.wait([capturing, Posthog().reset()]);
+      await Future<void>.delayed(Duration.zero);
+      loadFlags(listeners);
+      expect(calls, isEmpty);
+      release.complete();
+      await resetting;
+      expect(calls, ['capture', 'reset']);
+    });
+
+    test('is not replayed to a listener added after reset completes', () async {
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = Posthog().onFeatureFlags(received.add);
+      addTearDown(subscription.unsubscribe);
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received, isEmpty);
+    });
+
+    test('does not stop the next load replaying', () async {
+      loadFlags(listeners);
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = Posthog().onFeatureFlags(received.add);
+      addTearDown(subscription.unsubscribe);
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received.single.variants, {'on': true});
+    });
+  });
 
   test('onFeatureFlags listeners get the load when the config callback throws',
       () async {
