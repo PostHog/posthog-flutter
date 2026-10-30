@@ -144,6 +144,8 @@ void main() {
       final gzipped = await worker.encodeBody(body, gzip: true);
       final plain = await worker.encodeBody(body, gzip: false);
 
+      expect(gzipped.gzipped, isTrue);
+      expect(plain.gzipped, isFalse);
       expect(gzipped.length, json.length);
       expect(gzip.decode(gzipped.payload), json);
       expect(plain.payload, json);

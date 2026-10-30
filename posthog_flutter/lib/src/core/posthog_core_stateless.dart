@@ -872,8 +872,7 @@ abstract class PostHogCoreStateless {
       final response = await _fetchOnce(url, body,
           headers: headers,
           deliveredOnBodyFailure: true,
-          timeout: lane.timeout,
-          compression: lane.compression);
+          timeout: lane.timeout);
       if (response.status != 307 && response.status != 308) return response;
       final location = response.location;
       final target = location == null ? null : url.resolve(location);
@@ -919,8 +918,7 @@ abstract class PostHogCoreStateless {
   }
 
   /// Sends one request, aborted once it makes no progress for [timeout],
-  /// [_requestTimeout] by default. [body] is compressed with [compression],
-  /// the configured one by default. A transport failure is thrown as
+  /// [_requestTimeout] by default. A transport failure is thrown as
   /// [PostHogFetchNetworkError], except, with [deliveredOnBodyFailure], one
   /// that happens after a 2xx status arrived: the response is then returned
   /// without a body.
@@ -936,13 +934,11 @@ abstract class PostHogCoreStateless {
     Map<String, String> headers = const {},
     bool deliveredOnBodyFailure = false,
     Duration timeout = _requestTimeout,
-    PostHogCompression? compression,
   }) async {
     final attempt = _FetchAttempt(timeout,
         timeout > _responseBodyTimeout ? timeout : _responseBodyTimeout);
     try {
-      return await attempt.guard(_fetch(url, body, attempt, headers,
-          (compression ?? _compression) == PostHogCompression.gzip));
+      return await attempt.guard(_fetch(url, body, attempt, headers));
     } catch (e) {
       final status = attempt.status;
       if (deliveredOnBodyFailure &&
@@ -964,11 +960,11 @@ abstract class PostHogCoreStateless {
   /// requests, which don't wait for the queue's worker.
   static EncodedBody _encode(String json, PostHogCompression compression) {
     final bytes = utf8.encode(json);
+    final gzipped = compression == PostHogCompression.gzip;
     return (
-      payload: compression == PostHogCompression.gzip
-          ? Uint8List.fromList(gzip.encode(bytes))
-          : bytes,
+      payload: gzipped ? Uint8List.fromList(gzip.encode(bytes)) : bytes,
       length: bytes.length,
+      gzipped: gzipped,
     );
   }
 
@@ -999,7 +995,6 @@ abstract class PostHogCoreStateless {
     EncodedBody body,
     _FetchAttempt attempt,
     Map<String, String> headers,
-    bool gzipped,
   ) async {
     final request = await _httpClient.postUrl(url);
     attempt.attachRequest(request);
@@ -1014,7 +1009,7 @@ abstract class PostHogCoreStateless {
           '$postHogFlutterSdkName/$postHogFlutterVersion')
       ..set(HttpHeaders.contentTypeHeader, 'application/json');
     headers.forEach(request.headers.set);
-    if (gzipped) {
+    if (body.gzipped) {
       request.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
     }
     final payload = body.payload;

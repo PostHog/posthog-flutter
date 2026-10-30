@@ -23,9 +23,9 @@ typedef QueueReadResult = ({
   String? error,
 });
 
-/// A request body as it is sent: its [payload], compressed or not, and its
-/// UTF-8 [length] before compression.
-typedef EncodedBody = ({Uint8List payload, int length});
+/// A request body as it is sent: its [payload], gzipped or not as [gzipped]
+/// says, and its UTF-8 [length] before compression.
+typedef EncodedBody = ({Uint8List payload, int length, bool gzipped});
 
 /// Does the queue work that grows with the size of the events away from the
 /// app's UI isolate: encoding events to JSON and measuring them, writing,
@@ -203,6 +203,7 @@ final class _EncodeBody extends _Job {
     return (
       payload: compress ? Uint8List.fromList(gzip.encode(bytes)) : bytes,
       length: bytes.length,
+      gzipped: compress,
     );
   }
 }
@@ -346,9 +347,11 @@ final class _IsolateQueueWorker extends _JobRunner {
   /// Rebuilds the body the worker sent back without copying its bytes.
   static EncodedBody _materialize(TransferableTypedData payload) {
     final bytes = payload.materialize();
+    final header = bytes.asByteData(0, 5);
     return (
-      payload: bytes.asUint8List(4),
-      length: bytes.asByteData().getUint32(0)
+      payload: bytes.asUint8List(5),
+      length: header.getUint32(0),
+      gzipped: header.getUint8(4) == 1,
     );
   }
 
@@ -392,9 +395,11 @@ final class _IsolateQueueWorker extends _JobRunner {
   }
 
   /// [body] as one transferable buffer: its length before compression in
-  /// 4 bytes, then its payload.
+  /// 4 bytes, whether it is gzipped in 1, then its payload.
   static TransferableTypedData _transferable(EncodedBody body) {
-    final header = ByteData(4)..setUint32(0, body.length);
+    final header = ByteData(5)
+      ..setUint32(0, body.length)
+      ..setUint8(4, body.gzipped ? 1 : 0);
     return TransferableTypedData.fromList([header, body.payload]);
   }
 }
