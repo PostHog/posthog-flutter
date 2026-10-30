@@ -696,15 +696,16 @@ final class _UnsentWrite {
   /// About what [value] takes as JSON, without encoding it: encoding is the
   /// work kept off the UI isolate. Multi-byte text and escapes count low.
   static int _estimateBytes(Object? value) => switch (value) {
-        final String string => string.length,
+        final String string => string.length + 2,
         final Map<Object?, Object?> map => map.entries.fold(
-            0,
+            2,
             (total, entry) =>
                 total +
                 _estimateBytes(entry.key) +
-                _estimateBytes(entry.value)),
+                _estimateBytes(entry.value) +
+                2),
         final List<Object?> list =>
-          list.fold(0, (total, element) => total + _estimateBytes(element)),
+          list.fold(2, (total, element) => total + _estimateBytes(element) + 1),
         _ => 8,
       };
 

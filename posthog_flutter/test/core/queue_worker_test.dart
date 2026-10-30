@@ -370,6 +370,17 @@ void main() {
         expect(queue.removeOldestUnsentOver(100, maxBytes: 1), 0);
       });
 
+      test('counts the containers of unsent events in their estimated size',
+          () async {
+        final queue = gatedStorage.queue;
+        queue.removeOldestUnsentOver(0);
+        for (var i = 0; i < 2; i++) {
+          queue.add({'p': List.filled(100, '')});
+        }
+
+        expect(queue.removeOldestUnsentOver(100, maxBytes: 500), 1);
+      });
+
       test('removes the oldest unsent events over a count', () async {
         expect(gatedStorage.queue.removeOldestUnsentOver(3), 9);
         gated.writeGate!.complete();
