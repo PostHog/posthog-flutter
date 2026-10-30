@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -315,6 +316,28 @@ void main() {
       expect(storage.queue.length, 0);
       expect(Directory(pathOf('posthog_queue')).listSync().whereType<File>(),
           isEmpty);
+    });
+
+    test('an event a flush ran into while it was written is still sent',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final gated = GatedWorker()..deleteGate = Completer();
+      final client = testClient(server,
+          config: testConfig(flushAt: 1, flushInterval: Duration.zero),
+          storage: FileStorage(dir.path, worker: gated));
+
+      client.capture('a');
+      await server.waitForEvent('a');
+      while (gated.deletes == 0) {
+        await pumpEventQueue();
+      }
+      gated.writeGate = Completer();
+      client.capture('b');
+      gated.deleteGate!.complete();
+      await pumpEventQueue();
+      gated.writeGate!.complete();
+
+      await server.waitForEvent('b');
     });
 
     test('an AI event still being measured does not evict a kept one',

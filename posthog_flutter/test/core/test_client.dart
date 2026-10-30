@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -129,6 +130,50 @@ Map<String, Object?> queuedPropsOf(FileStorage storage, String event) {
   final message =
       getQueue(storage).singleWhere((message) => message['event'] == event);
   return message['properties'] as Map<String, Object?>;
+}
+
+/// Runs jobs like [QueueWorker.inline], except that writes and deletes wait
+/// for [writeGate] and [deleteGate] while those are set.
+class GatedWorker implements QueueWorker {
+  final _inline = QueueWorker.inline();
+  Completer<void>? writeGate;
+  Completer<void>? deleteGate;
+  var deletes = 0;
+
+  @override
+  Future<QueueWriteResult> write(
+    String? path,
+    Map<String, Object?> event, {
+    int? maxBytes,
+  }) {
+    final gate = writeGate;
+    return gate == null
+        ? _inline.write(path, event, maxBytes: maxBytes)
+        : gate.future
+            .then((_) => _inline.write(path, event, maxBytes: maxBytes));
+  }
+
+  @override
+  Future<List<String>> delete(List<String> paths) {
+    deletes++;
+    final gate = deleteGate;
+    return gate == null
+        ? _inline.delete(paths)
+        : gate.future.then((_) => _inline.delete(paths));
+  }
+
+  @override
+  Future<List<QueueReadResult>> read(List<String> paths) => _inline.read(paths);
+
+  @override
+  Future<EncodedBody> encodeBody(Object? body, {required bool gzip}) =>
+      _inline.encodeBody(body, gzip: gzip);
+
+  @override
+  bool get runsInBackground => false;
+
+  @override
+  void kill() {}
 }
 
 /// Skip reason for tests that simulate IO failures with POSIX permissions.

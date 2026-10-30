@@ -572,7 +572,12 @@ abstract class PostHogCoreStateless {
 
       // A full request's worth of bytes flushes like flushAt does, so large
       // events go out before the queue starts dropping them.
-      if (queue.byteCount >= captureV1MaxBatchBytes) _flushBackground(lane);
+      // The count is checked again: a flush that ran into this event while it
+      // was written ended without it.
+      if (queue.byteCount >= captureV1MaxBatchBytes ||
+          queue.length >= lane.flushAt) {
+        _flushBackground(lane);
+      }
       return true;
     }, onError: (Object e) {
       logger.error('Failed to queue an event:', e);
