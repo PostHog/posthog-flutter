@@ -350,8 +350,9 @@ class FileEventQueue {
   /// keeps, so they can still be sent by this client.
   final Map<String, Map<String, Object?>> _unwritten = {};
 
-  /// Events the worker is still writing, so a peek doesn't read them back.
-  final Map<String, Map<String, Object?>> _writing = {};
+  /// Events the worker is still measuring and writing. A peek leaves them
+  /// for later: the worker can still drop one for its size.
+  final Set<String> _writing = {};
 
   /// The worker jobs not done yet.
   final Set<Future<void>> _jobs = {};
@@ -424,6 +425,10 @@ class FileEventQueue {
   Future<void> get settled =>
       _jobs.isEmpty ? SynchronousFuture(null) : _settle();
 
+  Future<void> get _submitted => _jobs.isEmpty
+      ? SynchronousFuture(null)
+      : Future.wait(_jobs.toList()).then((_) {});
+
   Future<void> _settle() async {
     // Jobs that finishing jobs start are waited for too.
     while (_jobs.isNotEmpty) {
@@ -440,7 +445,7 @@ class FileEventQueue {
     final ids = _ids;
     final id = generateUuidV7();
     ids.add(id);
-    _writing[id] = event;
+    _writing.add(id);
     final path = _directory.isEmpty ? null : _pathOf(id);
     return _job(_worker.write(path, event, maxBytes: maxBytes).then((result) {
       _writing.remove(id);
@@ -465,20 +470,22 @@ class FileEventQueue {
   }
 
   /// Returns up to [count] events from the front of the queue, oldest
-  /// first, once the events added so far are written.
+  /// first, once the events added so far are written. Events added after
+  /// the call are not waited for, so that sustained captures can't hold back
+  /// the batch.
   ///
   /// With [maxBytes], the events also stay within that serialized size. Each
   /// event is checked before it is read, so one that does not fit is left
   /// for the next peek, and the first event always comes, alone when it is
   /// over the limit.
   Future<List<PostHogQueuedEvent>> peek(int count, {int? maxBytes}) =>
-      settled.then((_) => _peekWritten(count, maxBytes));
+      _submitted.then((_) => _peekWritten(count, maxBytes));
 
   Future<List<PostHogQueuedEvent>> _peekWritten(int count, int? maxBytes) {
     final selected = <String>[];
     var bytes = 0;
     for (final id in _ids) {
-      if (selected.length >= count) break;
+      if (selected.length >= count || _writing.contains(id)) break;
       final size = _sizes[id] ?? 0;
       if (maxBytes != null && selected.isNotEmpty && bytes + size > maxBytes) {
         break;
@@ -488,7 +495,7 @@ class FileEventQueue {
     }
     final toRead = [
       for (final id in selected)
-        if (!_unwritten.containsKey(id) && !_writing.containsKey(id)) id,
+        if (!_unwritten.containsKey(id)) id,
     ];
     final read = toRead.isEmpty
         ? SynchronousFuture(const <QueueReadResult>[])
@@ -509,7 +516,7 @@ class FileEventQueue {
     for (final id in selected) {
       // Removed while the files were read.
       if (!queued.contains(id)) continue;
-      final event = _unwritten[id] ?? _writing[id];
+      final event = _unwritten[id];
       if (event != null) {
         events.add((id: id, event: event));
         continue;

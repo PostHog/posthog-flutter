@@ -192,6 +192,33 @@ void main() {
       expect(queueFiles(), hasLength(10));
     });
 
+    test('a peek does not wait for events added after it', () async {
+      final queue = storage().queue;
+      queue.add({'i': 0});
+      var peeked = false;
+      var next = 1;
+      void keepAdding() {
+        if (!peeked) queue.add({'i': next++}).then((_) => keepAdding());
+      }
+
+      keepAdding();
+      final events = await queue.peek(1);
+      peeked = true;
+
+      expect(events.single.event['i'], 0);
+    });
+
+    test('a peek leaves an event that can still be dropped for its size',
+        () async {
+      final queue = storage().queue;
+      queue.add({'i': 0});
+
+      final peek = queue.peek(100);
+      queue.add({'i': 'x' * 100}, maxBytes: 10);
+
+      expect([for (final queued in await peek) queued.event['i']], [0]);
+    });
+
     test('reads events written by an earlier storage', () async {
       final first = storage();
       for (var i = 0; i < 3; i++) {
