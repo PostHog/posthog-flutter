@@ -383,6 +383,20 @@ void main() {
           allOf(containsPair('plan', 'new'), containsPair('coins', 1)));
     });
 
+    test('an AI event without person properties does not rewrite the snapshot',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client =
+          testClient(server, storage: FileStorage(dir.path, worker: worker));
+      final prepared = client.prepareEvent(r'$ai_generation')!;
+      final snapshot = File(pathOf('posthog_data.json'))..deleteSync();
+
+      expect(await client.captureAiPrepared(r'$ai_generation', prepared),
+          isNotNull);
+
+      expect(snapshot.existsSync(), isFalse);
+    });
+
     test('an AI event applies its person properties only to its own user',
         () async {
       final server = await LocalPostHogServer.start();

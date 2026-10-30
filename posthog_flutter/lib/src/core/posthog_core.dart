@@ -561,8 +561,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
     if (capturedAt == null) {
       _setPersonPropertiesForFlagsIfNeeded(set, setOnce);
     } else if (capturedAt > _personPropertiesResetAt) {
-      _mergePersonPropertiesForFlags({...?setOnce, ...?set}..removeWhere(
-          (key, _) => (_personPropertySetAt[key] ?? 0) > capturedAt));
+      final merged = {
+        ...?setOnce,
+        ...?set
+      }..removeWhere((key, _) => (_personPropertySetAt[key] ?? 0) > capturedAt);
+      if (merged.isNotEmpty) _mergePersonPropertiesForFlags(merged);
     }
   }
 
