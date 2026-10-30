@@ -237,8 +237,7 @@ class PostHogConfig {
   /// over 8 MiB, so a larger value, or a value of `0` or less, uses the
   /// default. By default the SDK drops a serialized event over 8 MiB plus
   /// 64 KiB for the rest of the event, measured before compression. A set
-  /// value limits the properties on Android, plus 64 KiB for the rest of the
-  /// event, and the whole serialized event on the other platforms.
+  /// value limits the whole serialized event.
   ///
   /// Not applied on web, where [Posthog.captureAi] sends nothing.
   ///

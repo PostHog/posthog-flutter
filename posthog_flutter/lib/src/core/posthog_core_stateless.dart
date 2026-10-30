@@ -291,8 +291,13 @@ abstract class PostHogCoreStateless {
     _removeDebugCallback = null;
 
     if (enabled) {
-      _removeDebugCallback =
-          events.onAny((event, payload) => logger.info(event, payload));
+      _removeDebugCallback = events.onAny((event, payload) {
+        // Logged without their properties where they happen, see [_enqueue]
+        // and [_sendBatch]: properties can hold prompts and media.
+        if (event != 'capture' && event != 'flush') {
+          logger.info(event, payload);
+        }
+      });
     }
   }
 
@@ -543,7 +548,9 @@ abstract class PostHogCoreStateless {
       queue.removeOldest(overflow);
       logger.warn('Queue is full, the oldest event is dropped.');
     }
-    queue.add(prepared, json: json, bytes: bytes);
+    final queuedBytes = queue.add(prepared, json: json, bytes: bytes);
+    logger.info('$type ${message['event']} queued for ${lane.path}, '
+        '$queuedBytes bytes.');
     final maxQueueBytes = lane.maxQueueBytes;
     if (maxQueueBytes != null && queue.removeOldestOver(maxQueueBytes) > 0) {
       logger.warn('Queue is over $maxQueueBytes bytes, the oldest events are '
@@ -723,6 +730,8 @@ abstract class PostHogCoreStateless {
     // flight, e.g. its oldest events dropped to make room.
     queue.remove([for (final queued in delivered) queued.id]);
     if (delivered.isNotEmpty) {
+      logger.info('flush ${delivered.length} events sent to ${lane.path}: '
+          '${delivered.map((queued) => queued.event['event']).join(', ')}.');
       events.emit('flush', [for (final queued in delivered) queued.event]);
     }
     if (delivered.length == batch.length) {

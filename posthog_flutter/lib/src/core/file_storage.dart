@@ -378,7 +378,7 @@ class FileEventQueue {
 
   /// Adds [event] at the end of the queue. [json] is the event already
   /// encoded, and [bytes] its UTF-8 size, when the caller has them.
-  void add(Map<String, Object?> event, {String? json, int? bytes}) {
+  int add(Map<String, Object?> event, {String? json, int? bytes}) {
     // Loaded before the new file exists, which would otherwise be listed
     // on top of being added.
     final ids = _ids;
@@ -391,11 +391,11 @@ class FileEventQueue {
         // Reported below when it is written.
       }
     }
-    ids.add(_track(
-        id, bytes ?? (encoded == null ? 0 : utf8.encode(encoded).length)));
+    final size = bytes ?? (encoded == null ? 0 : utf8.encode(encoded).length);
+    ids.add(_track(id, size));
     if (_directory.isEmpty) {
       _unwritten[id] = event;
-      return;
+      return size;
     }
     try {
       _writeAtomically(File(_pathOf(id)), encoded ?? jsonEncode(event));
@@ -406,6 +406,7 @@ class FileEventQueue {
           'is sent:',
           e);
     }
+    return size;
   }
 
   /// Returns up to [count] events from the front of the queue, oldest
