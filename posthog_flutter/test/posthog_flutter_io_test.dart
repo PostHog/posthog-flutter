@@ -108,6 +108,35 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO exception events', () {
+    test('passes AOT debug images and addresses through the native channel',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await posthogFlutterIO.captureException(
+        error: StateError('sample failure'),
+        stackTrace: StackTrace.fromString('''
+build_id: 'b718850999efbed01ab80642060ddbf3'
+isolate_dso_base: 7000000000
+#0 abs 7000205218 _kDartIsolateSnapshotInstructions+0x20
+'''),
+      );
+
+      final call = log.singleWhere((item) => item.method == 'captureException');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      final properties = Map<String, dynamic>.from(args['properties'] as Map);
+      final images = properties['\$debug_images'] as List;
+      expect(images.single, {
+        'debug_id': '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+        'image_addr': '0x7000000000',
+        'type': 'elf',
+      });
+      final exception = (properties['\$exception_list'] as List).single as Map;
+      final frames = (exception['stacktrace'] as Map)['frames'] as List;
+      expect((frames.single as Map)['instruction_addr'], '0x7000205218');
+    });
+  });
+
   group('PosthogFlutterIO sendFeatureFlagEvent', () {
     for (final sendFeatureFlagEvent in [null, true, false]) {
       final expected = {
@@ -1229,6 +1258,45 @@ void main() {
       expect(args.containsKey('traceId'), isFalse);
       expect(args.containsKey('spanId'), isFalse);
     });
+  });
+
+  group('PosthogFlutterIO calls made while an event is in flight', () {
+    List<String> sentAfterSetup() =>
+        log.map((c) => c.method).where((m) => m != 'setup').toList();
+
+    for (final slow in [false, true]) {
+      test(
+          'reach native after events captured before them '
+          '(${slow ? 'async' : 'no'} beforeSend)', () async {
+        await posthogFlutterIO
+            .setup(PostHogConfig('test_project_token', beforeSend: [
+          if (slow)
+            (event) async {
+              await Future<void>.delayed(Duration.zero);
+              return event;
+            },
+        ]));
+
+        final sent = [
+          posthogFlutterIO.capture(eventName: 'checkout'),
+          posthogFlutterIO.screen(screenName: 'Cart'),
+          posthogFlutterIO.captureException(error: StateError('boom')),
+        ];
+        await posthogFlutterIO.reset();
+        await posthogFlutterIO.identify(userId: 'new-user');
+        await posthogFlutterIO.register('plan', 'pro');
+        await Future.wait(sent);
+
+        expect(sentAfterSetup(), [
+          'capture',
+          'screen',
+          'captureException',
+          'reset',
+          'identify',
+          'register',
+        ]);
+      });
+    }
   });
 
   group('PosthogFlutterIO addExceptionStep', () {

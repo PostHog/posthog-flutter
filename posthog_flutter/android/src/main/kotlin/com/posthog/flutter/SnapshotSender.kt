@@ -1,11 +1,12 @@
 package com.posthog.flutter
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import com.posthog.android.internal.base64
 import com.posthog.internal.replay.RREvent
 import com.posthog.internal.replay.RRFullSnapshotEvent
 import com.posthog.internal.replay.RRMetaEvent
-import com.posthog.internal.replay.RRStyle
 import com.posthog.internal.replay.RRWireframe
 import com.posthog.internal.replay.capture
 
@@ -23,8 +24,9 @@ class SnapshotSender(
         width: Int? = null,
         height: Int? = null,
         quality: Int = DEFAULT_SCREENSHOT_COMPRESSION_QUALITY,
+        masked: Boolean = false,
     ) {
-        listOf(buildFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)).capture()
+        listOf(buildFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality, masked)).capture()
     }
 
     internal fun buildFullSnapshot(
@@ -36,8 +38,19 @@ class SnapshotSender(
         width: Int? = null,
         height: Int? = null,
         quality: Int = DEFAULT_SCREENSHOT_COMPRESSION_QUALITY,
+        masked: Boolean = false,
     ): RRFullSnapshotEvent {
-        val bitmap = requireNotNull(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
+        val bitmap =
+            if (masked) {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+                require(bounds.outWidth > 0 && bounds.outHeight > 0)
+                Bitmap.createBitmap(bounds.outWidth, bounds.outHeight, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(Color.BLACK)
+                }
+            } else {
+                requireNotNull(BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size))
+            }
         try {
             val wireframe =
                 RRWireframe(
@@ -48,7 +61,6 @@ class SnapshotSender(
                     height = height ?: bitmap.height,
                     type = "screenshot",
                     base64 = bitmap.base64(quality = quality),
-                    style = RRStyle(),
                 )
             return RRFullSnapshotEvent(
                 listOf(wireframe),

@@ -1,5 +1,39 @@
 ## Next
 
+## 5.58.2
+
+### Patch Changes
+
+- ce069ea: Keep events in call order on every platform except Windows and Linux while an async `beforeSend` runs. A `reset()`, `identify()`, `alias()`, `register()`, `group()`, `optIn()` or `optOut()` made after an un-awaited `capture()`, `screen()` or `captureException()` now applies after that event, so the event goes out with the user, super properties, groups and consent it was captured under, as in the native SDKs. While a `beforeSend` callback runs, later PostHog calls (getters included) wait for it; one that runs longer than 10 seconds stops holding them back, and its event is still sent when it finishes, with the user, super properties, groups and consent current by then.
+
+## 5.58.1
+
+### Patch Changes
+
+- 50c2c3e: Mask Android session replay frames while the app window has `FLAG_SECURE` set, instead of recording the secure screen.
+
+## 5.58.0
+
+### Minor Changes
+
+- cabe336: Resolve obfuscated Flutter mobile stack frames with uploaded debug symbols.
+- a136696: Add `isolate.addPostHogErrorListener()` and `isolate.removePostHogErrorListener()` to capture uncaught background isolate errors and clean up their listeners, and clarify that `captureIsolateErrors` only monitors the setup isolate.
+
+## 5.57.1
+
+### Patch Changes
+
+- dda207d: Upgrade the Android SDK to 3.72.9, which pulls in OkHttp 4.12.1 to block the compromised eMudhra intermediate certificates.
+
+## 5.57.0
+
+### Minor Changes
+
+- 0db911a: Add `getAllFeatureFlags()` to read every loaded feature flag result without capturing `$feature_flag_called`
+- 60bc22b: Add `captureFeatureView()` and `captureFeatureInteraction()` to capture `$feature_view` and `$feature_interaction` events for a feature flag
+- 48876f4: Add `PostHogConfig.evaluationContexts` to limit which feature flags are evaluated on iOS, Android, macOS, Windows, and Linux
+- cec2fc3: Add an optional `sendFeatureFlagEvent` parameter to `getFeatureFlag()` and `isFeatureEnabled()` to override `PostHogConfig.sendFeatureFlagEvent` per call
+
 ## 5.56.2
 
 ### Patch Changes
