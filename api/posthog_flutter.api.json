@@ -2299,15 +2299,6 @@
                                 "isExperimental": false,
                                 "isNamed": true,
                                 "isRequired": false,
-                                "name": "onFeatureFlags",
-                                "relativePath": "lib/src/posthog_config.dart",
-                                "typeName": "void Function(PostHogFeatureFlagsLoaded)?"
-                            },
-                            {
-                                "isDeprecated": false,
-                                "isExperimental": false,
-                                "isNamed": true,
-                                "isRequired": false,
                                 "name": "beforeSend",
                                 "relativePath": "lib/src/posthog_config.dart",
                                 "typeName": "List<FutureOr<PostHogEvent?> Function(PostHogEvent)>?"
@@ -2572,17 +2563,6 @@
                         "name": "bootstrap",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "PostHogBootstrapConfig?"
-                    },
-                    {
-                        "entryPoints": [],
-                        "isDeprecated": false,
-                        "isExperimental": false,
-                        "isReadable": true,
-                        "isStatic": false,
-                        "isWriteable": true,
-                        "name": "onFeatureFlags",
-                        "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "void Function(PostHogFeatureFlagsLoaded)?"
                     },
                     {
                         "entryPoints": [],
