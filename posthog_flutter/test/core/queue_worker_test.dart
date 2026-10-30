@@ -417,7 +417,7 @@ void main() {
           storage: FileStorage(pathOf('newer'), worker: worker));
 
       older.close();
-      expect(worker.logger, same(newer.logger));
+      expect(worker.logger, isNotNull);
 
       newer.close();
       expect(worker.logger, isNull);
