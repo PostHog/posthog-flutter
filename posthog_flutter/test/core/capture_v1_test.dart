@@ -411,6 +411,22 @@ void main() {
       expect(results.drops, {'no details': 1});
     });
 
+    test('keeps only reason codes as drop reasons', () {
+      final body = jsonEncode({
+        'results': {
+          'a': {'result': 'drop', 'details': 'event_too_big'},
+          'b': {'result': 'drop', 'details': 'x\n[PostHog] forged'},
+          'c': {'result': 'drop', 'details': 'user@example.com'},
+          'd': {'result': 'drop', 'details': 'a' * 65},
+        },
+      });
+
+      expect(captureV1Results(body, ['a', 'b', 'c', 'd'])!.drops, {
+        'event_too_big': 1,
+        'no details': 3,
+      });
+    });
+
     test('drops a 2xx without readable results without retrying it', () async {
       final server = await LocalPostHogServer.start();
       final storage = tempStorage();

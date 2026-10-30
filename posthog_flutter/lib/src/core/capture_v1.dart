@@ -150,6 +150,8 @@ class CaptureV1Identity {
       );
 }
 
+final _captureV1DropTag = RegExp(r'^[a-z0-9_]{1,64}$');
+
 /// The uuids among [uuids] that a capture v1 response [body] asks to
 /// retry, with how many of them it dropped (`drop`) by `details` tag and
 /// how many repeated copies of them it dropped (`duplicates_dropped`), or
@@ -183,9 +185,10 @@ class CaptureV1Identity {
       case {'result': 'retry'}:
         retry.add(uuid);
       case {'result': 'drop'}:
-        // The server's reason, an opaque tag.
+        // These tags reach the logs, so anything but a reason code, such as
+        // an echoed id or a forged log line, is discarded.
         final details = switch (result['details']) {
-          final String tag => tag,
+          final String tag when _captureV1DropTag.hasMatch(tag) => tag,
           _ => 'no details',
         };
         drops[details] = (drops[details] ?? 0) + 1;
