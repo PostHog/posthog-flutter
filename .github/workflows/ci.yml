@@ -167,7 +167,7 @@ jobs:
       - name: Test compliance adapter
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./sdk_compliance_adapter
-        run: flutter test test/feature_flag_has_experiment_test.dart test/flags_retry_test.dart test/minimal_flag_called_events_test.dart test/timestamp_test.dart
+        run: flutter test test/feature_flag_has_experiment_test.dart test/flags_retry_test.dart test/minimal_flag_called_events_test.dart test/recording_proxy_test.dart test/timestamp_test.dart
 
       # Browser-only tests (`@TestOn('browser')`) are skipped by the VM run above.
       - name: Test (web)

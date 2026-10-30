@@ -299,6 +299,7 @@ class _RecordingProxy {
 
   Future<void> _forward(HttpRequest request) async {
     final response = request.response;
+    var headersSent = false;
     try {
       final body = await request
           .fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
@@ -315,28 +316,44 @@ class _RecordingProxy {
           upstream.headers.set(name, values);
         }
       });
+      // Redirects are the SDK's to follow or refuse.
+      upstream.followRedirects = false;
       upstream.contentLength = body.length;
       upstream.add(body);
       final result = await upstream.close();
-      final resultBody = await result
-          .fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
-
       _record(request, body, result.statusCode);
 
       response.statusCode = result.statusCode;
       result.headers.forEach((name, values) {
-        if (name != HttpHeaders.contentLengthHeader &&
+        if (name == HttpHeaders.locationHeader) {
+          response.headers.set(name, values.map(_proxyLocation).toList());
+        } else if (name != HttpHeaders.contentLengthHeader &&
             name != HttpHeaders.transferEncodingHeader) {
           response.headers.set(name, values);
         }
       });
-      response.contentLength = resultBody.length;
-      response.add(resultBody);
+      headersSent = true;
+      // Not addStream: a failing body would take the response down with it.
+      await for (final chunk in result) {
+        response.add(chunk);
+      }
     } catch (error) {
       _state.lastError = error.toString();
-      response.statusCode = HttpStatus.badGateway;
+      // After the headers the status stands: the SDK counts a 2xx whose body
+      // fails as delivered, so it must not turn into a retry here.
+      if (!headersSent) response.statusCode = HttpStatus.badGateway;
     }
     await response.close();
+  }
+
+  /// The SDK only follows a redirect within the origin it was configured
+  /// with, which is this proxy's and not the harness's.
+  String _proxyLocation(String location) {
+    final uri = Uri.tryParse(location);
+    if (uri == null || !uri.hasScheme || uri.origin != _target.origin) {
+      return location;
+    }
+    return uri.replace(host: '127.0.0.1', port: _server.port).toString();
   }
 
   void _record(HttpRequest request, List<int> body, int statusCode) {
