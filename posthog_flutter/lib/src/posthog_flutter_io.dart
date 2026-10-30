@@ -46,6 +46,10 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// Stored beforeSend callbacks for dropping/modifying events
   List<BeforeSendCallback> _beforeSendCallbacks = [];
 
+  /// Starts with `$` so the native SDKs treat it like `$screen` in every other
+  /// respect. Never sent: sendBuiltEvent sets the event's real name.
+  static const _capturedScreenBuildName = r'$captured_screen';
+
   final _order = CallOrder();
 
   Future<dynamic> _invoke(String method, [Object? arguments]) =>
@@ -61,13 +65,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<Object?> _buildRunBeforeSendAndSend(
     Map<String, Object?> build, {
     bool ai = false,
+    String? eventName,
   }) async {
     // setup() replaces the callbacks at once but reaches native after this
     // event, which must not run under the next setup's filters.
     final callbacks = _beforeSendCallbacks;
     Object? result;
     await _order.event<({String uuid, Map<String, Object?>? send})?>(
-      () => _buildAndRunBeforeSend(build, ai, callbacks),
+      () => _buildAndRunBeforeSend(build, ai, callbacks, eventName),
       (built) async {
         if (built == null) return;
         final send = built.send;
@@ -92,6 +97,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object?> build,
     bool ai,
     List<BeforeSendCallback> callbacks,
+    String? eventName,
   ) async {
     final built = await _methodChannel.invokeMapMethod<String, Object?>(
       'buildEvent',
@@ -104,11 +110,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       final processed = await applyBeforeSend(
         callbacks,
-        _eventFromNative(built),
+        _eventFromNative(built, eventName: eventName),
       );
       if (processed == null) {
         printIfDebug(
-            '[PostHog] Event dropped by beforeSend: ${built['event']}');
+            '[PostHog] Event dropped by beforeSend: ${eventName ?? built['event']}');
       } else {
         send = _eventToNative(processed);
       }
@@ -118,14 +124,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     return (uuid: uuid, send: send);
   }
 
-  static PostHogEvent _eventFromNative(Map<String, Object?> built) {
+  static PostHogEvent _eventFromNative(
+    Map<String, Object?> built, {
+    String? eventName,
+  }) {
     final properties = _stringKeyedMap(built['properties']) ?? {};
     final userProperties = _stringKeyedMap(properties.remove(r'$set'));
     final userPropertiesSetOnce =
         _stringKeyedMap(properties.remove(r'$set_once'));
     final timestampMs = built['timestamp'] as int?;
     return PostHogEvent(
-      event: built['event'] as String? ?? '',
+      event: eventName ?? built['event'] as String? ?? '',
       properties: properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
@@ -457,16 +466,25 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     if (_beforeSendCallbacks.isNotEmpty) {
+      final ai = method == 'captureAi';
       try {
         return await _buildRunBeforeSendAndSend(
-          _captureArguments(
-            eventName: eventName,
-            properties: properties,
-            userProperties: userProperties,
-            userPropertiesSetOnce: userPropertiesSetOnce,
-            options: options,
-          ),
-          ai: method == 'captureAi',
+          {
+            ..._captureArguments(
+              eventName: eventName,
+              properties: properties,
+              userProperties: userProperties,
+              userPropertiesSetOnce: userPropertiesSetOnce,
+              options: options,
+            ),
+            // The native builders treat `$screen` as a screen() call: it needs
+            // a `$screen_name` and, on iOS, loses person properties. A plain
+            // capture has neither rule, so it builds under another name.
+            if (!ai && eventName == PostHogEventName.screen)
+              'eventName': _capturedScreenBuildName,
+          },
+          ai: ai,
+          eventName: eventName,
         );
       } on PlatformException catch (exception) {
         printIfDebug('Exeption on $method: $exception');

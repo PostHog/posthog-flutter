@@ -1241,6 +1241,22 @@ isolate_dso_base: 7000000000
       expect(seen!.properties, {'a': 1, r'$screen_name': 'Home'});
     });
 
+    test('capturing \$screen keeps capture semantics', () async {
+      PostHogEvent? seen;
+      await setUpWith((event) => seen = event);
+
+      await posthogFlutterIO.capture(
+        eventName: r'$screen',
+        userProperties: {'plan': 'pro'},
+      );
+
+      expect(argsOf('buildEvent')['eventName'], isNot(r'$screen'));
+      expect(argsOf('buildEvent')['eventName'], startsWith(r'$'));
+      expect(seen!.event, r'$screen');
+      expect(seen!.userProperties, {'plan': 'pro'});
+      expect(argsOf('sendBuiltEvent')['event'], r'$screen');
+    });
+
     test('captureException builds with its own timestamp', () async {
       await setUpWith((event) => event);
 
