@@ -19,6 +19,7 @@ import android.view.PixelCopy
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager.LayoutParams.FLAG_SECURE
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
@@ -461,7 +462,15 @@ class PosthogFlutterPlugin :
         mapOf(
             "isActive" to isSessionReplayActive(),
             "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
+            "secure" to isWindowSecure(),
         )
+
+    private fun isWindowSecure(): Boolean = ((activity?.window?.attributes?.flags ?: 0) and FLAG_SECURE) != 0
+
+    // Dart's capture-time value plus a send-time re-check, so a frame stays masked
+    // if FLAG_SECURE clears (e.g. the secure screen is popped) before it's sent.
+    @VisibleForTesting
+    internal fun isFrameMasked(secureAtCapture: Boolean): Boolean = secureAtCapture || isWindowSecure()
 
     private fun startSessionRecording(
         call: MethodCall,
@@ -1316,8 +1325,9 @@ class PosthogFlutterPlugin :
                 val timestampMs = replayTimeMillis()
                 val replayConfig = postHogConfig?.sessionReplayConfig
                 val quality = replayConfig?.screenshotCompressionQuality ?: DEFAULT_SCREENSHOT_COMPRESSION_QUALITY
+                val masked = isFrameMasked(call.argument<Boolean>("secureAtCapture") == true)
                 submitSnapshotWork(result) {
-                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)
+                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality, masked)
                 }
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)
