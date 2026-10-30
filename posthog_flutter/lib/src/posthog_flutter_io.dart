@@ -62,9 +62,12 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object?> build, {
     bool ai = false,
   }) async {
+    // setup() replaces the callbacks at once but reaches native after this
+    // event, which must not run under the next setup's filters.
+    final callbacks = _beforeSendCallbacks;
     Object? result;
     await _order.event<({String uuid, Map<String, Object?>? send})?>(
-      () => _buildAndRunBeforeSend(build, ai),
+      () => _buildAndRunBeforeSend(build, ai, callbacks),
       (built) async {
         if (built == null) return;
         final send = built.send;
@@ -88,6 +91,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   Future<({String uuid, Map<String, Object?>? send})?> _buildAndRunBeforeSend(
     Map<String, Object?> build,
     bool ai,
+    List<BeforeSendCallback> callbacks,
   ) async {
     final built = await _methodChannel.invokeMapMethod<String, Object?>(
       'buildEvent',
@@ -99,7 +103,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     Map<String, Object?>? send;
     try {
       final processed = await applyBeforeSend(
-        _beforeSendCallbacks,
+        callbacks,
         _eventFromNative(built),
       );
       if (processed == null) {

@@ -1402,6 +1402,19 @@ isolate_dso_base: 7000000000
       });
     }
 
+    test('an event keeps the callbacks set when it was captured', () async {
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', beforeSend: [(event) => null]));
+      log.clear();
+
+      final sent = posthogFlutterIO.capture(eventName: 'checkout');
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+      await sent;
+
+      expect(log.map((c) => c.method),
+          ['buildEvent', 'discardBuiltEvent', 'setup']);
+    });
+
     final lifecycleCalls = <String, Future<void> Function()>{
       'disable': () => posthogFlutterIO.optOut(),
       'close': () => posthogFlutterIO.close(),
