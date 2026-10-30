@@ -193,6 +193,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       return;
     }
 
+    return _sendCapture(processedEvent);
+  }
+
+  Future<void> _sendCapture(PostHogEvent processedEvent) {
     final extracted = CaptureUtils.extractUserProperties(
       properties: processedEvent.properties,
       userProperties: processedEvent.userProperties,
@@ -273,10 +277,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     }
 
     if (processedEvent.event != PostHogEventName.screen) {
-      await capture(
-        eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
-      );
+      await _sendCapture(processedEvent);
       return;
     }
 
@@ -575,10 +576,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       }
 
       if (processedEvent.event != PostHogEventName.exception) {
-        await capture(
-          eventName: processedEvent.event,
-          properties: processedEvent.properties?.cast<String, Object>(),
-        );
+        await _sendCapture(processedEvent);
         return;
       }
 

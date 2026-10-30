@@ -395,10 +395,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     // If event name was changed, use regular capture() instead
     if (processedEvent.event != PostHogEventName.screen) {
-      await capture(
-        eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
-      );
+      await _sendCapture(processedEvent.event, processedEvent);
       return;
     }
 
@@ -869,10 +866,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     // If event name was changed, use capture() instead
     if (processedEvent.event != PostHogEventName.exception) {
-      await capture(
-        eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
-      );
+      await _sendCapture(processedEvent.event, processedEvent);
       return;
     }
 

@@ -22,6 +22,7 @@ void main() {
         captures.add({
           'event': event.toDart,
           'properties': properties?.dartify(),
+          'options': options?.dartify(),
         });
       }).toJS,
     );
@@ -111,6 +112,148 @@ void main() {
     await sent;
 
     expect(calls, ['getFeatureFlagResult', r'$feature_view', 'reset']);
+  });
+
+  for (final hooked in [false, true]) {
+    test(
+        'feature events read the flag and reach posthog-js before a reset made '
+        'right after them (${hooked ? 'with' : 'without'} beforeSend)',
+        () async {
+      final calls = <String>[];
+      var variant = 'for-the-old-user';
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty(
+        'capture'.toJS,
+        ((JSString event, JSAny? properties, [JSAny? options]) {
+          final flagged = properties?.dartify() as Map?;
+          calls.add('${event.toDart}:${flagged?['feature_flag_variant']}');
+        }).toJS,
+      );
+      fake.setProperty(
+        'getFeatureFlagResult'.toJS,
+        ((JSString key, [JSAny? options]) => {
+              'key': key.toDart,
+              'enabled': true,
+              'variant': variant,
+            }.jsify()).toJS,
+      );
+      fake.setProperty(
+        'reset'.toJS,
+        (([JSAny? a]) {
+          calls.add('reset');
+          variant = 'for-the-new-user';
+        }).toJS,
+      );
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token',
+          beforeSend: [if (hooked) (event) => event]));
+
+      final sent = [
+        web.captureFeatureView(flag: 'checkout'),
+        web.captureFeatureInteraction(flag: 'checkout'),
+      ];
+      await web.reset();
+      await Future.wait(sent);
+
+      expect(calls, [
+        r'$feature_view:for-the-old-user',
+        r'$feature_interaction:for-the-old-user',
+        'reset',
+      ]);
+    });
+  }
+
+  group('a hook that renames an event', () {
+    final renames = <String, Future<void> Function(PosthogFlutterWeb)>{
+      'capture': (web) => web.capture(eventName: 'original'),
+      'screen': (web) => web.screen(screenName: 'Checkout'),
+      'captureException': (web) =>
+          web.captureException(error: StateError('boom')),
+    };
+
+    renames.forEach((name, send) {
+      test('$name runs the hook once and keeps its user properties', () async {
+        var runs = 0;
+        final web = PosthogFlutterWeb();
+        await web.setup(PostHogConfig('test_token', beforeSend: [
+          (event) {
+            runs++;
+            event.event = 'renamed';
+            event.userProperties = {'source': 'hook'};
+            return event;
+          },
+        ]));
+
+        await send(web);
+
+        expect(runs, 1);
+        expect(captures.single['event'], 'renamed');
+        final options = captures.single['options'] as Map;
+        expect(options[r'$set'], {'source': 'hook'});
+      });
+    });
+  });
+
+  group('a hook that calls the SDK', () {
+    test('can capture another event without running forever', () async {
+      final web = PosthogFlutterWeb();
+      final seen = <String>[];
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) {
+          seen.add(event.event);
+          if (event.event == 'outer') web.capture(eventName: 'inner');
+          return event;
+        },
+      ]));
+
+      await web.capture(eventName: 'outer');
+
+      expect(seen, ['outer', 'inner']);
+      expect(captures.map((c) => c['event']), ['inner', 'outer']);
+    });
+
+    test('an unawaited getter inside the hook does not delay the event',
+        () async {
+      final calls = <String>[];
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty(
+        'capture'.toJS,
+        ((JSString event, [JSAny? a, JSAny? b]) => calls.add(event.toDart))
+            .toJS,
+      );
+      fake.setProperty('reset'.toJS, (([JSAny? a]) => calls.add('reset')).toJS);
+      fake.setProperty('has_opted_out_capturing'.toJS, (() => false.toJS).toJS);
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) {
+          web.isOptOut();
+          return event;
+        },
+      ]));
+
+      final sent = web.capture(eventName: 'checkout');
+      await web.reset();
+      await sent;
+
+      expect(calls, ['checkout', 'reset']);
+    });
+  });
+
+  test('a change made after the hook returned is not sent', () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token', beforeSend: [
+      (event) {
+        Future<void>.delayed(Duration.zero, () {
+          event.properties?['late'] = true;
+        });
+        return event;
+      },
+    ]));
+
+    await web.capture(eventName: 'checkout', properties: {'plan': 'pro'});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect((captures.single['properties'] as Map).containsKey('late'), isFalse);
   });
 
   test('beforeSend null drops capture on web', () async {

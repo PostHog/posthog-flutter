@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -996,6 +998,160 @@ isolate_dso_base: 7000000000
             ['capture', 'screen', 'captureException', 'reset']);
       });
     }
+  });
+
+  group('PosthogFlutterIO hook that renames an event', () {
+    final renames = <String, Future<void> Function(PosthogFlutterIO)>{
+      'screen': (io) => io.screen(screenName: 'Checkout'),
+      'captureException': (io) =>
+          io.captureException(error: StateError('boom')),
+    };
+
+    renames.forEach((name, send) {
+      test('$name runs the hook once and keeps its user properties', () async {
+        var runs = 0;
+        await posthogFlutterIO
+            .setup(PostHogConfig('test_project_token', beforeSend: [
+          (event) {
+            runs++;
+            event.event = 'renamed';
+            event.userProperties = {'source': 'hook'};
+            return event;
+          },
+        ]));
+        log.clear();
+
+        await send(posthogFlutterIO);
+
+        expect(runs, 1);
+        final args = Map<String, dynamic>.from(
+            log.singleWhere((c) => c.method == 'capture').arguments as Map);
+        expect(args['eventName'], 'renamed');
+        expect(args['userProperties'], {'source': 'hook'});
+      });
+    });
+  });
+
+  group('PosthogFlutterIO hook that calls the SDK', () {
+    Future<void> setUpWith(
+      PostHogEvent? Function(PostHogEvent event) hook,
+    ) async {
+      await posthogFlutterIO
+          .setup(PostHogConfig('test_project_token', beforeSend: [hook]));
+      log.clear();
+    }
+
+    test('can capture another event without running forever', () async {
+      final seen = <String>[];
+      await setUpWith((event) {
+        seen.add(event.event);
+        if (event.event == 'outer') {
+          posthogFlutterIO.capture(eventName: 'inner');
+        }
+        return event;
+      });
+
+      await posthogFlutterIO.capture(eventName: 'outer');
+      await pumpEventQueue();
+
+      expect(seen, ['outer', 'inner']);
+      expect(
+        log.map((c) => (c.arguments as Map)['eventName']),
+        unorderedEquals(['inner', 'outer']),
+      );
+    });
+
+    final calls = <String, Future<void> Function(PosthogFlutterIO)>{
+      'reset': (io) => io.reset(),
+      'identify': (io) => io.identify(userId: 'user-1'),
+      'optOut': (io) => io.optOut(),
+      'close': (io) => io.close(),
+      'getFeatureFlag': (io) => io.getFeatureFlag(key: 'flag'),
+      'getDistinctId': (io) => io.getDistinctId(),
+      'isOptOut': (io) => io.isOptOut(),
+    };
+
+    calls.forEach((name, call) {
+      test('$name inside the hook does not deadlock the event', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (methodCall) async {
+          log.add(methodCall);
+          return switch (methodCall.method) {
+            'distinctId' => 'user-1',
+            'isOptOut' => false,
+            _ => null,
+          };
+        });
+        await setUpWith((event) {
+          call(posthogFlutterIO);
+          return event;
+        });
+
+        await posthogFlutterIO
+            .capture(eventName: 'checkout')
+            .timeout(const Duration(seconds: 2));
+        await pumpEventQueue();
+
+        expect(log.map((c) => c.method), contains('capture'));
+      });
+    });
+
+    test('an error in unawaited work does not drop the event', () async {
+      final errors = <Object>[];
+      await runZonedGuarded(() async {
+        await setUpWith((event) {
+          Future<void>.error(StateError('late failure'));
+          return event;
+        });
+        await posthogFlutterIO.capture(eventName: 'checkout');
+        await pumpEventQueue();
+      }, (error, _) => errors.add(error));
+
+      expect(errors, hasLength(1));
+      expect(log.map((c) => c.method), ['capture']);
+    });
+
+    test('a change made after the hook returned is not sent', () async {
+      await setUpWith((event) {
+        Future<void>.delayed(Duration.zero, () {
+          event.properties?['late'] = true;
+        });
+        return event;
+      });
+
+      await posthogFlutterIO
+          .capture(eventName: 'checkout', properties: {'plan': 'pro'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final args = log.single.arguments as Map;
+      expect(args['properties'], {'plan': 'pro'});
+    });
+  });
+
+  group('PosthogFlutterIO calls after a burst of events', () {
+    test('keep the order the app made them in', () async {
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', beforeSend: [(event) => event]));
+      log.clear();
+
+      final sent = <Future<void>>[];
+      final expected = <String>[];
+      for (var i = 0; i < 1000; i++) {
+        sent.add(posthogFlutterIO.capture(eventName: 'event $i'));
+        expected.add('event $i');
+        if (i % 100 == 99) {
+          sent.add(posthogFlutterIO.reset());
+          expected.add('reset');
+        }
+      }
+      await Future.wait(sent);
+
+      expect(
+        log.map((c) =>
+            c.method == 'reset' ? 'reset' : (c.arguments as Map)['eventName']),
+        expected,
+      );
+    });
   });
 
   group('PosthogFlutterIO addExceptionStep', () {

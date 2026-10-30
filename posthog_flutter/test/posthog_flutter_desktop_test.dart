@@ -456,6 +456,77 @@ void main() {
   });
 
   group('beforeSend hook', () {
+    group('that calls the SDK', () {
+      test('can capture another event without running forever', () async {
+        final server = await LocalPostHogServer.start();
+        final seen = <String>[];
+        late final PosthogFlutterDesktop platform;
+        final config = configFor(server)
+          ..beforeSend = [
+            (event) {
+              seen.add(event.event);
+              if (event.event == 'outer') {
+                platform.capture(eventName: 'inner');
+              }
+              return event;
+            },
+          ];
+        platform = await setUpPlatform(config);
+
+        await platform.capture(eventName: 'outer');
+        await server.waitForEvent('inner');
+        await server.waitForEvent('outer');
+
+        expect(seen, ['outer', 'inner']);
+      });
+
+      final calls = <String, Future<void> Function(PosthogFlutterDesktop)>{
+        'reset': (platform) => platform.reset(),
+        'identify': (platform) => platform.identify(userId: 'user-1'),
+        'optOut': (platform) => platform.optOut(),
+        'getDistinctId': (platform) => platform.getDistinctId(),
+        'getFeatureFlag': (platform) => platform.getFeatureFlag(key: 'flag'),
+      };
+
+      calls.forEach((name, call) {
+        test('$name inside the hook does not deadlock', () async {
+          final server = await LocalPostHogServer.start();
+          late final PosthogFlutterDesktop platform;
+          final config = configFor(server)
+            ..beforeSend = [
+              (event) {
+                if (event.event == 'trigger') call(platform);
+                return event;
+              },
+            ];
+          platform = await setUpPlatform(config);
+
+          await platform
+              .capture(eventName: 'trigger')
+              .timeout(const Duration(seconds: 2));
+        });
+      });
+    });
+
+    test('calls after a burst of events apply in order', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)..beforeSend = [(event) => event];
+      final platform = await setUpPlatform(config);
+      final firstUser = await platform.getDistinctId();
+
+      final sent = [
+        for (var i = 0; i < 100; i++) platform.capture(eventName: 'event $i'),
+        platform.reset(),
+        platform.capture(eventName: 'after reset'),
+      ];
+      await Future.wait(sent);
+
+      final last = await server.waitForEvent('event 99');
+      expect(last['distinct_id'], firstUser);
+      final after = await server.waitForEvent('after reset');
+      expect(after['distinct_id'], isNot(firstUser));
+    });
+
     test('dropping an event keeps it off the wire', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
