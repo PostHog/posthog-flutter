@@ -30,17 +30,11 @@ void main() {
       expect(
         properties.keys,
         unorderedEquals([
-          'distinct_id',
-          'token',
-          r'$lib',
-          r'$lib_version',
           r'$feature_flag',
           r'$feature_flag_response',
           r'$feature_flag_has_experiment',
         ]),
       );
-      expect(properties['distinct_id'], 'test-user');
-      expect(properties['token'], 'test-api-key');
       expect(properties[r'$feature_flag'], 'plain-flag');
       expect(properties[r'$feature_flag_response'], isTrue);
       expect(properties[r'$feature_flag_has_experiment'], isFalse);
@@ -218,7 +212,7 @@ Future<Map<String, Object?>> _postJson(
 }
 
 /// Serves `/flags/?v=2` with a swappable [flagsResponse] and records events
-/// posted to `/batch`.
+/// posted to the capture v1 endpoint.
 class _MockPostHogServer {
   _MockPostHogServer._(this._server, this.flagsResponse);
 
@@ -251,7 +245,8 @@ class _MockPostHogServer {
         continue;
       }
 
-      if (request.method == 'POST' && request.uri.path == '/batch') {
+      if (request.method == 'POST' &&
+          request.uri.path == '/i/v1/analytics/events') {
         final decoded = jsonDecode(body) as Map;
         for (final event in decoded['batch'] as List) {
           batchedEvents.add(Map<String, Object?>.from(event as Map));

@@ -157,7 +157,7 @@ Future<Map<String, Object?>> _postJson(
 }
 
 /// Serves `/flags/?v=2` with [flagsResponse] and records events posted to
-/// `/batch`.
+/// the capture v1 endpoint.
 class _MockPostHogServer {
   _MockPostHogServer._(this._server, this._flagsResponse);
 
@@ -190,7 +190,8 @@ class _MockPostHogServer {
         continue;
       }
 
-      if (request.method == 'POST' && request.uri.path == '/batch') {
+      if (request.method == 'POST' &&
+          request.uri.path == '/i/v1/analytics/events') {
         final decoded = jsonDecode(body) as Map;
         for (final event in decoded['batch'] as List) {
           batchedEvents.add(Map<String, Object?>.from(event as Map));

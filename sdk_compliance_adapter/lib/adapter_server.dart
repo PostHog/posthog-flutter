@@ -6,7 +6,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:posthog_flutter/posthog_flutter.dart';
-import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
+import 'package:posthog_flutter/src/core/capture_v1.dart';
+import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
 const _adapterVersion = '1.0.0';
@@ -15,11 +17,7 @@ const _defaultFlushIntervalMs = 500;
 const _defaultMaxRetries = 3;
 
 class ComplianceAdapter {
-  ComplianceAdapter() : platform = _CompliancePlatform() {
-    PosthogFlutterPlatformInterface.instance = platform;
-  }
-
-  final _CompliancePlatform platform;
+  final _CompliancePlatform platform = _CompliancePlatform();
   HttpServer? _server;
 
   Future<HttpServer> start({int port = 8080}) async {
@@ -54,7 +52,12 @@ class ComplianceAdapter {
         'sdk_name': postHogFlutterSdkName,
         'sdk_version': postHogFlutterVersion,
         'adapter_version': _adapterVersion,
-        'capabilities': ['capture_v0', 'encoding_gzip'],
+        'capabilities': [
+          'capture_v1',
+          'capture_ai_v1',
+          'encoding_gzip',
+          'event_options',
+        ],
       });
       return;
     }
@@ -80,20 +83,13 @@ class ComplianceAdapter {
       final maxRetries = _readInt(body['max_retries']) ?? _defaultMaxRetries;
       final enableCompression = body['enable_compression'] == true;
 
-      await platform.resetAdapterState();
-      platform.configure(
-        apiKey: apiKey,
-        host: host,
-        flushAt: flushAt,
-        flushIntervalMs: flushIntervalMs,
-        maxRetries: maxRetries,
-        enableCompression: enableCompression,
-      );
-
+      final compression =
+          enableCompression ? PostHogCompression.gzip : PostHogCompression.none;
       final config = PostHogConfig(apiKey)
-        ..host = host
         ..flushAt = flushAt
         ..flushInterval = Duration(milliseconds: flushIntervalMs)
+        ..compression = compression
+        ..captureAiCompression = compression
         ..preloadFeatureFlags = false
         ..captureApplicationLifecycleEvents = false
         ..debug = true;
@@ -109,13 +105,18 @@ class ComplianceAdapter {
         );
       }
 
-      await Posthog().setup(config);
+      await platform.resetAdapterState();
+      await platform.configure(
+        config,
+        host: host,
+        maxRetries: maxRetries,
+      );
 
       await _sendJson(request, {'success': true});
       return;
     }
 
-    if (method == 'POST' && path == '/capture') {
+    if (method == 'POST' && (path == '/capture' || path == '/capture_ai')) {
       if (!platform.isInitialized) {
         await _sendJson(
           request,
@@ -142,15 +143,16 @@ class ComplianceAdapter {
         return;
       }
 
-      final properties = _readObjectMap(body['properties']);
-      final timestamp = body['timestamp'] as String?;
-      platform.stageCapture(distinctId: distinctId, timestamp: timestamp);
-      await Posthog().capture(eventName: event, properties: properties);
+      final uuid = platform.capture(
+        distinctId: distinctId,
+        event: event,
+        properties: _readNullableObjectMap(body['properties']),
+        options: _readNullableObjectMap(body['options']),
+        timestamp: body['timestamp'] as String?,
+        ai: path == '/capture_ai',
+      );
 
-      await _sendJson(request, {
-        'success': true,
-        'uuid': platform.lastCapturedUuid,
-      });
+      await _sendJson(request, {'success': true, 'uuid': uuid});
       return;
     }
 
@@ -227,262 +229,201 @@ class ComplianceAdapter {
   }
 }
 
-class _CompliancePlatform extends PosthogFlutterPlatformInterface {
-  _AdapterState state = _AdapterState();
-  final _random = Random.secure();
+/// The real capture client, so the harness tests the SDK's own queue, retries
+/// and requests. `captureStateless` is the only entry point that takes the
+/// per-event distinct id the harness sends.
+class _CaptureClient extends DesktopPostHog {
+  _CaptureClient(super.config)
+      : super(
+          storage: FileStorage.memory(),
+          staticContext: const {},
+          timezone: null,
+        );
 
-  String? _apiKey;
-  String? _host;
-  int _flushAt = _defaultFlushAt;
-  int _flushIntervalMs = _defaultFlushIntervalMs;
-  int _maxRetries = _defaultMaxRetries;
-  bool _enableCompression = false;
-  bool _autoFlushPaused = false;
-  Timer? _flushTimer;
-  Future<void>? _activeFlush;
-  String? _nextDistinctId;
-  String? _nextTimestamp;
-
-  bool get isInitialized => _apiKey != null && _host != null;
-  String? lastCapturedUuid;
-
-  void configure({
-    required String apiKey,
-    required String host,
-    required int flushAt,
-    required int flushIntervalMs,
-    required int maxRetries,
-    required bool enableCompression,
-  }) {
-    _apiKey = apiKey;
-    _host = host;
-    _flushAt = max(1, flushAt);
-    _flushIntervalMs = max(1, flushIntervalMs);
-    _maxRetries = max(0, maxRetries);
-    _enableCompression = enableCompression;
-    _autoFlushPaused = false;
-    _flushTimer?.cancel();
-    _flushTimer = Timer.periodic(
-      Duration(milliseconds: _flushIntervalMs),
-      (_) => unawaited(_flushFromTimer()),
-    );
-  }
-
-  void stageCapture({required String distinctId, String? timestamp}) {
-    _nextDistinctId = distinctId;
-    final parsedTimestamp =
-        timestamp == null ? null : DateTime.tryParse(timestamp);
-    _nextTimestamp = parsedTimestamp?.toUtc().toIso8601String();
-  }
-
-  @override
-  Future<void> setup(PostHogConfig config) async {}
-
-  @override
-  Future<void> reset() => resetAdapterState();
-
-  @override
-  Future<void> capture({
-    required String eventName,
-    Map<String, Object>? properties,
-    Map<String, Object>? userProperties,
-    Map<String, Object>? userPropertiesSetOnce,
+  String? captureFor(
+    String distinctId,
+    String event,
+    Map<String, Object?> properties, {
     Map<String, Object?>? options,
-  }) async {
-    if (!isInitialized) {
-      throw StateError('SDK not initialized');
-    }
+    String? timestamp,
+    bool ai = false,
+  }) =>
+      captureStateless(
+        distinctId,
+        event,
+        properties: properties,
+        options: options,
+        timestamp: timestamp,
+        ai: ai,
+      );
 
-    final distinctId = _nextDistinctId;
-    if (distinctId == null || distinctId.isEmpty) {
-      throw StateError('distinct_id was not staged by the adapter');
-    }
+  void Function() onSent(void Function(int count) listener) =>
+      events.on('flush', (sent) => listener((sent! as List).length));
 
-    final stagedTimestamp = _nextTimestamp;
-    _nextDistinctId = null;
-    _nextTimestamp = null;
+  void Function() onError(void Function(Object error) listener) =>
+      events.on('error', (error) => listener(error!));
+}
 
-    final uuid = _uuidV4();
-    lastCapturedUuid = uuid;
+/// Forwards the SDK's capture requests to the harness and records them for
+/// `/state`: the SDK doesn't expose what it sent.
+class _RecordingProxy {
+  _RecordingProxy._(this._server, this._target, this._state);
 
-    final eventProperties = <String, Object?>{
-      ...?properties,
-      'distinct_id': distinctId,
-      'token': _apiKey,
-      '\$lib': postHogFlutterSdkName,
-      '\$lib_version': postHogFlutterVersion,
-      if (userProperties != null && userProperties.isNotEmpty)
-        '\$set': userProperties,
-      if (userPropertiesSetOnce != null && userPropertiesSetOnce.isNotEmpty)
-        '\$set_once': userPropertiesSetOnce,
-    };
+  final HttpServer _server;
+  final Uri _target;
+  final _AdapterState _state;
+  final _client = HttpClient()..autoUncompress = false;
 
-    _autoFlushPaused = false;
-    state.queue.add({
-      'uuid': uuid,
-      'event': eventName,
-      'distinct_id': distinctId,
-      'properties': eventProperties,
-      'timestamp': stagedTimestamp ?? DateTime.now().toUtc().toIso8601String(),
-    });
-    state.totalEventsCaptured++;
-    state.pendingEvents = state.queue.length;
+  String get url => 'http://127.0.0.1:${_server.port}';
 
-    if (state.queue.length >= _flushAt) {
-      unawaited(flush());
+  static Future<_RecordingProxy> start(String host, _AdapterState state) async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final proxy = _RecordingProxy._(server, Uri.parse(host), state);
+    unawaited(proxy._serve());
+    return proxy;
+  }
+
+  Future<void> close() async {
+    _client.close(force: true);
+    await _server.close(force: true);
+  }
+
+  Future<void> _serve() async {
+    await for (final request in _server) {
+      unawaited(_forward(request));
     }
   }
 
-  Future<void> _flushFromTimer() {
-    if (_autoFlushPaused) {
-      return Future.value();
+  Future<void> _forward(HttpRequest request) async {
+    final response = request.response;
+    try {
+      final body = await request
+          .fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
+      final upstream = await _client.openUrl(
+        request.method,
+        _target.replace(
+          path: request.uri.path,
+          query: request.uri.hasQuery ? request.uri.query : null,
+        ),
+      );
+      request.headers.forEach((name, values) {
+        if (name != HttpHeaders.hostHeader &&
+            name != HttpHeaders.contentLengthHeader) {
+          upstream.headers.set(name, values);
+        }
+      });
+      upstream.contentLength = body.length;
+      upstream.add(body);
+      final result = await upstream.close();
+      final resultBody = await result
+          .fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
+
+      _record(request, body, result.statusCode);
+
+      response.statusCode = result.statusCode;
+      result.headers.forEach((name, values) {
+        if (name != HttpHeaders.contentLengthHeader &&
+            name != HttpHeaders.transferEncodingHeader) {
+          response.headers.set(name, values);
+        }
+      });
+      response.contentLength = resultBody.length;
+      response.add(resultBody);
+    } catch (error) {
+      _state.lastError = error.toString();
+      response.statusCode = HttpStatus.badGateway;
     }
-    return flush();
+    await response.close();
   }
 
-  @override
-  Future<void> flush() {
-    final activeFlush = _activeFlush;
-    if (activeFlush != null) {
-      return activeFlush;
-    }
-
-    final flushFuture = _flushInternal();
-    _activeFlush = flushFuture;
-    return flushFuture.whenComplete(() {
-      if (identical(_activeFlush, flushFuture)) {
-        _activeFlush = null;
-      }
-    });
-  }
-
-  Future<void> _flushInternal() async {
-    final flushState = state;
-    final apiKey = _apiKey;
-    final host = _host;
-    final maxRetries = _maxRetries;
-    final enableCompression = _enableCompression;
-    if (apiKey == null || host == null || flushState.queue.isEmpty) {
+  void _record(HttpRequest request, List<int> body, int statusCode) {
+    if (request.uri.path != captureV1Path &&
+        request.uri.path != captureV1AiPath) {
       return;
     }
-
-    final batch = List<Map<String, Object?>>.from(flushState.queue);
-    final success = await _sendBatchWithRetries(
-      flushState,
-      batch,
-      apiKey: apiKey,
-      host: host,
-      maxRetries: maxRetries,
-      enableCompression: enableCompression,
-    );
-    if (success) {
-      final sentUuids = batch.map((event) => event['uuid']).toSet();
-      flushState.queue
-          .removeWhere((event) => sentUuids.contains(event['uuid']));
-      flushState.pendingEvents = flushState.queue.length;
-      flushState.totalEventsSent += batch.length;
-      if (identical(state, flushState)) {
-        _autoFlushPaused = false;
-      }
-    } else {
-      flushState.pendingEvents = flushState.queue.length;
-      if (identical(state, flushState)) {
-        _autoFlushPaused = true;
-      }
+    final gzipped =
+        request.headers.value(HttpHeaders.contentEncodingHeader) == 'gzip';
+    final decoded =
+        jsonDecode(utf8.decode(gzipped ? gzip.decode(body) : body)) as Map;
+    final batch = decoded['batch'] as List;
+    final attempt =
+        int.tryParse(request.headers.value('PostHog-Attempt') ?? '') ?? 1;
+    if (attempt > 1) _state.totalRetries++;
+    if (statusCode < 200 || statusCode >= 300) {
+      _state.lastError = 'Capture request failed with HTTP $statusCode';
     }
+    _state.requestsMade.add(_RequestRecord(
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+      statusCode: statusCode,
+      retryAttempt: attempt - 1,
+      eventCount: batch.length,
+      uuidList: [for (final event in batch) (event as Map)['uuid'] as String],
+    ));
   }
+}
 
-  Future<bool> _sendBatchWithRetries(
-    _AdapterState flushState,
-    List<Map<String, Object?>> batch, {
-    required String apiKey,
+class _CompliancePlatform {
+  _AdapterState state = _AdapterState();
+
+  _CaptureClient? _client;
+  _RecordingProxy? _proxy;
+  String? _apiKey;
+  String? _host;
+  int _maxRetries = _defaultMaxRetries;
+
+  bool get isInitialized => _client != null;
+
+  Future<void> configure(
+    PostHogConfig config, {
     required String host,
     required int maxRetries,
-    required bool enableCompression,
   }) async {
-    for (var attempt = 0; attempt <= maxRetries; attempt++) {
-      final result = await _postBatch(
-        flushState,
-        batch,
-        attempt,
-        apiKey: apiKey,
-        host: host,
-        enableCompression: enableCompression,
-      );
-      flushState.requestsMade.add(_RequestRecord(
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-        statusCode: result.statusCode,
-        retryAttempt: attempt,
-        eventCount: batch.length,
-        uuidList: batch.map((event) => event['uuid']! as String).toList(),
-      ));
-
-      if (attempt > 0) {
-        flushState.totalRetries++;
-      }
-
-      if (result.statusCode >= 200 && result.statusCode < 300) {
-        return true;
-      }
-
-      flushState.lastError =
-          'Batch request failed with HTTP ${result.statusCode}';
-      if (attempt < maxRetries && _shouldRetry(result.statusCode)) {
-        await Future<void>.delayed(
-          Duration(milliseconds: result.retryAfterMs ?? 100),
-        );
-        continue;
-      }
-      return false;
-    }
-    return false;
+    final proxy = await _RecordingProxy.start(host, state);
+    config.host = proxy.url;
+    final client = _CaptureClient(config);
+    final clientState = state;
+    client.onSent((count) {
+      clientState.totalEventsSent += count;
+      clientState.pendingEvents -= count;
+    });
+    client.onError((error) => clientState.lastError = error.toString());
+    _proxy = proxy;
+    _client = client;
+    _apiKey = config.projectToken;
+    _host = host;
+    _maxRetries = max(0, maxRetries);
   }
 
-  bool _shouldRetry(int statusCode) =>
-      statusCode == 408 || statusCode == 429 || statusCode >= 500;
+  String? capture({
+    required String distinctId,
+    required String event,
+    Map<String, Object?>? properties,
+    Map<String, Object?>? options,
+    String? timestamp,
+    bool ai = false,
+  }) {
+    final parsedTimestamp =
+        timestamp == null ? null : DateTime.tryParse(timestamp);
+    final uuid = _client!.captureFor(
+      distinctId,
+      event,
+      properties ?? const {},
+      options: options,
+      timestamp: parsedTimestamp?.toUtc().toIso8601String(),
+      ai: ai,
+    );
+    if (uuid != null) {
+      state.totalEventsCaptured++;
+      state.pendingEvents++;
+    }
+    return uuid;
+  }
 
-  Future<_PostResult> _postBatch(
-    _AdapterState flushState,
-    List<Map<String, Object?>> batch,
-    int attempt, {
-    required String apiKey,
-    required String host,
-    required bool enableCompression,
-  }) async {
-    final client = HttpClient();
+  Future<void> flush() async {
     try {
-      final uri = Uri.parse(host).resolve(
-        attempt > 0 ? '/batch?retry_count=$attempt' : '/batch',
-      );
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.headers.set(
-        HttpHeaders.userAgentHeader,
-        '$postHogFlutterSdkName/$postHogFlutterVersion',
-      );
-
-      final payload = jsonEncode({
-        'api_key': apiKey,
-        'batch': batch,
-        'sent_at': DateTime.now().toUtc().toIso8601String(),
-      });
-      final body = utf8.encode(payload);
-      final bytesToSend = enableCompression ? gzip.encode(body) : body;
-      if (enableCompression) {
-        request.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
-      }
-      request.contentLength = bytesToSend.length;
-      request.add(bytesToSend);
-
-      final response = await request.close();
-      final retryAfterMs = _retryAfterMs(response.headers);
-      await response.drain<void>();
-      return _PostResult(response.statusCode, retryAfterMs: retryAfterMs);
+      await _client?.flush();
     } catch (error) {
-      flushState.lastError = error.toString();
-      return const _PostResult(500);
-    } finally {
-      client.close(force: true);
+      state.lastError = error.toString();
     }
   }
 
@@ -550,21 +491,16 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       client.close(force: true);
     }
 
-    state.queue.add({
-      'uuid': _uuidV4(),
-      'event': r'$feature_flag_called',
-      'distinct_id': distinctId,
-      'properties': _featureFlagCalledProperties(
+    capture(
+      distinctId: distinctId,
+      event: r'$feature_flag_called',
+      properties: _featureFlagCalledProperties(
         key: key,
         value: value,
-        distinctId: distinctId,
         hasExperiment: hasExperiment,
         minimalFlagCalledEvents: minimalFlagCalledEvents,
       ),
-      'timestamp': DateTime.now().toUtc().toIso8601String(),
-    });
-    state.totalEventsCaptured++;
-    state.pendingEvents = state.queue.length;
+    );
 
     return value;
   }
@@ -576,20 +512,14 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
   /// experiment (`has_experiment == false`), only the cross-SDK minimal
   /// allowlist is sent. Any missing signal (either field absent, a legacy
   /// response shape, or `has_experiment` unreported) falls back to the full
-  /// legacy shape. `distinct_id` and `token` are transport fields this
-  /// adapter carries in every event's properties and stay in both shapes.
+  /// legacy shape.
   Map<String, Object?> _featureFlagCalledProperties({
     required String key,
     required Object? value,
-    required String distinctId,
     required bool? hasExperiment,
     required bool minimalFlagCalledEvents,
   }) {
     final allowlisted = <String, Object?>{
-      'distinct_id': distinctId,
-      'token': _apiKey,
-      r'$lib': postHogFlutterSdkName,
-      r'$lib_version': postHogFlutterVersion,
       r'$feature_flag': key,
       r'$feature_flag_response': value,
     };
@@ -640,29 +570,13 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
   }
 
   Future<void> resetAdapterState() async {
-    _flushTimer?.cancel();
-    _flushTimer = null;
-    _activeFlush = null;
-    _autoFlushPaused = false;
+    _client?.close();
+    _client = null;
+    await _proxy?.close();
+    _proxy = null;
     _apiKey = null;
     _host = null;
-    _nextDistinctId = null;
-    _nextTimestamp = null;
-    lastCapturedUuid = null;
     state = _AdapterState();
-  }
-
-  String _uuidV4() {
-    final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    String hex(int byte) => byte.toRadixString(16).padLeft(2, '0');
-    final value = bytes.map(hex).join();
-    return '${value.substring(0, 8)}-'
-        '${value.substring(8, 12)}-'
-        '${value.substring(12, 16)}-'
-        '${value.substring(16, 20)}-'
-        '${value.substring(20)}';
   }
 }
 
@@ -672,7 +586,6 @@ class _AdapterState {
   int totalEventsSent = 0;
   int totalRetries = 0;
   String? lastError;
-  final queue = <Map<String, Object?>>[];
   final requestsMade = <_RequestRecord>[];
 
   Map<String, Object?> toJson() => {
@@ -684,13 +597,6 @@ class _AdapterState {
         'requests_made':
             requestsMade.map((request) => request.toJson()).toList(),
       };
-}
-
-class _PostResult {
-  const _PostResult(this.statusCode, {this.retryAfterMs});
-
-  final int statusCode;
-  final int? retryAfterMs;
 }
 
 class _RequestRecord {
