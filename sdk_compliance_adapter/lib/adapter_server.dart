@@ -215,7 +215,7 @@ class ComplianceAdapter {
     }
 
     if (method == 'GET' && path == '/state') {
-      await _sendJson(request, platform.state.toJson());
+      await _sendJson(request, platform.stateJson());
       return;
     }
 
@@ -256,6 +256,9 @@ class _CaptureClient extends DesktopPostHog {
         timestamp: timestamp,
         ai: ai,
       );
+
+  @override
+  int get queuedEventCount => super.queuedEventCount;
 
   void Function() onSent(void Function(int count) listener) =>
       events.on('flush', (sent) => listener((sent! as List).length));
@@ -382,10 +385,7 @@ class _CompliancePlatform {
     config.host = proxy.url;
     final client = _CaptureClient(config);
     final clientState = state;
-    client.onSent((count) {
-      clientState.totalEventsSent += count;
-      clientState.pendingEvents -= count;
-    });
+    client.onSent((count) => clientState.totalEventsSent += count);
     client.onError((error) => clientState.lastError = error.toString());
     _proxy = proxy;
     _client = client;
@@ -412,12 +412,12 @@ class _CompliancePlatform {
       timestamp: parsedTimestamp?.toUtc().toIso8601String(),
       ai: ai,
     );
-    if (uuid != null) {
-      state.totalEventsCaptured++;
-      state.pendingEvents++;
-    }
+    if (uuid != null) state.totalEventsCaptured++;
     return uuid;
   }
+
+  Map<String, Object?> stateJson() =>
+      state.toJson(pendingEvents: _client?.queuedEventCount ?? 0);
 
   Future<void> flush() async {
     try {
@@ -581,14 +581,13 @@ class _CompliancePlatform {
 }
 
 class _AdapterState {
-  int pendingEvents = 0;
   int totalEventsCaptured = 0;
   int totalEventsSent = 0;
   int totalRetries = 0;
   String? lastError;
   final requestsMade = <_RequestRecord>[];
 
-  Map<String, Object?> toJson() => {
+  Map<String, Object?> toJson({required int pendingEvents}) => {
         'pending_events': pendingEvents,
         'total_events_captured': totalEventsCaptured,
         'total_events_sent': totalEventsSent,
