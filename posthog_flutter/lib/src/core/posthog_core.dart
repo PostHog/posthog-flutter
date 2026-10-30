@@ -53,6 +53,14 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// The person properties sent last, so that a duplicate `$set` is skipped.
   String? _cachedPersonProperties;
 
+  /// When each flag person property was last set, and when they were last
+  /// reset, counted in [_personPropertyClock]. An AI event's properties
+  /// apply only after the worker measured it, and must not overwrite newer
+  /// values set in the meantime.
+  var _personPropertyClock = 0;
+  var _personPropertiesResetAt = 0;
+  final _personPropertySetAt = <String, int>{};
+
   Map<String, PostHogFeatureFlagValue> _bootstrappedFlags = const {};
   Map<String, Object?> _bootstrappedPayloads = const {};
 
@@ -474,11 +482,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
       }
       final (:properties, :options, :timestamp) = prepared;
       final distinctId = getDistinctId();
+      final capturedAt = ++_personPropertyClock;
       return captureAiStateless(distinctId, event,
               properties: properties, options: options, timestamp: timestamp)
           .then((uuid) {
         if (uuid != null && getDistinctId() == distinctId) {
-          _applyPersonProperties(properties);
+          _applyPersonProperties(properties, capturedAt: capturedAt);
         }
         return uuid;
       });
@@ -541,12 +550,21 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// taken from the event as queued, after the beforeSend callbacks, so a
   /// value they removed or an event they or the size limit dropped neither
   /// reaches /flags nor turns on person processing for later events.
-  void _applyPersonProperties(Map<String, Object?> properties) {
+  ///
+  /// With [capturedAt], person properties set since then are kept.
+  void _applyPersonProperties(
+    Map<String, Object?> properties, {
+    int? capturedAt,
+  }) {
     if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
-    _setPersonPropertiesForFlagsIfNeeded(
-      _asPropertyMap(properties[r'$set']),
-      _asPropertyMap(properties[r'$set_once']),
-    );
+    final set = _asPropertyMap(properties[r'$set']);
+    final setOnce = _asPropertyMap(properties[r'$set_once']);
+    if (capturedAt == null) {
+      _setPersonPropertiesForFlagsIfNeeded(set, setOnce);
+    } else if (capturedAt > _personPropertiesResetAt) {
+      _mergePersonPropertiesForFlags({...?setOnce, ...?set}..removeWhere(
+          (key, _) => (_personPropertySetAt[key] ?? 0) > capturedAt));
+    }
   }
 
   /// Creates an alias for a user. An empty [alias] is ignored.
@@ -644,19 +662,29 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// flags reload sends.
   void setPersonPropertiesForFlags(Map<String, Object?> properties) {
     wrap(() {
-      final existing = getPersistedProperty<Map<String, Object?>>(
-              PostHogPersistedProperty.personProperties) ??
-          {};
-      setPersistedProperty(
-        PostHogPersistedProperty.personProperties,
-        {...existing, ...toJsonMap(properties, logger)},
-      );
+      final now = ++_personPropertyClock;
+      for (final key in properties.keys) {
+        _personPropertySetAt[key] = now;
+      }
+      _mergePersonPropertiesForFlags(properties);
     });
+  }
+
+  void _mergePersonPropertiesForFlags(Map<String, Object?> properties) {
+    final existing = getPersistedProperty<Map<String, Object?>>(
+            PostHogPersistedProperty.personProperties) ??
+        {};
+    setPersistedProperty(
+      PostHogPersistedProperty.personProperties,
+      {...existing, ...toJsonMap(properties, logger)},
+    );
   }
 
   /// Resets person properties for feature flag evaluation.
   void resetPersonPropertiesForFlags() {
     wrap(() {
+      _personPropertiesResetAt = ++_personPropertyClock;
+      _personPropertySetAt.clear();
       setPersistedProperty(PostHogPersistedProperty.personProperties, null);
     });
   }

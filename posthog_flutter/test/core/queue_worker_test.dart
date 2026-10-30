@@ -339,6 +339,27 @@ void main() {
       expect((await storage.aiQueue.peek(1)).single.event['uuid'], uuid);
     });
 
+    test('an AI event does not overwrite person properties set after it',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client =
+          testClient(server, storage: FileStorage(dir.path, worker: worker));
+      client.identify('user');
+      final prepared = client.prepareEvent(r'$ai_generation', properties: {
+        r'$set': {'plan': 'old', 'coins': 1},
+      })!;
+
+      // The worker measures the event only after the newer value is set.
+      final uuid = client.captureAiPrepared(r'$ai_generation', prepared);
+      client.setPersonProperties(userPropertiesToSet: {'plan': 'new'});
+      expect(await uuid, isNotNull);
+
+      await client.reloadFeatureFlagsAsync();
+
+      expect(server.flagsRequests.last.body['person_properties'],
+          allOf(containsPair('plan', 'new'), containsPair('coins', 1)));
+    });
+
     test('an AI event applies its person properties only to its own user',
         () async {
       final server = await LocalPostHogServer.start();
