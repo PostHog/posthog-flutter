@@ -219,6 +219,23 @@ void main() {
       expect([for (final queued in await peek) queued.event['i']], [0]);
     });
 
+    test('a peek goes on past events it cannot read', () async {
+      final queue = storage().queue;
+      await queue.add({'i': 0});
+      await queue.add({'i': 1});
+      await queue.add({'i': 2});
+      final files = queueFiles()..sort((a, b) => a.path.compareTo(b.path));
+      files[0].writeAsStringSync('{"i":');
+      files[1].deleteSync();
+      Directory(files[1].path).createSync();
+
+      final events = await queue.peek(1);
+
+      expect(events.single.event['i'], 2);
+      expect(files[0].existsSync(), isFalse);
+      expect(queue.length, 2);
+    });
+
     test('reads events written by an earlier storage', () async {
       final first = storage();
       for (var i = 0; i < 3; i++) {

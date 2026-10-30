@@ -485,10 +485,15 @@ class FileEventQueue {
   Future<List<PostHogQueuedEvent>> peek(int count, {int? maxBytes}) =>
       _submitted.then((_) => _peekWritten(count, maxBytes));
 
-  Future<List<PostHogQueuedEvent>> _peekWritten(int count, int? maxBytes) {
+  Future<List<PostHogQueuedEvent>> _peekWritten(
+    int count,
+    int? maxBytes, {
+    Set<String> skipped = const {},
+  }) {
     final selected = <String>[];
     var bytes = 0;
     for (final id in _ids) {
+      if (skipped.contains(id)) continue;
       if (selected.length >= count || _writing.contains(id)) break;
       final size = _sizes[id] ?? 0;
       if (maxBytes != null && selected.isNotEmpty && bytes + size > maxBytes) {
@@ -504,9 +509,16 @@ class FileEventQueue {
     final read = toRead.isEmpty
         ? SynchronousFuture(const <QueueReadResult>[])
         : _job(_worker.read([for (final id in toRead) _pathOf(id)]));
-    return read.then((read) => _collect(selected, {
-          for (var i = 0; i < toRead.length; i++) toRead[i]: read[i],
-        }));
+    return read.then((read) {
+      final events = _collect(selected, {
+        for (var i = 0; i < toRead.length; i++) toRead[i]: read[i],
+      });
+      // An empty peek ends the flush, which must not leave the events behind
+      // the unreadable ones unsent.
+      return events.isEmpty && selected.isNotEmpty
+          ? _peekWritten(count, maxBytes, skipped: {...skipped, ...selected})
+          : events;
+    });
   }
 
   /// The [selected] events still queued, from memory or from [read].
