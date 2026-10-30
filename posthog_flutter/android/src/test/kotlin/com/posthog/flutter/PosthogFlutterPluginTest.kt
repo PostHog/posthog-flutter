@@ -267,7 +267,7 @@ internal class PosthogFlutterPluginTest {
             )
 
             val replay = assertNotNull(plugin.lastBuiltConfig).sessionReplayConfig
-            assertEquals(1f, replay.screenshotScale)
+            assertNull(replay.screenshotScale)
             assertEquals(30, replay.screenshotCompressionQuality)
             assertEquals(PostHogScreenshotColorMode.ARGB_8888, replay.screenshotColorMode)
         } finally {

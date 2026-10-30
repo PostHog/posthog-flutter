@@ -246,7 +246,7 @@ class ScreenshotCapturer {
   }
 
   double get _screenshotScale => defaultTargetPlatform == TargetPlatform.android
-      ? effectiveConfig.sessionReplayConfig.screenshotScale
+      ? effectiveConfig.sessionReplayConfig.screenshotScale ?? 1.0
       : 1.0;
 
   int _imageDimension(double dimension, double scale) => scale == 1.0
