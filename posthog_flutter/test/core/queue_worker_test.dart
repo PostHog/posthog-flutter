@@ -358,6 +358,18 @@ void main() {
         expect(gatedStorage.queue.length, 5);
       });
 
+      test('removes the oldest unsent events over an estimated size', () async {
+        final queue = gatedStorage.queue;
+        queue.removeOldestUnsentOver(0);
+        for (var i = 0; i < 3; i++) {
+          queue.add({'p': 'x' * 100});
+        }
+
+        expect(queue.removeOldestUnsentOver(100, maxBytes: 250), 1);
+        expect(queue.removeOldestUnsentOver(100, maxBytes: 1), 1);
+        expect(queue.removeOldestUnsentOver(100, maxBytes: 1), 0);
+      });
+
       test('removes the oldest unsent events over a count', () async {
         expect(gatedStorage.queue.removeOldestUnsentOver(3), 9);
         gated.writeGate!.complete();
@@ -529,6 +541,32 @@ void main() {
       expect(await oversized, isNull);
       expect(storage.aiQueue.length, 1);
       expect((await storage.aiQueue.peek(1)).single.event['uuid'], uuid);
+    });
+
+    test('AI events waiting for a write stay within the byte limit', () async {
+      final gated = GatedWorker()..writeGate = Completer<void>();
+      final server = await LocalPostHogServer.start();
+      final client =
+          testClient(server, storage: FileStorage(dir.path, worker: gated));
+      final input = 'x' * (6 * 1024 * 1024);
+
+      final uuids = [
+        for (var i = 0; i < FileEventQueue.maxWritesInFlight + 12; i++)
+          client.captureAiPrepared(
+              r'$ai_generation',
+              client.prepareEvent(r'$ai_generation',
+                  properties: {'input': input})!),
+      ];
+      gated.writeGate!.complete();
+      final results = await Future.wait(uuids);
+      await client.settled;
+
+      // 6 MiB each: eight fit in 50 MiB, so four of the twelve waiting go.
+      expect(gated.writes, FileEventQueue.maxWritesInFlight + 8);
+      expect(
+          results.sublist(FileEventQueue.maxWritesInFlight,
+              FileEventQueue.maxWritesInFlight + 4),
+          everyElement(isNull));
     });
 
     test('an AI event does not overwrite person properties set after it',
