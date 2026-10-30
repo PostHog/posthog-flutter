@@ -15,7 +15,8 @@ const _adapterVersion = '1.0.0';
 const _defaultFlushAt = 100;
 const _defaultFlushIntervalMs = 500;
 const _defaultMaxRetries = 3;
-const _upstreamTimeout = Duration(seconds: 30);
+// The longest the SDK waits on any lane; it gives up on shorter lanes itself.
+const _upstreamTimeout = captureAiDefaultTimeout;
 
 class ComplianceAdapter {
   final _CompliancePlatform platform = _CompliancePlatform();
