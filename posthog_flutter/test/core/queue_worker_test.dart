@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/core/persistence.dart';
 import 'package:posthog_flutter/src/core/queue_worker.dart';
 
 import '../posthog_api_fake.dart';
@@ -285,6 +286,24 @@ void main() {
       expect(queue.byteCount, '{"event":"a"}'.length);
       expect([for (final queued in await queue.peek(10)) queued.event['event']],
           ['a']);
+    });
+
+    test('close keeps the directory locked until the file work is done',
+        () async {
+      String? stored() => FileStorage(dir.path)
+          .getProperty<String>(PostHogPersistedProperty.distinctId);
+      final first = FileStorage(dir.path, worker: worker);
+      first.queue.add({'event': 'a'});
+
+      first.close();
+      final during = storage()
+        ..setProperty(PostHogPersistedProperty.distinctId, 'during');
+      expect(stored(), isNull);
+
+      await first.settled;
+      during.close();
+      storage().setProperty(PostHogPersistedProperty.distinctId, 'after');
+      expect(stored(), 'after');
     });
 
     test('settled waits for the deletions', () async {

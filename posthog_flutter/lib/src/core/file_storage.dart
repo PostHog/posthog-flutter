@@ -180,10 +180,19 @@ class FileStorage {
     return code == 11 || code == 13; // EAGAIN or EACCES on Linux
   }
 
-  /// Releases the directory lock, so that another storage can write the
-  /// snapshot; this one stops writing it.
+  /// Releases the directory lock once the queues have no file work left, so
+  /// that another storage can write the snapshot and finds exactly the events
+  /// still to send; this one stops writing it.
   void close() {
     _role = _Role.secondary;
+    if ((_queue?._jobs.isEmpty ?? true) && (_aiQueue?._jobs.isEmpty ?? true)) {
+      _releaseLock();
+    } else {
+      settled.whenComplete(_releaseLock).ignore();
+    }
+  }
+
+  void _releaseLock() {
     final lockPath = _lockPath;
     if (lockPath != null) _heldLockPaths.remove(lockPath);
     _lockPath = null;
