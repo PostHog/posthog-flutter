@@ -51,23 +51,21 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// Applies the beforeSend callbacks to an event in order.
   /// Returns the possibly modified event, or null if any callback drops it.
-  /// Without callbacks the event comes back synchronously, so it is handed
-  /// over in the same call and nothing has to wait for it.
-  FutureOr<PostHogEvent?> _runBeforeSend(
+  PostHogEvent? _runBeforeSend(
     String eventName,
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
   }) {
-    final event = PostHogEvent(
-      event: eventName,
-      properties: properties,
-      userProperties: userProperties,
-      userPropertiesSetOnce: userPropertiesSetOnce,
+    return applyBeforeSend(
+      _beforeSendCallbacks,
+      PostHogEvent(
+        event: eventName,
+        properties: properties,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+      ),
     );
-    return _beforeSendCallbacks.isEmpty
-        ? event
-        : applyBeforeSend(_beforeSendCallbacks, event);
   }
 
   /// Native plugin calls to Flutter

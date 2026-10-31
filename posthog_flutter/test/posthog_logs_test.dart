@@ -218,22 +218,6 @@ void main() {
 
         expect(fake.capturedLogs.single.body, 'x-1-2');
       });
-
-      test('async hook is awaited', () async {
-        final config = PostHogConfig('test_token');
-        config.logsConfig.beforeSend = [
-          (record) async {
-            await Future<void>.delayed(Duration.zero);
-            record.body = 'async';
-            return record;
-          },
-        ];
-        await setupWith(config);
-
-        await Posthog().captureLog(body: 'x');
-
-        expect(fake.capturedLogs.single.body, 'async');
-      });
     });
 
     group('PostHogLogsConfig.toMap', () {

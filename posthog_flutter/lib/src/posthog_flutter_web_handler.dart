@@ -124,6 +124,15 @@ JSAny? _flagOptions(Map<dynamic, dynamic> args) {
   return {if (sendEvent != null) 'send_event': sendEvent}.jsify();
 }
 
+Object? readFeatureFlagResult(String key, {bool? sendEvent}) {
+  return posthog
+      ?.getFeatureFlagResult(
+        stringToJSAny(key),
+        {if (sendEvent != null) 'send_event': sendEvent}.jsify(),
+      )
+      ?.dartify();
+}
+
 bool _sdkInfoOverridden = false;
 
 void _maybeOverrideSDKInfo() {
@@ -378,14 +387,10 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
           posthog?.getFeatureFlag(stringToJSAny(key), _flagOptions(args));
       return featureFlag?.dartify();
     case 'getFeatureFlagResult':
-      final key = args['key'] as String;
-      final sendEvent = args['sendEvent'] as bool?;
-
-      final result = posthog?.getFeatureFlagResult(
-        stringToJSAny(key),
-        {if (sendEvent != null) 'send_event': sendEvent}.jsify(),
+      return readFeatureFlagResult(
+        args['key'] as String,
+        sendEvent: args['sendEvent'] as bool?,
       );
-      return result?.dartify();
     case 'getAllFeatureFlags':
       try {
         return posthog?.getAllFeatureFlags()?.dartify();
