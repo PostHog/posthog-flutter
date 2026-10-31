@@ -3,6 +3,7 @@ import 'dart:async';
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
@@ -19,6 +20,7 @@ import 'utils/flutter_version.dart';
 import 'utils/property_normalizer.dart';
 
 import 'feature_flag_result.dart';
+import 'feature_flags_listeners.dart';
 import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
@@ -85,8 +87,19 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         await cleanupSurveys();
         return null;
       case 'onFeatureFlagsCallback':
-        _onFeatureFlagsCallback
-            ?.call(featureFlagsLoadedFromMap(call.arguments));
+        final arguments = call.arguments;
+        // Sent before the native SDK got the latest reset() or close(), so
+        // these may be the previous user's flags.
+        if (arguments is! Map ||
+            arguments['generation'] !=
+                FeatureFlagsListeners.instance.generation) {
+          break;
+        }
+        final loaded = featureFlagsLoadedFromMap(call.arguments);
+        // First, so a throwing config callback can't starve listeners and a
+        // reset() or close() it starts clears this load.
+        FeatureFlagsListeners.instance.deliver(loaded);
+        _onFeatureFlagsCallback?.call(loaded);
         break;
       case 'pushIdentityProvider':
         // Returning a value here is the reply the native SDK awaits.
@@ -203,6 +216,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     SurveyService().hideSurvey();
   }
 
+  Map<String, Object> _flagsGenerationArguments() =>
+      {'flagsGeneration': FeatureFlagsListeners.instance.generation};
+
   /// Flutter to Native Calls
   ///
   @override
@@ -222,6 +238,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       await _invoke('setup', {
         ...config.toMap(),
         ...flutterVersionSetupArguments(),
+        ..._flagsGenerationArguments(),
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on setup: $exception');
@@ -604,7 +621,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      await _invoke('reset');
+      await _invoke('reset', _flagsGenerationArguments());
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reset: $exception');
     }
@@ -688,8 +705,17 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return featureFlagsLoadedFromMap(null);
     }
 
+    final generation = FeatureFlagsListeners.instance.generation;
     try {
-      return featureFlagsLoadedFromMap(await _invoke('reloadFeatureFlags'));
+      final loaded =
+          featureFlagsLoadedFromMap(await _invoke('reloadFeatureFlags'));
+      // posthog-android hands a manual reload only to its completion, not to
+      // the config callback that sends onFeatureFlagsCallback.
+      if (defaultTargetPlatform == TargetPlatform.android &&
+          generation == FeatureFlagsListeners.instance.generation) {
+        FeatureFlagsListeners.instance.deliver(loaded);
+      }
+      return loaded;
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reloadFeatureFlags: $exception');
       return featureFlagsLoadedFromMap(null);
@@ -1000,7 +1026,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      return await _invoke('close');
+      return await _invoke('close', _flagsGenerationArguments());
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on close: $exception');
     }

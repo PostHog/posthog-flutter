@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 /// The feature flags passed to [PostHogConfig.onFeatureFlags] and returned by
 /// [Posthog.reloadFeatureFlags].
 ///
@@ -50,4 +52,19 @@ class PostHogFeatureFlagsLoaded {
   @override
   String toString() =>
       'PostHogFeatureFlagsLoaded(variants: $variants, errorsLoading: $errorsLoading)';
+}
+
+/// A listener added with [Posthog.onFeatureFlags].
+///
+/// Call [unsubscribe] to stop receiving feature flags updates.
+class PostHogFeatureFlagsSubscription {
+  final void Function() _unsubscribe;
+
+  /// Not part of the public API.
+  @internal
+  PostHogFeatureFlagsSubscription(this._unsubscribe);
+
+  /// Stops the listener from receiving further updates. Calling it again has
+  /// no effect.
+  void unsubscribe() => _unsubscribe();
 }

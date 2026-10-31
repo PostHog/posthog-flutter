@@ -3,6 +3,7 @@
 // package as the core of your plugin.
 import 'dart:async';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -12,6 +13,7 @@ import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
+import 'src/feature_flags_listeners.dart';
 import 'src/feature_flags_loaded.dart';
 import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
@@ -37,6 +39,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Copied at setup. Event beforeSend runs here, before posthog-js, the same
   /// way [PosthogFlutterIO] runs it before the platform channel.
   List<BeforeSendCallback> _beforeSendCallbacks = [];
+  JSFunction? _featureFlagsUnsubscribe;
+
+  /// Bumped by each setup() and close(), so a posthog-js registration from an
+  /// earlier one stops delivering even when it can't be unsubscribed.
+  int _featureFlagsGeneration = 0;
 
   // posthog-js has no current screen, so the feature events get it from here
   // the way native SDKs stamp it: the last screen beforeSend accepted, under
@@ -149,19 +156,38 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     WebCanvasMaskProvider(config).register();
 
-    if (config.onFeatureFlags != null && ph != null) {
-      final dartCallback = config.onFeatureFlags!;
+    // Skipped for a posthog-js stub without onFeatureFlags.
+    if (ph != null && (ph as JSObject).has('onFeatureFlags')) {
+      final dartCallback = config.onFeatureFlags;
+      // Repeated setup would otherwise deliver each load twice.
+      _featureFlagsUnsubscribe?.callAsFunction();
+      _featureFlagsUnsubscribe = null;
+      final generation = ++_featureFlagsGeneration;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        dartCallback(featureFlagsLoadedFromMap({
+        // The posthog-js loader snippet queues the registration and returns
+        // no unsubscribe, so a later setup() or close() can't remove it.
+        if (generation != _featureFlagsGeneration) return;
+        final loaded = featureFlagsLoadedFromMap({
           'variants': jsFlagVariants.dartify(),
           'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
-        }));
+        });
+        // First, so a throwing config callback can't starve listeners and a
+        // reset() or close() it starts clears this load.
+        FeatureFlagsListeners.instance.deliver(loaded);
+        dartCallback?.call(loaded);
       }.toJS;
 
-      ph.onFeatureFlags(jsCallback);
+      // posthog-js replays loaded flags synchronously, and a callback may call
+      // close() or setup() before this returns the unsubscribe.
+      final unsubscribe = ph.onFeatureFlags(jsCallback);
+      if (generation == _featureFlagsGeneration) {
+        _featureFlagsUnsubscribe = unsubscribe;
+      } else {
+        unsubscribe?.callAsFunction();
+      }
     }
   }
 
@@ -443,7 +469,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reset() async {
-    return _call(const MethodCall('reset'));
+    return _order.run(() {
+      // Posthog.reset() cleared this when the app called it, but a load can
+      // still arrive while the reset waits behind an async beforeSend.
+      // posthog-js sends no empty load on reset, so nothing else would replace
+      // that load for listeners added later.
+      FeatureFlagsListeners.instance.clear();
+      return handleWebMethodCall(const MethodCall('reset'));
+    });
   }
 
   @override
@@ -599,6 +632,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<void> close() async {
     _currentScreen = null;
+    _featureFlagsUnsubscribe?.callAsFunction();
+    _featureFlagsUnsubscribe = null;
+    _featureFlagsGeneration++;
     return _call(const MethodCall('close'));
   }
 

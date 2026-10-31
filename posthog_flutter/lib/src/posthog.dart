@@ -5,6 +5,7 @@ import 'package:meta/meta.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'feature_flag_result.dart';
+import 'feature_flags_listeners.dart';
 import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_record.dart';
 import 'logs/posthog_log_severity.dart';
@@ -488,6 +489,7 @@ class Posthog {
     // Bumped before the platform call because native rotates inside that round
     // trip.
     PostHogInternalEvents.requestReplaySessionReset();
+    FeatureFlagsListeners.instance.clear();
     await _posthog.reset();
   }
 
@@ -610,6 +612,42 @@ class Posthog {
   /// ```
   Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() =>
       _posthog.reloadFeatureFlags();
+
+  /// Registers a [callback] that's invoked whenever feature flags are loaded
+  /// or updated.
+  ///
+  /// It's invoked after the SDK loads flags at startup (including from
+  /// bootstrap values), after [reloadFeatureFlags], and after calls that
+  /// reload flags such as [identify], [group] or [reset]. If a load fails,
+  /// [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the values are
+  /// the last known flags. If flags have already loaded when you register,
+  /// it's also invoked with the current values shortly afterwards.
+  ///
+  /// You can register before [setup], and the callback stays registered
+  /// across [close] and [setup]. Treat each invocation as "flags may have
+  /// changed", not as an exactly-once event.
+  ///
+  /// Returns a subscription; call
+  /// [PostHogFeatureFlagsSubscription.unsubscribe] to stop receiving updates.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final subscription = Posthog().onFeatureFlags((loaded) {
+  ///   if (loaded.variants['new-checkout'] == 'test') {
+  ///     // Show the test variant.
+  ///   }
+  /// });
+  ///
+  /// // Later, stop listening.
+  /// subscription.unsubscribe();
+  /// ```
+  PostHogFeatureFlagsSubscription onFeatureFlags(
+      OnFeatureFlagsCallback callback) {
+    // Creating the platform installs the channel handler native loads arrive
+    // on. With native auto-init this can be the app's only Dart SDK call.
+    _posthog;
+    return FeatureFlagsListeners.instance.add(callback);
+  }
 
   /// Sets person properties that are used only for feature flag evaluation.
   ///
@@ -1137,6 +1175,7 @@ class Posthog {
     // recording that follows must start clean either way.
     PostHogInternalEvents.requestReplaySessionReset();
     PosthogObserver.clearCurrentContext();
+    FeatureFlagsListeners.instance.clear();
 
     // Uninstall Flutter integrations
     _uninstallFlutterIntegrations();

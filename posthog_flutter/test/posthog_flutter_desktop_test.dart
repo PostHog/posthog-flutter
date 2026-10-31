@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_app_info.dart';
@@ -2434,6 +2435,57 @@ void main() {
       expect(failed.variants, {'variant-flag': 'test-variant'});
       expect(failed.errorsLoading, isTrue);
       expect(announced.last.errorsLoading, isTrue);
+    });
+
+    test('onFeatureFlags listeners receive each load', () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      final platform =
+          await setUpPlatform(configFor(server)..preloadFeatureFlags = false);
+
+      await platform.reloadFeatureFlags();
+
+      expect(received.last.variants, {'variant-flag': 'test-variant'});
+    });
+
+    test(
+        'onFeatureFlags listeners get the load when the config callback throws',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      FeatureFlagsListeners.instance.clear();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = (_) => throw StateError('app callback'));
+
+      await platform.reloadFeatureFlags();
+
+      expect(received.last.variants, {'variant-flag': 'test-variant'});
+    });
+
+    test('a reset started by the config callback is not undone by the load',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      FeatureFlagsListeners.instance.clear();
+      // What reset() and close() do before reaching the platform.
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = (_) => FeatureFlagsListeners.instance.clear());
+
+      await platform.reloadFeatureFlags();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received, isEmpty);
     });
 
     test('onFeatureFlags reports the flags cached by the previous launch',

@@ -45,6 +45,24 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private var channel: FlutterMethodChannel?
     private var featureFlagsSubscription: PostHogFeatureFlagsSubscription?
 
+    // Dart's feature flags lifecycle, sent with setup, reset and close. Each
+    // flags notification carries the one current when it fired, so Dart can
+    // drop loads from before a reset or close.
+    private let flagsGenerationLock = NSLock()
+    private var flagsGenerationValue = 0
+    private var flagsGeneration: Int {
+        get {
+            flagsGenerationLock.lock()
+            defer { flagsGenerationLock.unlock() }
+            return flagsGenerationValue
+        }
+        set {
+            flagsGenerationLock.lock()
+            flagsGenerationValue = newValue
+            flagsGenerationLock.unlock()
+        }
+    }
+
     // Mint route for pushIdentityProvider, anchored to the engine whose setup()
     // installed the provider. A live owner is never displaced; provider-enabled
     // engines stay candidates so detach promotes the most recent survivor instead
@@ -88,7 +106,15 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     }
 
     func featureFlagsDidUpdate(_ loaded: PostHogFeatureFlagsLoaded) {
-        invokeFlutterMethod("onFeatureFlagsCallback", arguments: Self.featureFlagsLoadedMap(loaded))
+        var arguments = Self.featureFlagsLoadedMap(loaded)
+        arguments["generation"] = flagsGeneration
+        invokeFlutterMethod("onFeatureFlagsCallback", arguments: arguments)
+    }
+
+    private func updateFlagsGeneration(_ call: FlutterMethodCall) {
+        if let generation = (call.arguments as? [String: Any])?["flagsGeneration"] as? Int {
+            flagsGeneration = generation
+        }
     }
 
     private static func featureFlagsLoadedMap(_ loaded: PostHogFeatureFlagsLoaded) -> [String: Any] {
@@ -485,6 +511,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "setup":
+            updateFlagsGeneration(call)
             setup(call, result: result)
         case "getFeatureFlag":
             getFeatureFlag(call, result: result)
@@ -515,6 +542,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         case "distinctId":
             distinctId(result)
         case "reset":
+            updateFlagsGeneration(call)
             reset(result)
         case "enable":
             enable(result)
@@ -547,6 +575,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         case "addExceptionStep":
             addExceptionStep(call, result: result)
         case "close":
+            updateFlagsGeneration(call)
             close(result)
         case "sendMetaEvent":
             sendMetaEvent(call, result: result)
