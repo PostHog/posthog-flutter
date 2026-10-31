@@ -46,32 +46,138 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   /// Stored beforeSend callbacks for dropping/modifying events
   List<BeforeSendCallback> _beforeSendCallbacks = [];
 
+  /// Starts with `$` so the native SDKs treat it like `$screen` in every other
+  /// respect. Never sent: sendBuiltEvent sets the event's real name.
+  static const _capturedScreenBuildName = r'$captured_screen';
+
   final _order = CallOrder();
 
   Future<dynamic> _invoke(String method, [Object? arguments]) =>
       _order.run(() => _methodChannel.invokeMethod(method, arguments));
 
-  /// Applies the beforeSend callbacks to an event in order.
-  /// Returns the possibly modified event, or null if any callback drops it.
-  /// Without callbacks the event comes back synchronously, so it is handed
-  /// over in the same call and nothing has to wait for it.
-  FutureOr<PostHogEvent?> _runBeforeSend(
-    String eventName,
-    Map<String, Object>? properties, {
-    Map<String, Object>? userProperties,
-    Map<String, Object>? userPropertiesSetOnce,
-    Map<String, Object?>? options,
+  /// Builds the event in the native SDK, runs the beforeSend callbacks on
+  /// the built event, then has the native SDK send what they return, so the
+  /// callbacks see what the SDK adds. [build] holds the `buildEvent`
+  /// arguments.
+  ///
+  /// Returns the native send result (the uuid on the AI lane), or null when
+  /// the native SDK skips the event or a callback drops it.
+  Future<Object?> _buildRunBeforeSendAndSend(
+    Map<String, Object?> build, {
+    bool ai = false,
+    String? eventName,
+  }) async {
+    // setup() replaces the callbacks at once but reaches native after this
+    // event, which must not run under the next setup's filters.
+    final callbacks = _beforeSendCallbacks;
+    Object? result;
+    await _order.event<({String uuid, Map<String, Object?>? send})?>(
+      () => _buildAndRunBeforeSend(build, ai, callbacks, eventName),
+      (built) async {
+        if (built == null) return;
+        final send = built.send;
+        if (send == null) {
+          await _methodChannel
+              .invokeMethod('discardBuiltEvent', {'uuid': built.uuid});
+          return;
+        }
+        result = await _methodChannel.invokeMethod<Object?>(
+          'sendBuiltEvent',
+          {...send, 'uuid': built.uuid, 'ai': ai},
+        );
+      },
+    );
+    return result;
+  }
+
+  /// Has the native SDK build the event and runs the beforeSend callbacks on
+  /// it. Returns null when the native SDK skips the event; `send` is null when
+  /// a callback drops it.
+  Future<({String uuid, Map<String, Object?>? send})?> _buildAndRunBeforeSend(
+    Map<String, Object?> build,
+    bool ai,
+    List<BeforeSendCallback> callbacks,
+    String? eventName,
+  ) async {
+    final built = await _methodChannel.invokeMapMethod<String, Object?>(
+      'buildEvent',
+      {...build, 'ai': ai},
+    );
+    final uuid = built?['uuid'];
+    if (built == null || uuid is! String) return null;
+
+    Map<String, Object?>? send;
+    try {
+      final processed = await applyBeforeSend(
+        callbacks,
+        _eventFromNative(built, eventName: eventName),
+      );
+      if (processed == null) {
+        printIfDebug(
+            '[PostHog] Event dropped by beforeSend: ${eventName ?? built['event']}');
+      } else {
+        send = _eventToNative(processed);
+      }
+    } catch (e) {
+      printIfDebug('[PostHog] Event dropped, it could not be read: $e');
+    }
+    return (uuid: uuid, send: send);
+  }
+
+  static PostHogEvent _eventFromNative(
+    Map<String, Object?> built, {
+    String? eventName,
   }) {
-    final event = PostHogEvent(
-      event: eventName,
+    final properties = _stringKeyedMap(built['properties']) ?? {};
+    final userProperties = _stringKeyedMap(properties.remove(r'$set'));
+    final userPropertiesSetOnce =
+        _stringKeyedMap(properties.remove(r'$set_once'));
+    final timestampMs = built['timestamp'] as int?;
+    return PostHogEvent(
+      event: eventName ?? built['event'] as String? ?? '',
       properties: properties,
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
-      options: options == null ? null : {...options},
+      options: (built['options'] as Map?)?.cast<String, Object?>(),
+      uuid: built['uuid'] as String?,
+      distinctId: built['distinctId'] as String?,
+      timestamp: timestampMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(timestampMs, isUtc: true),
     );
-    return _beforeSendCallbacks.isEmpty
-        ? event
-        : applyBeforeSend(_beforeSendCallbacks, event);
+  }
+
+  static Map<String, Object?> _eventToNative(PostHogEvent event) {
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: event.properties,
+      userProperties: event.userProperties,
+      userPropertiesSetOnce: event.userPropertiesSetOnce,
+    );
+    final properties = <String, Object>{
+      ...?extracted.properties,
+      if (extracted.userProperties != null) r'$set': extracted.userProperties!,
+      if (extracted.userPropertiesSetOnce != null)
+        r'$set_once': extracted.userPropertiesSetOnce!,
+    };
+    return {
+      'event': event.event,
+      'properties': PropertyNormalizer.normalize(properties),
+      if (event.distinctId?.trim().isNotEmpty == true)
+        'distinctId': event.distinctId,
+      if (event.timestamp != null)
+        'timestamp': event.timestamp!.millisecondsSinceEpoch,
+      'options': cleanEventOptions(event.options) ?? const <String, Object?>{},
+    };
+  }
+
+  /// Copies a map from the channel with its string keys and non-null values.
+  static Map<String, Object>? _stringKeyedMap(Object? value) {
+    if (value is! Map) return null;
+    return {
+      for (final entry in value.entries)
+        if (entry.key is String && entry.value != null)
+          entry.key as String: entry.value as Object,
+    };
   }
 
   /// Native plugin calls to Flutter
@@ -359,69 +465,79 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return null;
     }
 
-    Object? result;
-    await _order.event(
-      () => _runBeforeSend(
-        eventName,
-        properties,
-        userProperties: userProperties,
-        userPropertiesSetOnce: userPropertiesSetOnce,
-        options: options,
-      ),
-      (processedEvent) async {
-        result = await _sendCapture(method, eventName, processedEvent);
-      },
-    );
-    return result;
-  }
-
-  Future<Object?> _sendCapture(
-    String method,
-    String eventName,
-    PostHogEvent? processedEvent,
-  ) async {
-    if (processedEvent == null) {
-      printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
-      return null;
+    if (_beforeSendCallbacks.isNotEmpty) {
+      final ai = method == 'captureAi';
+      try {
+        return await _buildRunBeforeSendAndSend(
+          {
+            ..._captureArguments(
+              eventName: eventName,
+              properties: properties,
+              userProperties: userProperties,
+              userPropertiesSetOnce: userPropertiesSetOnce,
+              options: options,
+            ),
+            // The native builders treat `$screen` as a screen() call: it needs
+            // a `$screen_name` and, on iOS, loses person properties. A plain
+            // capture has neither rule, so it builds under another name.
+            if (!ai && eventName == PostHogEventName.screen)
+              'eventName': _capturedScreenBuildName,
+          },
+          ai: ai,
+          eventName: eventName,
+        );
+      } on PlatformException catch (exception) {
+        printIfDebug('Exeption on $method: $exception');
+        return null;
+      }
     }
 
     try {
-      // Use processed event properties (potentially modified by beforeSend)
-      final extracted = CaptureUtils.extractUserProperties(
-        properties: processedEvent.properties,
-        userProperties: processedEvent.userProperties,
-        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
+      return await _invoke(
+        method,
+        _captureArguments(
+          eventName: eventName,
+          properties: properties,
+          userProperties: userProperties,
+          userPropertiesSetOnce: userPropertiesSetOnce,
+          options: options,
+        ),
       );
-
-      final extractedProperties = extracted.properties;
-      final extractedUserProperties = extracted.userProperties;
-      final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
-
-      final normalizedProperties = extractedProperties != null
-          ? PropertyNormalizer.normalize(extractedProperties)
-          : null;
-      final normalizedUserProperties = extractedUserProperties != null
-          ? PropertyNormalizer.normalize(extractedUserProperties)
-          : null;
-      final normalizedUserPropertiesSetOnce =
-          extractedUserPropertiesSetOnce != null
-              ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
-              : null;
-      final cleanedOptions = cleanEventOptions(processedEvent.options);
-
-      return await _invoke(method, {
-        'eventName': processedEvent.event,
-        if (normalizedProperties != null) 'properties': normalizedProperties,
-        if (normalizedUserProperties != null)
-          'userProperties': normalizedUserProperties,
-        if (normalizedUserPropertiesSetOnce != null)
-          'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
-        if (cleanedOptions != null) 'options': cleanedOptions,
-      });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on $method: $exception');
       return null;
     }
+  }
+
+  /// The `capture`, `captureAi` and `buildEvent` arguments, with `$set` and
+  /// `$set_once` moved out of [properties] and the values normalized.
+  static Map<String, Object?> _captureArguments({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) {
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: properties,
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+    );
+    final extractedProperties = extracted.properties;
+    final extractedUserProperties = extracted.userProperties;
+    final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
+    final cleanedOptions = cleanEventOptions(options);
+    return {
+      'eventName': eventName,
+      if (extractedProperties != null)
+        'properties': PropertyNormalizer.normalize(extractedProperties),
+      if (extractedUserProperties != null)
+        'userProperties': PropertyNormalizer.normalize(extractedUserProperties),
+      if (extractedUserPropertiesSetOnce != null)
+        'userPropertiesSetOnce':
+            PropertyNormalizer.normalize(extractedUserPropertiesSetOnce),
+      if (cleanedOptions != null) 'options': cleanedOptions,
+    };
   }
 
   @override
@@ -434,62 +550,34 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
-    // The screen name argument wins over a properties `$screen_name`.
-    // beforeSend still runs after this and can change the name.
-    final propsWithScreenName = <String, Object>{
-      ...?properties,
-      PostHogPropertyName.screenName: screenName,
-    };
-
-    // Apply beforeSend callback - screen events are captured as $screen
-    return _order.event(
-      () => _runBeforeSend(
-        PostHogEventName.screen,
-        propsWithScreenName,
-        options: options,
-      ),
-      (processedEvent) => _sendScreen(screenName, processedEvent),
-    );
-  }
-
-  Future<void> _sendScreen(
-    String screenName,
-    PostHogEvent? processedEvent,
-  ) async {
-    if (processedEvent == null) {
-      printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
+    if (_beforeSendCallbacks.isNotEmpty) {
+      try {
+        final cleanedOptions = cleanEventOptions(options);
+        await _buildRunBeforeSendAndSend({
+          'eventName': PostHogEventName.screen,
+          // The screen name argument wins over a properties `$screen_name`.
+          'properties': PropertyNormalizer.normalize({
+            ...?properties,
+            PostHogPropertyName.screenName: screenName,
+          }),
+          if (cleanedOptions != null) 'options': cleanedOptions,
+        });
+      } on PlatformException catch (exception) {
+        printIfDebug('Exeption on screen: $exception');
+      }
       return;
     }
-
-    // If event name was changed, use regular capture() instead
-    if (processedEvent.event != PostHogEventName.screen) {
-      await capture(
-        eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
-        options: processedEvent.options,
-      );
-      return;
-    }
-
-    // Get the (possibly modified) screen name from properties and remove it
-    final finalScreenName =
-        processedEvent.properties?[PostHogPropertyName.screenName] as String? ??
-            screenName;
-    // It will be added back by native sdk
-    processedEvent.properties?.remove(PostHogPropertyName.screenName);
 
     try {
-      final normalizedProperties = processedEvent.properties?.isNotEmpty == true
-          ? PropertyNormalizer.normalize(
-              processedEvent.properties!.cast<String, Object>(),
-            )
-          : null;
-
-      final cleanedOptions = cleanEventOptions(processedEvent.options);
+      // The native SDK adds the screen name back as `$screen_name`.
+      final screenProperties = <String, Object>{...?properties}
+        ..remove(PostHogPropertyName.screenName);
+      final cleanedOptions = cleanEventOptions(options);
 
       await _invoke('screen', {
-        'screenName': finalScreenName,
-        if (normalizedProperties != null) 'properties': normalizedProperties,
+        'screenName': screenName,
+        if (screenProperties.isNotEmpty)
+          'properties': PropertyNormalizer.normalize(screenProperties),
         if (cleanedOptions != null) 'options': cleanedOptions,
       });
     } on PlatformException catch (exception) {
@@ -919,56 +1007,34 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-      // Apply beforeSend callback - exception events are captured as $exception
-      await _order.event(
-        () => _runBeforeSend(
-          PostHogEventName.exception,
-          exceptionProps.cast<String, Object>(),
-          options: options,
-        ),
-        (processedEvent) => _sendException(error, processedEvent),
+      if (_beforeSendCallbacks.isNotEmpty) {
+        final cleanedOptions = cleanEventOptions(options);
+        await _buildRunBeforeSendAndSend({
+          'eventName': PostHogEventName.exception,
+          'properties': PropertyNormalizer.normalize(
+            exceptionProps.cast<String, Object>(),
+          ),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          if (cleanedOptions != null) 'options': cleanedOptions,
+        });
+        return;
+      }
+
+      // Add timestamp from Flutter side (will be used and removed from native plugins)
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final normalizedData = PropertyNormalizer.normalize(
+        exceptionProps.cast<String, Object>(),
       );
+      final cleanedOptions = cleanEventOptions(options);
+
+      await _invoke('captureException', {
+        'timestamp': timestamp,
+        'properties': normalizedData,
+        if (cleanedOptions != null) 'options': cleanedOptions,
+      });
     } on PlatformException catch (exception) {
       printIfDebug('Exception in captureException: $exception');
     }
-  }
-
-  Future<void> _sendException(
-    Object error,
-    PostHogEvent? processedEvent,
-  ) async {
-    if (processedEvent == null) {
-      printIfDebug(
-        '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
-      );
-      return;
-    }
-
-    // If event name was changed, use capture() instead
-    if (processedEvent.event != PostHogEventName.exception) {
-      await capture(
-        eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
-        options: processedEvent.options,
-      );
-      return;
-    }
-
-    // Add timestamp from Flutter side (will be used and removed from native plugins)
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final normalizedData = processedEvent.properties != null
-        ? PropertyNormalizer.normalize(
-            processedEvent.properties!.cast<String, Object>(),
-          )
-        : <String, Object>{};
-
-    final cleanedOptions = cleanEventOptions(processedEvent.options);
-
-    await _invoke('captureException', {
-      'timestamp': timestamp,
-      'properties': normalizedData,
-      if (cleanedOptions != null) 'options': cleanedOptions,
-    });
   }
 
   @override

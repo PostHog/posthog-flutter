@@ -231,6 +231,12 @@ On iOS, macOS and Android, a malformed, empty or whitespace-only payload from `g
 
 On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
 
+### `beforeSend` on iOS, macOS and Android
+
+**This is a silent change.** Callbacks now get the event the native SDK built, including its system properties, such as `$device_type` and `$session_id`, and registered properties. Their changes are final. In 5.x they saw only the properties you passed, so a callback that loops over or strips every property now also touches the SDK's. `PostHogEvent` also has `uuid`, `distinctId` and `timestamp`, set on every platform except web.
+
+Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin for those.
+
 ### Lifecycle events on iOS and macOS
 
 `Application Installed`, `Application Updated` and `Application Opened` no longer include `version` and `build`. Update insights, cohorts and filters that use them to `$app_version` and `$app_build`. Android still sends them.
@@ -243,6 +249,7 @@ A path that needs user action, such as a VPN waiting for a password, counts as r
 
 - **Property order:** an event's properties are the SDK's, then registered properties, then the event's own, so your value now wins for that event. `beforeSend` runs after that merge, except that `$lib` and `$lib_version` always come from the `PostHog-Sdk-Info` header.
 - **Person processing:** it's sent as the `process_person_profile: false` option only while it's off, instead of a `$process_person_profile` property on every event.
+- **`beforeSend` and person processing:** person processing is decided before the callbacks run. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 - **Redirects:** only same-origin 307 and 308 redirects are followed. Any other redirect drops the batch.
 - **Retries:** a failed batch waits 1 second, doubling up to 30 seconds with ±25% jitter, instead of retrying within the same flush. `Retry-After` is a floor under that wait, capped at 30 seconds.
 - **Timestamps:** an event's timestamp is taken before `beforeSend` runs.

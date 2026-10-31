@@ -5642,6 +5642,33 @@
                                 "name": "options",
                                 "relativePath": "lib/src/posthog_event.dart",
                                 "typeName": "Map<String, Object?>?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "uuid",
+                                "relativePath": "lib/src/posthog_event.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "distinctId",
+                                "relativePath": "lib/src/posthog_event.dart",
+                                "typeName": "String?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "timestamp",
+                                "relativePath": "lib/src/posthog_event.dart",
+                                "typeName": "DateTime?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_event.dart",
@@ -5705,6 +5732,39 @@
                         "name": "options",
                         "relativePath": "lib/src/posthog_event.dart",
                         "typeName": "Map<String, Object?>?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": false,
+                        "name": "uuid",
+                        "relativePath": "lib/src/posthog_event.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "distinctId",
+                        "relativePath": "lib/src/posthog_event.dart",
+                        "typeName": "String?"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
+                        "name": "timestamp",
+                        "relativePath": "lib/src/posthog_event.dart",
+                        "typeName": "DateTime?"
                     }
                 ],
                 "isDeprecated": false,

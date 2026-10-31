@@ -16,11 +16,14 @@ import 'utils/utils.dart';
 import 'uuid.dart';
 
 /// An event built by [PostHogCore.prepareEvent]: its properties, its
-/// capture v1 options and the time it happened, as an ISO 8601 string.
+/// capture v1 options, the time it happened as an ISO 8601 string, its uuid
+/// and the id of the person it is captured for.
 typedef PostHogPreparedEvent = ({
   Map<String, Object?> properties,
   Map<String, Object?>? options,
   String timestamp,
+  String uuid,
+  String distinctId,
 });
 
 /// Stateful PostHog client with session management, identity, and feature flags.
@@ -461,16 +464,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
         return _queuePrepared(event, prepared, ai: ai);
       });
 
-  /// [options] with `process_person_profile: false` added when person
-  /// processing is off and [properties] neither ask for it nor set
-  /// `$process_person_profile`, as [prepareEvent] decides it.
-  Map<String, Object?>? personProcessingOptions(
-    Map<String, Object?>? options,
-    Map<String, Object?> properties,
-  ) =>
-      _personProcessingOptions(options, properties,
-          requested: _requestsPersonProcessing(properties));
-
   PostHogPreparedEvent? _prepareEvent(
     String event, {
     Map<String, Object?>? properties,
@@ -492,6 +485,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
         requested: _requestsPersonProcessing(properties),
       ),
       timestamp: currentISOTime(),
+      uuid: generateUuidV7(),
+      distinctId: getDistinctId(),
     );
   }
 
@@ -500,21 +495,31 @@ abstract class PostHogCore extends PostHogCoreStateless {
     PostHogPreparedEvent prepared, {
     bool ai = false,
   }) {
-    final (:properties, :options, :timestamp) = prepared;
-    final uuid = captureStateless(getDistinctId(), event,
-        properties: properties, options: options, timestamp: timestamp, ai: ai);
-    if (uuid == null) return null;
+    final (:properties, :options, :timestamp, :uuid, :distinctId) = prepared;
+    final queuedUuid = captureStateless(distinctId, event,
+        properties: properties,
+        options: options,
+        timestamp: timestamp,
+        uuid: uuid,
+        ai: ai);
+    if (queuedUuid == null) return null;
     // Taken from the event as queued, after the beforeSend callbacks, so a
     // value they removed or an event they or the size limit dropped neither
     // reaches /flags nor turns on person processing for later events.
     if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
-    _setPersonPropertiesForFlagsIfNeeded(
-      _asPropertyMap(properties[r'$set']),
-      _asPropertyMap(properties[r'$set_once']),
-    );
+    // A callback can send the event for another distinct id; its person
+    // properties then belong to that person, not to the current user's
+    // flags or person-properties hash.
+    final isCurrentUser = distinctId == getDistinctId();
+    if (isCurrentUser) {
+      _setPersonPropertiesForFlagsIfNeeded(
+        _asPropertyMap(properties[r'$set']),
+        _asPropertyMap(properties[r'$set_once']),
+      );
+    }
     // PostHog drops an AI event that is not an `$ai_*` event, so it never
     // updates the person.
-    if (!ai && (event == r'$set' || event == r'$identify')) {
+    if (!ai && isCurrentUser && (event == r'$set' || event == r'$identify')) {
       final set = properties[r'$set'];
       final setOnce = properties[r'$set_once'];
       if ((set is Map || setOnce is Map) &&
@@ -523,7 +528,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
             _personPropertiesHash(getDistinctId(), set, setOnce);
       }
     }
-    return uuid;
+    return queuedUuid;
   }
 
   /// Creates an alias for a user. An empty [alias] is ignored.
