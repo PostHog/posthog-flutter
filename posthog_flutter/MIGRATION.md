@@ -7,12 +7,16 @@
 | iOS deployment target | 13.0 | 15.0 |
 | macOS deployment target | 10.15 | 11.0 |
 | Android `minSdkVersion` declared by the plugin | 21 | 23 |
+| iOS and macOS dependency manager | CocoaPods or Swift Package Manager | Swift Package Manager only |
+| Flutter for iOS and macOS builds | 3.27 | 3.41 |
 
-The Dart (`>=3.6.0`) and Flutter (`>=3.27.0`) minimums are unchanged.
+The Dart minimum (`>=3.6.0`) is unchanged. Android, web, Windows and Linux builds aren't affected by the Swift Package Manager requirement.
 
 ### iOS and macOS
 
-Raise your app's deployment targets. A lower target fails the build.
+Raise your app's deployment targets. A lower target fails the build. Set **Minimum Deployments** for the `Runner` target in Xcode (**Runner > General > Minimum Deployments**), which sets `IPHONEOS_DEPLOYMENT_TARGET` and `MACOSX_DEPLOYMENT_TARGET`.
+
+If you keep a `Podfile` for other plugins, raise its platform too:
 
 ```ruby
 # ios/Podfile
@@ -22,7 +26,26 @@ platform :ios, '15.0'
 platform :osx, '11.0'
 ```
 
-Also set `IPHONEOS_DEPLOYMENT_TARGET` and `MACOSX_DEPLOYMENT_TARGET` in your Xcode projects, including when you build with Swift Package Manager.
+### Move from CocoaPods to Swift Package Manager
+
+posthog_flutter 6.0 has no podspec. On iOS and macOS, it installs only through Swift Package Manager.
+
+**If you ignore this, the build stops.** With Swift Package Manager turned off, `flutter build` exits with `Plugin posthog_flutter is only compatible with Swift Package Manager`.
+
+1. Use Flutter 3.41 or later. The plugin's `Package.swift` depends on the `FlutterFramework` package, which Flutter generates starting with 3.41.
+2. Turn Swift Package Manager on if it's off. It's on by default from Flutter 3.44. On 3.41 to 3.43, or if you turned it off, run:
+
+   ```sh
+   flutter config --enable-swift-package-manager
+   ```
+
+3. Run your app. Flutter adds Swift Package Manager to the Xcode project on its own.
+
+Other plugins that only support CocoaPods keep working: Flutter installs them through your `Podfile` and installs posthog_flutter as a Swift package. Keep the `Podfile` in that case.
+
+If every plugin in your app supports Swift Package Manager, you can remove CocoaPods. This is optional. Follow [Flutter's steps](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers#how-to-remove-cocoapods-integration).
+
+**Add-to-app:** Flutter doesn't support Swift Package Manager in Flutter modules yet ([flutter/flutter#146957](https://github.com/flutter/flutter/issues/146957)), and its build stops for a plugin without a podspec. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until Flutter adds support.
 
 ### Android
 
@@ -34,7 +57,6 @@ Also set `IPHONEOS_DEPLOYMENT_TARGET` and `MACOSX_DEPLOYMENT_TARGET` in your Xco
 PENDING, not on this branch yet. PR #673 (which contains #649) moves the plugin to posthog-ios 4.x and
 posthog-android 4.x. Neither is released. When it merges, replace this comment with a section covering:
 - Xcode 26 required.
-- posthog-ios 4.0 is not published to CocoaPods, so `s.dependency 'PostHog', '>= 4.0.0'` cannot resolve: state what CocoaPods apps must do.
 - onFeatureFlags receives, and reloadFeatureFlags() returns, PostHogFeatureFlagsLoaded.
 - Capture v1 endpoints and what reverse proxies must forward.
 - iOS and Android: malformed, empty or whitespace-only flag payloads become null. iOS: bootstrapped string payloads stay strings.
@@ -193,7 +215,9 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 ## Upgrade checklist
 
-- [ ] Raise iOS to 15.0 and macOS to 11.0 in your Podfiles and Xcode projects.
+- [ ] Use Flutter 3.41 or later and make sure Swift Package Manager is on.
+- [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
+- [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.
 - [ ] Rename `com.posthog.posthog.API_KEY` to `com.posthog.posthog.PROJECT_TOKEN` in `AndroidManifest.xml` and `Info.plist`.
 - [ ] If you set `sendFeatureFlagEvent = false`, check whether anything relies on `$feature_flag_called` from `getFeatureFlagResult()`.
 - [ ] Add `sendFeatureFlagEvent: false` wherever you replace `getFeatureFlagPayload()`.
