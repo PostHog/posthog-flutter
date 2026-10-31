@@ -16,7 +16,7 @@
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x
-- **Breaking:** pass a `PostHogFeatureFlagsLoaded` with the enabled flags, their values and whether loading failed to `PostHogConfig.onFeatureFlags` — update callbacks from `() { ... }` to `(loaded) { ... }` or `(_) { ... }`
+- **Breaking:** remove `PostHogConfig.onFeatureFlags` — call `Posthog().onFeatureFlags((loaded) { ... })` before `setup()` instead, which also covers the first load
 - **Breaking:** return the reloaded flags from `reloadFeatureFlags()` as a `Future<PostHogFeatureFlagsLoaded>`
 - **Breaking:** return `null` instead of the raw string for a malformed, empty or whitespace-only `getFeatureFlagResult()` payload on iOS, macOS and Android
 - **Breaking:** keep string payloads passed to `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, as strings on iOS and macOS instead of decoding them to numbers or booleans
