@@ -471,7 +471,14 @@ class Posthog {
   /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
   /// this call, or `true` to capture it even when the config turns it off.
   ///
-  /// Returns `false` when the flag is disabled, missing, or not a boolean flag.
+  /// [defaultValue] is what this call returns when the flag has no value.
+  /// Defaults to `null`, which returns `false`. A flag has no value when flags
+  /// have not loaded yet, the flags request failed, or no flag has this key. A
+  /// flag that has a value always wins, including `false` and variants, and
+  /// `$feature_flag_called` never reports [defaultValue] as the flag's value.
+  ///
+  /// Returns `false` when the flag is disabled, and `true` when it is enabled
+  /// or set to a variant.
   ///
   /// **Example:**
   /// ```dart
@@ -479,10 +486,16 @@ class Posthog {
   ///     sendFeatureFlagEvent: false)) {
   ///   // show the new checkout without recording a flag exposure
   /// }
+  ///
+  /// // Keep the feature on until the flag says otherwise.
+  /// final showCheckout =
+  ///     await Posthog().isFeatureEnabled('new-checkout', defaultValue: true);
   /// ```
-  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
+  Future<bool> isFeatureEnabled(String key,
+          {bool? sendFeatureFlagEvent, bool? defaultValue}) =>
       _posthog.isFeatureEnabled(key,
-          sendFeatureFlagEvent: sendFeatureFlagEvent);
+          sendFeatureFlagEvent: sendFeatureFlagEvent,
+          defaultValue: defaultValue);
 
   /// Reloads feature flags for the current user.
   ///

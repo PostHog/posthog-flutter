@@ -15,3 +15,4 @@
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
+- Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value

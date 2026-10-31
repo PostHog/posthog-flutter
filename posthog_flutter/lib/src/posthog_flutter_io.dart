@@ -589,7 +589,15 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key,
-      {bool? sendFeatureFlagEvent}) async {
+      {bool? sendFeatureFlagEvent, bool? defaultValue}) async {
+    if (defaultValue != null) {
+      // Native isFeatureEnabled returns a plain Bool, which can't tell a missing
+      // flag from a disabled one. Both call the same native flag read.
+      final result = await getFeatureFlagResult(
+          key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);
+      return result?.enabled ?? defaultValue;
+    }
+
     if (!isSupportedPlatform()) {
       return false;
     }
