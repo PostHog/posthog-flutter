@@ -34,5 +34,6 @@
 - Apply a `$process_person_profile` property or `process_person_profile` option passed with an event to that event on Windows and Linux
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
 - Run queued event encoding, file work and request compression on a background isolate on Windows and Linux so they no longer drop frames
+- Limit AI events waiting to be written on Windows and Linux to about 50 MiB in memory, dropping the oldest first and completing `captureAi` with `null` for them
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
