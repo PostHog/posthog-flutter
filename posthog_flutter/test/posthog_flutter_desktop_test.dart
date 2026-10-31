@@ -792,7 +792,7 @@ void main() {
     test('properties the callbacks remove stay removed', () async {
       final server = await LocalPostHogServer.start();
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
+      final flagsLoaded = _firstFlagsLoad();
       Map<String, Object?>? seen;
       final removed = [
         r'$feature/variant-flag',
@@ -800,9 +800,6 @@ void main() {
         r'$recording_status',
       ];
       final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        }
         ..beforeSend = [
           (event) {
             seen = {...?event.properties};
@@ -812,7 +809,7 @@ void main() {
           },
         ];
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       await platform.capture(eventName: 'scrubbed');
 
@@ -2355,9 +2352,10 @@ void main() {
       final server = await LocalPostHogServer.start();
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final announced = <PostHogFeatureFlagsLoaded>[];
-      final platform = await setUpPlatform(configFor(server)
-        ..preloadFeatureFlags = false
-        ..onFeatureFlags = announced.add);
+      final subscription = FeatureFlagsListeners.instance.add(announced.add);
+      addTearDown(subscription.unsubscribe);
+      final platform =
+          await setUpPlatform(configFor(server)..preloadFeatureFlags = false);
 
       final loaded = await platform.reloadFeatureFlags();
       expect(loaded.variants, {'variant-flag': 'test-variant'});
