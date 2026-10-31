@@ -44,13 +44,16 @@ FileStorage tempStorage() => FileStorage(tempDirectory().path);
 
 /// A client of [api] with [config], closed at the end of the test. It keeps
 /// its state in [storage], a new temporary directory by default, and
-/// attaches [context] and [timezone] to its events.
+/// attaches [context] and [timezone] to its events. Its backoff has no
+/// jitter unless [jitterUnit] says otherwise, so retries come 1, 2, 4, 8, 16
+/// and then 30 seconds apart.
 DesktopPostHog testClient(
   PostHogApiFake api, {
   PostHogConfig? config,
   FileStorage? storage,
   Map<String, Object?> context = const {},
   String? timezone,
+  double jitterUnit = 0.5,
 }) {
   final client = api.connect(
     () => DesktopPostHog(
@@ -60,6 +63,7 @@ DesktopPostHog testClient(
       timezone: timezone,
     ),
   );
+  client.jitterUnit = () => jitterUnit;
   addTearDown(client.close);
   return client;
 }
@@ -95,6 +99,12 @@ Map<String, Object?> queuedMessage(FileStorage storage, int index) =>
 Map<String, Object?> queuedProps(FileStorage storage, int index) {
   return queuedMessage(storage, index)['properties'] as Map<String, Object?>;
 }
+
+/// The capture v1 options of the queued event message at [index], empty
+/// when it has none.
+Map<String, Object?> queuedOptions(FileStorage storage, int index) =>
+    Map<String, Object?>.from(
+        (queuedMessage(storage, index)['options'] ?? const {}) as Map);
 
 /// The names of the queued events, oldest first.
 List<Object?> queuedEvents(FileStorage storage) =>

@@ -71,7 +71,7 @@ void main() {
             throw StateError('Unexpected directory access'));
   });
 
-  test('facade sends a gzipped batch with envelope and event metadata',
+  test('facade sends a gzipped capture v1 batch with envelope and metadata',
       () async {
     await Posthog().setup(config(flushAt: 2)..preloadFeatureFlags = false);
 
@@ -85,16 +85,21 @@ void main() {
     final request = server.batchRequests.single;
     expect(request.headers['content-encoding'], 'gzip');
     expect(request.headers['content-type'], 'application/json');
-    expect(request.body['api_key'], 'phc_transport');
-    expect(DateTime.tryParse(request.body['sent_at']! as String), isNotNull);
+    expect(request.headers['authorization'], 'Bearer phc_transport');
+    expect(request.headers['posthog-sdk-info'],
+        '$postHogFlutterSdkName/$postHogFlutterVersion');
+    expect(request.body.keys, unorderedEquals(['created_at', 'batch']));
+    expect(DateTime.tryParse(request.body['created_at']! as String), isNotNull);
     expect(request.eventNames, ['first event', 'second event']);
 
     for (final event in request.events) {
       expect(event['uuid'], isA<String>());
       expect(DateTime.tryParse(event['timestamp']! as String), isNotNull);
       expect(event['distinct_id'], isA<String>());
+      expect(event['session_id'], isA<String>());
       final properties = Map<String, Object?>.from(event['properties']! as Map);
-      expect(properties[r'$lib'], postHogFlutterSdkName);
+      expect(properties, isNot(contains(r'$lib')));
+      expect(properties, isNot(contains(r'$session_id')));
       expect(properties[r'$device_type'], 'Desktop');
       expect(properties[r'$app_version'], '1.2.3');
       expect(properties[r'$app_build'], 42);
