@@ -5,8 +5,10 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_app_info.dart';
+import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_desktop.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
@@ -218,6 +220,26 @@ void main() {
       expect(_propertiesOf(event)[r'$set'], {'plan': 'pro', 'team': 'core'});
     });
 
+    test(r'a beforeSend that removes a legacy $set keeps it off the event',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event..properties?.remove(r'$set'),
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        properties: {
+          r'$set': {'email': 'a@b.c'},
+        },
+      );
+
+      final event = await server.waitForEvent('redacted');
+      expect(_propertiesOf(event), isNot(contains(r'$set')));
+    });
+
     test(r'reports the platform language as $locale', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
@@ -282,7 +304,8 @@ void main() {
       expect(flags, isNot(contains('timezone')));
     });
 
-    test(r'reports $recording_status disabled on every event', () async {
+    test(r'reports $recording_status disabled unless the event sets it',
+        () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
 
@@ -295,7 +318,7 @@ void main() {
       final identify = await server.waitForEvent(r'$identify');
       expect(_propertiesOf(identify)[r'$recording_status'], 'disabled');
       final captured = await server.waitForEvent('replay event');
-      expect(_propertiesOf(captured)[r'$recording_status'], 'disabled');
+      expect(_propertiesOf(captured)[r'$recording_status'], 'active');
     });
   });
 
@@ -407,7 +430,7 @@ void main() {
       expect(_propertiesOf(event)[r'$set'], {'source': 'screen hook'});
     });
 
-    test('keeps the screen name when a callback rebuilds the properties',
+    test('a callback that removes the screen name keeps it off the events',
         () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -420,13 +443,28 @@ void main() {
       final platform = await setUpPlatform(config);
 
       await platform.screen(screenName: 'Home Screen');
+      await platform.capture(eventName: 'after screen');
 
       final event = await server.waitForEvent(r'$screen');
       final properties = _propertiesOf(event);
-      expect(properties[r'$screen_name'], 'Home Screen',
-          reason: 'the screen name is re-added after the callbacks, so one '
-              'dropping the key must not lose it');
+      expect(properties, isNot(contains(r'$screen_name')));
       expect(properties['scrubbed'], isTrue);
+      final after = await server.waitForEvent('after screen');
+      expect(_propertiesOf(after), isNot(contains(r'$screen_name')));
+    });
+
+    test('sends a non-string screen name a callback leaves', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event..properties?[r'$screen_name'] = 42,
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.screen(screenName: 'Home Screen');
+
+      final event = await server.waitForEvent(r'$screen');
+      expect(_propertiesOf(event)[r'$screen_name'], 42);
     });
 
     test('later events carry the last screen name', () async {
@@ -526,6 +564,31 @@ void main() {
       expect(server.eventNames, isNot(contains('original event')));
     });
 
+    test('a callback editing a registered nested map leaves later events alone',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'mutate') {
+              final metadata = event.properties?['metadata'];
+              if (metadata is Map) metadata['plan'] = 'pro';
+            }
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      await platform.register('metadata', {'plan': 'free'});
+
+      await platform.capture(eventName: 'mutate');
+      await platform.capture(eventName: 'after');
+
+      final mutated = _propertiesOf(await server.waitForEvent('mutate'));
+      final after = _propertiesOf(await server.waitForEvent('after'));
+      expect(mutated['metadata'], {'plan': 'pro'});
+      expect(after['metadata'], {'plan': 'free'});
+    });
+
     test('a callback can rewrite the person properties', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -541,6 +604,110 @@ void main() {
 
       final event = await server.waitForEvent('upgraded');
       expect(_propertiesOf(event)[r'$set'], {'plan': 'enterprise'});
+    });
+
+    test('flag evaluation gets the person properties the callbacks keep',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..preloadFeatureFlags = false
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'dropped') return null;
+            return event
+              ..userProperties = {'email': 'redacted'}
+              ..userPropertiesSetOnce = null;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+        userPropertiesSetOnce: {'first_seen': 'secret'},
+      );
+      await platform.capture(
+        eventName: 'dropped',
+        userProperties: {'dropped': 'secret'},
+      );
+      await platform.reloadFeatureFlags();
+
+      final personProperties = Map<String, Object?>.from(
+        server.flagsRequests.single.body['person_properties']! as Map,
+      );
+      expect(personProperties, containsPair('email', 'redacted'));
+      expect(personProperties, isNot(contains('first_seen')));
+      expect(personProperties, isNot(contains('dropped')));
+    });
+
+    test('a dropped person update does not turn on person processing',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event.event == 'dropped' ? null : event,
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'dropped',
+        userProperties: {'email': 'user@example.com'},
+      );
+      await platform.capture(eventName: 'after drop');
+
+      final event = await server.waitForEvent('after drop');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+    });
+
+    test('an event whose person properties are removed is personless',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [(event) => event..userProperties = null];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+      );
+
+      final event = await server.waitForEvent('redacted');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+    });
+
+    test('person properties a callback adds turn on person processing',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event..userProperties = {'email': 'user@example.com'},
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'signed up');
+
+      final event = await server.waitForEvent('signed up');
+      expect(_optionsOf(event), isNot(contains('process_person_profile')));
+      expect(_propertiesOf(event)[r'$set'], {'email': 'user@example.com'});
+    });
+
+    test('a callback can turn person processing back on', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) => event
+            ..userProperties = null
+            ..options = {'process_person_profile': true},
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+      );
+
+      final event = await server.waitForEvent('redacted');
+      expect(_optionsOf(event)['process_person_profile'], isTrue);
     });
 
     test('a throwing callback drops the event and stops the chain', () async {
@@ -576,17 +743,28 @@ void main() {
       expect(callOrder, ['transform', 'throw']);
     });
 
-    test('callbacks see user-provided properties only', () async {
+    test('callbacks see and change the properties and options the SDK adds',
+        () async {
       final server = await LocalPostHogServer.start();
-      Map<String, Object>? seenProperties;
+      PostHogEvent? seen;
       final config = configFor(server)
         ..beforeSend = [
           (event) {
-            seenProperties = event.properties;
+            seen = PostHogEvent(
+              event: event.event,
+              properties: {...?event.properties},
+              options: {...?event.options},
+            );
+            event.properties = {
+              ...?event.properties,
+              r'$device_type': 'Kiosk',
+            }..remove(r'$os_name');
+            event.options = null;
             return event;
           },
         ];
       final platform = await setUpPlatform(config);
+      await platform.register('plan', 'free');
 
       await platform.capture(
         eventName: 'context event',
@@ -594,13 +772,75 @@ void main() {
       );
 
       final event = await server.waitForEvent('context event');
-      // The whole map: no $session_id, $lib or other SDK enrichment is
-      // visible to the hook...
-      expect(seenProperties, {'plan': 'pro'});
-      // ...while the delivered event is still enriched after the hook ran.
+      final seenProperties = seen!.properties!;
+      expect(seenProperties, containsPair('plan', 'pro'),
+          reason: 'the event wins over a registered property');
+      expect(seenProperties, containsPair(r'$device_type', 'Desktop'));
+      expect(seenProperties, contains(r'$os_name'));
+      expect(seenProperties, contains(r'$session_id'));
+      expect(seenProperties, contains(r'$lib'));
+      expect(seen!.options, {'process_person_profile': false});
+      // The SDK adds nothing back after the hook ran.
       final properties = _propertiesOf(event);
-      expect(properties, containsPair(r'$lib', 'posthog-flutter'));
-      expect(properties.keys, contains(r'$session_id'));
+      expect(properties, containsPair(r'$device_type', 'Kiosk'));
+      expect(properties, isNot(contains(r'$os_name')));
+      expect(event, isNot(contains('options')));
+      expect(event['session_id'], isA<String>());
+    });
+
+    test('properties the callbacks remove stay removed', () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final flagsLoaded = Completer<void>();
+      Map<String, Object?>? seen;
+      final removed = [
+        r'$feature/variant-flag',
+        r'$active_feature_flags',
+        r'$recording_status',
+      ];
+      final config = configFor(server)
+        ..onFeatureFlags = (_) {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        }
+        ..beforeSend = [
+          (event) {
+            seen = {...?event.properties};
+            event.properties = {...?event.properties}
+              ..removeWhere((key, _) => removed.contains(key));
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+
+      await platform.capture(eventName: 'scrubbed');
+
+      final properties = _propertiesOf(await server.waitForEvent('scrubbed'));
+      expect(seen!.keys, containsAll(removed));
+      for (final key in removed) {
+        expect(properties, isNot(contains(key)));
+      }
+    });
+
+    test('the event time is taken before the callbacks run', () async {
+      final server = await LocalPostHogServer.start();
+      late DateTime hookStarted;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) async {
+            hookStarted = DateTime.now().toUtc();
+            // Real wait: the event must not take the time it is queued.
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'slow hook');
+
+      final event = await server.waitForEvent('slow hook');
+      final timestamp = DateTime.parse(event['timestamp']! as String);
+      expect(timestamp.isAfter(hookStarted), isFalse);
     });
 
     test('SDK-internal events bypass the callbacks', () async {
@@ -609,7 +849,7 @@ void main() {
       final flagsLoaded = Completer<void>();
       final seenEventNames = <String>[];
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         }
         ..beforeSend = [
@@ -950,6 +1190,242 @@ void main() {
         'Bad state: after reset': ['before reset'],
         'Bad state: after close': null,
       });
+    });
+  });
+
+  group('Event options', () {
+    test('are sent as they are, winning over their legacy properties',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+
+      await platform.capture(
+        eventName: 'tour step',
+        properties: {r'$product_tour_id': 'from-property'},
+        options: {
+          'process_person_profile': false,
+          'cookieless_mode': true,
+          'disable_skew_correction': true,
+          'product_tour_id': 'from-option',
+          'unknown_option': {'nested': 'x'},
+          'unset_option': null,
+        },
+      );
+
+      final event = await server.waitForEvent('tour step');
+      expect(event['options'], {
+        'process_person_profile': false,
+        'cookieless_mode': true,
+        'disable_skew_correction': true,
+        'product_tour_id': 'from-option',
+        'unknown_option': {'nested': 'x'},
+      });
+      expect(_propertiesOf(event), isNot(contains(r'$product_tour_id')));
+    });
+
+    test('a process_person_profile option applies to its event only', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+
+      await platform.capture(
+        eventName: 'processed',
+        options: {'process_person_profile': true},
+      );
+      await platform.capture(eventName: 'anonymous');
+
+      final processed = await server.waitForEvent('processed');
+      final anonymous = await server.waitForEvent('anonymous');
+      expect(_optionsOf(processed)['process_person_profile'], isTrue);
+      expect(_optionsOf(anonymous)['process_person_profile'], isFalse);
+    });
+
+    test('beforeSend can change them', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            event.options = {
+              ...?event.options,
+              'product_tour_id': 'from-hook',
+            };
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.screen(
+        screenName: 'Home',
+        options: {'product_tour_id': 'from-call'},
+      );
+      await platform.captureException(
+        error: StateError('boom'),
+        options: {'disable_skew_correction': true},
+      );
+
+      final screen = _optionsOf(await server.waitForEvent(r'$screen'));
+      final exception = _optionsOf(await server.waitForEvent(r'$exception'));
+      expect(screen['product_tour_id'], 'from-hook');
+      expect(exception['product_tour_id'], 'from-hook');
+      expect(exception['disable_skew_correction'], isTrue);
+    });
+
+    test('reach the events identify, setPersonProperties, group and alias send',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+      Map<String, Object?> options(String id) =>
+          {'product_tour_id': id, 'cookieless_mode': false, 'custom': id};
+
+      await platform.identify(userId: 'user-1', options: options('identify'));
+      await platform.setPersonProperties(
+        userPropertiesToSet: {'plan': 'pro'},
+        options: options('set'),
+      );
+      await platform.group(
+        groupType: 'company',
+        groupKey: 'acme',
+        options: options('group'),
+      );
+      await platform.alias(alias: 'alias-1', options: options('alias'));
+
+      for (final (name, id) in [
+        (r'$identify', 'identify'),
+        (r'$set', 'set'),
+        (r'$groupidentify', 'group'),
+        (r'$create_alias', 'alias'),
+      ]) {
+        final options = _optionsOf(await server.waitForEvent(name));
+        expect(options['product_tour_id'], id, reason: name);
+        expect(options['cookieless_mode'], isFalse, reason: name);
+        expect(options['custom'], id, reason: name);
+      }
+    });
+
+    test(r'a personless $set does not mark the person properties as sent',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+      await platform.identify(userId: 'user-1');
+
+      await platform.setPersonProperties(
+        userPropertiesToSet: {'plan': 'pro'},
+        options: {'process_person_profile': false},
+      );
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+      await platform.capture(eventName: 'done');
+      await server.waitForEvent('done');
+
+      final sets = [
+        for (final event in server.events)
+          if (event['event'] == r'$set') _optionsOf(event),
+      ];
+      expect(
+        [for (final set in sets) set['process_person_profile']],
+        [isFalse, isNull],
+      );
+    });
+  });
+
+  group('captureAi', () {
+    test('sends to the AI endpoint through beforeSend and returns the uuid',
+        () async {
+      final server = await LocalPostHogServer.start();
+      PostHogEvent? seen;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen = event;
+            event.properties = {...?event.properties, 'from_hook': true};
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      final uuid = await platform.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_model': 'gpt-5'},
+        options: {'custom': 'x'},
+      );
+      await platform.flush();
+
+      final event = await server.waitForAiEvent(r'$ai_generation');
+      expect(uuid, isNotNull);
+      expect(event['uuid'], uuid);
+      expect(_propertiesOf(event)[r'$ai_model'], 'gpt-5');
+      expect(_propertiesOf(event)['from_hook'], isTrue);
+      expect(_optionsOf(event)['custom'], 'x');
+      expect(seen!.properties, contains(r'$session_id'));
+      expect(server.eventNames, isNot(contains(r'$ai_generation')));
+    });
+
+    test('returns null when beforeSend drops the event', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server)
+        ..beforeSend = [
+          (event) => event.event == r'$ai_generation' ? null : event,
+        ]);
+
+      final uuid = await platform.captureAi(eventName: r'$ai_generation');
+      await platform.captureAi(eventName: r'$ai_span');
+
+      expect(uuid, isNull);
+      await server.waitForAiEvent(r'$ai_span');
+      expect(server.aiEvents, hasLength(1));
+    });
+
+    test('returns null when the event is over captureAiMaxEventBytes',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform =
+          await setUpPlatform(configFor(server)..captureAiMaxEventBytes = 4096);
+
+      final uuid = await platform.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_input': 'x' * 5000},
+      );
+
+      expect(uuid, isNull);
+    });
+
+    test('an oversized event does not turn on person processing', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..captureAiMaxEventBytes = 4096);
+
+      final uuid = await platform.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_input': 'x' * 5000},
+        userProperties: {'email': 'user@example.com'},
+      );
+      await platform.capture(eventName: 'after drop');
+      await platform.reloadFeatureFlags();
+
+      expect(uuid, isNull);
+      final event = await server.waitForEvent('after drop');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+      expect(server.flagsRequests.single.body['person_properties'],
+          isNot(contains('email')));
+    });
+
+    test('returns null while opted out', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+      await platform.optOut();
+
+      expect(await platform.captureAi(eventName: r'$ai_generation'), isNull);
+    });
+
+    test('logs a non-AI event name and still sends it', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+
+      final lines = await _printsOf(
+          () => platform.captureAi(eventName: 'not an AI event'));
+
+      expect(lines, [contains(r'does not start with $ai_')]);
+      await platform.flush();
+      expect(server.aiEvents.single['event'], 'not an AI event');
     });
   });
 
@@ -1728,7 +2204,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -1758,7 +2234,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -1794,7 +2270,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -1813,7 +2289,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -1840,7 +2316,7 @@ void main() {
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..sendFeatureFlagEvent = false
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -1892,6 +2368,27 @@ void main() {
     });
 
     test(
+        'reloadFeatureFlags returns the loaded flags, and the last known ones when loading fails',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final announced = <PostHogFeatureFlagsLoaded>[];
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = announced.add);
+
+      final loaded = await platform.reloadFeatureFlags();
+      expect(loaded.variants, {'variant-flag': 'test-variant'});
+      expect(loaded.errorsLoading, isFalse);
+
+      server.respond = (_) => const PostHogResponse(HttpStatus.badRequest);
+      final failed = await platform.reloadFeatureFlags();
+      expect(failed.variants, {'variant-flag': 'test-variant'});
+      expect(failed.errorsLoading, isTrue);
+      expect(announced.last.errorsLoading, isTrue);
+    });
+
+    test(
         r'getFeatureFlagResult follows config.sendFeatureFlagEvent unless overridden',
         () async {
       final server = await LocalPostHogServer.start();
@@ -1899,7 +2396,7 @@ void main() {
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
         ..sendFeatureFlagEvent = false
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -1918,6 +2415,27 @@ void main() {
       expect(_propertiesOf(called)[r'$feature_flag'], 'variant-flag');
     });
 
+    test(
+        'reloadFeatureFlags returns the loaded flags, and the last known ones when loading fails',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final announced = <PostHogFeatureFlagsLoaded>[];
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = announced.add);
+
+      final loaded = await platform.reloadFeatureFlags();
+      expect(loaded.variants, {'variant-flag': 'test-variant'});
+      expect(loaded.errorsLoading, isFalse);
+
+      server.respond = (_) => const PostHogResponse(HttpStatus.badRequest);
+      final failed = await platform.reloadFeatureFlags();
+      expect(failed.variants, {'variant-flag': 'test-variant'});
+      expect(failed.errorsLoading, isTrue);
+      expect(announced.last.errorsLoading, isTrue);
+    });
+
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();
@@ -1934,7 +2452,7 @@ void main() {
       final announced = Completer<void>();
       await platform.setup(configFor(server)
         ..preloadFeatureFlags = false
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           payloads.add(platform
               .getFeatureFlagResult(
                   key: 'variant-flag', sendFeatureFlagEvent: false)
@@ -1954,6 +2472,9 @@ void main() {
 
 Map<String, Object?> _propertiesOf(Map<String, Object?> event) =>
     Map<String, Object?>.from(event['properties']! as Map);
+
+Map<String, Object?> _optionsOf(Map<String, Object?> event) =>
+    Map<String, Object?>.from((event['options'] ?? const {}) as Map);
 
 /// Runs [body] and returns the lines it printed.
 Future<List<String>> _printsOf(Future<void> Function() body) async {

@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
 import '../posthog_api_fake.dart';
 import 'test_client.dart';
@@ -24,7 +23,7 @@ void main() {
       expect(props['foo'], 'bar');
     });
 
-    test('win over super properties and event properties', () {
+    test('lose to super properties and event properties', () {
       final storage = tempStorage();
       final client = testClient(server,
           storage: storage, context: _context, timezone: 'Europe/Berlin');
@@ -37,10 +36,10 @@ void main() {
       });
 
       final props = queuedProps(storage, 0);
-      expect(props[r'$os_name'], 'TestOS');
-      expect(props[r'$app_version'], '1.0.0');
-      expect(props[r'$timezone'], 'Europe/Berlin');
-      expect(props[r'$lib'], postHogFlutterSdkName);
+      expect(props[r'$os_name'], 'FromSuperProps');
+      expect(props[r'$app_version'], '2.0.0');
+      expect(props[r'$timezone'], 'UTC');
+      expect(props[r'$lib'], 'custom');
     });
 
     test('absent by default', () {

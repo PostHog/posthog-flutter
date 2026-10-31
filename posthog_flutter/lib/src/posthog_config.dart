@@ -196,6 +196,54 @@ class PostHogConfig {
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
 
+  /// How [Posthog.captureAi] request bodies are compressed, separately from
+  /// [compression].
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default (gzip).
+  PostHogCompression? captureAiCompression;
+
+  /// Maximum number of [Posthog.captureAi] events kept in their on-disk queue
+  /// before the oldest are dropped.
+  ///
+  /// AI events can be megabytes, so the default (100) is lower than
+  /// [maxQueueSize]. The queue also keeps at most 50 MiB of AI events,
+  /// whatever this is set to. A value of `0` or less uses the default.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  int? captureAiMaxQueueSize;
+
+  /// Timeout of a [Posthog.captureAi] request: how long it may go without
+  /// network activity. On iOS, macOS and Android it is sent to the native SDK
+  /// in whole seconds (a positive value under one second is sent as one
+  /// second).
+  ///
+  /// AI requests can carry several MB, so the default (60 seconds) is
+  /// longer than for other requests. [Duration.zero] or less uses the
+  /// default.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  Duration? captureAiTimeout;
+
+  /// Maximum size, in bytes, of a [Posthog.captureAi] event. The SDK drops a
+  /// larger event and [Posthog.captureAi] returns `null`.
+  ///
+  /// Use it to lower the limit. PostHog drops AI events whose properties are
+  /// over 8 MiB, so a larger value, or a value of `0` or less, uses the
+  /// default. By default the SDK drops a serialized event over 8 MiB plus
+  /// 64 KiB for the rest of the event, measured before compression. A set
+  /// value limits the whole serialized event.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  int? captureAiMaxEventBytes;
+
   /// Whether the SDK is enabled on Windows and Linux.
   ///
   /// Windows and Linux support is experimental. Defaults to `true`.
@@ -264,8 +312,24 @@ class PostHogConfig {
 
   /// Callback to be invoked when feature flags are loaded.
   ///
-  /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
-  /// callback to access the loaded flag values.
+  /// It receives the enabled flags and whether loading failed. It runs after
+  /// the flags load at startup, after [Posthog.reloadFeatureFlags], and after
+  /// calls that reload flags such as `identify()` or `group()`. When a load
+  /// fails, [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the flags
+  /// are the last known values. Defaults to `null`.
+  ///
+  /// **Android:** not called after [Posthog.reloadFeatureFlags]. Use the
+  /// flags that call returns instead.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('<project_token>')
+  ///   ..onFeatureFlags = (loaded) {
+  ///     if (loaded.variants['new-checkout'] == 'test') {
+  ///       // Show the test variant.
+  ///     }
+  ///   };
+  /// ```
   OnFeatureFlagsCallback? onFeatureFlags;
 
   /// Whether to automatically register this device's push token with PostHog.
@@ -390,7 +454,9 @@ class PostHogConfig {
   ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
   /// - Only user-provided properties are available; system properties (like
   ///   `$device_type`, `$session_id`) are added by the native SDK at a later
-  ///   stage.
+  ///   stage. On Windows and Linux, the callbacks see the system properties
+  ///   and the options the SDK adds, and can change them for that event,
+  ///   except `$lib` and `$lib_version`, which PostHog sets from the SDK.
   ///
   /// **Note:**
   /// - Callbacks can be synchronous or asynchronous (via

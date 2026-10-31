@@ -8,8 +8,11 @@ class PostHogEvent {
 
   /// User-provided properties for this event.
   ///
-  /// Note: System properties (like $device_type, $session_id, etc.) are added
-  /// by the native SDK at a later stage and are not available in this map.
+  /// On iOS, macOS, Android and web, system properties (like $device_type,
+  /// $session_id, etc.) are added by the native SDK at a later stage and are
+  /// not available in this map. On Windows and Linux, the map already holds
+  /// them, then the registered properties, then the event's own, and the
+  /// event is sent as the callbacks leave it.
   Map<String, Object>? properties;
 
   /// User properties to set on the user profile ($set).
@@ -22,6 +25,13 @@ class PostHogEvent {
   /// These properties will only be set if they don't already exist on the user profile.
   Map<String, Object>? userPropertiesSetOnce;
 
+  /// Settings that tell PostHog how to process this event, sent apart from
+  /// its properties. See `Posthog.capture` for the known keys.
+  ///
+  /// A callback can read, add, change or remove them. A null value means
+  /// unset.
+  Map<String, Object?>? options;
+
   /// Creates an event passed to a before-send callback.
   ///
   /// The [event] is the event name to capture.
@@ -33,15 +43,18 @@ class PostHogEvent {
   ///
   /// The optional [userPropertiesSetOnce] are person properties to set with
   /// `$set_once`.
+  ///
+  /// The optional [options] are the event's per-event options.
   PostHogEvent({
     required this.event,
     this.properties,
     this.userProperties,
     this.userPropertiesSetOnce,
+    this.options,
   });
 
   @override
   String toString() {
-    return 'PostHogEvent(event: $event, properties: $properties, userProperties: $userProperties, userPropertiesSetOnce: $userPropertiesSetOnce)';
+    return 'PostHogEvent(event: $event, properties: $properties, userProperties: $userProperties, userPropertiesSetOnce: $userPropertiesSetOnce, options: $options)';
   }
 }

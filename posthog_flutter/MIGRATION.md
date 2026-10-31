@@ -51,21 +51,15 @@ If every plugin in your app supports Swift Package Manager, you can remove Cocoa
 
 `posthog-android` has required `minSdkVersion` 23 since 3.39.0, so an app on 21 or 22 already could not build with this plugin. The plugin now declares the same value, and you have nothing to change.
 
-### Native SDKs
+### Native SDKs and Xcode
 
-<!--
-PENDING, not on this branch yet. PR #673 (which contains #649) moves the plugin to posthog-ios 4.x and
-posthog-android 4.x. Neither is released. When it merges, replace this comment with a section covering:
-- Xcode 26 required.
-- onFeatureFlags receives, and reloadFeatureFlags() returns, PostHogFeatureFlagsLoaded.
-- Capture v1 endpoints and what reverse proxies must forward.
-- iOS and Android: malformed, empty or whitespace-only flag payloads become null. iOS: bootstrapped string payloads stay strings.
-- iOS and macOS: lifecycle events stop sending version and build.
-- iOS: reachability moves to NWPathMonitor; events queued on disk by a 2.x SDK are deleted.
-Check each against the plugin before documenting it.
--->
+| | 5.x | 6.0 |
+| --- | --- | --- |
+| `posthog-ios` | `>= 3.92.3, < 4.0.0` | `>= 4.0.0, < 5.0.0` |
+| `posthog-android` | `[3.72.9, 4.0.0)` | `[4.0.0, 5.0.0)` |
+| Xcode | Not set by the plugin | 26 or later |
 
-The native dependency ranges are unchanged by this release: `posthog-ios` `>= 3.92.3, < 4.0.0` and `posthog-android` `[3.72.9, 4.0.0)`.
+Don't add these native SDKs to your app separately at a different major version.
 
 ## Breaking API changes
 
@@ -199,7 +193,60 @@ Future<void> disable() async {}
 Future<void> optOut() async {}
 ```
 
+### `onFeatureFlags` and `reloadFeatureFlags()`
+
+`PostHogConfig.onFeatureFlags` now receives a `PostHogFeatureFlagsLoaded`, and `reloadFeatureFlags()` returns a `Future<PostHogFeatureFlagsLoaded>`. It has `flags`, `variants` and `errorsLoading`.
+
+```dart
+// Before
+config.onFeatureFlags = () {
+  // ...
+};
+
+// After
+config.onFeatureFlags = (loaded) {
+  if (!loaded.errorsLoading) {
+    // Use loaded.variants
+  }
+};
+```
+
 ## Behavior changes
+
+### Events go to capture v1
+
+**This is a silent change if you use a reverse proxy or self-host.** On iOS, macOS, Android, Windows and Linux, events go to `/i/v1/analytics/events` instead of `/batch/`, and `captureAi` events go to `/i/v1/ai/events`. Web keeps using posthog-js and its current endpoints. PostHog Cloud and the managed reverse proxy already serve the new paths.
+
+Before you upgrade, make your own proxy:
+
+- forward `/i/v1/analytics/events` and `/i/v1/ai/events`
+- pass `Authorization` (the project token, sent as `Bearer <token>`), every `PostHog-*` header, `Content-Type`, `Content-Encoding` and `User-Agent` through unchanged
+- accept request bodies up to 20 MB
+
+If you ignore this on Windows and Linux, a 404 is retried, events stay queued, and the SDK prints one warning, also without `debug`. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides for those platforms.
+
+### Feature flag payloads
+
+On iOS, macOS and Android, a malformed, empty or whitespace-only payload from `getFeatureFlagResult()` is now `null` instead of the raw string. On Android, a JSON `null` payload is also `null` instead of the string `"null"`.
+
+On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
+
+### Lifecycle events on iOS and macOS
+
+`Application Installed`, `Application Updated` and `Application Opened` no longer include `version` and `build`. Update insights, cohorts and filters that use them to `$app_version` and `$app_build`. Android still sends them.
+
+### Network reachability on iOS and macOS
+
+A path that needs user action, such as a VPN waiting for a password, counts as reachable, and queues pause while cellular data is off for the app. Events captured in the first 100 ms after setup may leave out `$network_wifi` and `$network_cellular`. Events still on disk from a `posthog-ios` 2.x SDK are deleted instead of sent.
+
+### Windows and Linux
+
+- **Property order:** an event's properties are the SDK's, then registered properties, then the event's own, so your value now wins for that event. `beforeSend` runs after that merge, except that `$lib` and `$lib_version` always come from the `PostHog-Sdk-Info` header.
+- **Person processing:** it's sent as the `process_person_profile: false` option only while it's off, instead of a `$process_person_profile` property on every event.
+- **Redirects:** only same-origin 307 and 308 redirects are followed. Any other redirect drops the batch.
+- **Retries:** a failed batch waits 1 second, doubling up to 30 seconds with ±25% jitter, instead of retrying within the same flush. `Retry-After` is a floor under that wait, capped at 30 seconds.
+- **Timestamps:** an event's timestamp is taken before `beforeSend` runs.
+- **AI queue:** `captureAi` events have their own on-disk queue of up to `captureAiMaxQueueSize` events (100 by default) and 50 MiB. An event over `captureAiMaxEventBytes` (8 MiB plus 64 KiB by default) is dropped.
 
 ### `getFeatureFlagResult()` follows your config
 
@@ -213,12 +260,21 @@ await Posthog().getFeatureFlagResult('my-flag', sendFeatureFlagEvent: true);
 
 On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an omitted value keeps the posthog-js default, which captures the event. Pass `sendFeatureFlagEvent: false` to suppress it on web.
 
+## New features
+
+- An `options` argument on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` in `beforeSend`. `process_person_profile`, `cookieless_mode`, `disable_skew_correction` and `product_tour_id` win over their legacy `$` properties. On web, known keys are sent as those legacy properties and other keys are dropped.
+- `captureAi` for `$ai_*` events. It returns the event's UUID, or `null` when the event isn't admitted. On web it sends nothing and returns `null`.
+
 ## Upgrade checklist
 
 - [ ] Use Flutter 3.41 or later and make sure Swift Package Manager is on.
 - [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
 - [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.
 - [ ] Rename `com.posthog.posthog.API_KEY` to `com.posthog.posthog.PROJECT_TOKEN` in `AndroidManifest.xml` and `Info.plist`.
+- [ ] Use Xcode 26 or later.
+- [ ] If you run your own reverse proxy or self-host, serve `/i/v1/analytics/events` and `/i/v1/ai/events` first.
+- [ ] Update `onFeatureFlags` callbacks to take a `PostHogFeatureFlagsLoaded`.
+- [ ] Move anything that reads `version` or `build` on iOS and macOS lifecycle events to `$app_version` and `$app_build`.
 - [ ] If you set `sendFeatureFlagEvent = false`, check whether anything relies on `$feature_flag_called` from `getFeatureFlagResult()`.
 - [ ] Add `sendFeatureFlagEvent: false` wherever you replace `getFeatureFlagPayload()`.
 - [ ] Fix the remaining compile errors using the sections above, including any test fakes of the platform classes.
