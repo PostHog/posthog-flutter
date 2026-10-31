@@ -33,10 +33,12 @@ file untouched. A new client can try reading the file again. Corrupt file
 contents reset the state to defaults; the next state write replaces the file.
 
 `Posthog().close()` makes one attempt to send the queued events and waits for it
-for up to two seconds. Events it could not send stay on disk and go out with the
-next client, or are lost when state is kept in memory. Closing the app window
-does not call `close()`, but the SDK also sends the queue whenever the app
-becomes inactive.
+for up to two seconds, and for the queue's files for up to two more. Events it
+could not send stay on disk and go out with the next client, or are lost when
+state is kept in memory. Events are written in the background, so await
+`close()` before calling `exit()`; awaiting a capture or `identify` call also
+keeps that call's event. Closing the app window does not call `close()`, but the
+SDK also sends the queue whenever the app becomes inactive.
 
 ## Questions?
 

@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/core/logger.dart';
+import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 
@@ -85,9 +88,22 @@ Future<int> flagsRequestsFor(
   return api.flagsRequests.length - before - 1;
 }
 
+/// The value of [future], which an inline [QueueWorker] completes right
+/// away.
+T now<T>(Future<T> future) {
+  late T value;
+  var done = false;
+  future.then((result) {
+    value = result;
+    done = true;
+  });
+  if (!done) throw StateError('The future did not complete synchronously.');
+  return value;
+}
+
 /// The queued event messages, oldest first.
 List<Map<String, Object?>> getQueue(FileStorage storage) => [
-      for (final queued in storage.queue.peek(storage.queue.length))
+      for (final queued in now(storage.queue.peek(storage.queue.length)))
         queued.event,
     ];
 
@@ -115,6 +131,56 @@ Map<String, Object?> queuedPropsOf(FileStorage storage, String event) {
   final message =
       getQueue(storage).singleWhere((message) => message['event'] == event);
   return message['properties'] as Map<String, Object?>;
+}
+
+/// Runs jobs like [QueueWorker.inline], except that writes and deletes wait
+/// for [writeGate] and [deleteGate] while those are set.
+class GatedWorker implements QueueWorker {
+  @override
+  CoreLogger? logger;
+
+  final _inline = QueueWorker.inline();
+  Completer<void>? writeGate;
+  Completer<void>? deleteGate;
+  var writes = 0;
+  var deletes = 0;
+
+  @override
+  Future<QueueWriteResult> write(
+    String? path,
+    Map<String, Object?> event, {
+    int? maxBytes,
+  }) {
+    writes++;
+    final gate = writeGate;
+    return gate == null
+        ? _inline.write(path, event, maxBytes: maxBytes)
+        : gate.future
+            .then((_) => _inline.write(path, event, maxBytes: maxBytes));
+  }
+
+  @override
+  Future<List<String>> delete(List<String> paths) {
+    deletes++;
+    // Like the real worker, a delete never overtakes an earlier write.
+    final gates = [writeGate, deleteGate].nonNulls.map((gate) => gate.future);
+    return gates.isEmpty
+        ? _inline.delete(paths)
+        : Future.wait(gates).then((_) => _inline.delete(paths));
+  }
+
+  @override
+  Future<List<QueueReadResult>> read(List<String> paths) => _inline.read(paths);
+
+  @override
+  Future<EncodedBody> encodeBody(Object? body, {required bool gzip}) =>
+      _inline.encodeBody(body, gzip: gzip);
+
+  @override
+  bool get runsInBackground => false;
+
+  @override
+  void kill() {}
 }
 
 /// Skip reason for tests that simulate IO failures with POSIX permissions.

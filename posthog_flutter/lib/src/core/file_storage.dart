@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show SynchronousFuture, visibleForTesting;
+
 import 'logger.dart';
 import 'persistence.dart';
+import 'queue_worker.dart';
 import 'uuid.dart';
 
 /// Client state and queue storage, persistent unless created in memory.
@@ -35,16 +40,27 @@ import 'uuid.dart';
 /// changes with a snapshot it never saw; a new instance retries the disk.
 /// Files are replaced through a temporary file and a rename, without syncing
 /// them to disk: a crash can lose the latest writes but never leaves a file
-/// half-written.
+/// half-written. Queued events are written by a [QueueWorker] off the UI
+/// isolate, so an event can be lost to a crash or `exit()` in the moments
+/// after it is queued. The platform's capture and identify calls complete
+/// once their event is on disk.
 class FileStorage {
-  FileStorage(this._directory);
+  /// A storage in [_directory]. Its queues give their file work to [worker],
+  /// a background isolate by default.
+  FileStorage(this._directory, {QueueWorker? worker})
+      : _worker = worker ?? QueueWorker.defaultWorker();
 
-  FileStorage.memory()
+  /// A storage that keeps everything in memory. Its queues still measure
+  /// their events with [worker].
+  FileStorage.memory({QueueWorker? worker})
+      : this._memory(worker ?? QueueWorker.defaultWorker());
+
+  FileStorage._memory(this._worker)
       : _directory = '',
         _cache = {},
         _role = _Role.secondary,
-        _queue = FileEventQueue._memory(),
-        _aiQueue = FileEventQueue._memory();
+        _queue = FileEventQueue._memory(_worker),
+        _aiQueue = FileEventQueue._memory(_worker);
 
   static const _dataFileName = 'posthog_data.json';
   static const _lockFileName = 'posthog.lock';
@@ -58,6 +74,7 @@ class FileStorage {
   static final Set<String> _heldLockPaths = {};
 
   final String _directory;
+  final QueueWorker _worker;
   Map<String, Object?>? _cache;
   bool _readFailed = false;
 
@@ -93,14 +110,29 @@ class FileStorage {
   bool get isDegraded => _readAll() == null;
 
   /// The events waiting to be sent.
-  FileEventQueue get queue =>
-      _queue ??= FileEventQueue._(_pathOf(_queueDirectoryName), () => logger,
-          includeExisting: _open() == _Role.primary);
+  FileEventQueue get queue => _queue ??= FileEventQueue._(
+      _pathOf(_queueDirectoryName), () => logger, _worker,
+      includeExisting: _open() == _Role.primary);
 
   /// The AI events waiting to be sent, apart from the other events.
   FileEventQueue get aiQueue => _aiQueue ??= FileEventQueue._(
-      _pathOf(_aiQueueDirectoryName), () => logger,
+      _pathOf(_aiQueueDirectoryName), () => logger, _worker,
       includeExisting: _open() == _Role.primary);
+
+  /// Does the file work of the queues, and encodes their request bodies.
+  QueueWorker get worker => _worker;
+
+  /// Completes once both queues have no file work left, so that another
+  /// storage of the directory finds every event this one queued, and none it
+  /// removed.
+  Future<void> get settled async {
+    // Not Future.wait, which throws on the SynchronousFuture of an idle queue.
+    await _queue?.settled;
+    await _aiQueue?.settled;
+  }
+
+  /// Completes once the analytics events queued so far are on disk.
+  Future<void> get written => _queue?._submitted ?? SynchronousFuture(null);
 
   /// Decides, on first use, whether this storage writes the snapshot.
   _Role _open() {
@@ -155,10 +187,19 @@ class FileStorage {
     return code == 11 || code == 13; // EAGAIN or EACCES on Linux
   }
 
-  /// Releases the directory lock, so that another storage can write the
-  /// snapshot; this one stops writing it.
+  /// Releases the directory lock once the queues have no file work left, so
+  /// that another storage can write the snapshot and finds exactly the events
+  /// still to send; this one stops writing it.
   void close() {
     _role = _Role.secondary;
+    if ((_queue?._jobs.isEmpty ?? true) && (_aiQueue?._jobs.isEmpty ?? true)) {
+      _releaseLock();
+    } else {
+      settled.whenComplete(_releaseLock).ignore();
+    }
+  }
+
+  void _releaseLock() {
     final lockPath = _lockPath;
     if (lockPath != null) _heldLockPaths.remove(lockPath);
     _lockPath = null;
@@ -262,7 +303,7 @@ class FileStorage {
 
   void _writeSnapshot(String encoded) {
     try {
-      _writeAtomically(File(_dataFilePath), encoded);
+      writeAtomically(File(_dataFilePath), encoded);
     } catch (e) {
       // Best effort: the cache keeps the new value, the next successful
       // write persists the whole snapshot.
@@ -294,12 +335,17 @@ typedef PostHogQueuedEvent = ({String id, Map<String, Object?> event});
 /// Events are JSON-encodable maps; the client makes them so before adding
 /// them. The client removes an event by its id once it is delivered, so an
 /// event added while a batch is in flight is never removed with it.
+///
+/// The [QueueWorker] encodes, measures, writes, reads and deletes the files,
+/// in the order the queue asks it to. An event takes its place in the queue
+/// as soon as it is added, and counts in [byteCount] once the worker has
+/// measured it.
 class FileEventQueue {
-  FileEventQueue._(this._directory, this._logger,
+  FileEventQueue._(this._directory, this._logger, this._worker,
       {required bool includeExisting})
       : _loadedIds = includeExisting ? null : [];
 
-  FileEventQueue._memory()
+  FileEventQueue._memory(this._worker)
       : _directory = '',
         _logger = _noLogger,
         _loadedIds = [];
@@ -310,14 +356,32 @@ class FileEventQueue {
 
   final String _directory;
   final CoreLogger? Function() _logger;
+  final QueueWorker _worker;
 
   /// The queue, oldest first: the events found in the directory, read on
   /// first use, then the ones added here.
   List<String>? _loadedIds;
 
-  /// Events whose file could not be written, so they can still be sent by
-  /// this client.
+  /// Events whose file could not be written, or that a queue in memory
+  /// keeps, so they can still be sent by this client.
   final Map<String, Map<String, Object?>> _unwritten = {};
+
+  /// Events the worker is still measuring and writing. A peek leaves them
+  /// for later: the worker can still drop one for its size.
+  final Set<String> _writing = {};
+
+  /// Events waiting for a free write, oldest first. Eviction can still cancel
+  /// them, unlike a job the worker was given.
+  final Map<String, _UnsentWrite> _unsent = {};
+
+  /// The most writes the worker holds at once, so that captures outpacing it
+  /// keep only the events the queue limits allow in memory.
+  @visibleForTesting
+  static const maxWritesInFlight = 8;
+
+  var _writesInFlight = 0;
+
+  final Set<Future<void>> _jobs = {};
 
   /// The serialized size of each queued event, by id, and their total.
   final Map<String, int> _sizes = {};
@@ -367,69 +431,182 @@ class FileEventQueue {
     return name.substring(0, name.length - _extension.length);
   }
 
+  Future<T> _job<T>(Future<T> job) {
+    _jobs.add(job);
+    job.whenComplete(() => _jobs.remove(job)).ignore();
+    return job;
+  }
+
   /// The number of queued events.
   int get length => _ids.length;
 
-  /// The serialized size of the queued events, in bytes.
+  /// The number of queued events the worker has measured. The others come
+  /// after them, and can still be dropped for their size.
+  int get measuredLength => _ids.length - _writing.length;
+
+  /// The serialized size of the measured events, in bytes.
   int get byteCount {
     _ids; // Loads the queue, and the sizes, on first use.
     return _byteCount;
   }
 
-  /// Adds [event] at the end of the queue. [json] is the event already
-  /// encoded, and [bytes] its UTF-8 size, when the caller has them.
-  int add(Map<String, Object?> event, {String? json, int? bytes}) {
+  /// Completes once the worker has done every job the queue gave it so far:
+  /// the added events are measured and written, the removed ones deleted.
+  Future<void> get settled =>
+      _jobs.isEmpty ? SynchronousFuture(null) : _settle();
+
+  Future<void> get _submitted => _jobs.isEmpty
+      ? SynchronousFuture(null)
+      : Future.wait(_jobs.toList()).then((_) {});
+
+  Future<void> _settle() async {
+    // Jobs that finishing jobs start are waited for too.
+    while (_jobs.isNotEmpty) {
+      await Future.wait(_jobs.toList());
+    }
+  }
+
+  /// Adds [event] at the end of the queue, and completes with what the
+  /// worker did with it. With [maxBytes], an event whose serialized size is
+  /// over it is removed again and not written.
+  Future<QueueWriteResult> add(Map<String, Object?> event, {int? maxBytes}) {
     // Loaded before the new file exists, which would otherwise be listed
     // on top of being added.
     final ids = _ids;
     final id = generateUuidV7();
-    var encoded = json;
-    if (encoded == null) {
-      try {
-        encoded = jsonEncode(event);
-      } catch (_) {
-        // Reported below when it is written.
+    ids.add(id);
+    _writing.add(id);
+    if (_writesInFlight >= maxWritesInFlight) {
+      final unsent = _UnsentWrite(event, maxBytes);
+      _unsent[id] = unsent;
+      return _job(unsent.result.future);
+    }
+    return _job(_write(id, event, maxBytes));
+  }
+
+  Future<QueueWriteResult> _write(
+    String id,
+    Map<String, Object?> event,
+    int? maxBytes,
+  ) {
+    _writesInFlight++;
+    final path = _directory.isEmpty ? null : _pathOf(id);
+    QueueWriteResult done(QueueWriteResult result) {
+      _writesInFlight--;
+      _writeNext();
+      _writing.remove(id);
+      if (result.tooLarge) {
+        _ids.remove(id);
+        return result;
       }
+      // Removed while the worker wrote it: the deletion comes after.
+      if (!_ids.contains(id)) return result;
+      _track(id, result.bytes ?? 0);
+      if (path == null) {
+        _unwritten[id] = event;
+      } else if (result.error case final error?) {
+        _unwritten[id] = event;
+        _logger()?.warn(
+            'Failed to persist a queued event; it is kept in memory until it '
+            'is sent:',
+            error);
+      }
+      return result;
     }
-    final size = bytes ?? (encoded == null ? 0 : utf8.encode(encoded).length);
-    ids.add(_track(id, size));
-    if (_directory.isEmpty) {
-      _unwritten[id] = event;
-      return size;
+
+    return _worker.write(path, event, maxBytes: maxBytes).then(
+          done,
+          onError: (Object e) =>
+              done((bytes: null, tooLarge: false, error: '$e')),
+        );
+  }
+
+  void _writeNext() {
+    while (_writesInFlight < maxWritesInFlight && _unsent.isNotEmpty) {
+      final id = _unsent.keys.first;
+      final unsent = _unsent.remove(id)!;
+      unsent.result.complete(_write(id, unsent.event, unsent.maxBytes));
     }
-    try {
-      _writeAtomically(File(_pathOf(id)), encoded ?? jsonEncode(event));
-    } catch (e) {
-      _unwritten[id] = event;
-      _logger()?.warn(
-          'Failed to persist a queued event; it is kept in memory until it '
-          'is sent:',
-          e);
-    }
-    return size;
   }
 
   /// Returns up to [count] events from the front of the queue, oldest
-  /// first.
+  /// first, once the events added so far are written. Events added after
+  /// the call are not waited for, so that sustained captures can't hold back
+  /// the batch.
   ///
   /// With [maxBytes], the events also stay within that serialized size. Each
   /// event is checked before it is read, so one that does not fit is left
   /// for the next peek, and the first event always comes, alone when it is
   /// over the limit.
-  List<PostHogQueuedEvent> peek(int count, {int? maxBytes}) {
-    final events = <PostHogQueuedEvent>[];
-    final gone = <String>{};
+  Future<List<PostHogQueuedEvent>> peek(int count, {int? maxBytes}) =>
+      _submitted.then((_) => _peekWritten(count, maxBytes));
+
+  Future<List<PostHogQueuedEvent>> _peekWritten(
+    int count,
+    int? maxBytes, {
+    Set<String> skipped = const {},
+  }) {
+    final selected = <String>[];
     var bytes = 0;
     for (final id in _ids) {
-      if (events.length >= count) break;
+      if (skipped.contains(id)) continue;
+      if (selected.length >= count || _writing.contains(id)) break;
       final size = _sizes[id] ?? 0;
-      if (maxBytes != null && events.isNotEmpty && bytes + size > maxBytes) {
+      if (maxBytes != null && selected.isNotEmpty && bytes + size > maxBytes) {
         break;
       }
-      final event = _unwritten[id] ?? _read(id, gone);
-      if (event == null) continue;
-      events.add((id: id, event: event));
+      selected.add(id);
       bytes += size;
+    }
+    final toRead = [
+      for (final id in selected)
+        if (!_unwritten.containsKey(id)) id,
+    ];
+    final read = toRead.isEmpty
+        ? SynchronousFuture(const <QueueReadResult>[])
+        : _job(_worker.read([for (final id in toRead) _pathOf(id)]));
+    return read.then((read) {
+      final events = _collect(selected, {
+        for (var i = 0; i < toRead.length; i++) toRead[i]: read[i],
+      });
+      // An empty peek ends the flush, which must not leave the events behind
+      // the unreadable ones unsent.
+      return events.isEmpty && selected.isNotEmpty
+          ? _peekWritten(count, maxBytes, skipped: {...skipped, ...selected})
+          : events;
+    });
+  }
+
+  /// The [selected] events still queued, from memory or from [read].
+  List<PostHogQueuedEvent> _collect(
+    List<String> selected,
+    Map<String, QueueReadResult> read,
+  ) {
+    final events = <PostHogQueuedEvent>[];
+    final gone = <String>{};
+    final queued = _ids.toSet();
+    for (final id in selected) {
+      // Removed while the files were read.
+      if (!queued.contains(id)) continue;
+      final event = _unwritten[id];
+      if (event != null) {
+        events.add((id: id, event: event));
+        continue;
+      }
+      final result = read[id]!;
+      if (result.event case final event?) {
+        events.add((id: id, event: event));
+      } else if (result.gone) {
+        // Sent by another client using the same directory, or unreadable
+        // and deleted.
+        if (result.error case final error?) {
+          _logger()
+              ?.warn('Deleted queued event $id, which cannot be read:', error);
+        }
+        gone.add(id);
+      } else {
+        _logger()?.warn('Skipping queued event $id for now:', result.error);
+      }
     }
     if (gone.isNotEmpty) {
       _ids.removeWhere(gone.contains);
@@ -438,48 +615,39 @@ class FileEventQueue {
     return events;
   }
 
-  /// Reads the event queued as [id], or returns null. An event that is gone
-  /// for good (sent by another client, or unreadable and so deleted) is also
-  /// added to [gone]; one that cannot be read right now stays queued.
-  Map<String, Object?>? _read(String id, Set<String> gone) {
-    final file = File(_pathOf(id));
-    try {
-      final event = jsonDecode(utf8.decode(file.readAsBytesSync()));
-      if (event is Map<String, Object?>) return event;
-      throw const FormatException('Not a JSON object');
-    } on PathNotFoundException {
-      // Sent by another client using the same directory.
-      gone.add(id);
-    } on FormatException catch (e) {
-      _logger()?.warn('Deleting queued event $id, which cannot be read:', e);
-      gone.add(id);
-      _delete(file);
-    } on FileSystemException catch (e) {
-      _logger()?.warn('Skipping queued event $id for now:', e);
-    }
-    return null;
-  }
-
   /// Removes the events with the given [ids]; unknown ids are ignored.
   void remove(Iterable<String> ids) {
     final removed = ids.toSet();
     _ids.removeWhere(removed.contains);
-    removed.forEach(_forget);
+    _forget(removed);
   }
 
   /// Removes up to [count] events from the front of the queue.
   void removeOldest(int count) {
     final oldest = _ids.take(count).toList();
     _ids.removeRange(0, oldest.length);
-    oldest.forEach(_forget);
+    _forget(oldest);
   }
 
-  /// Removes the oldest events until the queue holds at most [maxBytes],
-  /// always keeping the newest event. Returns how many were removed.
+  /// Removes the oldest events still waiting to be written until at most
+  /// [maxCount] wait. Returns how many were removed.
+  ///
+  /// Their size is unknown, so eviction by [removeOldestOver] can't reach
+  /// them: this is what bounds a queue with a size limit on its events.
+  int removeOldestUnsentOver(int maxCount) {
+    final overflow = _unsent.length - maxCount;
+    if (overflow <= 0) return 0;
+    remove(_unsent.keys.take(overflow).toList());
+    return overflow;
+  }
+
+  /// Removes the oldest events until the measured ones hold at most
+  /// [maxBytes], always keeping the newest measured event. Returns how many
+  /// were removed.
   int removeOldestOver(int maxBytes) {
     var total = byteCount;
     var count = 0;
-    while (total > maxBytes && count < _ids.length - 1) {
+    while (total > maxBytes && count < measuredLength - 1) {
       total -= _sizes[_ids[count]] ?? 0;
       count++;
     }
@@ -487,34 +655,31 @@ class FileEventQueue {
     return count;
   }
 
-  void _forget(String id) {
-    _untrack(id);
-    if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
-      _delete(File(_pathOf(id)));
+  void _forget(Iterable<String> ids) {
+    final paths = <String>[];
+    for (final id in ids) {
+      _untrack(id);
+      _writing.remove(id);
+      if (_unsent.remove(id) case final unsent?) {
+        unsent.result.complete((bytes: null, tooLarge: false, error: null));
+      } else if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
+        paths.add(_pathOf(id));
+      }
     }
-  }
-
-  void _delete(File file) {
-    try {
-      file.deleteSync();
-    } on PathNotFoundException {
-      // Already deleted by another client using the same directory.
-    } on FileSystemException catch (e) {
-      _logger()
-          ?.warn('Failed to delete a queued event; it may be sent again:', e);
-    }
+    if (paths.isEmpty) return;
+    _job(_worker.delete(paths)).then((errors) {
+      for (final error in errors) {
+        _logger()?.warn(
+            'Failed to delete a queued event; it may be sent again:', error);
+      }
+    }).ignore();
   }
 }
 
-/// Replaces [file] with [contents] through a temporary file and a rename, so
-/// the file never exists half-written. Creates the directory when missing.
-void _writeAtomically(File file, String contents) {
-  final tmp = File('${file.path}.tmp');
-  try {
-    tmp.writeAsStringSync(contents);
-  } on PathNotFoundException {
-    tmp.parent.createSync(recursive: true);
-    tmp.writeAsStringSync(contents);
-  }
-  tmp.renameSync(file.path);
+final class _UnsentWrite {
+  _UnsentWrite(this.event, this.maxBytes);
+
+  final Map<String, Object?> event;
+  final int? maxBytes;
+  final result = Completer<QueueWriteResult>();
 }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
@@ -12,6 +13,7 @@ import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_desktop.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
+import 'core/test_client.dart';
 import 'posthog_api_fake.dart';
 
 // No TestWidgetsFlutterBinding here: the test binding replaces dart:io's
@@ -320,6 +322,83 @@ void main() {
       final captured = await server.waitForEvent('replay event');
       expect(_propertiesOf(captured)[r'$recording_status'], 'active');
     });
+  });
+
+  <String, Future<void> Function(PosthogFlutterDesktop)>{
+    'capture': (platform) => platform.capture(eventName: 'event'),
+    'screen': (platform) => platform.screen(screenName: 'screen'),
+    'captureException': (platform) =>
+        platform.captureException(error: StateError('error')),
+    'identify': (platform) => platform.identify(userId: 'user'),
+    'alias': (platform) => platform.alias(alias: 'alias'),
+    'group': (platform) =>
+        platform.group(groupType: 'company', groupKey: 'acme'),
+    'setPersonProperties': (platform) =>
+        platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'}),
+  }.forEach((name, call) {
+    test('an awaited $name completes once the event is on disk', () async {
+      final server = await LocalPostHogServer.start();
+      final worker = GatedWorker();
+      final defaultWorker = QueueWorker.defaultWorker;
+      QueueWorker.defaultWorker = () => worker;
+      addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+      final platform = await setUpPlatform(configFor(server));
+      worker.writeGate = Completer();
+
+      var done = false;
+      final completed = call(platform).then((_) => done = true);
+      await pumpEventQueue();
+      expect(done, isFalse);
+
+      worker.writeGate!.complete();
+      await completed;
+    });
+  });
+
+  test('a queue file job failing on close does not stop the next setup',
+      () async {
+    final server = await LocalPostHogServer.start();
+    final worker = _LateFailingDeletes();
+    final defaultWorker = QueueWorker.defaultWorker;
+    QueueWorker.defaultWorker = () => worker;
+    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+    final platform = await setUpPlatform(configFor(server));
+    await platform.capture(eventName: 'first');
+    await server.waitForEvent('first');
+
+    // Fails only once close() has given up on the flush and awaits settled.
+    final closed = platform.close();
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    worker.gate.complete();
+    await closed;
+
+    worker.fail = false;
+    await platform.setup(configFor(server));
+    await platform.capture(eventName: 'second');
+
+    await server.waitForEvent('second');
+  });
+
+  test('close gives up on stalled file work, and the next setup waits for it',
+      () async {
+    final server = await LocalPostHogServer.start();
+    final worker = GatedWorker();
+    final defaultWorker = QueueWorker.defaultWorker;
+    QueueWorker.defaultWorker = () => worker;
+    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+    final platform = await setUpPlatform(configFor(server));
+
+    worker.writeGate = Completer();
+    unawaited(platform.capture(eventName: 'stalled'));
+    await platform.close();
+
+    var ready = false;
+    final setup = platform.setup(configFor(server)).then((_) => ready = true);
+    await pumpEventQueue();
+    expect(ready, isFalse);
+
+    worker.writeGate!.complete();
+    await setup;
   });
 
   group('PosthogFlutterDesktop.screen', () {
@@ -1575,6 +1654,42 @@ void main() {
       expect(await nextLaunch.isOptOut(), isTrue);
       expect(await nextLaunch.getDistinctId(), distinctId);
     });
+    test('an event left unsent at close is sent once after the next setup',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond =
+          (_) => const PostHogResponse(HttpStatus.serviceUnavailable);
+      final platform = createPlatform();
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'kept');
+      await platform.close();
+
+      // The server records the events of the refused requests too.
+      final refused = server.eventNames.length;
+      server.respond = (_) => const PostHogResponse(HttpStatus.ok);
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'sentinel');
+      await server.waitForEvent('sentinel');
+
+      expect(server.eventNames.skip(refused).where((name) => name == 'kept'),
+          hasLength(1));
+    });
+
+    test('an event sent before close is not sent again after the next setup',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = createPlatform();
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'once');
+      await server.waitForEvent('once');
+      await platform.close();
+
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'sentinel');
+      await server.waitForEvent('sentinel');
+
+      expect(server.eventNames.where((name) => name == 'once'), hasLength(1));
+    });
   });
 
   group('PosthogFlutterDesktop.setup', () {
@@ -2503,3 +2618,13 @@ Map<String, Object?> _variantFlagResponse() => {
         },
       },
     };
+
+class _LateFailingDeletes extends GatedWorker {
+  final gate = Completer<void>();
+  var fail = true;
+
+  @override
+  Future<List<String>> delete(List<String> paths) => fail
+      ? gate.future.then((_) => throw StateError('job failed'))
+      : super.delete(paths);
+}

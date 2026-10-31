@@ -228,6 +228,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           userPropertiesSetOnce: _normalize(userPropertiesSetOnce),
           options: cleanEventOptions(options),
         );
+        return client.written;
       });
 
   @override
@@ -242,6 +243,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           userPropertiesToSetOnce: _normalize(userPropertiesToSetOnce),
           options: cleanEventOptions(options),
         );
+        return client.written;
       });
 
   @override
@@ -279,7 +281,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         final current = _clientForContinuation('capture', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   @override
@@ -365,7 +367,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
         // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          _captureProcessed(current, processed, exceptionSteps, prepared);
+          await _captureProcessed(current, processed, exceptionSteps, prepared);
           return;
         }
 
@@ -381,7 +383,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           current.registerForSession(
               {PostHogPropertyName.screenName: finalScreenName});
         }
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -423,10 +425,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   Future<void> alias({required String alias, Map<String, Object?>? options}) =>
       _guard(
         'alias',
-        (client) => client.alias(
-          alias,
-          options: cleanEventOptions(options),
-        ),
+        (client) {
+          client.alias(alias, options: cleanEventOptions(options));
+          return client.written;
+        },
       );
 
   @override
@@ -564,6 +566,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           groupProperties: _normalize(groupProperties),
           options: cleanEventOptions(options),
         );
+        return client.written;
       });
 
   @override
@@ -640,7 +643,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         final current =
             _clientForContinuation('captureException', scope, distinctId);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, exceptionSteps, prepared);
       });
 
   @override
@@ -668,14 +671,22 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _featureFlagsUnsubscribe?.call();
       _featureFlagsUnsubscribe = null;
 
-      return _previousClose = _closeClient(client);
+      _previousClose = _closeClient(client);
     });
-    // A repeated close() also waits until the queue is sent.
-    await _previousClose;
+    // A repeated close() also waits until the queue is sent. Stalled storage
+    // doesn't hold up the app's shutdown, only the next setup().
+    try {
+      await _previousClose.timeout(_closeTimeout);
+    } catch (e) {
+      printIfDebug('[PostHog] Queue file work left unfinished on close: $e');
+    }
   }
 
   /// How long close() waits for the queue to be sent.
   static const _closeFlushTimeout = Duration(seconds: 2);
+
+  /// How long close() waits in all, with the queue's file work.
+  static const _closeTimeout = Duration(seconds: 4);
 
   /// Makes one bounded attempt to send the queue, then closes [client].
   /// Events left unsent stay on disk for the next client, or are lost when
@@ -688,6 +699,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       printIfDebug('[PostHog] Events left unsent on close: $e');
     }
     client.close();
+    try {
+      // The next client reads the directory only once this one's files are
+      // written and deleted, so it neither misses an event nor sends one again.
+      await client.settled;
+    } catch (e) {
+      printIfDebug('[PostHog] Queue file work failed on close: $e');
+    }
   }
 
   @override
@@ -814,7 +832,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// with [ai], and returns its uuid, or null when it is not queued. The
   /// client adds nothing to it; an `$exception` event gets the exception
   /// steps recorded up to now.
-  String? _captureProcessed(
+  FutureOr<String?> _captureProcessed(
     DesktopPostHog client,
     PostHogEvent event,
     ExceptionStepsBuffer? exceptionSteps,
@@ -842,14 +860,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       options = client.personProcessingOptions(
           {...?options}..remove('process_person_profile'), properties);
     }
-    return client.capturePrepared(
-        event.event,
-        (
-          properties: properties,
-          options: options,
-          timestamp: prepared.timestamp,
-        ),
-        ai: ai);
+    final queued = (
+      properties: properties,
+      options: options,
+      timestamp: prepared.timestamp,
+    );
+    return ai
+        ? client.captureAiPrepared(event.event, queued)
+        : client.capturePrepared(event.event, queued);
   }
 
   /// Whether [event] has a name; an event without one is dropped.

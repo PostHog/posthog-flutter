@@ -21,12 +21,12 @@ String? captureAi(
   final prepared = client.prepareEvent(event, properties: properties);
   return prepared == null
       ? null
-      : client.capturePrepared(event, prepared, ai: true);
+      : now(client.captureAiPrepared(event, prepared));
 }
 
 /// The queued AI events, oldest first.
 List<Map<String, Object?>> aiQueue(FileStorage storage) => [
-      for (final queued in storage.aiQueue.peek(storage.aiQueue.length))
+      for (final queued in now(storage.aiQueue.peek(storage.aiQueue.length)))
         queued.event,
     ];
 
@@ -144,6 +144,24 @@ void main() {
             properties: {'input': filler(8 * 1024 * 1024)}),
         isNotNull,
       );
+    });
+
+    test('an oversized AI event does not displace a queued one', () {
+      final storage = tempStorage();
+      final client = testClient(server,
+          config: testConfig()
+            ..captureAiMaxQueueSize = 1
+            ..captureAiMaxEventBytes = 1000,
+          storage: storage);
+
+      captureAi(client, r'$ai_span', properties: {'i': 0});
+      captureAi(client, r'$ai_span', properties: {'input': filler(2000)});
+
+      expect([
+        for (final event in aiQueue(storage)) (event['properties']! as Map)['i']
+      ], [
+        0
+      ]);
     });
 
     test('keeps captureAiMaxQueueSize AI events, apart from maxQueueSize', () {
