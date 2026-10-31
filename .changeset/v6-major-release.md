@@ -24,6 +24,7 @@
 - **Breaking:** send events to capture v1 (`/i/v1/analytics/events`) instead of `/batch/` on iOS, macOS, Android, Windows and Linux — update your reverse proxy first, see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) migration guides
 - **Breaking:** retry a 404 on Windows and Linux so events stay queued, printing one warning, also without `debug`, until a reverse proxy or self-hosted instance serves the new path
 - **Breaking:** drop the batch on a redirect on Windows and Linux, following only same-origin 307 and 308 redirects, and cap a `Retry-After` wait at 30 seconds
+- **Breaking:** write events to disk only when the returned future completes on Windows and Linux, so an unawaited call can be lost on a crash or `exit()` — await the call or `Posthog().close()` before `exit()`
 - **Breaking:** apply SDK properties, then registered properties, then event properties on Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** always set `$lib` and `$lib_version` from the `PostHog-Sdk-Info` header on Windows and Linux, ignoring changes made in `beforeSend`
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
@@ -32,5 +33,6 @@
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`
 - Apply a `$process_person_profile` property or `process_person_profile` option passed with an event to that event on Windows and Linux
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
+- Run queued event encoding, file work and request compression on a background isolate on Windows and Linux so they no longer drop frames
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
