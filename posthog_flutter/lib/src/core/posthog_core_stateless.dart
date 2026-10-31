@@ -626,6 +626,10 @@ abstract class PostHogCoreStateless {
     });
   }
 
+  /// How many events are waiting to be sent, AI events included.
+  @protected
+  int get queuedEventCount => _analytics.queue.length + _ai.queue.length;
+
   /// Flushes the queues of pending events and AI events.
   /// If a flush is already in progress, returns the existing future to avoid
   /// concurrent flushes sending duplicate events.
