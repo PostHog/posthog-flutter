@@ -553,6 +553,7 @@ abstract class PostHogCoreStateless {
     // it is kept, so that it never displaces an older one for nothing.
     if (maxEventBytes == null) _makeRoom(lane, queued: queue.length + 1);
     final queued = queue.add(prepared, maxBytes: maxEventBytes).then((result) {
+      if (result == queueWriteEvicted) return false;
       if (result.tooLarge) {
         // Name and size only: AI properties can hold prompts and media.
         logger.warn('Dropping AI event ${message['event']} of '
@@ -587,7 +588,9 @@ abstract class PostHogCoreStateless {
     // Events over the limit before they are even measured would be evicted
     // once they are, unless enough of the newer ones turn out too large.
     if (maxEventBytes != null &&
-        queue.removeOldestUnsentOver(lane.maxQueueSize) > 0) {
+        queue.removeOldestUnsentOver(lane.maxQueueSize,
+                maxBytes: lane.maxQueueBytes) >
+            0) {
       logger.warn('Queue is full, the oldest event is dropped.');
     }
 

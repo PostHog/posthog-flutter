@@ -474,8 +474,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// its size limit.
   ///
   /// Completes with the event's uuid, or null when it is not queued: the
-  /// client is closed or opted out, or the event is over the size limit.
-  /// Its person properties apply once it is queued, unless [reset] ran since
+  /// client is closed or opted out, or the event is over the size limit or
+  /// was evicted while waiting to be written. Its person properties apply once it is queued, unless [reset] ran since
   /// it was captured.
   Future<String?> captureAiPrepared(
     String event,

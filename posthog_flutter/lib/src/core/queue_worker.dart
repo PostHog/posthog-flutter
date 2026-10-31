@@ -14,6 +14,10 @@ import 'logger.dart';
 /// and so not written; and the error that kept its file from being written.
 typedef QueueWriteResult = ({int? bytes, bool tooLarge, String? error});
 
+/// The result of an event removed from its queue before the worker got it.
+const QueueWriteResult queueWriteEvicted =
+    (bytes: null, tooLarge: false, error: null);
+
 /// A queued event read back by [QueueWorker.read]: the event, or null with
 /// the reason. A file that is [gone] was sent by another client, or could
 /// not be decoded and was deleted; any other [error] may pass.

@@ -373,6 +373,7 @@ class FileEventQueue {
   /// Events waiting for a free write, oldest first. Eviction can still cancel
   /// them, unlike a job the worker was given.
   final Map<String, _UnsentWrite> _unsent = {};
+  int _unsentBytes = 0;
 
   /// The most writes the worker holds at once, so that captures outpacing it
   /// keep only the events the queue limits allow in memory.
@@ -467,8 +468,9 @@ class FileEventQueue {
   }
 
   /// Adds [event] at the end of the queue, and completes with what the
-  /// worker did with it. With [maxBytes], an event whose serialized size is
-  /// over it is removed again and not written.
+  /// worker did with it, or [queueWriteEvicted] when it was removed before it
+  /// reached the worker. With [maxBytes], an event
+  /// whose serialized size is over it is removed again and not written.
   Future<QueueWriteResult> add(Map<String, Object?> event, {int? maxBytes}) {
     // Loaded before the new file exists, which would otherwise be listed
     // on top of being added.
@@ -479,6 +481,7 @@ class FileEventQueue {
     if (_writesInFlight >= maxWritesInFlight) {
       final unsent = _UnsentWrite(event, maxBytes);
       _unsent[id] = unsent;
+      _unsentBytes += unsent.estimatedBytes;
       return _job(unsent.result.future);
     }
     return _job(_write(id, event, maxBytes));
@@ -525,6 +528,7 @@ class FileEventQueue {
     while (_writesInFlight < maxWritesInFlight && _unsent.isNotEmpty) {
       final id = _unsent.keys.first;
       final unsent = _unsent.remove(id)!;
+      _unsentBytes -= unsent.estimatedBytes;
       unsent.result.complete(_write(id, unsent.event, unsent.maxBytes));
     }
   }
@@ -630,15 +634,24 @@ class FileEventQueue {
   }
 
   /// Removes the oldest events still waiting to be written until at most
-  /// [maxCount] wait. Returns how many were removed.
+  /// [maxCount] wait and, with [maxBytes], their estimated sizes add up to at
+  /// most that, always keeping the newest. Returns how many were removed.
   ///
-  /// Their size is unknown, so eviction by [removeOldestOver] can't reach
+  /// Their size is unmeasured, so eviction by [removeOldestOver] can't reach
   /// them: this is what bounds a queue with a size limit on its events.
-  int removeOldestUnsentOver(int maxCount) {
-    final overflow = _unsent.length - maxCount;
-    if (overflow <= 0) return 0;
-    remove(_unsent.keys.take(overflow).toList());
-    return overflow;
+  int removeOldestUnsentOver(int maxCount, {int? maxBytes}) {
+    var waiting = _unsent.length;
+    var bytes = _unsentBytes;
+    final evicted = <String>[];
+    for (final MapEntry(key: id, value: unsent) in _unsent.entries) {
+      final overBytes = maxBytes != null && bytes > maxBytes && waiting > 1;
+      if (waiting <= maxCount && !overBytes) break;
+      evicted.add(id);
+      waiting--;
+      bytes -= unsent.estimatedBytes;
+    }
+    if (evicted.isNotEmpty) remove(evicted);
+    return evicted.length;
   }
 
   /// Removes the oldest events until the measured ones hold at most
@@ -661,7 +674,8 @@ class FileEventQueue {
       _untrack(id);
       _writing.remove(id);
       if (_unsent.remove(id) case final unsent?) {
-        unsent.result.complete((bytes: null, tooLarge: false, error: null));
+        _unsentBytes -= unsent.estimatedBytes;
+        unsent.result.complete(queueWriteEvicted);
       } else if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
         paths.add(_pathOf(id));
       }
@@ -677,9 +691,27 @@ class FileEventQueue {
 }
 
 final class _UnsentWrite {
-  _UnsentWrite(this.event, this.maxBytes);
+  _UnsentWrite(this.event, this.maxBytes)
+      : estimatedBytes = _estimateBytes(event);
+
+  /// About what [value] takes as JSON, without encoding it: encoding is the
+  /// work kept off the UI isolate. Multi-byte text and escapes count low.
+  static int _estimateBytes(Object? value) => switch (value) {
+        final String string => string.length + 2,
+        final Map<Object?, Object?> map => map.entries.fold(
+            2,
+            (total, entry) =>
+                total +
+                _estimateBytes(entry.key) +
+                _estimateBytes(entry.value) +
+                2),
+        final List<Object?> list =>
+          list.fold(2, (total, element) => total + _estimateBytes(element) + 1),
+        _ => 8,
+      };
 
   final Map<String, Object?> event;
+  final int estimatedBytes;
   final int? maxBytes;
   final result = Completer<QueueWriteResult>();
 }
