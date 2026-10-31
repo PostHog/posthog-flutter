@@ -22,6 +22,15 @@ extension PostHogConfigSerialization on PostHogConfig {
       'surveys': surveys,
       'personProfiles': personProfiles.name,
       'compression': compression.name,
+      // Unset AI lane settings are omitted so the native defaults apply.
+      if (captureAiCompression != null)
+        'captureAiCompression': captureAiCompression!.name,
+      if (captureAiMaxQueueSize != null)
+        'captureAiMaxQueueSize': captureAiMaxQueueSize,
+      if (captureAiTimeout != null)
+        'captureAiTimeoutSeconds': _captureAiTimeoutSeconds(captureAiTimeout!),
+      if (captureAiMaxEventBytes != null)
+        'captureAiMaxEventBytes': captureAiMaxEventBytes,
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
       'sessionReplayConfig': sessionReplayConfig.toMap(),
@@ -37,6 +46,11 @@ extension PostHogConfigSerialization on PostHogConfig {
       if (bootstrap != null) 'bootstrap': bootstrap!.toMap(),
     };
   }
+
+  /// Android takes whole seconds. A positive sub-second timeout is sent as 1s
+  /// instead of 0, which the native SDKs read as "use the default".
+  static int _captureAiTimeoutSeconds(Duration timeout) =>
+      timeout > Duration.zero && timeout.inSeconds < 1 ? 1 : timeout.inSeconds;
 }
 
 extension PostHogBootstrapConfigSerialization on PostHogBootstrapConfig {

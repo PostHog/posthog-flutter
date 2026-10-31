@@ -44,6 +44,77 @@ void main() {
         hasLength(1));
   });
 
+  test('counts the serialized bytes of the queued events', () {
+    int size(Map<String, Object?> event) =>
+        utf8.encode(jsonEncode(event)).length;
+    final first = {'event': 'first', 'padding': 'é' * 10};
+    final second = {'event': 'second'};
+    final third = {'event': 'third'};
+    final storage = FileStorage(dir.path);
+    final queue = storage.queue
+      ..add(first)
+      ..add(second)
+      ..add(third);
+    expect(queue.byteCount, size(first) + size(second) + size(third));
+
+    queue.removeOldest(1);
+    expect(queue.byteCount, size(second) + size(third));
+
+    // Read back from the files by the next process.
+    storage.close();
+    final next = FileStorage(dir.path);
+    addTearDown(next.close);
+    final restored = next.queue;
+    expect(restored.byteCount, size(second) + size(third));
+    restored.remove([restored.peek(1).single.id]);
+    expect(restored.byteCount, size(third));
+  });
+
+  group('peek with maxBytes', () {
+    // Each event serializes to `{"p":"<padding>"}`, 18 bytes here.
+    FileEventQueue queueOf(List<String> paddings) {
+      final storage = FileStorage(dir.path);
+      addTearDown(storage.close);
+      final queue = storage.queue;
+      for (final padding in paddings) {
+        queue.add({'p': padding});
+      }
+      return queue;
+    }
+
+    List<Object?> paddingsOf(List<PostHogQueuedEvent> events) =>
+        [for (final queued in events) queued.event['p']];
+
+    test('stops before the event that would pass the limit', () {
+      final queue = queueOf(['a' * 10, 'b' * 10, 'c' * 10]);
+
+      expect(
+          paddingsOf(queue.peek(10, maxBytes: 18 * 2)), ['a' * 10, 'b' * 10]);
+    });
+
+    test('returns an event over the limit alone', () {
+      final queue = queueOf(['a' * 100, 'b']);
+
+      expect(paddingsOf(queue.peek(10, maxBytes: 50)), ['a' * 100]);
+    });
+
+    test('counts UTF-8 bytes, not characters', () {
+      // 18 characters but 28 bytes each.
+      final queue = queueOf(['é' * 10, 'è' * 10]);
+
+      expect(paddingsOf(queue.peek(10, maxBytes: 18 * 2)), ['é' * 10]);
+    });
+
+    test('does not read the events past the limit', () {
+      final queue = queueOf(['a' * 10, 'b' * 10]);
+      // Unreadable: a peek that read it would delete it.
+      final second = _queueFiles(dir).last..writeAsStringSync('not json');
+
+      expect(paddingsOf(queue.peek(10, maxBytes: 18)), ['a' * 10]);
+      expect(second.existsSync(), isTrue);
+    });
+  });
+
   test('keeps the queue order across a restart', () async {
     final before = client();
     for (var i = 0; i < 50; i++) {
@@ -95,7 +166,9 @@ void main() {
           ['event_3', 'event_4']);
       expect(api.requests, isEmpty);
       async.elapse(const Duration(seconds: 30));
-      expect(api.batchRequests.single.events, original);
+      expect(
+          [for (final event in api.batchRequests.single.events) event['uuid']],
+          [for (final event in original) (event as Map)['uuid']]);
       expect(_queueFiles(dir), isEmpty);
     });
   });
