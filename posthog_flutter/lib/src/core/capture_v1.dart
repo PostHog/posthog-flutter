@@ -109,7 +109,7 @@ String? _liftString(
 }
 
 String _jsonType(Object value) => switch (value) {
-      bool() => 'bool',
+      bool() => 'boolean',
       num() => 'number',
       Map() => 'object',
       List() => 'array',
@@ -150,13 +150,19 @@ class CaptureV1Identity {
       );
 }
 
+final _captureV1DropTag = RegExp(r'^[a-z0-9_]{1,64}$');
+
 /// The uuids among [uuids] that a capture v1 response [body] asks to
-/// retry, with how many of them it rejected (`drop` or `limited`), or null
-/// when the body has no readable per-event results.
+/// retry, with how many of them it dropped (`drop`) by `details` tag and
+/// how many repeated copies of them it dropped (`duplicates_dropped`), or
+/// null when the body has no readable per-event results.
 ///
-/// `ok`, `warning`, `drop`, `limited` and any unknown result are final.
-/// An event missing from the results counts as delivered.
-({Set<String> retry, int rejected})? captureV1Results(
+/// [uuids] holds one entry per event sent, repeats included.
+///
+/// `ok`, `warning`, `drop` and any unknown result are final; only `drop`
+/// counts as dropped. An event missing from the results counts as
+/// delivered.
+({Set<String> retry, Map<String, int> drops, int duplicates})? captureV1Results(
   String? body,
   Iterable<String> uuids,
 ) {
@@ -169,17 +175,30 @@ class CaptureV1Identity {
     return null;
   }
   if (results is! Map) return null;
+  final batch = uuids.toList(growable: false);
   final retry = <String>{};
-  var rejected = 0;
-  for (final uuid in uuids) {
-    switch (results[uuid]) {
+  final drops = <String, int>{};
+  var duplicates = 0;
+  for (final uuid in batch.toSet()) {
+    final result = results[uuid];
+    switch (result) {
       case {'result': 'retry'}:
         retry.add(uuid);
-      case {'result': 'drop' || 'limited'}:
-        rejected++;
+      case {'result': 'drop'}:
+        // These tags reach the logs, so anything but a reason code, such as
+        // an echoed id or a forged log line, is discarded.
+        final details = switch (result['details']) {
+          final String tag when _captureV1DropTag.hasMatch(tag) => tag,
+          _ => 'no details',
+        };
+        drops[details] = (drops[details] ?? 0) + 1;
+    }
+    // Clamped so a malformed count can't exceed the batch.
+    if (result case {'duplicates_dropped': final int dropped}) {
+      duplicates += dropped.clamp(0, batch.length);
     }
   }
-  return (retry: retry, rejected: rejected);
+  return (retry: retry, drops: drops, duplicates: duplicates);
 }
 
 /// Whether two `Set`s hold the same elements.

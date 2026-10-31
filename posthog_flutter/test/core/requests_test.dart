@@ -46,7 +46,8 @@ void main() {
           client.flush(),
           throwsA(isA<PostHogFetchHttpError>()
               .having((e) => e.status, 'status', 400)
-              .having((e) => e.responseBody, 'responseBody', 'invalid batch')));
+              .having((e) => e.responseBody, 'responseBody', 'invalid batch')
+              .having((e) => '$e', 'toString', isNot(contains('invalid')))));
     });
 
     test('leave a redirect unfollowed', () async {
@@ -243,6 +244,7 @@ void main() {
           async.elapse(const Duration(seconds: 6));
           body.add(utf8.encode(' '));
         }
+        body.add(utf8.encode('{"results": {}}'));
         body.close();
         async.flushMicrotasks();
 
@@ -282,7 +284,7 @@ void main() {
       });
     });
 
-    test('counts a 2xx whose body times out as delivered', () {
+    test('drops a 2xx whose body times out without resending it', () {
       fakeAsync((async) {
         // Cancelled in this zone: fake_async does not run the root zone's
         // microtasks.
@@ -299,11 +301,11 @@ void main() {
           createHttpClient: (_) => http,
         );
         client.capture('evt');
-        var flushed = false;
-        client.flush().then((_) => flushed = true);
+        Object? error;
+        client.flush().catchError((Object e) => error = e);
         async.elapse(const Duration(seconds: 10));
 
-        expect(flushed, isTrue);
+        expect(error, isA<PostHogFetchHttpError>());
         async.elapse(const Duration(seconds: 30));
         expect(openCalls, 1,
             reason: 'a resend would store the events a second time');
@@ -334,7 +336,8 @@ class _ControlledHttpClient implements HttpClient {
 
 class _ControlledRequest implements HttpClientRequest {
   _ControlledRequest({HttpClientResponse? response, this.takeChunk})
-      : _response = response ?? _ControlledResponse(Stream.value(<int>[]));
+      : _response = response ??
+            _ControlledResponse(Stream.value(utf8.encode('{"results": {}}')));
 
   final HttpClientResponse _response;
 

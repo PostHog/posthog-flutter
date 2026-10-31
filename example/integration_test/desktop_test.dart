@@ -203,7 +203,11 @@ class _FakePostHog {
     switch (request.uri.path) {
       case '/i/v1/analytics/events':
         response.statusCode = batchStatus;
-        if (batchStatus == HttpStatus.ok) _batches.add(body);
+        if (batchStatus == HttpStatus.ok) {
+          _batches.add(body);
+          response.headers.contentType = ContentType.json;
+          response.write(jsonEncode({'results': <String, Object?>{}}));
+        }
       case '/flags/':
         _flagsRequests.add(body);
         response.headers.contentType = ContentType.json;
