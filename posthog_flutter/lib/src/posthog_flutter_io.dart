@@ -3,7 +3,6 @@ import 'dart:async';
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
@@ -37,8 +36,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
-
-  OnFeatureFlagsCallback? _onFeatureFlagsCallback;
 
   PushIdentityProvider? _pushIdentityProvider;
 
@@ -95,11 +92,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
                 FeatureFlagsListeners.instance.generation) {
           break;
         }
-        final loaded = featureFlagsLoadedFromMap(call.arguments);
-        // First, so a throwing config callback can't starve listeners and a
-        // reset() or close() it starts clears this load.
-        FeatureFlagsListeners.instance.deliver(loaded);
-        _onFeatureFlagsCallback?.call(loaded);
+        FeatureFlagsListeners.instance
+            .deliver(featureFlagsLoadedFromMap(call.arguments));
         break;
       case 'pushIdentityProvider':
         // Returning a value here is the reply the native SDK awaits.
@@ -230,7 +224,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
-    _onFeatureFlagsCallback = config.onFeatureFlags;
     _pushIdentityProvider = config.pushIdentityProvider;
     _beforeSendCallbacks = config.beforeSend;
 
@@ -705,17 +698,8 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return featureFlagsLoadedFromMap(null);
     }
 
-    final generation = FeatureFlagsListeners.instance.generation;
     try {
-      final loaded =
-          featureFlagsLoadedFromMap(await _invoke('reloadFeatureFlags'));
-      // posthog-android hands a manual reload only to its completion, not to
-      // the config callback that sends onFeatureFlagsCallback.
-      if (defaultTargetPlatform == TargetPlatform.android &&
-          generation == FeatureFlagsListeners.instance.generation) {
-        FeatureFlagsListeners.instance.deliver(loaded);
-      }
-      return loaded;
+      return featureFlagsLoadedFromMap(await _invoke('reloadFeatureFlags'));
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reloadFeatureFlags: $exception');
       return featureFlagsLoadedFromMap(null);

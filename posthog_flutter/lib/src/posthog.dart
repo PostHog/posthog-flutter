@@ -47,8 +47,8 @@ class Posthog {
   /// the SDK for tracking events and feature flags.
   ///
   /// The [config] object contains your project token, host, and other settings.
-  /// To listen for feature flag load events, provide an `onFeatureFlags`
-  /// callback in the [PostHogConfig].
+  /// To listen for feature flag load events, call [onFeatureFlags] before this
+  /// method.
   ///
   /// Repeated setup reapplies Dart-side settings such as the error-tracking
   /// hooks. Most native settings still require [close] before setup because
@@ -60,9 +60,9 @@ class Posthog {
   /// ```dart
   /// final config = PostHogConfig('YOUR_PROJECT_TOKEN');
   /// config.host = 'YOUR_POSTHOG_HOST';
-  /// config.onFeatureFlags = (loaded) {
+  /// Posthog().onFeatureFlags((loaded) {
   ///   // Feature flags are now loaded, you can read flag values here
-  /// };
+  /// });
   /// await Posthog().setup(config);
   /// ```
   ///

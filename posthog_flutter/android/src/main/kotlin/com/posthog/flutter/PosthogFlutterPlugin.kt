@@ -28,8 +28,8 @@ import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
-import com.posthog.PostHogFeatureFlagsCallback
 import com.posthog.PostHogFeatureFlagsLoaded
+import com.posthog.PostHogFeatureFlagsSubscription
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
@@ -168,6 +168,8 @@ class PosthogFlutterPlugin :
 
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
+    private var featureFlagsSubscription: PostHogFeatureFlagsSubscription? = null
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         if (bitmapExportExecutor.isShutdown) {
             bitmapExportExecutor = Executors.newSingleThreadExecutor()
@@ -178,6 +180,16 @@ class PosthogFlutterPlugin :
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
 
         this.applicationContext = flutterPluginBinding.applicationContext
+        // Before initPlugin, so this also catches the first load of a native auto-init.
+        featureFlagsSubscription?.unsubscribe()
+        featureFlagsSubscription =
+            PostHog.onFeatureFlags { loaded ->
+                Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
+                invokeFlutterMethod(
+                    "onFeatureFlagsCallback",
+                    loaded.toFlutterMap() + ("generation" to flagsGeneration),
+                )
+            }
         initPlugin()
 
         channel.setMethodCallHandler(this)
@@ -850,15 +862,6 @@ class PosthogFlutterPlugin :
                         )
                     }
                 }
-
-                onFeatureFlags =
-                    PostHogFeatureFlagsCallback { loaded ->
-                        Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
-                        invokeFlutterMethod(
-                            "onFeatureFlagsCallback",
-                            loaded.toFlutterMap() + ("generation" to flagsGeneration),
-                        )
-                    }
             }
 
         lastBuiltConfig = config
@@ -999,6 +1002,8 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopOcclusionDetector()
+        featureFlagsSubscription?.unsubscribe()
+        featureFlagsSubscription = null
         channel.setMethodCallHandler(null)
         pushChannelCandidates.remove(channel)
         if (activeChannel === channel) {

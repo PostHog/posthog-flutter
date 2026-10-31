@@ -67,7 +67,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   _ClientScope? _clientScope;
 
   /// The configuration of the latest setup(), read by the Dart-side hooks:
-  /// beforeSend, onFeatureFlags and exception processing.
+  /// beforeSend and exception processing.
   PostHogConfig? _config;
 
   void Function()? _featureFlagsUnsubscribe;
@@ -180,10 +180,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     );
     _featureFlagsUnsubscribe = client.onFeatureFlags(() {
       final loaded = client.featureFlagsLoaded();
-      // First, so a throwing config callback can't starve listeners and a
-      // reset() or close() it starts clears this load.
       FeatureFlagsListeners.instance.deliver(loaded);
-      _config?.onFeatureFlags?.call(loaded);
     });
 
     final stepsConfig = config.errorTrackingConfig.exceptionSteps;

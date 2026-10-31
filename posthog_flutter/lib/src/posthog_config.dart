@@ -310,28 +310,6 @@ class PostHogConfig {
   /// call instead.
   PostHogBootstrapConfig? bootstrap;
 
-  /// Callback to be invoked when feature flags are loaded.
-  ///
-  /// It receives the enabled flags and whether loading failed. It runs after
-  /// the flags load at startup, after [Posthog.reloadFeatureFlags], and after
-  /// calls that reload flags such as `identify()` or `group()`. When a load
-  /// fails, [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the flags
-  /// are the last known values. Defaults to `null`.
-  ///
-  /// **Android:** not called after [Posthog.reloadFeatureFlags]. Use the
-  /// flags that call returns instead.
-  ///
-  /// **Example:**
-  /// ```dart
-  /// final config = PostHogConfig('<project_token>')
-  ///   ..onFeatureFlags = (loaded) {
-  ///     if (loaded.variants['new-checkout'] == 'test') {
-  ///       // Show the test variant.
-  ///     }
-  ///   };
-  /// ```
-  OnFeatureFlagsCallback? onFeatureFlags;
-
   /// Whether to automatically register this device's push token with PostHog.
   ///
   /// On iOS the native SDK swizzles the app delegate's remote-notification
@@ -481,14 +459,10 @@ class PostHogConfig {
   ///
   /// The [projectToken] is trimmed before it is stored.
   ///
-  /// The optional [onFeatureFlags] callback is invoked when feature flags finish
-  /// loading.
-  ///
   /// The optional [beforeSend] callbacks are copied into [beforeSend] and run in
   /// order before Dart-captured events are sent.
   PostHogConfig(
     String projectToken, {
-    this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
   })  : projectToken = projectToken.trim(),
         beforeSend = beforeSend ?? [];
