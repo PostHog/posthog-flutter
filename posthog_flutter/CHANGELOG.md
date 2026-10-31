@@ -1,5 +1,11 @@
 ## Next
 
+## 5.58.3
+
+### Patch Changes
+
+- 5b85326: Fix session replay after `optIn()` continuing the session that was active while opted out, and raise the minimum PostHog iOS SDK to 3.92.3.
+
 ## 5.58.2
 
 ### Patch Changes

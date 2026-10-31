@@ -2512,6 +2512,27 @@ void main() {
       expect(_propertiesOf(called)[r'$feature_flag'], 'variant-flag');
     });
 
+    test(
+        'reloadFeatureFlags returns the loaded flags, and the last known ones when loading fails',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final announced = <PostHogFeatureFlagsLoaded>[];
+      final platform = await setUpPlatform(configFor(server)
+        ..preloadFeatureFlags = false
+        ..onFeatureFlags = announced.add);
+
+      final loaded = await platform.reloadFeatureFlags();
+      expect(loaded.variants, {'variant-flag': 'test-variant'});
+      expect(loaded.errorsLoading, isFalse);
+
+      server.respond = (_) => const PostHogResponse(HttpStatus.badRequest);
+      final failed = await platform.reloadFeatureFlags();
+      expect(failed.variants, {'variant-flag': 'test-variant'});
+      expect(failed.errorsLoading, isTrue);
+      expect(announced.last.errorsLoading, isTrue);
+    });
+
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();
