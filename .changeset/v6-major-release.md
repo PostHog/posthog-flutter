@@ -27,10 +27,15 @@
 - **Breaking:** apply SDK properties, then registered properties, then event properties on Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** always set `$lib` and `$lib_version` from the `PostHog-Sdk-Info` header on Windows and Linux, ignoring changes made in `beforeSend`
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
+- **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
+- **Breaking:** decide person processing before `beforeSend` runs on Windows and Linux — a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`
 - Apply a `$process_person_profile` property or `process_person_profile` option passed with an event to that event on Windows and Linux
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
+- Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set on every platform except web — a callback can change the distinct ID and timestamp, and the event keeps its uuid
+- Attach `$exception_steps` before `beforeSend` runs on Windows and Linux so callbacks can read or remove them — steps recorded while a callback runs, or an event a callback renames to `$exception`, no longer get them
+- Add `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
