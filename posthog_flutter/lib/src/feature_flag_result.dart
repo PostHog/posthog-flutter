@@ -53,23 +53,4 @@ class PostHogFeatureFlagResult {
 
   @override
   int get hashCode => Object.hash(key, enabled, variant);
-
-  /// Creates a [PostHogFeatureFlagResult] from a native SDK response map.
-  ///
-  /// The [result] should be a map containing `key`, `enabled`, `variant`, and
-  /// `payload` entries. Falls back to [fallbackKey] if the map does not include
-  /// a key.
-  ///
-  /// Returns `null` if [result] is `null` or is not a [Map].
-  static PostHogFeatureFlagResult? fromMap(Object? result, String fallbackKey) {
-    if (result == null) return null;
-    if (result is! Map) return null;
-
-    return PostHogFeatureFlagResult(
-      key: result['key'] as String? ?? fallbackKey,
-      enabled: result['enabled'] as bool? ?? false,
-      variant: result['variant'] as String?,
-      payload: result['payload'],
-    );
-  }
 }

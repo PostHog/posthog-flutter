@@ -122,8 +122,8 @@ void main() {
       'register': (web) => web.register('plan', 'pro'),
       'unregister': (web) => web.unregister('plan'),
       'group': (web) => web.group(groupType: 'company', groupKey: 'acme'),
-      'opt_in_capturing': (web) => web.enable(),
-      'opt_out_capturing': (web) => web.disable(),
+      'opt_in_capturing': (web) => web.optIn(),
+      'opt_out_capturing': (web) => web.optOut(),
     };
     for (final MapEntry(key: method, value: call) in followUps.entries) {
       test('$method waits for events whose beforeSend is still running',

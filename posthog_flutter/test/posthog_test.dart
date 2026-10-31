@@ -8,6 +8,7 @@ import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
 import 'package:posthog_flutter/src/replay/screenshot/screenshot_capturer.dart';
+import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -214,16 +215,6 @@ void main() {
   });
 
   group('PostHogConfig', () {
-    test('sendFeatureFlagEvents forwards to sendFeatureFlagEvent', () {
-      final config = PostHogConfig('test_project_token');
-
-      // ignore: deprecated_member_use_from_same_package
-      config.sendFeatureFlagEvents = false;
-
-      expect(config.sendFeatureFlagEvent, isFalse);
-      expect(config.toMap()['sendFeatureFlagEvents'], isFalse);
-    });
-
     test('toMap forwards evaluationContexts only when set', () {
       final config = PostHogConfig('test_project_token');
       expect(config.toMap().containsKey('evaluationContexts'), isFalse);
@@ -237,10 +228,8 @@ void main() {
       config.host = ' \nhttps://eu.i.posthog.com/\t ';
 
       expect(config.projectToken, equals('test_project_token'));
-      expect(config.apiKey, equals('test_project_token'));
       expect(config.host, equals('https://eu.i.posthog.com/'));
       expect(config.toMap()['projectToken'], equals('test_project_token'));
-      expect(config.toMap()['apiKey'], equals('test_project_token'));
       expect(config.toMap()['host'], equals('https://eu.i.posthog.com/'));
     });
 
@@ -491,7 +480,7 @@ void main() {
       final result = await Posthog().getFeatureFlagResult('non-existent');
       expect(result, isNull);
       expect(fakePlatformInterface.getFeatureFlagResultCalls, [
-        {'key': 'non-existent', 'sendEvent': true}
+        {'key': 'non-existent', 'sendFeatureFlagEvent': null}
       ]);
     });
 
@@ -506,24 +495,26 @@ void main() {
       expect(
           await Posthog().getFeatureFlagResult('variant-flag'), same(expected));
       expect(fakePlatformInterface.getFeatureFlagResultCalls, [
-        {'key': 'variant-flag', 'sendEvent': true}
+        {'key': 'variant-flag', 'sendFeatureFlagEvent': null}
       ]);
     });
 
-    test('passes sendEvent=true by default', () async {
+    test('leaves sendFeatureFlagEvent to the config by default', () async {
       await Posthog().getFeatureFlagResult('test');
 
       expect(
-        fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
-        isTrue,
+        fakePlatformInterface
+            .getFeatureFlagResultCalls.last['sendFeatureFlagEvent'],
+        isNull,
       );
     });
 
-    test('passes sendEvent=false when specified', () async {
-      await Posthog().getFeatureFlagResult('test', sendEvent: false);
+    test('passes sendFeatureFlagEvent=false when specified', () async {
+      await Posthog().getFeatureFlagResult('test', sendFeatureFlagEvent: false);
 
       expect(
-        fakePlatformInterface.getFeatureFlagResultCalls.last['sendEvent'],
+        fakePlatformInterface
+            .getFeatureFlagResultCalls.last['sendFeatureFlagEvent'],
         isFalse,
       );
     });
@@ -627,12 +618,12 @@ void main() {
     });
 
     test('fromMap returns null for null input', () {
-      final result = PostHogFeatureFlagResult.fromMap(null, 'fallback');
+      final result = featureFlagResultFromMap(null, 'fallback');
       expect(result, isNull);
     });
 
     test('fromMap returns null for non-Map input', () {
-      final result = PostHogFeatureFlagResult.fromMap('not a map', 'fallback');
+      final result = featureFlagResultFromMap('not a map', 'fallback');
       expect(result, isNull);
     });
 
@@ -644,7 +635,7 @@ void main() {
         'payload': {'data': 123},
       };
 
-      final result = PostHogFeatureFlagResult.fromMap(map, 'fallback');
+      final result = featureFlagResultFromMap(map, 'fallback');
 
       expect(result, isNotNull);
       expect(result!.key, equals('my-flag'));
@@ -656,7 +647,7 @@ void main() {
     test('fromMap uses fallback key when map key is null', () {
       final map = {'enabled': true, 'variant': null, 'payload': null};
 
-      final result = PostHogFeatureFlagResult.fromMap(map, 'fallback-key');
+      final result = featureFlagResultFromMap(map, 'fallback-key');
 
       expect(result, isNotNull);
       expect(result!.key, equals('fallback-key'));
@@ -665,7 +656,7 @@ void main() {
     test('fromMap defaults enabled to false when not in map', () {
       final map = <String, dynamic>{'key': 'my-flag'};
 
-      final result = PostHogFeatureFlagResult.fromMap(map, 'fallback');
+      final result = featureFlagResultFromMap(map, 'fallback');
 
       expect(result, isNotNull);
       expect(result!.enabled, isFalse);

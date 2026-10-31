@@ -68,7 +68,7 @@ void main() {
           };
         });
         final result = await posthogFlutterIO.getFeatureFlagResult(
-            key: 'flag', sendEvent: false);
+            key: 'flag', sendFeatureFlagEvent: false);
         expect(result, isNotNull);
         expect(result!.key, 'flag');
         expect(result.enabled, enabled);
@@ -80,7 +80,7 @@ void main() {
       expect(
           await posthogFlutterIO.getFeatureFlagResult(key: 'missing'), isNull);
       expect(log.single.method, 'getFeatureFlagResult');
-      expect(log.single.arguments, {'key': 'missing', 'sendEvent': true});
+      expect(log.single.arguments, {'key': 'missing'});
     });
   });
 
@@ -216,14 +216,14 @@ isolate_dso_base: 7000000000
       },
     );
 
-    test('setup sends projectToken and deprecated apiKey alias', () async {
+    test('setup sends projectToken', () async {
       testConfig = PostHogConfig(' \n test_project_token\t ');
       await posthogFlutterIO.setup(testConfig);
 
       final call = log.firstWhere((c) => c.method == 'setup');
       final args = Map<String, dynamic>.from(call.arguments as Map);
       expect(args['projectToken'], equals('test_project_token'));
-      expect(args['apiKey'], equals('test_project_token'));
+      expect(args.containsKey('apiKey'), isFalse);
     });
 
     test(

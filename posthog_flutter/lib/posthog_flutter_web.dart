@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
+import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
@@ -353,7 +354,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         () => Future<void>.value(),
         (_) async {
           final result = flagVariant == null
-              ? await getFeatureFlagResult(key: flag, sendEvent: false)
+              ? await getFeatureFlagResult(
+                  key: flag, sendFeatureFlagEvent: false)
               : null;
           final captured = featureEvent(
               event, flag, flagVariant ?? result?.variant ?? result?.enabled);
@@ -377,12 +379,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {
+  Future<void> optOut() async {
     return _call(const MethodCall('disable'));
   }
 
   @override
-  Future<void> enable() async {
+  Future<void> optIn() async {
     return _call(const MethodCall('enable'));
   }
 
@@ -493,23 +495,19 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    return _call(
-      MethodCall('getFeatureFlagPayload', {'key': key}),
-    );
-  }
-
-  @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool? sendFeatureFlagEvent,
   }) async {
     final result = await _call(
-      MethodCall('getFeatureFlagResult', {'key': key, 'sendEvent': sendEvent}),
+      MethodCall('getFeatureFlagResult', {
+        'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      }),
     );
 
     // Web SDK returns: { key, enabled, variant, payload }
-    return PostHogFeatureFlagResult.fromMap(result, key);
+    return featureFlagResultFromMap(result, key);
   }
 
   @override
@@ -517,7 +515,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final results = await _call(const MethodCall('getAllFeatureFlags'));
     if (results is! List) return null;
     return results
-        .map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+        .map((result) => featureFlagResultFromMap(result, ''))
         .nonNulls
         .toList();
   }

@@ -89,8 +89,6 @@ void main() {
     final nullReadsByName =
         <String, Future<Object?> Function(PosthogFlutterDesktop)>{
       'getFeatureFlag': (platform) => platform.getFeatureFlag(key: 'flag'),
-      'getFeatureFlagPayload': (platform) =>
-          platform.getFeatureFlagPayload(key: 'flag'),
       'getFeatureFlagResult': (platform) =>
           platform.getFeatureFlagResult(key: 'flag'),
       'getAllFeatureFlags': (platform) => platform.getAllFeatureFlags(),
@@ -133,7 +131,7 @@ void main() {
       await platform.setup(config);
       await platform.capture(eventName: 'disabled event');
       await platform.identify(userId: 'disabled user');
-      await platform.enable();
+      await platform.optIn();
       await platform.reloadFeatureFlags();
       await platform.flush();
       expect(await platform.getFeatureFlag(key: 'flag'), isNull);
@@ -247,9 +245,9 @@ void main() {
         ];
       final platform = await setUpPlatform(config);
 
-      await platform.disable();
+      await platform.optOut();
       final blocked = platform.capture(eventName: 'blocked capture');
-      await platform.enable();
+      await platform.optIn();
       releaseHook.complete();
       await blocked;
       await platform.capture(eventName: 'sentinel event');
@@ -345,9 +343,9 @@ void main() {
         ];
       final platform = await setUpPlatform(config);
 
-      await platform.disable();
+      await platform.optOut();
       await platform.screen(screenName: 'Hidden');
-      await platform.enable();
+      await platform.optIn();
       await platform.capture(eventName: 'sentinel event');
 
       final event = await server.waitForEvent('sentinel event');
@@ -377,10 +375,10 @@ void main() {
 
       final screen = platform.screen(screenName: 'Blocked');
       await hookStarted.future;
-      await platform.disable();
+      await platform.optOut();
       releaseHook.complete();
       await screen;
-      await platform.enable();
+      await platform.optIn();
       await platform.capture(eventName: 'sentinel event');
 
       final event = await server.waitForEvent('sentinel event');
@@ -677,9 +675,9 @@ void main() {
         ];
       final platform = await setUpPlatform(config);
 
-      await platform.disable();
+      await platform.optOut();
       final blocked = platform.captureException(error: StateError('blocked'));
-      await platform.enable();
+      await platform.optIn();
       releaseHook.complete();
       await blocked;
       await platform.capture(eventName: 'sentinel event');
@@ -918,9 +916,9 @@ void main() {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
 
-      await platform.disable();
+      await platform.optOut();
       await platform.addExceptionStep('while opted out');
-      await platform.enable();
+      await platform.optIn();
       await platform.captureException(error: StateError('opted in'));
 
       final event = await server.waitForEvent(r'$exception');
@@ -1053,7 +1051,7 @@ void main() {
       final platform = launch(createAppDirectory());
       await platform.setup(configFor(server)..optOut = true);
 
-      await platform.enable();
+      await platform.optIn();
 
       await server.waitForEvent('Application Installed');
     });
@@ -1092,7 +1090,7 @@ void main() {
       final firstLaunch = createPlatform(appDirectory: appDirectory);
       await firstLaunch.setup(configFor(server));
       final distinctId = await firstLaunch.getDistinctId();
-      await firstLaunch.disable();
+      await firstLaunch.optOut();
       await firstLaunch.close();
 
       final nextLaunch = createPlatform(appDirectory: appDirectory);
@@ -1133,12 +1131,12 @@ void main() {
       final platform =
           createPlatform(resolveAppDirectory: () => release.future);
       final setup = platform.setup(configFor(server));
-      final disable = platform.disable();
+      final disable = platform.optOut();
       final capture = platform.capture(eventName: 'disabled event');
       release.complete(directory.path);
       await Future.wait([setup, disable, capture]);
       expect(await platform.isOptOut(), isTrue);
-      await platform.enable();
+      await platform.optIn();
       await platform.capture(eventName: 'enabled event');
       await server.waitForEvent('enabled event');
       expect(server.eventNames, ['enabled event']);
@@ -1149,7 +1147,7 @@ void main() {
       final directory = createAppDirectory();
       final previousLaunch = createPlatform(appDirectory: directory);
       await previousLaunch.setup(configFor(server));
-      await previousLaunch.disable();
+      await previousLaunch.optOut();
       await previousLaunch.close();
 
       final release = Completer<String?>();
@@ -1160,7 +1158,7 @@ void main() {
       release.complete(directory.path);
       await Future.wait([setup, capture]);
       expect(await platform.isOptOut(), isTrue);
-      await platform.enable();
+      await platform.optIn();
       await platform.capture(eventName: 'enabled event');
       await server.waitForEvent('enabled event');
       expect(server.eventNames, ['enabled event']);
@@ -1273,7 +1271,7 @@ void main() {
       final platform = createPlatform();
 
       final setup = platform.setup(configFor(server));
-      final disable = platform.disable();
+      final disable = platform.optOut();
       await Future.wait([setup, disable]);
 
       expect(await platform.isOptOut(), isTrue);
@@ -1647,7 +1645,11 @@ void main() {
       expect(await platform.getFeatureFlag(key: 'beta'), isTrue);
       expect(await platform.getFeatureFlag(key: 'checkout'), 'variant-b');
       expect(
-        await platform.getFeatureFlagPayload(key: 'beta'),
+        (await platform.getFeatureFlagResult(
+          key: 'beta',
+          sendFeatureFlagEvent: false,
+        ))
+            ?.payload,
         {'color': 'blue'},
       );
       expect(server.flagsRequests, isEmpty);
@@ -1719,7 +1721,8 @@ void main() {
       );
     });
 
-    test(r'getFeatureFlagPayload does not capture $feature_flag_called',
+    test(
+        r'getFeatureFlagResult with sendFeatureFlagEvent false does not capture $feature_flag_called',
         () async {
       final server = await LocalPostHogServer.start();
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
@@ -1731,10 +1734,11 @@ void main() {
       final platform = await setUpPlatform(config);
       await flagsLoaded.future;
 
-      final payload = await platform.getFeatureFlagPayload(
+      final silent = await platform.getFeatureFlagResult(
         key: 'variant-flag',
+        sendFeatureFlagEvent: false,
       );
-      expect(payload, {'color': 'blue'});
+      expect(silent?.payload, {'color': 'blue'});
 
       await platform.capture(eventName: 'sentinel event');
       await server.waitForEvent('sentinel event');
@@ -1887,6 +1891,33 @@ void main() {
       expect(server.eventNames, isNot(contains(r'$feature_flag_called')));
     });
 
+    test(
+        r'getFeatureFlagResult follows config.sendFeatureFlagEvent unless overridden',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final flagsLoaded = Completer<void>();
+      final config = configFor(server)
+        ..sendFeatureFlagEvent = false
+        ..onFeatureFlags = () {
+          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
+        };
+      final platform = await setUpPlatform(config);
+      await flagsLoaded.future;
+
+      expect(
+          (await platform.getFeatureFlagResult(key: 'variant-flag'))?.variant,
+          'test-variant');
+      await platform.capture(eventName: 'sentinel event');
+      await server.waitForEvent('sentinel event');
+      expect(server.eventNames, isNot(contains(r'$feature_flag_called')));
+
+      await platform.getFeatureFlagResult(
+          key: 'variant-flag', sendFeatureFlagEvent: true);
+      final called = await server.waitForEvent(r'$feature_flag_called');
+      expect(_propertiesOf(called)[r'$feature_flag'], 'variant-flag');
+    });
+
     test('onFeatureFlags reports the flags cached by the previous launch',
         () async {
       final server = await LocalPostHogServer.start();
@@ -1904,7 +1935,10 @@ void main() {
       await platform.setup(configFor(server)
         ..preloadFeatureFlags = false
         ..onFeatureFlags = () {
-          payloads.add(platform.getFeatureFlagPayload(key: 'variant-flag'));
+          payloads.add(platform
+              .getFeatureFlagResult(
+                  key: 'variant-flag', sendFeatureFlagEvent: false)
+              .then((result) => result?.payload));
           if (!announced.isCompleted) announced.complete();
         });
       await announced.future;

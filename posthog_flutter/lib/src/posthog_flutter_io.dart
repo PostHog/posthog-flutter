@@ -13,6 +13,7 @@ import 'error_tracking/dart_exception_processor.dart';
 import 'utils/before_send.dart';
 import 'utils/call_order.dart';
 import 'utils/capture_utils.dart';
+import 'utils/channel_serialization.dart';
 import 'utils/flutter_version.dart';
 import 'utils/property_normalizer.dart';
 
@@ -533,7 +534,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {
+  Future<void> optOut() async {
     if (!isSupportedPlatform()) {
       return;
     }
@@ -546,7 +547,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> enable() async {
+  Future<void> optIn() async {
     if (!isSupportedPlatform()) {
       return;
     }
@@ -734,25 +735,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    if (!isSupportedPlatform()) {
-      return null;
-    }
-
-    try {
-      return await _invoke('getFeatureFlagPayload', {
-        'key': key,
-      });
-    } on PlatformException catch (exception) {
-      printIfDebug('Exeption on getFeatureFlagPayload: $exception');
-      return null;
-    }
-  }
-
-  @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool? sendFeatureFlagEvent,
   }) async {
     if (!isSupportedPlatform()) {
       return null;
@@ -761,11 +746,11 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       final result = await _invoke('getFeatureFlagResult', {
         'key': key,
-        'sendEvent': sendEvent,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
       });
 
       // Native returns: { key, enabled, variant, payload }
-      return PostHogFeatureFlagResult.fromMap(result, key);
+      return featureFlagResultFromMap(result, key);
     } on PlatformException catch (exception) {
       printIfDebug('Exception on getFeatureFlagResult: $exception');
       return null;
@@ -781,7 +766,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     try {
       final results = await _invoke('getAllFeatureFlags') as List<Object?>?;
       return results
-          ?.map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+          ?.map((result) => featureFlagResultFromMap(result, ''))
           .nonNulls
           .toList();
     } on PlatformException catch (exception) {

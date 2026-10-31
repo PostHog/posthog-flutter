@@ -57,7 +57,6 @@ extension PostHogExtension on PostHog {
   // ignore: non_constant_identifier_names
   external bool has_opted_out_capturing();
   external JSAny? getFeatureFlag(JSAny key, [JSAny? options]);
-  external JSAny? getFeatureFlagPayload(JSAny key);
   external JSAny? getFeatureFlagResult(JSAny key, [JSAny? options]);
   // Added in posthog-js 1.395.0; the call site guards with try/catch.
   external JSAny? getAllFeatureFlags();
@@ -378,18 +377,13 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final featureFlag =
           posthog?.getFeatureFlag(stringToJSAny(key), _flagOptions(args));
       return featureFlag?.dartify();
-    case 'getFeatureFlagPayload':
-      final key = args['key'] as String;
-
-      final featureFlag = posthog?.getFeatureFlagPayload(stringToJSAny(key));
-      return featureFlag?.dartify();
     case 'getFeatureFlagResult':
       final key = args['key'] as String;
-      final sendEvent = args['sendEvent'] as bool? ?? true;
+      final sendEvent = args['sendEvent'] as bool?;
 
       final result = posthog?.getFeatureFlagResult(
         stringToJSAny(key),
-        {'send_event': sendEvent}.jsify(),
+        {if (sendEvent != null) 'send_event': sendEvent}.jsify(),
       );
       return result?.dartify();
     case 'getAllFeatureFlags':

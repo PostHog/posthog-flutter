@@ -95,7 +95,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
   // Feature flag test data
   final Map<String, Object?> featureFlagValues = {};
-  final Map<String, Object?> featureFlagPayloads = {};
 
   final List<Map<String, Object?>> flagReadCalls = [];
 
@@ -231,10 +230,10 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {}
+  Future<void> optOut() async {}
 
   @override
-  Future<void> enable() async {}
+  Future<void> optIn() async {}
 
   @override
   Future<void> close() async {
@@ -294,19 +293,15 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     return featureFlagValues[key] == true;
   }
 
-  @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    return featureFlagPayloads[key];
-  }
-
   PostHogFeatureFlagResult? featureFlagResult;
 
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool? sendFeatureFlagEvent,
   }) async {
-    getFeatureFlagResultCalls.add({'key': key, 'sendEvent': sendEvent});
+    getFeatureFlagResultCalls
+        .add({'key': key, 'sendFeatureFlagEvent': sendFeatureFlagEvent});
 
     return featureFlagResult;
   }
