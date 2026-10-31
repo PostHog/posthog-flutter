@@ -181,6 +181,26 @@ config.dataMode = PostHogDataMode.any;
 
 They serialized the internal platform-channel format and have no replacement. `toMap()` is gone from `PostHogConfig`, `PostHogBootstrapConfig`, `PostHogLogsConfig`, `PostHogRageClickConfig`, `PostHogSessionReplayConfig`, `PostHogErrorTrackingConfig` and `PostHogExceptionStepsConfig`. To build a result, for example in a test, call the `PostHogFeatureFlagResult` constructor, which stays public.
 
+### `beforeSend` callbacks are synchronous
+
+`BeforeSendCallback` is now `PostHogEvent? Function(PostHogEvent)`, and `BeforeSendLogCallback` is `PostHogLogRecord? Function(PostHogLogRecord)`. An `async` callback is a compile error. Load what it needs ahead of time and read it synchronously.
+
+```dart
+// Before
+config.beforeSend = [
+  (event) async {
+    final allowed = await loadAllowList();
+    return allowed.contains(event.event) ? event : null;
+  },
+];
+
+// After
+final allowed = await loadAllowList();
+config.beforeSend = [
+  (event) => allowed.contains(event.event) ? event : null,
+];
+```
+
 ### Platform interface changes
 
 These affect only code that calls, extends or fakes `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` or `PosthogFlutterWeb` directly, such as test mocks. `Posthog().optIn()` and `optOut()` are unaffected.
