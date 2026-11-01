@@ -14,7 +14,6 @@
 - **Breaking:** remove `PostHogDataMode.cellular` — use `PostHogDataMode.any`
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
 - **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, and stop it following a per-app language on Android — update filters that match it
-- Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x
@@ -29,6 +28,7 @@
 - **Breaking:** apply SDK properties, then registered properties, then event properties on Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** always set `$lib` and `$lib_version` from the `PostHog-Sdk-Info` header on Windows and Linux, ignoring changes made in `beforeSend`
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
+- Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
 - Add `Posthog().onFeatureFlags()` to get notified after every feature flags load, returning a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`

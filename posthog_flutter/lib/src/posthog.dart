@@ -585,12 +585,13 @@ class Posthog {
   /// with every event.
   ///
   /// Default: [PosthogObserver] reports the locale your `MaterialApp` resolved
-  /// each time a route changes. Call this if you don't use the observer, or to
-  /// report a different value. Your value wins over the observer's and survives
-  /// [reset]. It's kept in memory, so call it again on the next launch. Compare
-  /// `$locale`, which is the device language. An app that translates outside
-  /// `Localizations` needs this, and one that declares no `supportedLocales`
-  /// reports `en-US` otherwise.
+  /// each time a route changes, which is `en-US` if you declare no
+  /// `supportedLocales`. Call this if you don't use the observer, translate
+  /// outside `Localizations`, or want to report a different value.
+  ///
+  /// Your value wins over the observer's and survives [reset]. It's kept in
+  /// memory, so call it again on the next launch. Compare `$locale`, which is
+  /// the device language.
   ///
   /// The [language] is a BCP 47 tag, such as `de` or `pt-BR`. Pass `null` to go
   /// back to the observer's value.
