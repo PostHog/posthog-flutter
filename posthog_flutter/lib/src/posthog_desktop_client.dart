@@ -24,12 +24,17 @@ class DesktopPostHog extends PostHogCore {
   /// The IANA name of the local time zone.
   final String? _timezone;
 
+  /// The language the app displays, reported as `$app_language`.
+  String? appLanguage;
+
   @override
   Map<String, Object?> getContextProperties() {
-    final language = languageCodeOf(PlatformDispatcher.instance.locale);
+    final locale = localeTagOf(PlatformDispatcher.instance.locale);
+    final language = appLanguage;
     return {
       ..._staticContext,
-      if (language != null) r'$locale': language,
+      if (locale != null) r'$locale': locale,
+      if (language != null) r'$app_language': language,
     };
   }
 

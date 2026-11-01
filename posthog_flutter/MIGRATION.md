@@ -241,6 +241,14 @@ On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`,
 
 `Application Installed`, `Application Updated` and `Application Opened` no longer include `version` and `build`. Update insights, cohorts and filters that use them to `$app_version` and `$app_build`. Android still sends them.
 
+### `$locale` and `$app_language`
+
+`$locale` now means the device's language, with its region, on every platform: `de-CH` instead of `de` on iOS, macOS, Windows and Linux. On Android it no longer follows a per-app language or `Locale.setDefault()`. If a user picks a language for your app in iOS Settings, iOS reports that language as the first preferred language, so `$locale` follows it.
+
+Update feature flags, cohorts, insights and actions that match `$locale`: a filter on `$locale = de` stops matching `de-CH`. Events already stored keep the old values.
+
+The new `$app_language` property is the language your app shows. `PosthogObserver` reports the locale your `MaterialApp` resolved every time a route changes, so an app using the observer needs no changes. Native detection is off because Flutter apps translate in Dart. Without the observer, or to send another value, call `Posthog().setAppLanguage('de')`.
+
 ### Network reachability on iOS and macOS
 
 A path that needs user action, such as a VPN waiting for a password, counts as reachable, and queues pause while cellular data is off for the app. Events captured in the first 100 ms after setup may leave out `$network_wifi` and `$network_cellular`. Events still on disk from a `posthog-ios` 2.x SDK are deleted instead of sent.
@@ -278,6 +286,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 ## Upgrade checklist
 
+- [ ] Update feature flags, cohorts, insights and actions that match `$locale`, which now includes the region. Use `$app_language` for the language your app shows.
 - [ ] Use Flutter 3.41 or later and make sure Swift Package Manager is on.
 - [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
 - [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.

@@ -506,6 +506,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _guard('unregister', (client) => client.unregister(key));
 
   @override
+  Future<void> setAppLanguage(String? language) =>
+      _guard('setAppLanguage', (client) => client.appLanguage = language);
+
+  @override
   Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
       _guardWith(
           'isFeatureEnabled',

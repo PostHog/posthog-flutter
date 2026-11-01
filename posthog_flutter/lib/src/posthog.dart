@@ -41,6 +41,10 @@ class Posthog {
 
   String? _currentScreen;
 
+  String? _appLanguageFromApp;
+  String? _resolvedAppLanguage;
+  String? _sentAppLanguage;
+
   /// Initializes the PostHog SDK.
   ///
   /// This method sets up the connection to your PostHog instance and prepares
@@ -69,7 +73,7 @@ class Posthog {
   /// For Android and iOS, if you are performing a manual setup,
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
-  Future<void> setup(PostHogConfig config) {
+  Future<void> setup(PostHogConfig config) async {
     if (config.projectToken.isEmpty) {
       debugPrint(
         '[PostHog] projectToken must not be blank. Setup skipped.',
@@ -106,7 +110,11 @@ class Posthog {
 
     _installFlutterIntegrations(config);
 
-    return _posthog.setup(config);
+    await _posthog.setup(config);
+    // A new desktop client starts without it.
+    if (_sentAppLanguage != null) {
+      await _posthog.setAppLanguage(_sentAppLanguage);
+    }
   }
 
   void _installFlutterIntegrations(PostHogConfig config) {
@@ -499,6 +507,10 @@ class Posthog {
     PostHogInternalEvents.requestReplaySessionReset();
     FeatureFlagsListeners.instance.clear();
     await _posthog.reset();
+    // posthog-js clears registered properties on reset.
+    if (_sentAppLanguage != null) {
+      await _posthog.setAppLanguage(_sentAppLanguage);
+    }
   }
 
   /// Opts the current user out of data collection.
@@ -568,6 +580,43 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when the property has been removed.
   Future<void> unregister(String key) => _posthog.unregister(key);
+
+  /// Sets the `$app_language` property: the language your app displays, sent
+  /// with every event.
+  ///
+  /// Default: [PosthogObserver] reports the locale your `MaterialApp` resolved
+  /// each time a route changes. Call this if you don't use the observer, or to
+  /// report a different value. Your value wins over the observer's and survives
+  /// [reset]. It's kept in memory, so call it again on the next launch. Compare
+  /// `$locale`, which is the device language.
+  ///
+  /// The [language] is a BCP 47 tag, such as `de` or `pt-BR`. Pass `null` to go
+  /// back to the observer's value.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().setAppLanguage('de');
+  /// ```
+  Future<void> setAppLanguage(String? language) async {
+    final normalized = language?.trim().replaceAll('_', '-');
+    _appLanguageFromApp = normalized?.isEmpty == true ? null : normalized;
+    await _syncAppLanguage();
+  }
+
+  /// For internal use only. Called by [PosthogObserver] as routes change.
+  @internal
+  Future<void> reportResolvedAppLanguage(String? language) async {
+    _resolvedAppLanguage = language;
+    await _syncAppLanguage();
+  }
+
+  Future<void> _syncAppLanguage() async {
+    final language = _appLanguageFromApp ?? _resolvedAppLanguage;
+    if (language != _sentAppLanguage) {
+      _sentAppLanguage = language;
+      await _posthog.setAppLanguage(language);
+    }
+  }
 
   /// Returns whether a boolean feature flag is enabled.
   ///

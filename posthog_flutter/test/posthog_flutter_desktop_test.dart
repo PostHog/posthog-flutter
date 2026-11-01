@@ -250,7 +250,7 @@ void main() {
       final event = await server.waitForEvent('localized event');
       expect(
         _propertiesOf(event)[r'$locale'],
-        PlatformDispatcher.instance.locale.languageCode,
+        PlatformDispatcher.instance.locale.toLanguageTag(),
       );
     });
 

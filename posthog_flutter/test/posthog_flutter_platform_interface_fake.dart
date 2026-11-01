@@ -116,6 +116,13 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> Function()? onSessionBoundaryCall;
 
   // Overridden because the base implementations throw UnimplementedError.
+  final List<String?> appLanguageCalls = [];
+
+  @override
+  Future<void> setAppLanguage(String? language) async {
+    appLanguageCalls.add(language);
+  }
+
   @override
   Future<void> reset() async {
     await onSessionBoundaryCall?.call();

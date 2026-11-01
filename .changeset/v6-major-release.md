@@ -13,6 +13,8 @@
 - **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter — use `throttleDelay`
 - **Breaking:** remove `PostHogDataMode.cellular` — use `PostHogDataMode.any`
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
+- **Breaking:** change `$locale` to the device's language with its region on every platform, such as `de-CH` instead of `de` on iOS, macOS, Windows and Linux — filter on `$app_language` for the old meaning
+- Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x

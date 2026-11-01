@@ -936,6 +936,19 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setAppLanguage(String? language) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      await _invoke('setAppLanguage', {'language': language});
+    } on PlatformException catch (exception) {
+      printIfDebug('Exeption on setAppLanguage: $exception');
+    }
+  }
+
+  @override
   Future<void> flush() async {
     if (!isSupportedPlatform()) {
       return;
