@@ -258,6 +258,7 @@ class _CaptureClient extends DesktopPostHog {
 
   Map<String, Object?> _flagsRequestFields = const {};
   String? _flagsUser;
+  bool _switchingFlagsUser = false;
   void Function()? onCaptured;
 
   @override
@@ -320,7 +321,11 @@ class _CaptureClient extends DesktopPostHog {
     required bool disableGeoip,
   }) async {
     // A user's cached flags and reported flag calls must not serve the next.
-    if (_flagsUser != null && _flagsUser != distinctId) reset();
+    if (_flagsUser != null && _flagsUser != distinctId) {
+      _switchingFlagsUser = true;
+      reset();
+      _switchingFlagsUser = false;
+    }
     _flagsUser = distinctId;
     _actAs(distinctId);
     if (groups.isEmpty) {
@@ -348,14 +353,21 @@ class _CaptureClient extends DesktopPostHog {
     required Map<String, Object?> personProperties,
     required Map<String, Map<String, Object?>> groupProperties,
     required Map<String, Object?> extraPayload,
-  }) =>
-      super.getFlags(
-        distinctId,
-        groups: groups,
-        personProperties: personProperties,
-        groupProperties: groupProperties,
-        extraPayload: {...extraPayload, ..._flagsRequestFields},
-      );
+  }) {
+    // reset() reloads for an anonymous id nobody asked about. Its answer could
+    // outlive a failed reload for the requested user, so no request is sent.
+    if (_switchingFlagsUser) {
+      return Future.value(GetFlagsFailure(const FeatureFlagRequestError(
+          type: FeatureFlagRequestErrorType.unknownError)));
+    }
+    return super.getFlags(
+      distinctId,
+      groups: groups,
+      personProperties: personProperties,
+      groupProperties: groupProperties,
+      extraPayload: {...extraPayload, ..._flagsRequestFields},
+    );
+  }
 
   @override
   int get queuedEventCount => super.queuedEventCount;

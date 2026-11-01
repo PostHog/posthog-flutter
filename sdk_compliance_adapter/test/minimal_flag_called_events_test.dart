@@ -191,6 +191,13 @@ void main() {
 
       expect(response['value'], isFalse);
     });
+
+    test('requests flags only for the requested users', () async {
+      await harness.evaluate('plain-flag', 'test-user');
+      await harness.evaluate('plain-flag', 'next-user');
+
+      expect(mockServer.flagsDistinctIds, ['test-user', 'next-user']);
+    });
   });
 
   test('counts each captured flag call once', () async {
@@ -296,6 +303,7 @@ class _MockPostHogServer {
   Map<String, Object?> flagsResponse;
   int flagsStatus = HttpStatus.ok;
   final List<Map<String, Object?>> batchedEvents = [];
+  final List<String> flagsDistinctIds = [];
 
   String get url => 'http://127.0.0.1:${_server.port}';
 
@@ -316,6 +324,8 @@ class _MockPostHogServer {
       if (request.method == 'POST' &&
           request.uri.path == '/flags/' &&
           request.uri.queryParameters['v'] == '2') {
+        flagsDistinctIds
+            .add((jsonDecode(body) as Map)['distinct_id'] as String);
         request.response.statusCode = flagsStatus;
         request.response.headers.contentType = ContentType.json;
         request.response.write(jsonEncode(flagsResponse));
