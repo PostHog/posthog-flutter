@@ -96,6 +96,13 @@ void main() {
       expect(fake.appLanguageCalls, ['pt-BR', 'en']);
     });
 
+    test('is sent again after setup', () async {
+      await Posthog().setAppLanguage('de');
+      await Posthog().setup(PostHogConfig('phc_test'));
+
+      expect(fake.appLanguageCalls, ['de', 'de']);
+    });
+
     test('is sent again after reset', () async {
       await Posthog().setAppLanguage('de');
       await Posthog().reset();

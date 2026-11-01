@@ -96,6 +96,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final instance = PosthogFlutterWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
 
+    // posthog-js persists registered properties, but $app_language lasts one launch.
+    posthog?.unregister(stringToJSAny(r'$app_language'));
+
     // Set the platform instance so that Posthog() can call methods directly
     // on the web implementation instead of going through the method channel.
     // This is required because method channels can only pass serializable data,

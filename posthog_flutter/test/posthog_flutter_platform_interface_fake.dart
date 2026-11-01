@@ -115,7 +115,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   /// the session id, which happens while the call is still in flight.
   Future<void> Function()? onSessionBoundaryCall;
 
-  // Overridden because the base implementations throw UnimplementedError.
   final List<String?> appLanguageCalls = [];
 
   @override
@@ -123,6 +122,7 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     appLanguageCalls.add(language);
   }
 
+  // Overridden because the base implementations throw UnimplementedError.
   @override
   Future<void> reset() async {
     await onSessionBoundaryCall?.call();

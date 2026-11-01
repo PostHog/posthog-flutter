@@ -588,7 +588,9 @@ class Posthog {
   /// each time a route changes. Call this if you don't use the observer, or to
   /// report a different value. Your value wins over the observer's and survives
   /// [reset]. It's kept in memory, so call it again on the next launch. Compare
-  /// `$locale`, which is the device language.
+  /// `$locale`, which is the device language. An app that translates outside
+  /// `Localizations` needs this, and one that declares no `supportedLocales`
+  /// reports `en-US` otherwise.
   ///
   /// The [language] is a BCP 47 tag, such as `de` or `pt-BR`. Pass `null` to go
   /// back to the observer's value.

@@ -6,8 +6,10 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
 // Browser-only: handleWebMethodCall talks to the posthog-js instance on
@@ -32,6 +34,52 @@ void main() {
 
   Map<Object?, Object?> readOptions() =>
       capturedOptions!.dartify()! as Map<Object?, Object?>;
+
+  group('handleWebMethodCall setAppLanguage', () {
+    late List<Object?> registered;
+    late List<String> unregistered;
+
+    setUp(() {
+      registered = [];
+      unregistered = [];
+      final fake = JSObject();
+      fake.setProperty(
+        'register'.toJS,
+        ((JSAny properties) {
+          registered.add(properties.dartify());
+        }).toJS,
+      );
+      fake.setProperty(
+        'unregister'.toJS,
+        ((JSString key) {
+          unregistered.add(key.toDart);
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('registers a language and unregisters null', () async {
+      await handleWebMethodCall(
+          const MethodCall('setAppLanguage', {'language': 'de'}));
+      await handleWebMethodCall(
+          const MethodCall('setAppLanguage', {'language': null}));
+
+      expect(registered, [
+        {r'$app_language': 'de'}
+      ]);
+      expect(unregistered, [r'$app_language']);
+    });
+
+    test('registerWith clears the language persisted by a past launch', () {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final previous = PosthogFlutterPlatformInterface.instance;
+      addTearDown(() => PosthogFlutterPlatformInterface.instance = previous);
+
+      PosthogFlutterWeb.registerWith(webPluginRegistrar);
+
+      expect(unregistered, [r'$app_language']);
+    });
+  });
 
   group('handleWebMethodCall captureLog', () {
     test('remaps trace fields to snake_case for posthog-js', () async {
