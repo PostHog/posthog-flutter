@@ -712,6 +712,31 @@ void main() {
       expect(personProperties, isNot(contains('email')));
     });
 
+    test(
+        'person properties of an event a callback sends for another distinct '
+        'id leave person processing off for the current user', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'other') event.distinctId = 'other-user';
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'other',
+        userProperties: {'email': 'other@example.com'},
+      );
+      await platform.capture(eventName: 'next');
+
+      final event = await server.waitForEvent('other');
+      expect(event['distinct_id'], 'other-user');
+      final next = await server.waitForEvent('next');
+      expect(_optionsOf(next)['process_person_profile'], isFalse);
+    });
+
     test('a dropped person update does not turn on person processing',
         () async {
       final server = await LocalPostHogServer.start();

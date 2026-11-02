@@ -506,12 +506,13 @@ abstract class PostHogCore extends PostHogCoreStateless {
     // Taken from the event as queued, after the beforeSend callbacks, so a
     // value they removed or an event they or the size limit dropped neither
     // reaches /flags nor turns on person processing for later events.
-    if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
+    //
     // A callback can send the event for another distinct id; its person
     // properties then belong to that person, not to the current user's
-    // flags or person-properties hash.
+    // person processing, flags or person-properties hash.
     final isCurrentUser = distinctId == getDistinctId();
     if (isCurrentUser) {
+      if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
       _setPersonPropertiesForFlagsIfNeeded(
         _asPropertyMap(properties[r'$set']),
         _asPropertyMap(properties[r'$set_once']),
