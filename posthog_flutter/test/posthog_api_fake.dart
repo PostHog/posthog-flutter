@@ -55,8 +55,11 @@ class PostHogRequest {
 /// How the PostHog API answers a request.
 class PostHogResponse {
   const PostHogResponse(this.status,
-      {this.body = '{"status": 1}', this.location, this.headers = const {}})
+      {this.body = defaultBody, this.location, this.headers = const {}})
       : isDropped = false;
+
+  /// The body of a response that sets none.
+  static const defaultBody = '{"status": 1}';
 
   /// A success with [json] as its body.
   PostHogResponse.json(Object? json, {Map<String, String> headers = const {}})
@@ -169,7 +172,18 @@ abstract class PostHogApiFake {
       waiter.done.complete();
       return true;
     });
-    return respond(request);
+    final response = await respond(request);
+    // Capture v1 answers every 2xx with per-event results. A success left
+    // with the default body gets an `ok` result for each event, so only a
+    // test that sets a body of its own sends an unreadable one.
+    if ((request.isBatch || request.isAi) &&
+        response.status >= 200 &&
+        response.status < 300 &&
+        identical(response.body, PostHogResponse.defaultBody)) {
+      return PostHogResponse.results(request, (_) => 'ok',
+          headers: response.headers);
+    }
+    return response;
   }
 
   Future<void> _waitUntil(bool Function() isReady) {

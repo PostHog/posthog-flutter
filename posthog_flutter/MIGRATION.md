@@ -241,6 +241,10 @@ On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`,
 
 A path that needs user action, such as a VPN waiting for a password, counts as reachable, and queues pause while cellular data is off for the app. Events captured in the first 100 ms after setup may leave out `$network_wifi` and `$network_cellular`. Events still on disk from a `posthog-ios` 2.x SDK are deleted instead of sent.
 
+### Personal API keys
+
+A personal API key (`phx_...`) in `projectToken` now skips `setup()` with one log line, so the SDK doesn't start and the key is never sent. Use your project token (`phc_...`).
+
 ### Windows and Linux
 
 - **Property order:** an event's properties are the SDK's, then registered properties, then the event's own, so your value now wins for that event. `beforeSend` runs after that merge, except that `$lib` and `$lib_version` always come from the `PostHog-Sdk-Info` header.
@@ -266,7 +270,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 - An `options` argument on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` in `beforeSend`. `process_person_profile`, `cookieless_mode`, `disable_skew_correction` and `product_tour_id` win over their legacy `$` properties. On web, known keys are sent as those legacy properties and other keys are dropped.
 - `captureAi` for `$ai_*` events. It returns the event's UUID, or `null` when the event isn't admitted. On web it sends nothing and returns `null`.
-- `Posthog().onFeatureFlags()` to get notified after every feature flags load. It returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`.
+- `Posthog().onFeatureFlags()` to get notified after every feature flags load. It returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`. You can register it before `WidgetsFlutterBinding.ensureInitialized()`, but other SDK calls, including `setup()`, are skipped with a warning until the binding is initialized.
 
 ## Upgrade checklist
 
