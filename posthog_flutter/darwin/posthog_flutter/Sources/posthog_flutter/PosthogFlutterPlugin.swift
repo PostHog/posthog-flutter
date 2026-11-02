@@ -50,7 +50,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     // dropped on the next build, so a callback that never completes can't
     // keep it in memory.
     // setup and close clear it, so a build can't be sent through a reconfigured SDK.
-    private var builtEvents: [String: (event: PostHogEvent, builtAt: Date)] = [:]
+    private var builtEvents: [String: (event: PostHogEvent, builtAt: TimeInterval)] = [:]
     private static let builtEventTimeout: TimeInterval = 60
 
     private static let nativeBeforeSendLock = NSLock()
@@ -1635,8 +1635,8 @@ extension PosthogFlutterPlugin {
             return
         }
         let uuid = built.uuid.uuidString.lowercased()
-        let now = Date()
-        builtEvents = builtEvents.filter { now.timeIntervalSince($0.value.builtAt) < Self.builtEventTimeout }
+        let now = ProcessInfo.processInfo.systemUptime
+        builtEvents = builtEvents.filter { now - $0.value.builtAt < Self.builtEventTimeout }
         builtEvents[uuid] = (built, now)
         result([
             "event": built.event,
