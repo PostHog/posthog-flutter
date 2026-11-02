@@ -199,6 +199,10 @@ Call `Posthog().onFeatureFlags()` before `setup()`, which also covers the first 
 
 ```dart
 // Before
+final config = PostHogConfig('<project_token>', onFeatureFlags: () {
+  // ...
+});
+// or
 config.onFeatureFlags = () {
   // ...
 };
