@@ -7,7 +7,7 @@ import 'package:posthog_flutter_sdk_compliance_adapter/adapter_server.dart';
 
 void main() {
   test('pending events leave with a batch the SDK gives up on', () async {
-    final harness = await _Harness.start((request, _) async {
+    final harness = await _Harness.start((request, _, __) async {
       request.response.statusCode = HttpStatus.badRequest;
       await request.response.close();
     });
@@ -21,7 +21,7 @@ void main() {
   });
 
   test('a 303 reaches the SDK instead of being followed', () async {
-    final harness = await _Harness.start((request, origin) async {
+    final harness = await _Harness.start((request, origin, _) async {
       request.response
         ..statusCode = HttpStatus.seeOther
         ..headers.set(HttpHeaders.locationHeader, '$origin/elsewhere');
@@ -36,9 +36,17 @@ void main() {
   });
 
   test('the SDK follows a same-origin redirect through the proxy', () async {
-    final harness = await _Harness.start((request, origin) async {
+    final harness = await _Harness.start((request, origin, body) async {
       if (request.uri.path == '/moved') {
-        request.response.write('{}');
+        final batch = (jsonDecode(body) as Map)['batch'] as List;
+        request.response.write(
+          jsonEncode({
+            'results': {
+              for (final event in batch)
+                (event as Map)['uuid']: {'result': 'ok'},
+            },
+          }),
+        );
       } else {
         request.response
           ..statusCode = HttpStatus.temporaryRedirect
@@ -56,7 +64,7 @@ void main() {
 
   for (final location in ['ftp://example.com/path', 'http:/path']) {
     test('a 307 to $location reaches the SDK as a terminal redirect', () async {
-      final harness = await _Harness.start((request, _) async {
+      final harness = await _Harness.start((request, _, __) async {
         request.response
           ..statusCode = HttpStatus.temporaryRedirect
           ..headers.set(HttpHeaders.locationHeader, location);
@@ -73,8 +81,8 @@ void main() {
     });
   }
 
-  test('a 2xx whose body breaks off stays delivered', () async {
-    final harness = await _Harness.start((request, _) async {
+  test('a 2xx whose body breaks off is dropped without a retry', () async {
+    final harness = await _Harness.start((request, _, __) async {
       final socket = await request.response.detachSocket(writeHeaders: false);
       socket.write('HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n{');
       await socket.flush();
@@ -86,7 +94,7 @@ void main() {
 
     final state = await harness.state();
     expect(harness.paths, hasLength(1));
-    expect(state['total_events_sent'], 1);
+    expect(state['total_events_sent'], 0);
     expect(state['pending_events'], 0);
   });
 }
@@ -101,7 +109,8 @@ class _Harness {
   final paths = <String>[];
 
   static Future<_Harness> start(
-    Future<void> Function(HttpRequest request, String origin) respond,
+    Future<void> Function(HttpRequest request, String origin, String body)
+        respond,
   ) async {
     final ingestion = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final adapter = ComplianceAdapter();
@@ -112,8 +121,8 @@ class _Harness {
     unawaited(() async {
       await for (final request in ingestion) {
         harness.paths.add(request.uri.path);
-        await request.drain<void>();
-        await respond(request, origin);
+        final body = await utf8.decoder.bind(request).join();
+        await respond(request, origin, body);
       }
     }());
     await harness._post('/init', {

@@ -459,8 +459,8 @@ class _RecordingProxy {
       }
     } catch (error) {
       _state.lastError = error.toString();
-      // After the headers the status stands: the SDK counts a 2xx whose body
-      // fails as delivered, so it must not turn into a retry here.
+      // After the headers the status stands: the SDK drops a 2xx whose body
+      // fails for good, so it must not turn into a retry here.
       if (!headersSent) response.statusCode = HttpStatus.badGateway;
     }
     await response.close();
