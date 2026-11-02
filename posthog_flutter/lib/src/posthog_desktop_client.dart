@@ -33,8 +33,7 @@ class DesktopPostHog extends PostHogCore {
     };
   }
 
-  // Session replay is not available on desktop. Common properties are merged
-  // over the event's own, so an event cannot change it.
+  // Session replay is not available on desktop.
   @override
   Map<String, Object?> getCommonEventProperties() => {
         ...super.getCommonEventProperties(),
