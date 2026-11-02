@@ -449,12 +449,19 @@ void main() {
     await Posthog().getFeatureFlag('b', sendFeatureFlagEvent: false);
     await Posthog().isFeatureEnabled('c');
     await Posthog().isFeatureEnabled('d', sendFeatureFlagEvent: true);
+    await Posthog().isFeatureEnabled('e', defaultValue: true);
 
     expect(fake.flagReadCalls, [
       {'method': 'getFeatureFlag', 'key': 'a', 'sendFeatureFlagEvent': null},
       {'method': 'getFeatureFlag', 'key': 'b', 'sendFeatureFlagEvent': false},
       {'method': 'isFeatureEnabled', 'key': 'c', 'sendFeatureFlagEvent': null},
       {'method': 'isFeatureEnabled', 'key': 'd', 'sendFeatureFlagEvent': true},
+      {
+        'method': 'isFeatureEnabled',
+        'key': 'e',
+        'sendFeatureFlagEvent': null,
+        'defaultValue': true,
+      },
     ]);
   });
 

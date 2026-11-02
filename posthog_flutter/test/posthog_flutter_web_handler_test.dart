@@ -274,6 +274,47 @@ void main() {
     }
   });
 
+  group('PosthogFlutterWeb isFeatureEnabled defaultValue', () {
+    late Object? receivedOptions;
+
+    void installFlagValue(JSAny? value) {
+      final fake = JSObject();
+      fake.setProperty(
+        'isFeatureEnabled'.toJS,
+        ((JSString key, JSAny? options) {
+          receivedOptions = options.dartify();
+          return value;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    }
+
+    for (final (name, value, defaultValue, expected)
+        in <(String, JSAny?, bool, bool)>[
+      ('missing flag returns default true', null, true, true),
+      ('missing flag returns default false', null, false, false),
+      ('false flag beats default true', false.toJS, true, false),
+      ('variant beats default false', true.toJS, false, true),
+    ]) {
+      test(name, () async {
+        installFlagValue(value);
+
+        expect(
+            await PosthogFlutterWeb()
+                .isFeatureEnabled('flag', defaultValue: defaultValue),
+            expected);
+      });
+    }
+
+    test('does not pass the default to posthog-js', () async {
+      installFlagValue(null);
+
+      await PosthogFlutterWeb().isFeatureEnabled('flag', defaultValue: true);
+
+      expect(receivedOptions, <String, Object?>{});
+    });
+  });
+
   group('PosthogFlutterWeb getAllFeatureFlags', () {
     test('decodes the posthog-js results', () async {
       final fake = JSObject();

@@ -284,11 +284,12 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key,
-      {bool? sendFeatureFlagEvent}) async {
+      {bool? sendFeatureFlagEvent, bool? defaultValue}) async {
     flagReadCalls.add({
       'method': 'isFeatureEnabled',
       'key': key,
       'sendFeatureFlagEvent': sendFeatureFlagEvent,
+      if (defaultValue != null) 'defaultValue': defaultValue,
     });
     return featureFlagValues[key] == true;
   }
