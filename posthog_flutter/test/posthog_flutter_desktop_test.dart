@@ -2300,7 +2300,7 @@ void main() {
           });
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
@@ -2322,7 +2322,7 @@ void main() {
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final flagsLoaded = Completer<void>();
       final config = configFor(server)
-        ..onFeatureFlags = () {
+        ..onFeatureFlags = (_) {
           if (!flagsLoaded.isCompleted) flagsLoaded.complete();
         };
       final platform = await setUpPlatform(config);
