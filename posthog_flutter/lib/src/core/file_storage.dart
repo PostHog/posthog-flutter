@@ -9,9 +9,10 @@ import 'uuid.dart';
 ///
 /// The persisted properties (identity, feature flags, consent, super
 /// properties) live in one JSON snapshot, `posthog_data.json`. Every queued
-/// event is a file of its own in `posthog_queue/`, named after a UUIDv7 so
-/// that the names sort in queueing order: queueing an event writes one small
-/// file and leaves the others alone.
+/// event is a file of its own in `posthog_queue/`, or `posthog_ai_queue/`
+/// for AI events, named after a UUIDv7 so that the names sort in queueing
+/// order: queueing an event writes one small file and leaves the others
+/// alone.
 ///
 /// One storage at a time writes the snapshot of a directory: the first to
 /// use it locks `posthog.lock` until it is closed. Another storage on the
@@ -42,11 +43,13 @@ class FileStorage {
       : _directory = '',
         _cache = {},
         _role = _Role.secondary,
-        _queue = FileEventQueue._memory();
+        _queue = FileEventQueue._memory(),
+        _aiQueue = FileEventQueue._memory();
 
   static const _dataFileName = 'posthog_data.json';
   static const _lockFileName = 'posthog.lock';
   static const _queueDirectoryName = 'posthog_queue';
+  static const _aiQueueDirectoryName = 'posthog_ai_queue';
 
   /// The lock files held by storages of this isolate. A POSIX file lock
   /// belongs to the whole process and is released as soon as the process
@@ -76,6 +79,7 @@ class FileStorage {
   RandomAccessFile? _lock;
   String? _lockPath;
   FileEventQueue? _queue;
+  FileEventQueue? _aiQueue;
 
   String _pathOf(String name) => '$_directory${Platform.pathSeparator}$name';
 
@@ -92,6 +96,11 @@ class FileStorage {
   FileEventQueue get queue =>
       _queue ??= FileEventQueue._(_pathOf(_queueDirectoryName), () => logger,
           includeExisting: _open() == _Role.primary);
+
+  /// The AI events waiting to be sent, apart from the other events.
+  FileEventQueue get aiQueue => _aiQueue ??= FileEventQueue._(
+      _pathOf(_aiQueueDirectoryName), () => logger,
+      includeExisting: _open() == _Role.primary);
 
   /// Decides, on first use, whether this storage writes the snapshot.
   _Role _open() {
@@ -310,6 +319,10 @@ class FileEventQueue {
   /// this client.
   final Map<String, Map<String, Object?>> _unwritten = {};
 
+  /// The serialized size of each queued event, by id, and their total.
+  final Map<String, int> _sizes = {};
+  int _byteCount = 0;
+
   List<String> get _ids => _loadedIds ??= _load();
 
   String _pathOf(String id) =>
@@ -319,7 +332,8 @@ class FileEventQueue {
     try {
       return [
         for (final entity in Directory(_directory).listSync())
-          if (entity is File && entity.path.endsWith(_extension)) _idOf(entity),
+          if (entity is File && entity.path.endsWith(_extension))
+            _track(_idOf(entity), _lengthOf(entity)),
       ]..sort();
     } on PathNotFoundException {
       return [];
@@ -332,6 +346,22 @@ class FileEventQueue {
     }
   }
 
+  static int _lengthOf(File file) {
+    try {
+      return file.lengthSync();
+    } on FileSystemException {
+      return 0;
+    }
+  }
+
+  String _track(String id, int size) {
+    _sizes[id] = size;
+    _byteCount += size;
+    return id;
+  }
+
+  void _untrack(String id) => _byteCount -= _sizes.remove(id) ?? 0;
+
   static String _idOf(File file) {
     final name = file.uri.pathSegments.last;
     return name.substring(0, name.length - _extension.length);
@@ -340,19 +370,35 @@ class FileEventQueue {
   /// The number of queued events.
   int get length => _ids.length;
 
-  /// Adds [event] at the end of the queue.
-  void add(Map<String, Object?> event) {
+  /// The serialized size of the queued events, in bytes.
+  int get byteCount {
+    _ids; // Loads the queue, and the sizes, on first use.
+    return _byteCount;
+  }
+
+  /// Adds [event] at the end of the queue. [json] is the event already
+  /// encoded, and [bytes] its UTF-8 size, when the caller has them.
+  int add(Map<String, Object?> event, {String? json, int? bytes}) {
     // Loaded before the new file exists, which would otherwise be listed
     // on top of being added.
     final ids = _ids;
     final id = generateUuidV7();
-    ids.add(id);
+    var encoded = json;
+    if (encoded == null) {
+      try {
+        encoded = jsonEncode(event);
+      } catch (_) {
+        // Reported below when it is written.
+      }
+    }
+    final size = bytes ?? (encoded == null ? 0 : utf8.encode(encoded).length);
+    ids.add(_track(id, size));
     if (_directory.isEmpty) {
       _unwritten[id] = event;
-      return;
+      return size;
     }
     try {
-      _writeAtomically(File(_pathOf(id)), jsonEncode(event));
+      _writeAtomically(File(_pathOf(id)), encoded ?? jsonEncode(event));
     } catch (e) {
       _unwritten[id] = event;
       _logger()?.warn(
@@ -360,19 +406,35 @@ class FileEventQueue {
           'is sent:',
           e);
     }
+    return size;
   }
 
   /// Returns up to [count] events from the front of the queue, oldest
   /// first.
-  List<PostHogQueuedEvent> peek(int count) {
+  ///
+  /// With [maxBytes], the events also stay within that serialized size. Each
+  /// event is checked before it is read, so one that does not fit is left
+  /// for the next peek, and the first event always comes, alone when it is
+  /// over the limit.
+  List<PostHogQueuedEvent> peek(int count, {int? maxBytes}) {
     final events = <PostHogQueuedEvent>[];
     final gone = <String>{};
+    var bytes = 0;
     for (final id in _ids) {
       if (events.length >= count) break;
+      final size = _sizes[id] ?? 0;
+      if (maxBytes != null && events.isNotEmpty && bytes + size > maxBytes) {
+        break;
+      }
       final event = _unwritten[id] ?? _read(id, gone);
-      if (event != null) events.add((id: id, event: event));
+      if (event == null) continue;
+      events.add((id: id, event: event));
+      bytes += size;
     }
-    if (gone.isNotEmpty) _ids.removeWhere(gone.contains);
+    if (gone.isNotEmpty) {
+      _ids.removeWhere(gone.contains);
+      gone.forEach(_untrack);
+    }
     return events;
   }
 
@@ -412,7 +474,21 @@ class FileEventQueue {
     oldest.forEach(_forget);
   }
 
+  /// Removes the oldest events until the queue holds at most [maxBytes],
+  /// always keeping the newest event. Returns how many were removed.
+  int removeOldestOver(int maxBytes) {
+    var total = byteCount;
+    var count = 0;
+    while (total > maxBytes && count < _ids.length - 1) {
+      total -= _sizes[_ids[count]] ?? 0;
+      count++;
+    }
+    removeOldest(count);
+    return count;
+  }
+
   void _forget(String id) {
+    _untrack(id);
     if (_unwritten.remove(id) == null && _directory.isNotEmpty) {
       _delete(File(_pathOf(id)));
     }

@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:meta/meta.dart';
 
 import '../feature_flag_result.dart';
+import '../feature_flags_loaded.dart';
 import '../posthog_config.dart';
 import 'feature_flag_utils.dart';
 import 'feature_flags.dart';
@@ -13,6 +14,14 @@ import 'posthog_core_stateless.dart';
 import 'session_manager.dart';
 import 'utils/utils.dart';
 import 'uuid.dart';
+
+/// An event built by [PostHogCore.prepareEvent]: its properties, its
+/// capture v1 options and the time it happened, as an ISO 8601 string.
+typedef PostHogPreparedEvent = ({
+  Map<String, Object?> properties,
+  Map<String, Object?>? options,
+  String timestamp,
+});
 
 /// Stateful PostHog client with session management, identity, and feature flags.
 ///
@@ -124,9 +133,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   bool isMinimalFlagCalledEventsEnabled() =>
       _getStoredFlagDetails()?.minimalFlagCalledEvents == true;
 
-  /// Platform context (OS, app, device) attached to every event. It wins
-  /// over registered and event properties of the same name: it describes
-  /// the environment the SDK runs in.
+  /// Platform context (OS, app, device) attached to every event. Registered
+  /// and event properties of the same name override it.
   @protected
   Map<String, Object?> getContextProperties();
 
@@ -142,28 +150,53 @@ abstract class PostHogCore extends PostHogCoreStateless {
   @protected
   String? getTimezone();
 
+  /// The properties of an event: the ones the SDK sets, then the
+  /// registered ones, then the event's own [properties], each winning over
+  /// the ones before. A value set for an event changes that event only.
+  ///
+  /// Person processing is not a property: see [_personProcessingOptions].
   Map<String, Object?> _enrichProperties(Map<String, Object?>? properties) {
     final now = DateTime.now().millisecondsSinceEpoch;
     // Resolved first: it may start a new session, which the debug
     // properties below then describe.
     final managedSessionId = _session.touch(now);
-    final callerSessionId = properties?[r'$session_id'];
-    final sessionId = callerSessionId is String && callerSessionId.isNotEmpty
-        ? callerSessionId
-        : managedSessionId;
     final timezone = getTimezone();
-    return {
-      ...props,
-      ..._sessionProps,
-      ...?properties,
+    final enriched = {
       ...getContextProperties(),
       if (timezone != null) r'$timezone': timezone,
       ...getCommonEventProperties(),
-      r'$session_id': sessionId,
-      r'$process_person_profile': _hasPersonProcessing(),
+      r'$session_id': managedSessionId,
       r'$is_identified': _isIdentified(),
       ..._sessionDebugProperties(now),
+      ..._sessionProps,
+      ...props,
+      ...?properties,
     };
+    // An empty or non-string session id would leave the event out of its
+    // session.
+    final sessionId = enriched[r'$session_id'];
+    if (sessionId is! String || sessionId.isEmpty) {
+      enriched[r'$session_id'] = managedSessionId;
+    }
+    return enriched;
+  }
+
+  /// The [options] of an event with [properties], with
+  /// `process_person_profile: false` added when person processing is off,
+  /// the event is not [requested] to update the person, and neither an
+  /// option nor a `$process_person_profile` property says otherwise.
+  Map<String, Object?>? _personProcessingOptions(
+    Map<String, Object?>? options,
+    Map<String, Object?> properties, {
+    required bool requested,
+  }) {
+    if (requested ||
+        _hasPersonProcessing() ||
+        properties[r'$process_person_profile'] != null ||
+        options?['process_person_profile'] != null) {
+      return options;
+    }
+    return {...?options, 'process_person_profile': false};
   }
 
   /// The state of the session and the queue, attached to every event to
@@ -179,8 +212,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   /// Adds [properties] to every later event until [reset], without
-  /// persisting them. They win over registered properties, and the event's
-  /// own properties win over them.
+  /// persisting them. Registered properties and the event's own win over
+  /// them.
   void registerForSession(Map<String, Object?> properties) {
     wrap(() => _sessionProps.addAll(properties));
   }
@@ -292,10 +325,13 @@ abstract class PostHogCore extends PostHogCoreStateless {
   ///
   /// An empty [distinctId] is ignored, as are all calls while opted out or
   /// when `personProfiles` is `never`.
+  ///
+  /// The optional [options] are sent with the event this call sends.
   void identify(
     String distinctId, {
     Map<String, Object?>? userProperties,
     Map<String, Object?>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
     wrap(() {
       if (distinctId.trim().isEmpty) {
@@ -327,16 +363,19 @@ abstract class PostHogCore extends PostHogCoreStateless {
         _setPersonPropertiesForFlagsIfNeeded(
             userProperties, userPropertiesSetOnce);
 
+        final identifyProperties = _enrichProperties({
+          'distinct_id': distinctId,
+          r'$anon_distinct_id': previousDistinctId,
+          ...maybeAdd(r'$set', userProperties),
+          ...maybeAdd(r'$set_once', userPropertiesSetOnce),
+        });
         identifyStateless(
           distinctId,
-          properties: _enrichProperties({
-            'distinct_id': distinctId,
-            r'$anon_distinct_id': previousDistinctId,
-            ...maybeAdd(r'$set', userProperties),
-            ...maybeAdd(r'$set_once', userPropertiesSetOnce),
-          }),
+          properties: identifyProperties,
+          options: options,
         );
-        if (userProperties != null || userPropertiesSetOnce != null) {
+        if ((userProperties != null || userPropertiesSetOnce != null) &&
+            !_isPersonless(identifyProperties, options)) {
           _cachedPersonProperties = _personPropertiesHash(
               distinctId, userProperties, userPropertiesSetOnce);
         }
@@ -345,10 +384,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
         // There is no anonymous history to link: the id already is the
         // anonymous one, so the transition is recorded with a $set.
         setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
-        capture(r'$set', properties: {
-          r'$set': userProperties ?? {},
-          r'$set_once': userPropertiesSetOnce ?? {},
-        });
+        capture(r'$set',
+            properties: {
+              r'$set': userProperties ?? {},
+              r'$set_once': userPropertiesSetOnce ?? {},
+            },
+            options: options);
         if (hasUserProperties) _reloadFeatureFlags();
       } else if (hasUserProperties) {
         // Person property changes are processed asynchronously by PostHog,
@@ -356,6 +397,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         setPersonProperties(
           userPropertiesToSet: userProperties,
           userPropertiesToSetOnce: userPropertiesSetOnce,
+          options: options,
         );
       } else {
         logger.info('identify was called with the current distinct id of an '
@@ -370,42 +412,124 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// for person processing even for an anonymous user. `$groups` in
   /// [properties] apply to this event only; use [group] to associate the
   /// user with a group.
-  void capture(String event, {Map<String, Object?>? properties}) {
+  ///
+  /// The capture v1 [options] are sent with the event as they are.
+  void capture(
+    String event, {
+    Map<String, Object?>? properties,
+    Map<String, Object?>? options,
+  }) {
     wrap(() {
-      if (_ignoredWhileOptedOut('posthog.capture')) return;
-
-      final userProperties = properties?[r'$set'];
-      final userPropertiesSetOnce = properties?[r'$set_once'];
-      if (_personProfiles != PostHogPersonProfiles.never &&
-          (_isNonEmptyMap(userProperties) ||
-              _isNonEmptyMap(userPropertiesSetOnce))) {
-        _enablePersonProcessing();
-      }
-      _setPersonPropertiesForFlagsIfNeeded(
-        _asPropertyMap(userProperties),
-        _asPropertyMap(userPropertiesSetOnce),
-      );
-
-      final allProperties = _enrichProperties(properties);
-      // Once an event is person-processed, all later ones are too.
-      if (allProperties[r'$process_person_profile'] == true) {
-        _enablePersonProcessing();
-      }
-
-      captureStateless(getDistinctId(), event, properties: allProperties);
-      if (event == r'$set' || event == r'$identify') {
-        final set = allProperties[r'$set'];
-        final setOnce = allProperties[r'$set_once'];
-        if (set is Map || setOnce is Map) {
-          _cachedPersonProperties =
-              _personPropertiesHash(getDistinctId(), set, setOnce);
-        }
-      }
+      final prepared =
+          _prepareEvent(event, properties: properties, options: options);
+      if (prepared != null) _queuePrepared(event, prepared);
     });
   }
 
+  /// Builds the event [capture] would send, with every property and option
+  /// the SDK adds, so that it can still be changed before
+  /// [capturePrepared] queues it. Returns null when the client is closed
+  /// or opted out.
+  ///
+  /// Like [capture], person properties in [properties] ask for person
+  /// processing, and the event starts or extends the session. They feed
+  /// flag evaluation only as [capturePrepared] queues the event.
+  PostHogPreparedEvent? prepareEvent(
+    String event, {
+    Map<String, Object?>? properties,
+    Map<String, Object?>? options,
+  }) =>
+      wrap<PostHogPreparedEvent?>(
+          () => _prepareEvent(event, properties: properties, options: options));
+
+  /// Queues an event built by [prepareEvent], possibly changed since.
+  /// Unlike [capture], it adds nothing to it. Its `$set` / `$set_once`
+  /// feed flag evaluation.
+  ///
+  /// With [ai], the event goes to PostHog's AI endpoint from a queue of its
+  /// own, which drops a serialized event over its size limit.
+  ///
+  /// Returns the event's uuid, or null when it is not queued: the client
+  /// is closed or opted out, or the AI event is over the size limit.
+  String? capturePrepared(
+    String event,
+    PostHogPreparedEvent prepared, {
+    bool ai = false,
+  }) =>
+      wrap<String?>(() {
+        if (_ignoredWhileOptedOut('posthog.capture')) return null;
+        return _queuePrepared(event, prepared, ai: ai);
+      });
+
+  /// [options] with `process_person_profile: false` added when person
+  /// processing is off and [properties] neither ask for it nor set
+  /// `$process_person_profile`, as [prepareEvent] decides it.
+  Map<String, Object?>? personProcessingOptions(
+    Map<String, Object?>? options,
+    Map<String, Object?> properties,
+  ) =>
+      _personProcessingOptions(options, properties,
+          requested: _requestsPersonProcessing(properties));
+
+  PostHogPreparedEvent? _prepareEvent(
+    String event, {
+    Map<String, Object?>? properties,
+    Map<String, Object?>? options,
+  }) {
+    if (_ignoredWhileOptedOut('posthog.capture')) return null;
+
+    final allProperties = _enrichProperties(properties);
+    // Once an event is person-processed, all later ones are too. A value
+    // passed for this event alone doesn't count.
+    if (_hasPersonProcessing()) {
+      _enablePersonProcessing();
+    }
+    return (
+      properties: allProperties,
+      options: _personProcessingOptions(
+        options,
+        allProperties,
+        requested: _requestsPersonProcessing(properties),
+      ),
+      timestamp: currentISOTime(),
+    );
+  }
+
+  String? _queuePrepared(
+    String event,
+    PostHogPreparedEvent prepared, {
+    bool ai = false,
+  }) {
+    final (:properties, :options, :timestamp) = prepared;
+    final uuid = captureStateless(getDistinctId(), event,
+        properties: properties, options: options, timestamp: timestamp, ai: ai);
+    if (uuid == null) return null;
+    // Taken from the event as queued, after the beforeSend callbacks, so a
+    // value they removed or an event they or the size limit dropped neither
+    // reaches /flags nor turns on person processing for later events.
+    if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
+    _setPersonPropertiesForFlagsIfNeeded(
+      _asPropertyMap(properties[r'$set']),
+      _asPropertyMap(properties[r'$set_once']),
+    );
+    // PostHog drops an AI event that is not an `$ai_*` event, so it never
+    // updates the person.
+    if (!ai && (event == r'$set' || event == r'$identify')) {
+      final set = properties[r'$set'];
+      final setOnce = properties[r'$set_once'];
+      if ((set is Map || setOnce is Map) &&
+          !_isPersonless(properties, options)) {
+        _cachedPersonProperties =
+            _personPropertiesHash(getDistinctId(), set, setOnce);
+      }
+    }
+    return uuid;
+  }
+
   /// Creates an alias for a user. An empty [alias] is ignored.
-  void alias(String alias) {
+  ///
+  /// The optional [options] are sent with the `$create_alias` event.
+  void alias(String alias, {Map<String, Object?>? options}) {
     wrap(() {
       if (alias.trim().isEmpty) {
         logger.warn('alias was called with an empty alias. '
@@ -415,7 +539,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (_ignoredWhileOptedOut('posthog.alias')) return;
       if (!_requirePersonProcessing('posthog.alias')) return;
 
-      aliasStateless(alias, getDistinctId(), properties: _enrichProperties({}));
+      aliasStateless(alias, getDistinctId(),
+          properties: _enrichProperties(null), options: options);
     });
   }
 
@@ -440,10 +565,13 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// key changes, the properties stored for the previous key are dropped and
   /// flags are reloaded. A call with an empty [groupType]
   /// or [groupKey] is ignored.
+  ///
+  /// The optional [options] are sent with the `$groupidentify` event.
   void group(
     String groupType,
     String groupKey, {
     Map<String, Object?>? groupProperties,
+    Map<String, Object?>? options,
   }) {
     wrap(() {
       if (groupType.trim().isEmpty || groupKey.trim().isEmpty) {
@@ -468,8 +596,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
         groupType,
         groupKey,
         distinctId: getDistinctId(),
-        eventProperties: _enrichProperties({}),
+        eventProperties: _enrichProperties(null),
         groupProperties: groupProperties,
+        options: options,
       );
     });
   }
@@ -924,6 +1053,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
     await wrap(_flagsAsync);
   }
 
+  /// The enabled flags currently served, and whether the latest load failed.
+  PostHogFeatureFlagsLoaded featureFlagsLoaded() => PostHogFeatureFlagsLoaded(
+        variants: _getFeatureFlags() ?? const {},
+        errorsLoading: _getStoredFlagDetails()?.requestError != null,
+      );
+
   /// Registers a callback for when feature flags are loaded. A callback
   /// registered right after the client is created also hears about the flags
   /// it starts with, bootstrapped or cached. Returns an unsubscribe function.
@@ -943,6 +1078,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
           entry.key as String: entry.value as String,
     };
   }
+
+  bool _requestsPersonProcessing(Map<String, Object?>? properties) =>
+      _personProfiles != PostHogPersonProfiles.never &&
+      (_isNonEmptyMap(properties?[r'$set']) ||
+          _isNonEmptyMap(properties?[r'$set_once']));
 
   bool _hasPersonProcessing() {
     if (_personProfiles == PostHogPersonProfiles.always) return true;
@@ -990,9 +1130,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   /// Sets properties on the person profile. They also feed feature flag
   /// evaluation from the next flags reload on.
+  ///
+  /// The optional [options] are sent with the `$set` event.
   void setPersonProperties({
     Map<String, Object?>? userPropertiesToSet,
     Map<String, Object?>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) {
     wrap(() {
       final isSetEmpty =
@@ -1007,7 +1150,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
       final hash = _personPropertiesHash(
           getDistinctId(), userPropertiesToSet, userPropertiesToSetOnce);
 
-      if (_cachedPersonProperties == hash) {
+      // A personless `$set` doesn't update the person, so it is never a
+      // duplicate.
+      if (_cachedPersonProperties == hash && !_isPersonless(null, options)) {
         logger.info(
             'A duplicate setPersonProperties call was made. It has been ignored.');
         return;
@@ -1019,10 +1164,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
       };
       setPersonPropertiesForFlags(mergedProperties);
 
-      capture(r'$set', properties: {
-        r'$set': userPropertiesToSet ?? {},
-        r'$set_once': userPropertiesToSetOnce ?? {},
-      });
+      capture(r'$set',
+          properties: {
+            r'$set': userPropertiesToSet ?? {},
+            r'$set_once': userPropertiesToSetOnce ?? {},
+          },
+          options: options);
     });
   }
 
@@ -1042,6 +1189,16 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   static bool _isNonEmptyMap(Object? value) => value is Map && value.isNotEmpty;
+
+  /// Whether [options], or else [properties], turn person processing off
+  /// for their event. An option wins over the property.
+  static bool _isPersonless(
+    Map<String, Object?>? properties,
+    Map<String, Object?>? options,
+  ) =>
+      (options?['process_person_profile'] ??
+          properties?[r'$process_person_profile']) ==
+      false;
 
   static Map<String, Object>? _asPropertyMap(Object? value) {
     if (value is! Map) return null;

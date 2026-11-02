@@ -21,8 +21,11 @@ Future<void> main() async {
   final config = PostHogConfig(
     'phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06',
   );
-  config.onFeatureFlags = () {
-    debugPrint('[PostHog] Feature flags loaded!');
+  config.onFeatureFlags = (loaded) {
+    debugPrint(
+      '[PostHog] Feature flags loaded: ${loaded.variants}, '
+      'errorsLoading: ${loaded.errorsLoading}',
+    );
   };
 
   config.beforeSend = [

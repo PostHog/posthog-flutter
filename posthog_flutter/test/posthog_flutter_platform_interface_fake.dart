@@ -1,4 +1,5 @@
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
@@ -8,11 +9,13 @@ class CapturedExceptionCall {
   final Object error;
   final StackTrace? stackTrace;
   final Map<String, Object>? properties;
+  final Map<String, Object?>? options;
 
   CapturedExceptionCall({
     required this.error,
     this.stackTrace,
     this.properties,
+    this.options,
   });
 }
 
@@ -128,8 +131,9 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> stopSessionRecording() async {}
 
   @override
-  Future<void> reloadFeatureFlags() async {
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
     reloadFeatureFlagsCount++;
+    return PostHogFeatureFlagsLoaded(variants: const {}, errorsLoading: false);
   }
 
   @override
@@ -163,12 +167,71 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   // Tracking for captureLog calls (after Dart-side beforeSend has run)
   final List<CapturedLogCall> capturedLogs = [];
 
+  /// The options each event call received, as (method, options).
+  final List<(String, Map<String, Object?>?)> optionsCalls = [];
+
+  /// Returned by [captureAi].
+  String? captureAiResult;
+
+  @override
+  Future<void> capture({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('capture', options));
+  }
+
+  @override
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('captureAi', options));
+    return captureAiResult;
+  }
+
+  @override
+  Future<void> identify({
+    required String userId,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('identify', options));
+  }
+
+  @override
+  Future<void> alias({
+    required String alias,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('alias', options));
+  }
+
+  @override
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('group', options));
+  }
+
   @override
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     this.screenName = screenName;
+    optionsCalls.add(('screen', options));
   }
 
   @override
@@ -205,12 +268,14 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     capturedExceptions.add(
       CapturedExceptionCall(
         error: error,
         stackTrace: stackTrace,
         properties: properties,
+        options: options,
       ),
     );
   }
@@ -244,10 +309,12 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) async {
     setPersonPropertiesCalls.add({
       'userPropertiesToSet': userPropertiesToSet,
       'userPropertiesToSetOnce': userPropertiesToSetOnce,
+      if (options != null) 'options': options,
     });
   }
 
