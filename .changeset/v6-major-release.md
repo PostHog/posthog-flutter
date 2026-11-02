@@ -28,7 +28,7 @@
 - **Breaking:** always set `$lib` and `$lib_version` from the `PostHog-Sdk-Info` header on Windows and Linux, ignoring changes made in `beforeSend`
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
 - **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
-- **Breaking:** decide person processing before `beforeSend` runs on Windows and Linux — a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
+- **Breaking:** decide person processing before `beforeSend` runs on iOS, macOS, Android, Windows and Linux — a callback that removes `$set` no longer prevents a person profile, and a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`

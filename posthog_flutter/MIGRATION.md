@@ -235,6 +235,8 @@ On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`,
 
 **This is a silent change.** Callbacks now get the event the native SDK built, including its system properties, such as `$device_type` and `$session_id`, and registered properties. Their changes are final. In 5.x they saw only the properties you passed, so a callback that loops over or strips every property now also touches the SDK's. `PostHogEvent` also has `uuid`, `distinctId` and `timestamp`, set on every platform except web.
 
+**Person processing is decided before the callbacks run.** In 5.x, a callback that removed `$set` prevented a person profile. Now the event is still person-processed, and so are later events. Return `null` to drop an event that must not create a profile. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
+
 Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin for those.
 
 ### Lifecycle events on iOS and macOS
