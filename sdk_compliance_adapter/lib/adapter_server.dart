@@ -470,7 +470,10 @@ class _RecordingProxy {
   /// with, which is this proxy's and not the harness's.
   String _proxyLocation(String location) {
     final uri = Uri.tryParse(location);
-    if (uri == null || !uri.hasScheme || uri.origin != _target.origin) {
+    if (uri == null ||
+        uri.scheme != _target.scheme ||
+        uri.host != _target.host ||
+        uri.port != _target.port) {
       return location;
     }
     return uri.replace(host: '127.0.0.1', port: _server.port).toString();

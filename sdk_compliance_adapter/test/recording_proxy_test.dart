@@ -54,6 +54,25 @@ void main() {
     expect((await harness.state())['total_events_sent'], 1);
   });
 
+  for (final location in ['ftp://example.com/path', 'http:/path']) {
+    test('a 307 to $location reaches the SDK as a terminal redirect', () async {
+      final harness = await _Harness.start((request, _) async {
+        request.response
+          ..statusCode = HttpStatus.temporaryRedirect
+          ..headers.set(HttpHeaders.locationHeader, location);
+        await request.response.close();
+      });
+      addTearDown(harness.close);
+
+      await harness.captureAndFlush();
+
+      final state = await harness.state();
+      expect(harness.paths, ['/i/v1/analytics/events']);
+      expect(state['total_events_sent'], 0);
+      expect(state['pending_events'], 0);
+    });
+  }
+
   test('a 2xx whose body breaks off stays delivered', () async {
     final harness = await _Harness.start((request, _) async {
       final socket = await request.response.detachSocket(writeHeaders: false);
