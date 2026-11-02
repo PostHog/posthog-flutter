@@ -2284,13 +2284,9 @@ void main() {
               'off-flag': {'key': 'off-flag', 'enabled': false},
             },
           });
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
-      final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      final flagsLoaded = _firstFlagsLoad();
+      final platform = await setUpPlatform(configFor(server));
+      await flagsLoaded;
 
       expect(await platform.isFeatureEnabled('missing', defaultValue: true),
           isTrue);
@@ -2306,13 +2302,9 @@ void main() {
     test(r'$feature_flag_called does not report the defaultValue', () async {
       final server = await LocalPostHogServer.start();
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
-      final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      final flagsLoaded = _firstFlagsLoad();
+      final platform = await setUpPlatform(configFor(server));
+      await flagsLoaded;
 
       await platform.isFeatureEnabled('missing', defaultValue: true);
 
