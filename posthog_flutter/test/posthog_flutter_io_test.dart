@@ -1271,6 +1271,33 @@ isolate_dso_base: 7000000000
       });
     });
 
+    test('registerPushNotificationToken forwards repeated FID registrations',
+        () async {
+      for (var i = 0; i < 2; i++) {
+        await posthogFlutterIO.registerPushNotificationToken(
+          'c1234567890123456789012',
+          appId: 'firebase-project',
+        );
+      }
+
+      expect(log.map((call) => [call.method, call.arguments]), [
+        [
+          'registerPushNotificationToken',
+          {
+            'deviceToken': 'c1234567890123456789012',
+            'appId': 'firebase-project',
+          },
+        ],
+        [
+          'registerPushNotificationToken',
+          {
+            'deviceToken': 'c1234567890123456789012',
+            'appId': 'firebase-project',
+          },
+        ],
+      ]);
+    });
+
     test('registerPushNotificationToken omits appId when null', () async {
       await posthogFlutterIO.registerPushNotificationToken('token-abc');
 
