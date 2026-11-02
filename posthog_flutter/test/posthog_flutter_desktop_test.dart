@@ -788,6 +788,45 @@ void main() {
       expect(_propertiesOf(event)[r'$set'], {'email': 'user@example.com'});
     });
 
+    test('person properties a callback adds leave later events personless',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'signed up') {
+              event.userProperties = {'email': 'user@example.com'};
+            }
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'signed up');
+      await platform.capture(eventName: 'next');
+
+      final next = await server.waitForEvent('next');
+      expect(_optionsOf(next)['process_person_profile'], isFalse);
+    });
+
+    test(
+        'removing person properties keeps person processing on for later events',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [(event) => event..userProperties = null];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+      );
+      await platform.capture(eventName: 'next');
+
+      final next = await server.waitForEvent('next');
+      expect(_optionsOf(next), isNot(contains('process_person_profile')));
+    });
+
     test('a callback can turn person processing back on', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)

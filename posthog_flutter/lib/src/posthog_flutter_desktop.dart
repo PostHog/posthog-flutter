@@ -853,6 +853,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           distinctId: distinctId == null || distinctId.trim().isEmpty
               ? base.distinctId
               : distinctId,
+          requestsPersonProcessing: base.requestsPersonProcessing,
         ),
         ai: ai);
   }
