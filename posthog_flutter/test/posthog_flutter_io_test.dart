@@ -1194,6 +1194,57 @@ isolate_dso_base: 7000000000
       expect(seen!.userProperties, {'name': 'Ada'});
     });
 
+    test('callbacks can cast nested values from the native SDK', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        if (call.method != 'buildEvent') return null;
+        return {
+          ...nativeBuiltEvent(call.arguments as Map),
+          'properties': <Object?, Object?>{
+            r'$exception_list': <Object?>[
+              <Object?, Object?>{
+                'type': 'StateError',
+                'stacktrace': <Object?, Object?>{
+                  'frames': <Object?>[
+                    <Object?, Object?>{'in_app': true},
+                  ],
+                },
+              },
+            ],
+            'bytes': Int32List.fromList([1, 2]),
+            'empty': <Object?>[],
+          },
+        };
+      });
+      await setUpWith((event) {
+        final list =
+            event.properties![r'$exception_list'] as List<Map<String, dynamic>>;
+        final stack = list.single['stacktrace'] as Map<String, dynamic>;
+        final frames = stack['frames'] as List<Map<String, dynamic>>;
+        frames.single['in_app'] = false;
+        return event;
+      });
+
+      await posthogFlutterIO.capture(eventName: 'failed');
+
+      final sent = log.singleWhere((c) => c.method == 'sendBuiltEvent');
+      expect((sent.arguments as Map)['properties'], {
+        r'$exception_list': [
+          {
+            'type': 'StateError',
+            'stacktrace': {
+              'frames': [
+                {'in_app': false},
+              ],
+            },
+          },
+        ],
+        'bytes': [1, 2],
+        'empty': <Object?>[],
+      });
+    });
+
     test('sends what the callbacks return with the built uuid', () async {
       await setUpWith((event) => PostHogEvent(
             event: 'renamed',

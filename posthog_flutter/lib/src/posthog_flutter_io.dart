@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
@@ -176,8 +177,29 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     return {
       for (final entry in value.entries)
         if (entry.key is String && entry.value != null)
-          entry.key as String: entry.value as Object,
+          entry.key as String: _valueFromNative(entry.value) as Object,
     };
+  }
+
+  /// Gives a nested value from the channel, where every map and list is
+  /// untyped, the types `capture` callers pass: callbacks commonly cast
+  /// `$exception_list` to `List<Map<String, dynamic>>`, and a failed cast
+  /// drops the event.
+  static Object? _valueFromNative(Object? value) {
+    if (value is Map) {
+      if (value.keys.any((key) => key is! String)) return value;
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key as String: _valueFromNative(entry.value),
+      };
+    }
+    if (value is List && value is! TypedData) {
+      final items = value.map(_valueFromNative).toList();
+      return items.isNotEmpty && items.every((i) => i is Map<String, dynamic>)
+          ? List<Map<String, dynamic>>.from(items)
+          : items;
+    }
+    return value;
   }
 
   /// Native plugin calls to Flutter
