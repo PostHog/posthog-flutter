@@ -59,10 +59,9 @@ void main() {
     });
 
     test('registers a language and unregisters null', () async {
-      await handleWebMethodCall(
-          const MethodCall('setAppLanguage', {'language': 'de'}));
-      await handleWebMethodCall(
-          const MethodCall('setAppLanguage', {'language': null}));
+      final web = PosthogFlutterWeb();
+      await web.setAppLanguage('de');
+      await web.setAppLanguage(null);
 
       expect(registered, [
         {r'$app_language': 'de'}

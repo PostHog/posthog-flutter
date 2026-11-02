@@ -512,6 +512,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> setAppLanguage(String? language) async {
+    return _call(MethodCall('setAppLanguage', {'language': language}));
+  }
+
+  @override
   Future<bool> isFeatureEnabled(String key,
       {bool? sendFeatureFlagEvent}) async {
     final result = await _call(
