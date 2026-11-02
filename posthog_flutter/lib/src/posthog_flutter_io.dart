@@ -32,11 +32,17 @@ import 'posthog_internal_events.dart';
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   PosthogFlutterIO() {
-    _methodChannel.setMethodCallHandler(_handleMethodCall);
+    _installMethodCallHandler();
   }
+
+  static const _handlerRetryInterval = Duration(milliseconds: 500);
+  static const _maxHandlerRetries = 120;
 
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
+
+  bool _handlerInstalled = false;
+  Timer? _handlerRetry;
 
   OnFeatureFlagsCallback? _onFeatureFlagsCallback;
 
@@ -50,8 +56,41 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   final _order = CallOrder();
 
-  Future<dynamic> _invoke(String method, [Object? arguments]) =>
-      _order.run(() => _methodChannel.invokeMethod(method, arguments));
+  Future<dynamic> _invoke(String method, [Object? arguments]) {
+    if (!_installMethodCallHandler()) {
+      // Callers already fall back on a PlatformException. Waiting for the
+      // binding instead would hang an app awaiting setup() before creating it.
+      return Future<dynamic>.error(PlatformException(
+        code: 'binding_not_initialized',
+        message: 'Skipped $method: the Flutter binding is not initialized.',
+      ));
+    }
+    return _order.run(() => _methodChannel.invokeMethod(method, arguments));
+  }
+
+  /// Returns whether the channel is ready. Without a binding it isn't, and the
+  /// timer covers apps whose native SDK auto-inits and that make no later call.
+  /// Native loads sent in the meantime wait in the channel's buffer.
+  bool _installMethodCallHandler() {
+    if (_handlerInstalled) return true;
+    try {
+      _methodChannel.setMethodCallHandler(_handleMethodCall);
+      _handlerInstalled = true;
+      _handlerRetry?.cancel();
+    } catch (_) {
+      if (_handlerRetry == null) {
+        debugPrint(
+          '[PostHog] Call WidgetsFlutterBinding.ensureInitialized() before '
+          'setup(). SDK calls are skipped until the binding is initialized.',
+        );
+        _handlerRetry = Timer.periodic(_handlerRetryInterval, (timer) {
+          if (timer.tick >= _maxHandlerRetries) timer.cancel();
+          _installMethodCallHandler();
+        });
+      }
+    }
+    return _handlerInstalled;
+  }
 
   /// Applies the beforeSend callbacks to an event in order.
   /// Returns the possibly modified event, or null if any callback drops it.

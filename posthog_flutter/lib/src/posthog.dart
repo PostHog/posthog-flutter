@@ -623,8 +623,9 @@ class Posthog {
   /// the last known flags. If flags have already loaded when you register,
   /// it's also invoked with the current values shortly afterwards.
   ///
-  /// You can register before [setup], and the callback stays registered
-  /// across [close] and [setup]. Treat each invocation as "flags may have
+  /// You can register before [setup], even before
+  /// `WidgetsFlutterBinding.ensureInitialized()`, and the callback stays
+  /// registered across [close] and [setup]. Treat each invocation as "flags may have
   /// changed", not as an exactly-once event.
   ///
   /// Returns a subscription; call
