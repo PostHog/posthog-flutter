@@ -408,6 +408,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final isFeatureEnabled = posthog
               ?.isFeatureEnabled(stringToJSAny(key), _flagOptions(args))
               ?.dartify() as bool? ??
+          args['defaultValue'] as bool? ??
           false;
       return isFeatureEnabled;
     case 'group':
