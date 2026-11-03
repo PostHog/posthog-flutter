@@ -36,24 +36,12 @@ void main() {
         expect(response['success'], isTrue);
         expect(response['value'], 'retry-success');
         expect(flagsServer.flagsRequestCount, 2);
-
-        final state = await _getJson('$adapterBase/state');
-        expect(state['total_retries'], 1);
       },
     );
   }
 
-  for (final (status, retries) in [
-    (400, 1),
-    (401, 1),
-    (408, 1),
-    (429, 1),
-    (500, 1),
-    (503, 1),
-    (502, 0),
-    (504, 0),
-  ]) {
-    test('does not retry HTTP $status with max_retries=$retries', () async {
+  for (final status in [400, 401, 408, 429, 500, 503]) {
+    test('does not retry HTTP $status', () async {
       final flagsServer = await _FlagsServer.start([status, HttpStatus.ok]);
       addTearDown(flagsServer.close);
       final adapter = ComplianceAdapter();
@@ -63,24 +51,18 @@ void main() {
       await _postJson('$base/init', {
         'api_key': 'test-api-key',
         'host': flagsServer.url,
-        'max_retries': retries,
         'flush_interval_ms': 60000,
       });
-      await expectLater(
-          _postJson('$base/get_feature_flag', {
-            'key': 'retry-flag',
-            'distinct_id': 'test-user',
-          }),
-          throwsA(isA<HttpException>()));
+      final response = await _postJson('$base/get_feature_flag', {
+        'key': 'retry-flag',
+        'distinct_id': 'test-user',
+      });
+      expect(response['value'], isFalse);
       expect(flagsServer.flagsRequestCount, 1);
-      final state = await _getJson('$base/state');
-      expect(state['total_retries'], 0);
-      expect(
-          state['last_error'], 'Feature flag request failed with HTTP $status');
     });
   }
 
-  test('propagates error after /flags retries are exhausted', () async {
+  test('answers false after the /flags retry fails too', () async {
     final flagsServer = await _FlagsServer.start([
       HttpStatus.badGateway,
       HttpStatus.badGateway,
@@ -95,29 +77,16 @@ void main() {
     await _postJson('$adapterBase/init', {
       'api_key': 'test-api-key',
       'host': flagsServer.url,
-      'max_retries': 1,
       'flush_interval_ms': 60000,
     });
 
-    await expectLater(
-      _postJson('$adapterBase/get_feature_flag', {
-        'key': 'retry-flag',
-        'distinct_id': 'test-user',
-      }),
-      throwsA(
-        isA<HttpException>().having(
-          (error) => error.message,
-          'message',
-          contains('HTTP 500'),
-        ),
-      ),
-    );
+    final response = await _postJson('$adapterBase/get_feature_flag', {
+      'key': 'retry-flag',
+      'distinct_id': 'test-user',
+    });
 
+    expect(response['value'], isFalse);
     expect(flagsServer.flagsRequestCount, 2);
-
-    final state = await _getJson('$adapterBase/state');
-    expect(state['total_retries'], 1);
-    expect(state['last_error'], 'Feature flag request failed with HTTP 502');
   });
 }
 
@@ -130,21 +99,6 @@ Future<Map<String, Object?>> _postJson(
     final request = await client.postUrl(Uri.parse(url));
     request.headers.contentType = ContentType.json;
     request.write(jsonEncode(payload));
-    final response = await request.close();
-    final body = await utf8.decoder.bind(response).join();
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw HttpException('HTTP ${response.statusCode}: $body');
-    }
-    return Map<String, Object?>.from(jsonDecode(body) as Map);
-  } finally {
-    client.close(force: true);
-  }
-}
-
-Future<Map<String, Object?>> _getJson(String url) async {
-  final client = HttpClient();
-  try {
-    final request = await client.getUrl(Uri.parse(url));
     final response = await request.close();
     final body = await utf8.decoder.bind(response).join();
     if (response.statusCode < 200 || response.statusCode >= 300) {

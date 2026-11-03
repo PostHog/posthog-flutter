@@ -29,6 +29,14 @@ import 'utils/property_normalizer.dart';
 
 typedef _ClientScope = ({String projectToken, String host});
 
+/// Builds the client [PosthogFlutterDesktop] runs on, in place of a plain
+/// [DesktopPostHog].
+typedef DesktopClientFactory = DesktopPostHog Function(
+  PostHogConfig config,
+  FileStorage storage,
+  Map<String, Object?> staticContext,
+);
+
 /// The Windows and Linux implementation, built on the pure-Dart
 /// [DesktopPostHog] client.
 ///
@@ -43,9 +51,11 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     required Future<String?> Function() appDirectory,
     required DesktopAppInfo appInfo,
     required String? timezone,
+    @visibleForTesting DesktopClientFactory? createClient,
   })  : _appDirectory = appDirectory,
         _appInfo = appInfo,
-        _timezone = timezone;
+        _timezone = timezone,
+        _createClient = createClient;
 
   /// See [DesktopStorage.appDirectory].
   final Future<String?> Function() _appDirectory;
@@ -57,6 +67,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   final DesktopAppInfo _appInfo;
 
   final String? _timezone;
+
+  final DesktopClientFactory? _createClient;
 
   DesktopPostHog? _client;
 
@@ -160,14 +172,17 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     final storageDirectory = appDirectory == null
         ? null
         : DesktopStorage.projectDirectory(appDirectory, config.projectToken);
-    final client = DesktopPostHog(
-      config,
-      staticContext: collectDesktopContext(_appInfo),
-      timezone: _timezone,
-      storage: storageDirectory == null
-          ? FileStorage.memory()
-          : FileStorage(storageDirectory),
-    );
+    final storage = storageDirectory == null
+        ? FileStorage.memory()
+        : FileStorage(storageDirectory);
+    final staticContext = collectDesktopContext(_appInfo);
+    final client = _createClient?.call(config, storage, staticContext) ??
+        DesktopPostHog(
+          config,
+          staticContext: staticContext,
+          timezone: _timezone,
+          storage: storage,
+        );
     _client = client;
     _clientScope = (
       projectToken: config.projectToken,
