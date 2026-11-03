@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:meta/meta.dart';
 
 import '../feature_flag_result.dart';
@@ -46,8 +47,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// The reload that waits for the /flags request in flight.
   Completer<void>? _pendingFlagsReload;
 
-  /// Changes when reset invalidates responses requested for the previous user.
-  int _featureFlagsGeneration = 0;
+  /// Changes when reset ends the current user, invalidating what was requested
+  /// or captured for them but has not come back yet.
+  int _resetGeneration = 0;
 
   final _session = PostHogSessionManager();
 
@@ -56,6 +58,20 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   /// The person properties sent last, so that a duplicate `$set` is skipped.
   String? _cachedPersonProperties;
+
+  /// When each flag person property was last set, and when they were last
+  /// reset, counted in [_personPropertyClock]. An AI event's properties
+  /// apply only after the worker measured it, and must not overwrite newer
+  /// values set in the meantime.
+  var _personPropertyClock = 0;
+  var _personPropertiesResetAt = 0;
+  final _personPropertySetAt = <String, int>{};
+
+  /// AI events with person properties the worker is still measuring. Events
+  /// captured meanwhile are person-processed, as they would be after a
+  /// [capture] with the same properties, even if the size limit then drops
+  /// the AI event.
+  var _aiEventsRequestingPerson = 0;
 
   Map<String, PostHogFeatureFlagValue> _bootstrappedFlags = const {};
   Map<String, Object?> _bootstrappedPayloads = const {};
@@ -95,7 +111,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// the configured default; this client keeps the current consent decision.
   void reset() {
     wrap(() {
-      _featureFlagsGeneration++;
+      _resetGeneration++;
+      _aiEventsRequestingPerson = 0;
       _sessionProps.clear();
       _flagCallReported.clear();
       _cachedPersonProperties = null;
@@ -451,20 +468,69 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// Unlike [capture], it adds nothing to it. Its `$set` / `$set_once`
   /// feed flag evaluation.
   ///
-  /// With [ai], the event goes to PostHog's AI endpoint from a queue of its
-  /// own, which drops a serialized event over its size limit.
-  ///
   /// Returns the event's uuid, or null when it is not queued: the client
-  /// is closed or opted out, or the AI event is over the size limit.
-  String? capturePrepared(
+  /// is closed or opted out.
+  Future<String?> capturePrepared(String event, PostHogPreparedEvent prepared) {
+    final queued = wrap<Future<String?>>(() {
+      if (_ignoredWhileOptedOut('posthog.capture')) {
+        return SynchronousFuture(null);
+      }
+      final (:uuid, :queued) = _queuePrepared(event, prepared);
+      return queued.then((kept) => kept ? uuid : null);
+    });
+    return queued ?? SynchronousFuture(null);
+  }
+
+  /// Queues an AI event built by [prepareEvent], like [capturePrepared], on
+  /// the queue of PostHog's AI endpoint, which drops a serialized event over
+  /// its size limit.
+  ///
+  /// Completes with the event's uuid, or null when it is not queued: the
+  /// client is closed or opted out, or the event is over the size limit or
+  /// was evicted while waiting to be written. Its person properties apply once it is queued, unless [reset] ran since
+  /// it was captured.
+  Future<String?> captureAiPrepared(
     String event,
-    PostHogPreparedEvent prepared, {
-    bool ai = false,
-  }) =>
-      wrap<String?>(() {
-        if (_ignoredWhileOptedOut('posthog.capture')) return null;
-        return _queuePrepared(event, prepared, ai: ai);
+    PostHogPreparedEvent prepared,
+  ) {
+    final queued = wrap<Future<String?>>(() {
+      if (_ignoredWhileOptedOut('posthog.capture')) {
+        return SynchronousFuture(null);
+      }
+      final (
+        :properties,
+        :options,
+        :timestamp,
+        :uuid,
+        :distinctId,
+        :requestsPersonProcessing,
+      ) = prepared;
+      final queued = captureAiStateless(distinctId, event,
+          properties: properties,
+          options: options,
+          timestamp: timestamp,
+          uuid: uuid);
+      // Sent for another distinct id, its person properties belong to that
+      // person, not to the current user.
+      if (distinctId != getDistinctId()) return queued;
+      final generation = _resetGeneration;
+      final capturedAt = ++_personPropertyClock;
+      if (requestsPersonProcessing) _aiEventsRequestingPerson++;
+      return queued.then((uuid) {
+        if (uuid != null && generation == _resetGeneration) {
+          _applyPersonProperties(properties,
+              requestsPersonProcessing: requestsPersonProcessing,
+              capturedAt: capturedAt);
+        }
+        return uuid;
+      }).whenComplete(() {
+        if (requestsPersonProcessing && generation == _resetGeneration) {
+          _aiEventsRequestingPerson--;
+        }
       });
+    });
+    return queued ?? SynchronousFuture(null);
+  }
 
   PostHogPreparedEvent? _prepareEvent(
     String event, {
@@ -494,11 +560,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
     );
   }
 
-  String? _queuePrepared(
+  ({String uuid, Future<bool> queued}) _queuePrepared(
     String event,
-    PostHogPreparedEvent prepared, {
-    bool ai = false,
-  }) {
+    PostHogPreparedEvent prepared,
+  ) {
     final (
       :properties,
       :options,
@@ -507,32 +572,18 @@ abstract class PostHogCore extends PostHogCoreStateless {
       :distinctId,
       :requestsPersonProcessing,
     ) = prepared;
-    final queuedUuid = captureStateless(distinctId, event,
+    final queued = captureStateless(distinctId, event,
         properties: properties,
         options: options,
         timestamp: timestamp,
-        uuid: uuid,
-        ai: ai);
-    if (queuedUuid == null) return null;
-    // Flag person properties come from the event as queued, after the
-    // beforeSend callbacks, so a value they removed doesn't reach /flags.
-    // Person processing follows what the app captured, like the event itself
-    // and the native SDKs. An event they or the size limit dropped does neither.
-    //
+        uuid: uuid);
     // A callback can send the event for another distinct id; its person
     // properties then belong to that person, not to the current user's
     // person processing, flags or person-properties hash.
-    final isCurrentUser = distinctId == getDistinctId();
-    if (isCurrentUser) {
-      if (requestsPersonProcessing) _enablePersonProcessing();
-      _setPersonPropertiesForFlagsIfNeeded(
-        _asPropertyMap(properties[r'$set']),
-        _asPropertyMap(properties[r'$set_once']),
-      );
-    }
-    // PostHog drops an AI event that is not an `$ai_*` event, so it never
-    // updates the person.
-    if (!ai && isCurrentUser && (event == r'$set' || event == r'$identify')) {
+    if (distinctId != getDistinctId()) return queued;
+    _applyPersonProperties(properties,
+        requestsPersonProcessing: requestsPersonProcessing);
+    if (event == r'$set' || event == r'$identify') {
       final set = properties[r'$set'];
       final setOnce = properties[r'$set_once'];
       if ((set is Map || setOnce is Map) &&
@@ -541,7 +592,34 @@ abstract class PostHogCore extends PostHogCoreStateless {
             _personPropertiesHash(getDistinctId(), set, setOnce);
       }
     }
-    return queuedUuid;
+    return queued;
+  }
+
+  /// Applies the person properties of a queued event with [properties]:
+  /// taken from the event as queued, after the beforeSend callbacks, so a
+  /// value they removed doesn't reach /flags. Person processing follows
+  /// [requestsPersonProcessing], what the app captured, like the event itself
+  /// and the native SDKs. An event they or the size limit dropped does
+  /// neither.
+  ///
+  /// With [capturedAt], person properties set since then are kept.
+  void _applyPersonProperties(
+    Map<String, Object?> properties, {
+    required bool requestsPersonProcessing,
+    int? capturedAt,
+  }) {
+    if (requestsPersonProcessing) _enablePersonProcessing();
+    final set = _asPropertyMap(properties[r'$set']);
+    final setOnce = _asPropertyMap(properties[r'$set_once']);
+    if (capturedAt == null) {
+      _setPersonPropertiesForFlagsIfNeeded(set, setOnce);
+    } else if (capturedAt > _personPropertiesResetAt) {
+      final merged = {
+        ...?setOnce,
+        ...?set
+      }..removeWhere((key, _) => (_personPropertySetAt[key] ?? 0) > capturedAt);
+      if (merged.isNotEmpty) _mergePersonPropertiesForFlags(merged);
+    }
   }
 
   /// Creates an alias for a user. An empty [alias] is ignored.
@@ -639,19 +717,29 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// flags reload sends.
   void setPersonPropertiesForFlags(Map<String, Object?> properties) {
     wrap(() {
-      final existing = getPersistedProperty<Map<String, Object?>>(
-              PostHogPersistedProperty.personProperties) ??
-          {};
-      setPersistedProperty(
-        PostHogPersistedProperty.personProperties,
-        {...existing, ...toJsonMap(properties, logger)},
-      );
+      final now = ++_personPropertyClock;
+      for (final key in properties.keys) {
+        _personPropertySetAt[key] = now;
+      }
+      _mergePersonPropertiesForFlags(properties);
     });
+  }
+
+  void _mergePersonPropertiesForFlags(Map<String, Object?> properties) {
+    final existing = getPersistedProperty<Map<String, Object?>>(
+            PostHogPersistedProperty.personProperties) ??
+        {};
+    setPersistedProperty(
+      PostHogPersistedProperty.personProperties,
+      {...existing, ...toJsonMap(properties, logger)},
+    );
   }
 
   /// Resets person properties for feature flag evaluation.
   void resetPersonPropertiesForFlags() {
     wrap(() {
+      _personPropertiesResetAt = ++_personPropertyClock;
+      _personPropertySetAt.clear();
       setPersistedProperty(PostHogPersistedProperty.personProperties, null);
     });
   }
@@ -709,7 +797,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   Future<void> _doFlagsAsync() async {
     _loadingFlags = true;
-    final generation = _featureFlagsGeneration;
+    final generation = _resetGeneration;
     try {
       final distinctId = getDistinctId();
       final groupsMap = _getGroups();
@@ -741,7 +829,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         extraPayload: extraProperties,
       );
 
-      if (generation != _featureFlagsGeneration) return;
+      if (generation != _resetGeneration) return;
 
       if (result is GetFlagsFailure) {
         final stored = _getStoredFlagDetails();
@@ -1105,6 +1193,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   bool _hasPersonProcessing() {
     if (_personProfiles == PostHogPersonProfiles.always) return true;
     if (_personProfiles == PostHogPersonProfiles.never) return false;
+    if (_aiEventsRequestingPerson > 0) return true;
 
     final isIdentified = _isIdentified();
     final hasGroups = _getGroups().isNotEmpty;

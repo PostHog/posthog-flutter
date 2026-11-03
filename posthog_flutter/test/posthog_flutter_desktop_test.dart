@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
@@ -12,6 +13,7 @@ import 'package:posthog_flutter/src/posthog_event.dart';
 import 'package:posthog_flutter/src/posthog_flutter_desktop.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
+import 'core/test_client.dart';
 import 'posthog_api_fake.dart';
 
 // No TestWidgetsFlutterBinding here: the test binding replaces dart:io's
@@ -261,22 +263,18 @@ void main() {
     test('does not admit a capture made while opted out', () async {
       final server = await LocalPostHogServer.start();
       final callbackEvents = <String>[];
-      final releaseHook = Completer<void>();
       final config = configFor(server)
         ..beforeSend = [
-          (event) async {
+          (event) {
             callbackEvents.add(event.event);
-            if (event.event == 'blocked capture') await releaseHook.future;
             return event;
           },
         ];
       final platform = await setUpPlatform(config);
 
       await platform.optOut();
-      final blocked = platform.capture(eventName: 'blocked capture');
+      await platform.capture(eventName: 'blocked capture');
       await platform.optIn();
-      releaseHook.complete();
-      await blocked;
       await platform.capture(eventName: 'sentinel event');
 
       await server.waitForEvent('sentinel event');
@@ -325,6 +323,83 @@ void main() {
       final captured = await server.waitForEvent('replay event');
       expect(_propertiesOf(captured)[r'$recording_status'], 'active');
     });
+  });
+
+  <String, Future<void> Function(PosthogFlutterDesktop)>{
+    'capture': (platform) => platform.capture(eventName: 'event'),
+    'screen': (platform) => platform.screen(screenName: 'screen'),
+    'captureException': (platform) =>
+        platform.captureException(error: StateError('error')),
+    'identify': (platform) => platform.identify(userId: 'user'),
+    'alias': (platform) => platform.alias(alias: 'alias'),
+    'group': (platform) =>
+        platform.group(groupType: 'company', groupKey: 'acme'),
+    'setPersonProperties': (platform) =>
+        platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'}),
+  }.forEach((name, call) {
+    test('an awaited $name completes once the event is on disk', () async {
+      final server = await LocalPostHogServer.start();
+      final worker = GatedWorker();
+      final defaultWorker = QueueWorker.defaultWorker;
+      QueueWorker.defaultWorker = () => worker;
+      addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+      final platform = await setUpPlatform(configFor(server));
+      worker.writeGate = Completer();
+
+      var done = false;
+      final completed = call(platform).then((_) => done = true);
+      await pumpEventQueue();
+      expect(done, isFalse);
+
+      worker.writeGate!.complete();
+      await completed;
+    });
+  });
+
+  test('a queue file job failing on close does not stop the next setup',
+      () async {
+    final server = await LocalPostHogServer.start();
+    final worker = _LateFailingDeletes();
+    final defaultWorker = QueueWorker.defaultWorker;
+    QueueWorker.defaultWorker = () => worker;
+    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+    final platform = await setUpPlatform(configFor(server));
+    await platform.capture(eventName: 'first');
+    await server.waitForEvent('first');
+
+    // Fails only once close() has given up on the flush and awaits settled.
+    final closed = platform.close();
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    worker.gate.complete();
+    await closed;
+
+    worker.fail = false;
+    await platform.setup(configFor(server));
+    await platform.capture(eventName: 'second');
+
+    await server.waitForEvent('second');
+  });
+
+  test('close gives up on stalled file work, and the next setup waits for it',
+      () async {
+    final server = await LocalPostHogServer.start();
+    final worker = GatedWorker();
+    final defaultWorker = QueueWorker.defaultWorker;
+    QueueWorker.defaultWorker = () => worker;
+    addTearDown(() => QueueWorker.defaultWorker = defaultWorker);
+    final platform = await setUpPlatform(configFor(server));
+
+    worker.writeGate = Completer();
+    unawaited(platform.capture(eventName: 'stalled'));
+    await platform.close();
+
+    var ready = false;
+    final setup = platform.setup(configFor(server)).then((_) => ready = true);
+    await pumpEventQueue();
+    expect(ready, isFalse);
+
+    worker.writeGate!.complete();
+    await setup;
   });
 
   group('PosthogFlutterDesktop.screen', () {
@@ -382,36 +457,6 @@ void main() {
           reason: 'no callback runs for a screen while opted out');
       expect(_propertiesOf(event), isNot(contains(r'$screen_name')),
           reason: 'the screen did not become the current one');
-    });
-
-    test('does not remember a screen when consent changes during its hook',
-        () async {
-      final server = await LocalPostHogServer.start();
-      final hookStarted = Completer<void>();
-      final releaseHook = Completer<void>();
-      final config = configFor(server)
-        ..beforeSend = [
-          (event) async {
-            if (event.event == r'$screen') {
-              hookStarted.complete();
-              await releaseHook.future;
-            }
-            return event;
-          },
-        ];
-      final platform = await setUpPlatform(config);
-
-      final screen = platform.screen(screenName: 'Blocked');
-      await hookStarted.future;
-      await platform.optOut();
-      releaseHook.complete();
-      await screen;
-      await platform.optIn();
-      await platform.capture(eventName: 'sentinel event');
-
-      final event = await server.waitForEvent('sentinel event');
-      expect(server.eventNames, ['sentinel event']);
-      expect(_propertiesOf(event), isNot(contains(r'$screen_name')));
     });
 
     test('runs the hook once when it renames a screen event', () async {
@@ -968,10 +1013,11 @@ void main() {
       late DateTime hookStarted;
       final config = configFor(server)
         ..beforeSend = [
-          (event) async {
+          (event) {
             hookStarted = DateTime.now().toUtc();
             // Real wait: the event must not take the time it is queued.
-            await Future<void>.delayed(const Duration(milliseconds: 50));
+            final waited = Stopwatch()..start();
+            while (waited.elapsedMilliseconds < 50) {}
             return event;
           },
         ];
@@ -1045,22 +1091,18 @@ void main() {
     test('does not admit an exception made while opted out', () async {
       final server = await LocalPostHogServer.start();
       final callbackEvents = <String>[];
-      final releaseHook = Completer<void>();
       final config = configFor(server)
         ..beforeSend = [
-          (event) async {
+          (event) {
             callbackEvents.add(event.event);
-            if (event.event == r'$exception') await releaseHook.future;
             return event;
           },
         ];
       final platform = await setUpPlatform(config);
 
       await platform.optOut();
-      final blocked = platform.captureException(error: StateError('blocked'));
+      await platform.captureException(error: StateError('blocked'));
       await platform.optIn();
-      releaseHook.complete();
-      await blocked;
       await platform.capture(eventName: 'sentinel event');
 
       await server.waitForEvent('sentinel event');
@@ -1152,75 +1194,6 @@ void main() {
       expect(firstStep['screen'], 'cart');
       expect(firstStep[r'$timestamp'], isA<String>());
       expect(stepMessagesOf(sentinel), isNull);
-    });
-
-    for (final call in ['capture', 'screen', 'captureException']) {
-      for (final enabled in [true, false]) {
-        test(
-            '$call keeps its original exception steps across close/setup '
-            '(initially enabled: $enabled)', () async {
-          final server = await LocalPostHogServer.start();
-          final entered = Completer<void>();
-          final release = Completer<void>();
-          final config = configFor(server)
-            ..errorTrackingConfig.exceptionSteps.enabled = enabled
-            ..beforeSend = [
-              (event) async {
-                entered.complete();
-                await release.future;
-                event.event = r'$exception';
-                return event;
-              },
-            ];
-          final platform = await setUpPlatform(config);
-          await platform.addExceptionStep('original client');
-
-          final pending = switch (call) {
-            'capture' => platform.capture(eventName: 'custom error'),
-            'screen' => platform.screen(screenName: 'Error'),
-            _ => platform.captureException(error: StateError('pending')),
-          };
-          await entered.future;
-          await platform.close();
-          await platform.setup(configFor(server));
-          await platform.addExceptionStep('replacement client');
-          release.complete();
-          await pending;
-
-          final event = await server.waitForEvent(r'$exception');
-          // Steps are attached as the event is built, before beforeSend, as
-          // on iOS and Android: an event renamed to `$exception` by a
-          // callback gets none.
-          expect(
-              stepMessagesOf(event),
-              enabled && call == 'captureException'
-                  ? ['original client']
-                  : null);
-        });
-      }
-    }
-
-    test('attaches the steps recorded before beforeSend runs', () async {
-      final server = await LocalPostHogServer.start();
-      final entered = Completer<void>();
-      final release = Completer<void>();
-      final platform = await setUpPlatform(configFor(server)
-        ..beforeSend = [
-          (event) async {
-            entered.complete();
-            await release.future;
-            return event;
-          },
-        ]);
-      await platform.addExceptionStep('before capture');
-      final pending = platform.captureException(error: StateError('pending'));
-      await entered.future;
-      await platform.addExceptionStep('during beforeSend');
-      release.complete();
-      await pending;
-
-      expect(stepMessagesOf(await server.waitForEvent(r'$exception')),
-          ['before capture']);
     });
 
     test('are seen by beforeSend, which can remove them', () async {
@@ -1741,6 +1714,42 @@ void main() {
       expect(await nextLaunch.isOptOut(), isTrue);
       expect(await nextLaunch.getDistinctId(), distinctId);
     });
+    test('an event left unsent at close is sent once after the next setup',
+        () async {
+      final server = await LocalPostHogServer.start();
+      server.respond =
+          (_) => const PostHogResponse(HttpStatus.serviceUnavailable);
+      final platform = createPlatform();
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'kept');
+      await platform.close();
+
+      // The server records the events of the refused requests too.
+      final refused = server.eventNames.length;
+      server.respond = (_) => const PostHogResponse(HttpStatus.ok);
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'sentinel');
+      await server.waitForEvent('sentinel');
+
+      expect(server.eventNames.skip(refused).where((name) => name == 'kept'),
+          hasLength(1));
+    });
+
+    test('an event sent before close is not sent again after the next setup',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = createPlatform();
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'once');
+      await server.waitForEvent('once');
+      await platform.close();
+
+      await platform.setup(configFor(server));
+      await platform.capture(eventName: 'sentinel');
+      await server.waitForEvent('sentinel');
+
+      expect(server.eventNames.where((name) => name == 'once'), hasLength(1));
+    });
   });
 
   group('PosthogFlutterDesktop.setup', () {
@@ -1992,44 +2001,6 @@ void main() {
       await Future.wait([firstClose, repeatedClose]);
     });
 
-    test(
-        'an event whose callbacks finish while close sends the queue reaches '
-        'the next client', () async {
-      final server = await LocalPostHogServer.start();
-      final releaseHook = Completer<void>();
-      final config = configFor(server)
-        ..flushAt = 20
-        ..beforeSend = [
-          (event) async {
-            if (event.event == 'slow event') await releaseHook.future;
-            return event;
-          },
-        ];
-      final platform = await setUpPlatform(config);
-      await platform.capture(eventName: 'queued event');
-      final batch = Completer<PostHogResponse>();
-      final batchReceived = Completer<void>();
-      server.respond = (_) {
-        if (batchReceived.isCompleted) {
-          return const PostHogResponse(HttpStatus.ok);
-        }
-        batchReceived.complete();
-        return batch.future;
-      };
-
-      final slowCapture = platform.capture(eventName: 'slow event');
-      final close = platform.close();
-      final setup = platform.setup(config);
-      await batchReceived.future;
-      releaseHook.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      batch.complete(const PostHogResponse(HttpStatus.ok));
-      await Future.wait([slowCapture, close, setup]);
-      await platform.flush();
-
-      expect(server.eventNames, ['queued event', 'slow event']);
-    });
-
     test('close sends the queued events', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server)..flushAt = 20);
@@ -2066,30 +2037,6 @@ void main() {
       ]);
     });
 
-    test('an event whose callbacks finish after close reaches the next client',
-        () async {
-      final server = await LocalPostHogServer.start();
-      final release = Completer<void>();
-      final config = configFor(server)
-        ..beforeSend = [
-          (event) async {
-            if (event.event == 'slow event') await release.future;
-            return event;
-          },
-        ];
-      final platform = await setUpPlatform(config);
-
-      final slowCapture = platform.capture(eventName: 'slow event');
-      await platform.close();
-      await platform.setup(config);
-      release.complete();
-      await slowCapture;
-      await platform.capture(eventName: 'sentinel event');
-
-      await server.waitForEvent('sentinel event');
-      expect(server.eventNames, ['slow event', 'sentinel event']);
-    });
-
     final pendingCalls = <String,
         ({
       String eventName,
@@ -2110,68 +2057,6 @@ void main() {
       ),
     };
 
-    for (final entry in pendingCalls.entries) {
-      test('${entry.key} pending in a hook does not cross project scope',
-          () async {
-        final server = await LocalPostHogServer.start();
-        final hookStarted = Completer<void>();
-        final releaseHook = Completer<void>();
-        final config = configFor(server)
-          ..beforeSend = [
-            (event) async {
-              hookStarted.complete();
-              await releaseHook.future;
-              return event;
-            },
-          ];
-        final platform = await setUpPlatform(config);
-
-        final pending = entry.value.call(platform);
-        await hookStarted.future;
-        await platform.close();
-        await platform.setup(
-          configFor(server, projectToken: 'next_project'),
-        );
-        releaseHook.complete();
-        await pending;
-        await platform.capture(eventName: 'sentinel event');
-
-        await server.waitForEvent('sentinel event');
-        expect(server.eventNames, ['sentinel event']);
-      });
-    }
-
-    for (final entry in pendingCalls.entries) {
-      test('${entry.key} pending in a hook does not cross host scope',
-          () async {
-        final firstServer = await LocalPostHogServer.start();
-        final nextServer = await LocalPostHogServer.start();
-        final hookStarted = Completer<void>();
-        final releaseHook = Completer<void>();
-        final config = configFor(firstServer)
-          ..beforeSend = [
-            (event) async {
-              hookStarted.complete();
-              await releaseHook.future;
-              return event;
-            },
-          ];
-        final platform = await setUpPlatform(config);
-
-        final pending = entry.value.call(platform);
-        await hookStarted.future;
-        await platform.close();
-        await platform.setup(configFor(nextServer));
-        releaseHook.complete();
-        await pending;
-        await platform.capture(eventName: 'sentinel event');
-
-        await nextServer.waitForEvent('sentinel event');
-        expect(firstServer.eventNames, isNot(contains(entry.value.eventName)));
-        expect(nextServer.eventNames, ['sentinel event']);
-      });
-    }
-
     final identityChanges =
         <String, Future<void> Function(PosthogFlutterDesktop)>{
       'identify': (platform) => platform.identify(userId: 'next-user'),
@@ -2180,62 +2065,26 @@ void main() {
 
     for (final identityChange in identityChanges.entries) {
       for (final entry in pendingCalls.entries) {
-        test(
-            '${entry.key} without hooks is sent before an unawaited '
-            '${identityChange.key}', () async {
-          final server = await LocalPostHogServer.start();
-          final platform = await setUpPlatform(configFor(server));
-          final distinctId = await platform.getDistinctId();
+        for (final hooked in [false, true]) {
+          test(
+              '${entry.key} ${hooked ? 'with' : 'without'} hooks is sent before '
+              'an unawaited ${identityChange.key}', () async {
+            final server = await LocalPostHogServer.start();
+            final platform = await setUpPlatform(
+                configFor(server)..beforeSend = [if (hooked) (event) => event]);
+            final distinctId = await platform.getDistinctId();
 
-          final call = entry.value.call(platform);
-          final change = identityChange.value(platform);
-          await Future.wait([call, change]);
-          await platform.capture(eventName: 'sentinel event');
+            final call = entry.value.call(platform);
+            final change = identityChange.value(platform);
+            await Future.wait([call, change]);
+            await platform.capture(eventName: 'sentinel event');
 
-          await server.waitForEvent('sentinel event');
-          final event = server.events
-              .singleWhere((event) => event['event'] == entry.value.eventName);
-          expect(event['distinct_id'], distinctId);
-        });
-      }
-    }
-
-    for (final identityChange in ['identify', 'reset']) {
-      for (final entry in pendingCalls.entries) {
-        test('${entry.key} pending in a hook does not cross $identityChange',
-            () async {
-          final server = await LocalPostHogServer.start();
-          final hookStarted = Completer<void>();
-          final releaseHook = Completer<void>();
-          final config = configFor(server)
-            ..beforeSend = [
-              (event) async {
-                if (event.event == entry.value.eventName) {
-                  hookStarted.complete();
-                  await releaseHook.future;
-                }
-                return event;
-              },
-            ];
-          final platform = await setUpPlatform(config);
-          final initialDistinctId = await platform.getDistinctId();
-
-          final pending = entry.value.call(platform);
-          await hookStarted.future;
-          if (identityChange == 'identify') {
-            await platform.identify(userId: 'identified_user');
-            expect(await platform.getDistinctId(), 'identified_user');
-          } else {
-            await platform.reset();
-            expect(await platform.getDistinctId(), isNot(initialDistinctId));
-          }
-          releaseHook.complete();
-          await pending;
-          await platform.capture(eventName: 'sentinel event');
-
-          await server.waitForEvent('sentinel event');
-          expect(server.eventNames, isNot(contains(entry.value.eventName)));
-        });
+            await server.waitForEvent('sentinel event');
+            final event = server.events.singleWhere(
+                (event) => event['event'] == entry.value.eventName);
+            expect(event['distinct_id'], distinctId);
+          });
+        }
       }
     }
 
@@ -2726,6 +2575,16 @@ Map<String, Object?> _variantFlagResponse() => {
         },
       },
     };
+
+class _LateFailingDeletes extends GatedWorker {
+  final gate = Completer<void>();
+  var fail = true;
+
+  @override
+  Future<List<String>> delete(List<String> paths) => fail
+      ? gate.future.then((_) => throw StateError('job failed'))
+      : super.delete(paths);
+}
 
 /// Answers `/flags/` with [flags], and every other request with a success.
 PostHogResponder _answerFlags(Map<String, Object?> flags) =>

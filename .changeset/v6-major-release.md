@@ -12,6 +12,8 @@
 - **Breaking:** remove `Posthog().getFeatureFlagPayload()` — use `getFeatureFlagResult(key, sendFeatureFlagEvent: false)` and read `payload`
 - **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter — use `throttleDelay`
 - **Breaking:** remove `PostHogDataMode.cellular` — use `PostHogDataMode.any`
+- **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
+- Keep a `reset()`, `identify()` or `optOut()` made right after an un-awaited `capture()`, `screen()` or `captureException()` from applying to that event first, and stop dropping that event on Windows and Linux
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
@@ -24,6 +26,7 @@
 - **Breaking:** send events to capture v1 (`/i/v1/analytics/events`) instead of `/batch/` on iOS, macOS, Android, Windows and Linux — update your reverse proxy first, see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) migration guides
 - **Breaking:** retry a 404 on Windows and Linux so events stay queued, printing one warning, also without `debug`, until a reverse proxy or self-hosted instance serves the new path
 - **Breaking:** drop the batch on a redirect on Windows and Linux, following only same-origin 307 and 308 redirects, and cap a `Retry-After` wait at 30 seconds
+- **Breaking:** write events to disk only when the returned future completes on Windows and Linux, so an unawaited call can be lost on a crash or `exit()` — await the call or `Posthog().close()` before `exit()`
 - **Breaking:** apply SDK properties, then registered properties, then event properties on Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** always set `$lib` and `$lib_version` from the `PostHog-Sdk-Info` header on Windows and Linux, ignoring changes made in `beforeSend`
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
@@ -38,6 +41,8 @@
 - Drop a batch whose 2xx response has no readable per-event results on Windows and Linux instead of counting it as delivered, without resending it
 - Log one line per batch that lost events on Windows and Linux, with the endpoint, count and reasons, also for a terminal status, and count a `limited` result as delivered
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
+- Run queued event encoding, file work and request compression on a background isolate on Windows and Linux so they no longer drop frames
+- Limit AI events waiting to be written on Windows and Linux to about 50 MiB in memory, dropping the oldest first and completing `captureAi` with `null` for them
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
 - Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set on every platform except web — a callback can change the distinct ID and timestamp, and the event keeps its uuid
 - Attach `$exception_steps` before `beforeSend` runs on Windows and Linux so callbacks can read or remove them — steps recorded while a callback runs, or an event a callback renames to `$exception`, no longer get them

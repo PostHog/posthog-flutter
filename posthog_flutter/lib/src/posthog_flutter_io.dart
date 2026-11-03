@@ -109,7 +109,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     Map<String, Object?>? send;
     try {
-      final processed = await applyBeforeSend(
+      final processed = applyBeforeSend(
         callbacks,
         _eventFromNative(built, eventName: eventName),
       );
