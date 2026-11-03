@@ -28,7 +28,7 @@
 - **Breaking:** change `getFeatureFlagResult()` to follow `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux when `sendFeatureFlagEvent` is omitted — pass `sendFeatureFlagEvent: true` to keep capturing `$feature_flag_called`
 - **Breaking:** return `null` instead of the raw string for a malformed, empty or whitespace-only `getFeatureFlagResult()` payload on iOS, macOS and Android
 - **Breaking:** keep string payloads passed to `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, as strings on iOS and macOS instead of decoding them to numbers or booleans
-- **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, and stop it following a per-app language on Android — update filters that match it
+- **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android — update filters that match it
 - **Breaking:** stop sending the legacy `version` and `build` properties on `Application Installed`, `Application Updated` and `Application Opened` on iOS and macOS — use `$app_version` and `$app_build`
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
 - Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set before `beforeSend` runs on every platform except web — a callback can change the distinct ID and timestamp, and the event keeps its uuid

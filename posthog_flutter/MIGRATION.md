@@ -313,7 +313,7 @@ Events the native SDK captures itself don't go through Dart callbacks. Use `Post
 
 ### `$locale` and `$app_language`
 
-`$locale` now means the device's language, with its region, on iOS, Android, macOS, Windows and Linux: `de-CH` instead of `de` on iOS, macOS, Windows and Linux. On Android it no longer follows a per-app language or `Locale.setDefault()`. On older Android versions, Hebrew, Indonesian and Yiddish values also change from legacy codes, such as `in-ID` to `id-ID`. If a user picks a language for your app in iOS Settings, iOS reports that language as the first preferred language, so `$locale` follows it.
+`$locale` now means the device's language, with its region, on iOS, Android, macOS, Windows and Linux: `de-CH` instead of `de` on iOS, macOS, Windows and Linux. On Android it no longer follows a per-app language or `Locale.setDefault()`. On older Android versions, Hebrew, Indonesian and Yiddish values also change from legacy codes, such as `in-ID` to `id-ID`. If a user picks a language for your app in iOS or macOS Settings, the system reports that language as the first preferred language, so `$locale` follows it.
 
 Update cohorts, insights and actions that match `$locale`: a filter on `$locale = de` stops matching `de-CH`. To keep matching a language, use a regex such as `^de(-|$)`, because "contains" also matches `en-DE`. Events already stored keep the old values. Feature flags aren't affected: the SDK doesn't send `$locale` or `$app_language` with flag requests, so flags only see these if you set them as person properties yourself.
 
