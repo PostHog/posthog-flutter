@@ -41,3 +41,4 @@
 - Limit AI events waiting to be written on Windows and Linux to about 50 MiB in memory, dropping the oldest first and completing `captureAi` with `null` for them
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
+- Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value
