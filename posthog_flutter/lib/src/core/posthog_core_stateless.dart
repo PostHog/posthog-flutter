@@ -58,8 +58,9 @@ bool _isRetryableFlagsError(Object err) =>
     (err is PostHogFetchNetworkError && !_isConnectionRefused(err.cause)) ||
     (err is PostHogFetchHttpError && (err.status == 502 || err.status == 504));
 
-/// `ECONNREFUSED` on macOS, Linux, and Windows.
-const _connectionRefusedCodes = {61, 111, 10061};
+/// `ECONNREFUSED` on macOS and Linux; Windows reports `WSAECONNREFUSED`
+/// (10061) or `ERROR_CONNECTION_REFUSED` (1225).
+const _connectionRefusedCodes = {61, 111, 10061, 1225};
 
 bool _isConnectionRefused(Object? cause) =>
     cause is SocketException &&
