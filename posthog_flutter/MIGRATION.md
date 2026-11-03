@@ -56,7 +56,7 @@ If every plugin in your app supports Swift Package Manager, you can remove Cocoa
 | | 5.x | 6.0 |
 | --- | --- | --- |
 | `posthog-ios` | `>= 3.92.3, < 4.0.0` | `>= 4.0.0, < 5.0.0` |
-| `posthog-android` | `[3.72.9, 4.0.0)` | `[4.0.0, 5.0.0)` |
+| `posthog-android` | `[3.75.0, 4.0.0)` | `[4.0.0, 5.0.0)` |
 | Xcode | Not set by the plugin | 26 or later |
 
 Don't add these native SDKs to your app separately at a different major version.
@@ -202,6 +202,10 @@ These affect only code that calls, extends or fakes `PosthogFlutterPlatformInter
 - `enable()` and `disable()` are now `optIn()` and `optOut()`.
 - `getFeatureFlagPayload()` is removed.
 - `getFeatureFlagResult({required String key, bool sendEvent = true})` is now `getFeatureFlagResult({required String key, bool? sendFeatureFlagEvent})`.
+- `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException` take an `options` map.
+- `captureAi()` is new. The base class throws `UnimplementedError` unless you override it.
+- `isFeatureEnabled()` takes `defaultValue`.
+- `reloadFeatureFlags()` returns a `Future<PostHogFeatureFlagsLoaded>`.
 
 ```dart
 // Before
@@ -358,7 +362,7 @@ When the event is sent, the SDK removes each one from `properties` and uses it f
 - Person processing is sent as the `process_person_profile: false` option only while it's off, instead of a `$process_person_profile` property on every event.
 - Events still queued on disk by 5.x are sent to capture v1 after the update, with their legacy option properties moved to options.
 
-**Review your `beforeSend` hooks for the new event shape.** On Windows and Linux, `beforeSend` sees the options the SDK adds, including `process_person_profile: false`. A hook that returns a new `PostHogEvent` or replaces `event.options` without that key turns person processing on for that event. A legacy option property that a hook adds doesn't replace an option that is already set. `beforeSend` doesn't see `$identify`, `$create_alias`, `$groupidentify` or `$feature_flag_called`.
+**Review your `beforeSend` callbacks for the new event shape.** On Windows and Linux, `beforeSend` sees the options the SDK adds, including `process_person_profile: false`. A callback that returns a new `PostHogEvent` or replaces `event.options` without that key turns person processing on for that event. A legacy option property that a callback adds doesn't replace an option that is already set. `beforeSend` doesn't see `$identify`, `$create_alias`, `$groupidentify` or `$feature_flag_called`.
 
 On iOS, macOS and Android, `beforeSend` sees only the options you passed. The native SDK adds its own options after the hook.
 
@@ -446,7 +450,8 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 - [ ] Use Xcode 26 or later.
 - [ ] If you run your own reverse proxy or self-host, serve `/i/v1/analytics/events` and `/i/v1/ai/events` first.
 - [ ] Shorten or hash distinct IDs over 200 UTF-8 bytes.
-- [ ] On Windows and Linux, review your `beforeSend` hooks for the new event shape.
+- [ ] Make `beforeSend` callbacks, including `PostHogLogsConfig.beforeSend`, synchronous.
+- [ ] On Windows and Linux, review your `beforeSend` callbacks for the new event shape.
 - [ ] Update `onFeatureFlags` callbacks to take a `PostHogFeatureFlagsLoaded`.
 - [ ] Move anything that reads `version` or `build` on iOS and macOS lifecycle events to `$app_version` and `$app_build`.
 - [ ] If you set `sendFeatureFlagEvent = false`, check whether anything relies on `$feature_flag_called` from `getFeatureFlagResult()`.
