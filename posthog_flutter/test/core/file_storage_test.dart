@@ -18,7 +18,7 @@ void main() {
 
         expect(storage.getProperty<bool>(PostHogPersistedProperty.optedOut),
             isTrue);
-        final queued = storage.queue.peek(1).single;
+        final queued = now(storage.queue.peek(1)).single;
         expect(queued.event['event'], 'captured');
         storage.queue.removeOldest(1);
         storage.queue.remove([queued.id]);

@@ -14,9 +14,9 @@ import 'replay/mask/posthog_text_mask.dart';
 /// that are about to be captured. Return a possibly modified event to send it,
 /// or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+/// Callbacks are synchronous, as in the native SDKs, so the event is sent
+/// with the user and properties it was captured under.
+typedef BeforeSendCallback = PostHogEvent? Function(
   PostHogEvent event,
 );
 
@@ -27,9 +27,8 @@ typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
 /// attributes that are about to be captured. Return a possibly modified record
 /// to send it, or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogLogRecord?>`).
-typedef BeforeSendLogCallback = FutureOr<PostHogLogRecord?> Function(
+/// Callbacks are synchronous, as in the native SDKs.
+typedef BeforeSendLogCallback = PostHogLogRecord? Function(
   PostHogLogRecord record,
 );
 
@@ -211,6 +210,8 @@ class PostHogConfig {
   /// [maxQueueSize]. The queue also keeps at most 50 MiB of AI events,
   /// whatever this is set to. A value of `0` or less uses the default.
   ///
+  /// When it is full, the oldest events are dropped.
+  ///
   /// Not applied on web, where [Posthog.captureAi] sends nothing.
   ///
   /// Defaults to `null`, which keeps the SDK default.
@@ -310,11 +311,14 @@ class PostHogConfig {
   /// call instead.
   PostHogBootstrapConfig? bootstrap;
 
-  /// Whether to automatically register this device's push token with PostHog.
+  /// Whether to automatically register this device's push token or Firebase
+  /// Installation ID (FID) with PostHog.
   ///
   /// On iOS the native SDK swizzles the app delegate's remote-notification
   /// registration callback; on Android it fetches the FCM token at startup when
-  /// `firebase-messaging` is on the classpath. Either way the host app is still
+  /// `firebase-messaging` is on the classpath, or the FID when the app's manifest
+  /// enables `firebase_messaging_installation_id_enabled`. The host app must
+  /// still register with Firebase in FID mode. Either way the host app is still
   /// responsible for requesting notification permission and calling
   /// `registerForRemoteNotifications()` (iOS) — this only observes the result.
   ///
@@ -403,23 +407,6 @@ class PostHogConfig {
   /// ];
   /// ```
   ///
-  /// **Example (async callback):**
-  /// ```dart
-  /// config.beforeSend = [
-  ///   (event) async {
-  ///     // Perform async operations
-  ///     final shouldSend = await checkIfEventAllowed(event.event);
-  ///     if (!shouldSend) {
-  ///       return null; // Drop the event
-  ///     }
-  ///     // Enrich event with async data
-  ///     final extraData = await fetchExtraContext();
-  ///     event.properties = {...?event.properties, ...extraData};
-  ///     return event;
-  ///   },
-  /// ];
-  /// ```
-  ///
   /// **Limitations:**
   /// - These callbacks do NOT intercept native-initiated events such as:
   ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is
@@ -437,20 +424,12 @@ class PostHogConfig {
   ///   except `$lib` and `$lib_version`, which PostHog sets from the SDK.
   ///
   /// **Note:**
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogEvent?>`)
+  /// - Callbacks are synchronous. Load anything they need (such as remote
+  ///   config) ahead of time.
   /// - If a callback throws, the event is dropped and later callbacks are not
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
-  /// - On every platform except Windows and Linux, PostHog calls made after a
-  ///   capture (including `reset()`, `identify()` and getters) wait until its
-  ///   callbacks finish, so the event keeps the user and consent it was
-  ///   captured under. A callback that runs longer than 10 seconds stops
-  ///   holding them back; its event is still sent when it finishes, with the
-  ///   user, super properties, groups and consent current by then. Calls made
-  ///   from inside a callback do not wait, but a callback that waits on a
-  ///   PostHog call made elsewhere stalls until that limit.
   List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, captureDeepLinks integrations
@@ -622,8 +601,7 @@ class PostHogLogsConfig {
   ///   native SDKs' own `beforeSend`. Dart callbacks cannot cross the platform
   ///   channel, and running it here gives identical behavior everywhere
   ///   (including web). This mirrors the event [PostHogConfig.beforeSend].
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogLogRecord?>`).
+  /// - Callbacks are synchronous.
   /// - A callback that throws is logged, and the record is dropped.
   /// - The W3C trace fields (`traceId`, `spanId`, `traceFlags`) are **not**
   ///   part of [PostHogLogRecord] and are not visible here. They pass straight

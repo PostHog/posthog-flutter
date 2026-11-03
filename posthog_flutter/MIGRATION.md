@@ -175,6 +175,26 @@ config.dataMode = PostHogDataMode.any;
 
 They serialized the internal platform-channel format and have no replacement. `toMap()` is gone from `PostHogConfig`, `PostHogBootstrapConfig`, `PostHogLogsConfig`, `PostHogRageClickConfig`, `PostHogSessionReplayConfig`, `PostHogErrorTrackingConfig` and `PostHogExceptionStepsConfig`. To build a result, for example in a test, call the `PostHogFeatureFlagResult` constructor, which stays public.
 
+### `beforeSend` callbacks are synchronous
+
+`BeforeSendCallback` is now `PostHogEvent? Function(PostHogEvent)`, and `BeforeSendLogCallback` is `PostHogLogRecord? Function(PostHogLogRecord)`. An `async` callback is a compile error. Load what it needs ahead of time and read it synchronously.
+
+```dart
+// Before
+config.beforeSend = [
+  (event) async {
+    final allowed = await loadAllowList();
+    return allowed.contains(event.event) ? event : null;
+  },
+];
+
+// After
+final allowed = await loadAllowList();
+config.beforeSend = [
+  (event) => allowed.contains(event.event) ? event : null,
+];
+```
+
 ### Platform interface changes
 
 These affect only code that calls, extends or fakes `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` or `PosthogFlutterWeb` directly, such as test mocks. `Posthog().optIn()` and `optOut()` are unaffected.
@@ -264,6 +284,7 @@ A personal API key (`phx_...`) in `projectToken` now skips `setup()` with one lo
 - **Person processing:** it's sent as the `process_person_profile: false` option only while it's off, instead of a `$process_person_profile` property on every event.
 - **Redirects:** only same-origin 307 and 308 redirects are followed. Any other redirect drops the batch.
 - **Retries:** a failed batch waits 1 second, doubling up to 30 seconds with ±25% jitter, instead of retrying within the same flush. `Retry-After` is a floor under that wait, capped at 30 seconds.
+- **Writes to disk:** an event is no longer on disk when `capture`, `screen`, `captureException`, `captureFeatureView`, `captureFeatureInteraction`, `identify`, `alias`, `group` or `setPersonProperties` returns, only when the returned future completes. One you didn't await can be lost if the app crashes or calls `exit()` right after. Await the call, or `Posthog().close()`, before `exit()`. Only `close()` also covers events the SDK captures itself, such as `$feature_flag_called`. An `identify` not awaited before `exit()` can lose its `$identify` event for good, because the new ID is already saved. `close()` can now take up to 4 seconds, and a later `setup()` waits for the queue's file work.
 - **Timestamps:** an event's timestamp is taken before `beforeSend` runs.
 - **AI queue:** `captureAi` events have their own on-disk queue of up to `captureAiMaxQueueSize` events (100 by default) and 50 MiB. An event over `captureAiMaxEventBytes` (8 MiB plus 64 KiB by default) is dropped.
 

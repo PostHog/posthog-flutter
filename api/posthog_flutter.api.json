@@ -2605,7 +2605,7 @@
                                 "isRequired": false,
                                 "name": "beforeSend",
                                 "relativePath": "lib/src/posthog_config.dart",
-                                "typeName": "List<FutureOr<PostHogEvent?> Function(PostHogEvent)>?"
+                                "typeName": "List<PostHogEvent? Function(PostHogEvent)>?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_config.dart",
@@ -2954,7 +2954,7 @@
                         "isWriteable": true,
                         "name": "beforeSend",
                         "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "List<FutureOr<PostHogEvent?> Function(PostHogEvent)>"
+                        "typeName": "List<PostHogEvent? Function(PostHogEvent)>"
                     }
                 ],
                 "isDeprecated": false,
@@ -3768,7 +3768,7 @@
                         "isWriteable": true,
                         "name": "beforeSend",
                         "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "List<FutureOr<PostHogLogRecord?> Function(PostHogLogRecord)>"
+                        "typeName": "List<PostHogLogRecord? Function(PostHogLogRecord)>"
                     }
                 ],
                 "isDeprecated": false,
@@ -6753,7 +6753,7 @@
         ],
         "typeAliasDeclarations": [
             {
-                "aliasedTypeName": "FutureOr<PostHogEvent?> Function(PostHogEvent)",
+                "aliasedTypeName": "PostHogEvent? Function(PostHogEvent)",
                 "entryPoints": [
                     "posthog_flutter.dart"
                 ],
@@ -6763,7 +6763,7 @@
                 "relativePath": "lib/src/posthog_config.dart"
             },
             {
-                "aliasedTypeName": "FutureOr<PostHogLogRecord?> Function(PostHogLogRecord)",
+                "aliasedTypeName": "PostHogLogRecord? Function(PostHogLogRecord)",
                 "entryPoints": [
                     "posthog_flutter.dart"
                 ],
