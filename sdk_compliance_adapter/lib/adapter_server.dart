@@ -144,7 +144,7 @@ class ComplianceAdapter {
       }
 
       await platform.resetAdapterState();
-      if (isUsableProjectToken(apiKey)) {
+      if (isUsableProjectToken(config.projectToken)) {
         await platform.configure(
           config,
           host: host,

@@ -97,6 +97,35 @@ void main() {
     expect(state['total_events_sent'], 0);
     expect(state['pending_events'], 0);
   });
+
+  for (final (token, admitted) in [
+    (' phx_test ', false),
+    (' \n\t ', false),
+    (' phc_test ', true),
+  ]) {
+    test('init admits the trimmed token ${jsonEncode(token)}: $admitted',
+        () async {
+      final harness = await _Harness.start(
+        (request, _, body) async {
+          final batch = (jsonDecode(body) as Map)['batch'] as List;
+          request.response.write(jsonEncode({
+            'results': {
+              for (final event in batch)
+                (event as Map)['uuid']: {'result': 'ok'},
+            },
+          }));
+          await request.response.close();
+        },
+        apiKey: token,
+      );
+      addTearDown(harness.close);
+
+      await harness.captureAndFlush();
+
+      expect(harness.paths, hasLength(admitted ? 1 : 0));
+      expect((await harness.state())['total_events_sent'], admitted ? 1 : 0);
+    });
+  }
 }
 
 class _Harness {
@@ -110,8 +139,9 @@ class _Harness {
 
   static Future<_Harness> start(
     Future<void> Function(HttpRequest request, String origin, String body)
-        respond,
-  ) async {
+        respond, {
+    String apiKey = 'phc_test',
+  }) async {
     final ingestion = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final adapter = ComplianceAdapter();
     final adapterServer = await adapter.start(port: 0);
@@ -126,7 +156,7 @@ class _Harness {
       }
     }());
     await harness._post('/init', {
-      'api_key': 'phc_test',
+      'api_key': apiKey,
       'host': origin,
       'flush_at': 100,
       'flush_interval_ms': 60000,
