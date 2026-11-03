@@ -304,14 +304,14 @@ jobs:
         working-directory: ./posthog_flutter
         run: flutter pub publish --dry-run
 
-  # Apple builds (iOS and macOS) with CocoaPods and Swift Package Manager
+  # Apple builds (iOS and macOS) with Swift Package Manager
   build-apple:
     needs: detect-markdown-only
     runs-on: macos-26
     strategy:
       matrix:
         target: [ios, macos]
-        package_manager: [cocoapods, spm]
+        package_manager: [spm]
         include:
           - target: ios
             build_command: flutter build ios --simulator --no-codesign
@@ -340,12 +340,8 @@ jobs:
           xcode-version: '26.4'
 
       - name: Enable Swift Package Manager
-        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && (matrix.package_manager == 'spm') }}
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter config --enable-swift-package-manager
-
-      - name: Disable Swift Package Manager
-        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && (matrix.package_manager == 'cocoapods') }}
-        run: flutter config --no-enable-swift-package-manager
 
       - name: Install dependencies
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
@@ -357,7 +353,7 @@ jobs:
         run: ${{ matrix.build_command }}
 
       - name: iOS plugin tests
-        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && matrix.target == 'ios' && matrix.package_manager == 'cocoapods' }}
+        if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && matrix.target == 'ios' }}
         timeout-minutes: 15
         working-directory: ./example/ios
         run: xcodebuild test -workspace Runner.xcworkspace -scheme Runner -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:RunnerTests
