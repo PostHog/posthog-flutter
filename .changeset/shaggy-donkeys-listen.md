@@ -2,4 +2,4 @@
 'posthog_flutter': patch
 ---
 
-Keep surveys working on Android after a repeated `setup()` call. The native SDK ignores a repeated setup and keeps the survey delegate from the first one, but the plugin built a new delegate and routed all survey actions to it. Every action then failed as `SurveyInvalidated`, so a displayed survey captured no `survey shown`, `survey sent` or `survey dismissed` event, discarded the user's answer, and was never recorded as seen. A recurring survey came back on every launch. A Flutter hot restart runs `main()` again, so it hits this path.
+Keep Android surveys working when `setup()` runs more than once in a process, for example after a Flutter hot restart. The plugin now reuses the survey delegate that the native SDK holds, and points it at the engine that is attached, so a survey that appears captures `survey shown`, `survey sent` and `survey dismissed` again, keeps the answer, and counts as seen. A recurring survey no longer comes back on every launch.

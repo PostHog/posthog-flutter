@@ -169,6 +169,8 @@ class PosthogFlutterPlugin :
             snapshotSendExecutor = Executors.newSingleThreadExecutor()
         }
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
+        // The surveys delegate outlives the channel, so move it to the live engine on a re-attach.
+        flutterSurveysDelegate?.channel = channel
 
         this.applicationContext = flutterPluginBinding.applicationContext
         initPlugin()

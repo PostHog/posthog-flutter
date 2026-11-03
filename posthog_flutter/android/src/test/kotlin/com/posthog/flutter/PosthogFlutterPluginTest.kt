@@ -155,6 +155,31 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun setup_surveysDelegate_reSetupAfterDetachRepointsTheChannel() {
+        val plugin = PosthogFlutterPlugin()
+        val messenger = Mockito.mock(BinaryMessenger::class.java)
+        val binding = attach(plugin, messenger)
+        val call = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        plugin.onDetachedFromEngine(binding)
+
+        val reattachedMessenger = Mockito.mock(BinaryMessenger::class.java)
+        attach(plugin, reattachedMessenger)
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        // The reused delegate must reach the engine that is attached now, not the detached one.
+        val delegate = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
+        (delegate as PostHogFlutterSurveysDelegate).channel.invokeMethod("hideSurveys", null)
+
+        Mockito
+            .verify(reattachedMessenger)
+            .send(Mockito.eq("posthog_flutter"), Mockito.any(), Mockito.any())
+        Mockito
+            .verify(messenger, Mockito.never())
+            .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
+
+    @Test
     fun setup_verifyScreenshotMaskAlignment_defaultsToFalse() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
