@@ -44,23 +44,19 @@ Future<T> retriable<T>(
 /// in UTC and a [Uri] its string.
 /// Other values JSON cannot represent are converted like `jsonEncode` does,
 /// through their `toJson()`, or else sent as their `toString()` with a
-/// warning to [logger]. Map keys become strings. With [repairSurrogates],
-/// a lone UTF-16 surrogate in a string or key becomes U+FFFD. With
-/// [dropNullMembers],
+/// warning to [logger]. Map keys become strings. With [dropNullMembers],
 /// map entries whose converted value is null are left out at every level,
 /// while list elements keep their positions.
 Object? toJsonValue(Object? value, CoreLogger logger,
-    {bool dropNullMembers = false, bool repairSurrogates = false}) {
+    {bool dropNullMembers = false}) {
   // The maps and lists being converted: one that contains itself goes to
   // the fallback below, which reports it, instead of recursing forever.
   final converting = Set<Object>.identity();
 
   Object? convert(Object? value) {
     switch (value) {
-      case null || bool() || int() || double(isFinite: true):
+      case null || bool() || String() || int() || double(isFinite: true):
         return value;
-      case final String string:
-        return repairSurrogates ? toWellFormed(string) : string;
       case double():
         return null;
       case final DateTime date:
@@ -74,7 +70,7 @@ Object? toJsonValue(Object? value, CoreLogger logger,
             for (final MapEntry(:key, value: member) in map.entries)
               if (convert(member) case final converted
                   when converted != null || !dropNullMembers)
-                repairSurrogates ? toWellFormed('$key') : '$key': converted,
+                '$key': converted,
           };
         } finally {
           converting.remove(map);
@@ -117,6 +113,19 @@ String toWellFormed(String value) {
   }
   return units == null ? value : String.fromCharCodes(units);
 }
+
+/// The JSON [value] with [toWellFormed] applied to its strings and keys.
+Object? toWellFormedJson(Object? value) => switch (value) {
+      final String string => toWellFormed(string),
+      final Map map => {
+          for (final MapEntry(:key, :value) in map.entries)
+            toWellFormed('$key'): toWellFormedJson(value),
+        },
+      final List list => [
+          for (final element in list) toWellFormedJson(element)
+        ],
+      _ => value,
+    };
 
 /// Whether [value] holds no lone UTF-16 surrogate.
 bool isWellFormed(String value) => identical(toWellFormed(value), value);
