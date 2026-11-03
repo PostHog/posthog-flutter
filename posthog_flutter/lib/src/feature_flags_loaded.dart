@@ -1,5 +1,7 @@
-/// The feature flags passed to [PostHogConfig.onFeatureFlags] and returned by
-/// [Posthog.reloadFeatureFlags].
+import 'package:meta/meta.dart';
+
+/// The feature flags passed to [Posthog.onFeatureFlags] listeners and returned
+/// by [Posthog.reloadFeatureFlags].
 ///
 /// Only enabled flags are included. When the latest load failed,
 /// [errorsLoading] is `true` and the flags are the last known values, which
@@ -7,15 +9,14 @@
 ///
 /// **Example:**
 /// ```dart
-/// final config = PostHogConfig('<project_token>')
-///   ..onFeatureFlags = (loaded) {
-///     if (loaded.errorsLoading) {
-///       // The values are the last known (cached) flags.
-///     }
-///     if (loaded.variants['new-checkout'] == 'test') {
-///       // Show the test variant.
-///     }
-///   };
+/// Posthog().onFeatureFlags((loaded) {
+///   if (loaded.errorsLoading) {
+///     // The values are the last known (cached) flags.
+///   }
+///   if (loaded.variants['new-checkout'] == 'test') {
+///     // Show the test variant.
+///   }
+/// });
 /// ```
 class PostHogFeatureFlagsLoaded {
   /// The keys of the enabled feature flags.
@@ -31,9 +32,8 @@ class PostHogFeatureFlagsLoaded {
   ///
   /// When it did, [flags] and [variants] hold the last known values.
   ///
-  /// **Flutter web:** when [PostHogConfig.onFeatureFlags] is first set, it is
-  /// called right away with the current flags and `false`, even if
-  /// posthog-js's last load before that failed.
+  /// **Flutter web:** the first load after [Posthog.setup] can be the current
+  /// flags with `false`, even if posthog-js's last load before that failed.
   final bool errorsLoading;
 
   /// Creates the loaded feature flags from [variants], keeping only enabled
@@ -50,4 +50,19 @@ class PostHogFeatureFlagsLoaded {
   @override
   String toString() =>
       'PostHogFeatureFlagsLoaded(variants: $variants, errorsLoading: $errorsLoading)';
+}
+
+/// A listener added with [Posthog.onFeatureFlags].
+///
+/// Call [unsubscribe] to stop receiving feature flags updates.
+class PostHogFeatureFlagsSubscription {
+  final void Function() _unsubscribe;
+
+  /// Not part of the public API.
+  @internal
+  PostHogFeatureFlagsSubscription(this._unsubscribe);
+
+  /// Stops the listener from receiving further updates. Calling it again has
+  /// no effect.
+  void unsubscribe() => _unsubscribe();
 }

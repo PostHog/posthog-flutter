@@ -213,22 +213,28 @@ Future<void> disable() async {}
 Future<void> optOut() async {}
 ```
 
-### `onFeatureFlags` and `reloadFeatureFlags()`
+### `PostHogConfig.onFeatureFlags` is removed
 
-`PostHogConfig.onFeatureFlags` now receives a `PostHogFeatureFlagsLoaded`, and `reloadFeatureFlags()` returns a `Future<PostHogFeatureFlagsLoaded>`. It has `flags`, `variants` and `errorsLoading`.
+Call `Posthog().onFeatureFlags()` before `setup()`, which also covers the first load. The callback receives a `PostHogFeatureFlagsLoaded`, with `flags`, `variants` and `errorsLoading`, and `reloadFeatureFlags()` now returns a `Future<PostHogFeatureFlagsLoaded>`.
 
 ```dart
 // Before
+final config = PostHogConfig('<project_token>', onFeatureFlags: () {
+  // ...
+});
+// or
 config.onFeatureFlags = () {
   // ...
 };
+await Posthog().setup(config);
 
 // After
-config.onFeatureFlags = (loaded) {
+Posthog().onFeatureFlags((loaded) {
   if (!loaded.errorsLoading) {
     // Use loaded.variants
   }
-};
+});
+await Posthog().setup(config);
 ```
 
 ## Behavior changes
@@ -301,6 +307,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 - An `options` argument on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` in `beforeSend`. `process_person_profile`, `cookieless_mode`, `disable_skew_correction` and `product_tour_id` win over their legacy `$` properties. On web, known keys are sent as those legacy properties and other keys are dropped.
 - `captureAi` for `$ai_*` events. It returns the event's UUID, or `null` when the event isn't admitted. On web it sends nothing and returns `null`.
+- `Posthog().onFeatureFlags()` to get notified after every feature flags load. It returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`. You can register it before `WidgetsFlutterBinding.ensureInitialized()`, but other SDK calls, including `setup()`, are skipped with a warning until the binding is initialized.
 
 ## Upgrade checklist
 
@@ -310,7 +317,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 - [ ] Rename `com.posthog.posthog.API_KEY` to `com.posthog.posthog.PROJECT_TOKEN` in `AndroidManifest.xml` and `Info.plist`.
 - [ ] Use Xcode 26 or later.
 - [ ] If you run your own reverse proxy or self-host, serve `/i/v1/analytics/events` and `/i/v1/ai/events` first.
-- [ ] Update `onFeatureFlags` callbacks to take a `PostHogFeatureFlagsLoaded`.
+- [ ] Replace `PostHogConfig.onFeatureFlags` with `Posthog().onFeatureFlags()` before `setup()`.
 - [ ] Move anything that reads `version` or `build` on iOS and macOS lifecycle events to `$app_version` and `$app_build`.
 - [ ] If you set `sendFeatureFlagEvent = false`, check whether anything relies on `$feature_flag_called` from `getFeatureFlagResult()`.
 - [ ] Add `sendFeatureFlagEvent: false` wherever you replace `getFeatureFlagPayload()`.
