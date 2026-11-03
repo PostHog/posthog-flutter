@@ -398,7 +398,6 @@ When the event is sent, the SDK removes each one from `properties` and uses it f
 - When the response asks to retry only some events, the SDK keeps those events queued and removes the rest.
 - After a failed send, the wait before the next one doubles from 1 second up to 30 seconds, with up to 25% random jitter. Retries have no limit: queued events stay until they're delivered or a full queue drops the oldest. In 5.x, a failed batch was retried up to 3 times, 3 seconds apart, within the same flush.
 - A `Retry-After` header is a floor under that wait, capped at 30 seconds. In 5.x it had no cap.
-<!-- TODO(capture-v1): the 1 s starting wait is the mobile divergence from the fleet's 100 ms that Eli hasn't confirmed yet (proposed 2026-11-02; desktop uses the same value). Keep or change this line once he decides. -->
 - A 2xx response without PostHog's per-event results drops the batch. It isn't retried, because PostHog may have stored some of the events.
 - A request times out after 10 seconds without progress, and an AI request after 60 seconds. In 5.x, a request timed out after 10 seconds in total.
 
@@ -422,7 +421,6 @@ If a proxy redirects capture requests to another host, point `host` at the final
 - An event over `captureAiMaxEventBytes` (8 MiB plus 64 KiB by default) is dropped, and `captureAi` returns `null`. You can only lower the limit.
 - AI requests are gzipped unless you set `captureAiCompression` to `PostHogCompression.none`. `compression` doesn't apply.
 - AI requests time out after 60 seconds without progress, or `captureAiTimeout`.
-<!-- TODO(capture-v1): gzip by default, the 100-event and 50 MiB queue and the 60 s timeout follow the mobile AI-lane defaults Eli hasn't confirmed yet (DIVERGENCES "Accepted divergences", proposed 2026-11-02 for iOS and Android; desktop uses the same values). Update these lines if he changes any default. -->
 - AI events use `flushAt` and `maxBatchSize`, like other events.
 - `flush()` and `close()` also send AI events, and AI events left on disk are sent after the next `setup()`.
 - PostHog drops an event sent with `captureAi` whose name doesn't start with `$ai_`. With `debug` on, the SDK logs a warning for it. `capture` never sends events to the AI endpoint.
