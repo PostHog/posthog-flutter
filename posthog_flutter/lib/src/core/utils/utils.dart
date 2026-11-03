@@ -44,7 +44,8 @@ Future<T> retriable<T>(
 /// in UTC and a [Uri] its string.
 /// Other values JSON cannot represent are converted like `jsonEncode` does,
 /// through their `toJson()`, or else sent as their `toString()` with a
-/// warning to [logger]. Map keys become strings. With [dropNullMembers],
+/// warning to [logger]. Map keys become strings. A lone UTF-16 surrogate
+/// in a string or key becomes U+FFFD. With [dropNullMembers],
 /// map entries whose converted value is null are left out at every level,
 /// while list elements keep their positions.
 Object? toJsonValue(Object? value, CoreLogger logger,
@@ -55,8 +56,10 @@ Object? toJsonValue(Object? value, CoreLogger logger,
 
   Object? convert(Object? value) {
     switch (value) {
-      case null || bool() || String() || int() || double(isFinite: true):
+      case null || bool() || int() || double(isFinite: true):
         return value;
+      case final String string:
+        return toWellFormed(string);
       case double():
         return null;
       case final DateTime date:
@@ -70,7 +73,7 @@ Object? toJsonValue(Object? value, CoreLogger logger,
             for (final MapEntry(:key, value: member) in map.entries)
               if (convert(member) case final converted
                   when converted != null || !dropNullMembers)
-                '$key': converted,
+                toWellFormed('$key'): converted,
           };
         } finally {
           converting.remove(map);
@@ -94,6 +97,28 @@ Object? toJsonValue(Object? value, CoreLogger logger,
 
   return convert(value);
 }
+
+/// [value] with each lone UTF-16 surrogate replaced by U+FFFD, or [value]
+/// itself when it has none. `jsonEncode` writes a lone surrogate as a
+/// `\ud800` escape, which capture v1 rejects in a top-level field.
+String toWellFormed(String value) {
+  List<int>? units;
+  for (var i = 0; i < value.length; i++) {
+    final unit = value.codeUnitAt(i);
+    if (unit & 0xF800 != 0xD800) continue;
+    if (unit < 0xDC00 &&
+        i + 1 < value.length &&
+        value.codeUnitAt(i + 1) & 0xFC00 == 0xDC00) {
+      i++;
+      continue;
+    }
+    (units ??= List.of(value.codeUnits))[i] = 0xFFFD;
+  }
+  return units == null ? value : String.fromCharCodes(units);
+}
+
+/// Whether [value] holds no lone UTF-16 surrogate.
+bool isWellFormed(String value) => identical(toWellFormed(value), value);
 
 /// [toJsonValue] for a map, typed as the JSON object it becomes.
 Map<String, Object?> toJsonMap(Map<Object?, Object?> map, CoreLogger logger) =>

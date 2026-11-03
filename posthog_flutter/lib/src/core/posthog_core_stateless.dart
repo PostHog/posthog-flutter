@@ -536,6 +536,14 @@ abstract class PostHogCoreStateless {
     Map<String, Object?>? options,
     String? timestamp,
   }) {
+    if (captureV1MalformedField(message) case final field?) {
+      // Never repaired: two broken ids could become the same id.
+      logger.warn(field == 'name'
+          ? 'Dropping an event: its name is not well-formed UTF-16.'
+          : 'Dropping event ${message['event']}: its $field is not '
+              'well-formed UTF-16.');
+      return (uuid: generateUuidV7(), queued: Future.value(false));
+    }
     final prepared = <String, Object?>{
       ...message,
       if (message['properties'] case final Map properties)
@@ -622,7 +630,7 @@ abstract class PostHogCoreStateless {
           if (toJsonValue(value, logger, dropNullMembers: true)
               case final converted
               when converted != null || key == r'$feature_flag_response')
-            '$key': converted,
+            toWellFormed('$key'): converted,
       };
 
   void _scheduleFlush(_CaptureLane lane) {

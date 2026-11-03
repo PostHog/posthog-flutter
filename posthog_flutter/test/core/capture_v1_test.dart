@@ -95,6 +95,67 @@ void main() {
     });
   });
 
+  group('Lone surrogates', () {
+    test('drop only the events whose name or ids hold one', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server, config: testConfig(debug: true));
+
+      final lines = printedLines(() {
+        client.capture('cut\uD83D');
+        client.capture('session', properties: {r'$session_id': 's\uDE00'});
+        client.capture('window', properties: {r'$window_id': '\uD800w'});
+        client.capture('kept', properties: {'emoji': '\u{1F600}'});
+        client.identify('user\uDC00');
+        client.capture('after identify');
+      });
+      await client.flush();
+
+      expect(server.events.map((event) => event['event']), ['kept']);
+      final drops = lines.where((line) => line.contains('not well-formed'));
+      expect(drops, hasLength(5));
+      expect(drops, everyElement(isNot(matches('[\uD800-\uDFFF]'))));
+      expect(drops, contains(contains('event window: its window id')));
+    });
+
+    test('in properties and options become U+FFFD, keys included', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.capture('e', properties: {
+        'cut\uD83D': [
+          'a\uDE00',
+          {'k\uDC00': 'v\uD800'},
+        ],
+        'emoji': '\u{1F600}',
+      }, options: {
+        'product_tour_id': 't\uD800',
+      });
+      await client.flush();
+
+      final event = server.events.single;
+      expect(
+          event['properties'],
+          containsPair('cut�', [
+            'a�',
+            {'k�': 'v�'},
+          ]));
+      expect(event['properties'], containsPair('emoji', '\u{1F600}'));
+      expect(event['options'], containsPair('product_tour_id', 't�'));
+    });
+
+    test('in an AI event name drop it, and captureAi returns null', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      final prepared = client.prepareEvent('\$ai_cut\uD83D')!;
+      final uuid = await client.captureAiPrepared('\$ai_cut\uD83D', prepared);
+      await client.flush();
+
+      expect(uuid, isNull);
+      expect(server.aiRequests, isEmpty);
+    });
+  });
+
   group('captureV1Event', () {
     final logger = CoreLogger((_) {});
 
