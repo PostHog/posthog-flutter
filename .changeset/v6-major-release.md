@@ -47,7 +47,7 @@
 - Attach `$exception_steps` before `beforeSend` runs on Windows and Linux so callbacks can read or remove them — steps recorded while a callback runs, or an event a callback renames to `$exception`, no longer get them
 - Retry a 404 on Windows and Linux so events stay queued, printing one warning, also without `debug`, until a reverse proxy or self-hosted instance serves the new path
 - Apply a `$process_person_profile` property or `process_person_profile` option passed with an event to that event on Windows and Linux
-- Drop an event whose name, distinct ID, `$session_id` or `$window_id` holds a lone UTF-16 surrogate on Windows and Linux instead of losing its whole batch, ignore an `identify()`, `alias()` or `group()` call whose id holds one, and replace lone surrogates in properties and options with U+FFFD
+- Replace lone UTF-16 surrogates with U+FFFD on Windows and Linux, in event names, ids, properties and options, so one such event no longer loses its whole batch; iOS, macOS and Android already send them that way
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
 - Drop a batch whose 2xx response has no readable per-event results on Windows and Linux instead of counting it as delivered, without resending it
 - Log one line per batch that lost events on Windows and Linux, with the endpoint, count and reasons, also for a terminal status, and count a `limited` result as delivered

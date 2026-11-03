@@ -340,8 +340,7 @@ Capture v1 checks each event on its own and drops only the invalid ones, so the 
 - PostHog drops an event whose distinct ID is over 200 UTF-8 bytes. Legacy capture shortened the ID to 200 characters and kept the event. If you identify users with a long ID, such as a JWT or a long email address, shorten or hash it before you upgrade. Otherwise every event for that user is dropped.
 - `identify` with an empty or whitespace-only distinct ID is ignored, as in 5.x.
 - A `NaN` or infinite `double` property value is removed and the event is still sent, as in 5.x. Inside a list, it's sent as `null`.
-- The SDK drops an event whose name, distinct ID, `$session_id` or `$window_id` holds a lone UTF-16 surrogate, such as a string cut in the middle of an emoji, and sends the rest of the batch. With `debug` on, it logs the drop.
-- A lone surrogate in a property or option becomes U+FFFD and the event is sent. `identify`, `alias` and `group` with an ID that holds one are ignored, so the ID isn't saved. In 5.x, legacy capture rejected the whole batch for a lone surrogate anywhere in it. On iOS, macOS and Android, the event is sent with U+FFFD in place of each lone surrogate.
+- A lone UTF-16 surrogate, such as a string cut in the middle of an emoji, becomes U+FFFD and the event is sent. This covers the event name, distinct ID, `$session_id`, `$window_id`, properties and options, and the IDs `identify`, `alias` and `group` save. In 5.x, legacy capture rejected the whole batch for a lone surrogate anywhere in it. iOS, macOS and Android already send the event with U+FFFD in place of each lone surrogate.
 - The SDK doesn't report these drops to your code. With `debug` on, it logs how many events PostHog dropped and why (see [Logs](#logs)).
 
 #### SDK identity
