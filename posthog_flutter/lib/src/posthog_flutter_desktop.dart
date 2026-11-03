@@ -87,18 +87,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return client;
   }
 
-  DesktopPostHog? _clientForContinuation(
-    String op,
-    _ClientScope scope,
-    String distinctId,
-  ) {
+  DesktopPostHog? _clientForContinuation(String op, _ClientScope scope) {
     final client = _clientFor(op);
     if (client == null) return null;
-    if (_clientScope != scope ||
-        client.optedOut ||
-        client.getDistinctId() != distinctId) {
-      printIfDebug('[PostHog] $op dropped: the project, the user or the '
-          'consent changed while beforeSend was running.');
+    if (_clientScope != scope || client.optedOut) {
+      printIfDebug('[PostHog] $op dropped: the project or the consent changed '
+          'while beforeSend was running.');
       return null;
     }
     return client;
@@ -275,9 +269,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current = _clientForContinuation('capture', scope, distinctId);
+        final current = _clientForContinuation('capture', scope);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        _captureProcessed(
+            current, processed, exceptionSteps, prepared, distinctId);
       });
 
   @override
@@ -316,9 +311,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return null;
         }
 
-        final current = _clientForContinuation('captureAi', scope, distinctId);
+        final current = _clientForContinuation('captureAi', scope);
         if (current == null) return null;
-        return _captureProcessed(current, processed, exceptionSteps, prepared,
+        return _captureProcessed(
+            current, processed, exceptionSteps, prepared, distinctId,
             ai: true);
       });
 
@@ -354,12 +350,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current = _clientForContinuation('screen', scope, distinctId);
+        final current = _clientForContinuation('screen', scope);
         if (current == null) return;
 
         // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          _captureProcessed(current, processed, exceptionSteps, prepared);
+          _captureProcessed(
+              current, processed, exceptionSteps, prepared, distinctId);
           return;
         }
 
@@ -375,7 +372,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           current.registerForSession(
               {PostHogPropertyName.screenName: finalScreenName});
         }
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        _captureProcessed(
+            current, processed, exceptionSteps, prepared, distinctId);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -631,10 +629,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current =
-            _clientForContinuation('captureException', scope, distinctId);
+        final current = _clientForContinuation('captureException', scope);
         if (current == null) return;
-        _captureProcessed(current, processed, exceptionSteps, prepared);
+        _captureProcessed(
+            current, processed, exceptionSteps, prepared, distinctId);
       });
 
   @override
@@ -794,7 +792,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     DesktopPostHog client,
     PostHogEvent event,
     ExceptionStepsBuffer? exceptionSteps,
-    _PreparedEvent prepared, {
+    _PreparedEvent prepared,
+    String distinctId, {
     bool ai = false,
   }) {
     if (!_hasName(event.event)) return null;
@@ -825,6 +824,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           options: options,
           timestamp: prepared.timestamp,
         ),
+        distinctId: distinctId,
         ai: ai);
   }
 

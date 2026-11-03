@@ -342,16 +342,28 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
             screenName;
     _currentScreen = finalScreenName;
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: processedEvent.properties,
+      userProperties: processedEvent.userProperties,
+      userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
+    );
     final remaining = _withOptionProperties(
-      processedEvent.properties,
+      extracted.properties,
       processedEvent.options,
       PostHogEventName.screen,
     );
+    final userProperties = extracted.userProperties;
+    final userPropertiesSetOnce = extracted.userPropertiesSetOnce;
 
     return handleWebMethodCall(
       MethodCall('screen', {
         'screenName': finalScreenName,
         if (remaining != null && remaining.isNotEmpty) 'properties': remaining,
+        if (userProperties != null)
+          'userProperties': PropertyNormalizer.normalize(userProperties),
+        if (userPropertiesSetOnce != null)
+          'userPropertiesSetOnce':
+              PropertyNormalizer.normalize(userPropertiesSetOnce),
       }),
     );
   }
@@ -649,14 +661,24 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         return;
       }
 
-      final normalizedData = PropertyNormalizer.normalize(
-        _withOptionProperties(
-              processedEvent.properties?.cast<String, Object>(),
-              processedEvent.options,
-              PostHogEventName.exception,
-            ) ??
-            <String, Object>{},
+      final extracted = CaptureUtils.extractUserProperties(
+        properties: processedEvent.properties?.cast<String, Object>(),
+        userProperties: processedEvent.userProperties,
+        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
       );
+      final userProperties = extracted.userProperties;
+      final userPropertiesSetOnce = extracted.userPropertiesSetOnce;
+      // posthog-js's captureException takes no capture options, but capture
+      // merges `$set` and `$set_once` from the event's properties.
+      final normalizedData = PropertyNormalizer.normalize({
+        ...?_withOptionProperties(
+          extracted.properties,
+          processedEvent.options,
+          PostHogEventName.exception,
+        ),
+        if (userProperties != null) r'$set': userProperties,
+        if (userPropertiesSetOnce != null) r'$set_once': userPropertiesSetOnce,
+      });
 
       return await handleWebMethodCall(
         MethodCall('captureException', {'properties': normalizedData}),

@@ -15,6 +15,8 @@
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
 - Keep a `reset()`, `identify()` or `optOut()` made right after an un-awaited `capture()`, `screen()`, `captureException()`, `captureFeatureView()` or `captureFeatureInteraction()` from applying to that event first, and stop dropping that event on Windows and Linux
 - Run a `beforeSend` callback that renames a screen or exception event once, and keep its `userProperties`
+- Keep `userProperties` and `userPropertiesSetOnce` that a `beforeSend` callback sets on a screen or exception event on web
+- Send an event as its original user when a `beforeSend` callback calls `reset()` or `identify()` on Windows and Linux, instead of dropping it
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26

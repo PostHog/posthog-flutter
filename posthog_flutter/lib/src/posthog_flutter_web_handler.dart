@@ -296,6 +296,19 @@ Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
   }
 }
 
+/// posthog-js capture options carrying `$set` and `$set_once`.
+/// See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
+Map<String, Object> _personCaptureOptions(Map args) {
+  final userProperties = safeMapConversion(args['userProperties']);
+  final userPropertiesSetOnce = safeMapConversion(
+    args['userPropertiesSetOnce'],
+  );
+  return {
+    if (userProperties.isNotEmpty) '\$set': userProperties,
+    if (userPropertiesSetOnce.isNotEmpty) '\$set_once': userPropertiesSetOnce,
+  };
+}
+
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
   _maybeOverrideSDKInfo();
 
@@ -338,20 +351,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
       _addAppVersionProperties(properties);
-      final userProperties = safeMapConversion(args['userProperties']);
-      final userPropertiesSetOnce = safeMapConversion(
-        args['userPropertiesSetOnce'],
-      );
-
-      // Build options object for posthog-js capture with $set and $set_once
-      // See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
-      final options = <String, Object>{};
-      if (userProperties.isNotEmpty) {
-        options['\$set'] = userProperties;
-      }
-      if (userPropertiesSetOnce.isNotEmpty) {
-        options['\$set_once'] = userPropertiesSetOnce;
-      }
+      final options = _personCaptureOptions(args);
 
       posthog?.capture(
         stringToJSAny(eventName),
@@ -366,7 +366,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       properties.addAll(_getLocationProperties());
       _addAppVersionProperties(properties);
 
-      posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
+      final options = _personCaptureOptions(args);
+      posthog?.capture(
+        stringToJSAny('\$screen'),
+        mapToJSAny(properties),
+        options.isNotEmpty ? mapToJSAny(options) : null,
+      );
       break;
     case 'captureLog':
       final body = args['body'] as String;

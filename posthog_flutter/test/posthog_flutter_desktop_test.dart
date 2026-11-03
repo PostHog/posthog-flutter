@@ -546,6 +546,53 @@ void main() {
       });
     });
 
+    for (final (name, call)
+        in <(String, Future<void> Function(PosthogFlutterDesktop))>[
+      ('reset', (platform) => platform.reset()),
+      ('identify', (platform) => platform.identify(userId: 'user-1')),
+    ]) {
+      test('$name inside the hook keeps the event on the earlier user',
+          () async {
+        final server = await LocalPostHogServer.start();
+        late final PosthogFlutterDesktop platform;
+        final config = configFor(server)
+          ..beforeSend = [
+            (event) {
+              if (event.event == 'trigger') call(platform);
+              return event;
+            },
+          ];
+        platform = await setUpPlatform(config);
+        final firstUser = await platform.getDistinctId();
+
+        await platform.capture(eventName: 'trigger');
+
+        final event = await server.waitForEvent('trigger');
+        expect(event['distinct_id'], firstUser);
+        expect(await platform.getDistinctId(), isNot(firstUser));
+      });
+    }
+
+    test('optOut inside the hook drops the event', () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'trigger') platform.optOut();
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'trigger');
+      await platform.optIn();
+      await platform.capture(eventName: 'after');
+      await server.waitForEvent('after');
+
+      expect(server.eventNames, isNot(contains('trigger')));
+    });
+
     test('calls after a burst of events apply in order', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)..beforeSend = [(event) => event];

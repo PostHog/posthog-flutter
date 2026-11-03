@@ -38,6 +38,40 @@ void main() {
     globalContext.setProperty('posthog'.toJS, fake);
   });
 
+  group('a hook that sets user properties without renaming', () {
+    PostHogConfig hooked() => PostHogConfig('test_token', beforeSend: [
+          (event) {
+            event.userProperties = {'plan': 'pro'};
+            event.userPropertiesSetOnce = {'first': 'yes'};
+            return event;
+          },
+        ]);
+
+    test('keeps them on a screen', () async {
+      final web = PosthogFlutterWeb();
+      await web.setup(hooked());
+
+      await web.screen(screenName: 'Cart');
+
+      expect(captures.single['event'], r'$screen');
+      expect(captures.single['options'], {
+        r'$set': {'plan': 'pro'},
+        r'$set_once': {'first': 'yes'},
+      });
+    });
+
+    test('keeps them on an exception', () async {
+      final web = PosthogFlutterWeb();
+      await web.setup(hooked());
+
+      await web.captureException(error: StateError('boom'));
+
+      final properties = captures.single['properties'] as Map;
+      expect(properties[r'$set'], {'plan': 'pro'});
+      expect(properties[r'$set_once'], {'first': 'yes'});
+    });
+  });
+
   test('feature events carry the screen name beforeSend accepted', () async {
     final web = PosthogFlutterWeb();
     await web.setup(PostHogConfig('test_token', beforeSend: [

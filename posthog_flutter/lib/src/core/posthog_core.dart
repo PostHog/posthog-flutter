@@ -449,16 +449,21 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// With [ai], the event goes to PostHog's AI endpoint from a queue of its
   /// own, which drops a serialized event over its size limit.
   ///
+  /// [distinctId] is the user the event was prepared for, which a callback
+  /// calling `reset()` or `identify()` may have replaced. The event stays
+  /// theirs, and doesn't update the replacement's person state.
+  ///
   /// Returns the event's uuid, or null when it is not queued: the client
   /// is closed or opted out, or the AI event is over the size limit.
   String? capturePrepared(
     String event,
     PostHogPreparedEvent prepared, {
+    String? distinctId,
     bool ai = false,
   }) =>
       wrap<String?>(() {
         if (_ignoredWhileOptedOut('posthog.capture')) return null;
-        return _queuePrepared(event, prepared, ai: ai);
+        return _queuePrepared(event, prepared, distinctId: distinctId, ai: ai);
       });
 
   /// [options] with `process_person_profile: false` added when person
@@ -498,12 +503,15 @@ abstract class PostHogCore extends PostHogCoreStateless {
   String? _queuePrepared(
     String event,
     PostHogPreparedEvent prepared, {
+    String? distinctId,
     bool ai = false,
   }) {
     final (:properties, :options, :timestamp) = prepared;
-    final uuid = captureStateless(getDistinctId(), event,
+    final currentDistinctId = getDistinctId();
+    final uuid = captureStateless(distinctId ?? currentDistinctId, event,
         properties: properties, options: options, timestamp: timestamp, ai: ai);
     if (uuid == null) return null;
+    if (distinctId != null && distinctId != currentDistinctId) return uuid;
     // Taken from the event as queued, after the beforeSend callbacks, so a
     // value they removed or an event they or the size limit dropped neither
     // reaches /flags nor turns on person processing for later events.
