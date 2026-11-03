@@ -333,11 +333,14 @@ class PostHogConfig {
   /// ```
   OnFeatureFlagsCallback? onFeatureFlags;
 
-  /// Whether to automatically register this device's push token with PostHog.
+  /// Whether to automatically register this device's push token or Firebase
+  /// Installation ID (FID) with PostHog.
   ///
   /// On iOS the native SDK swizzles the app delegate's remote-notification
   /// registration callback; on Android it fetches the FCM token at startup when
-  /// `firebase-messaging` is on the classpath. Either way the host app is still
+  /// `firebase-messaging` is on the classpath, or the FID when the app's manifest
+  /// enables `firebase_messaging_installation_id_enabled`. The host app must
+  /// still register with Firebase in FID mode. Either way the host app is still
   /// responsible for requesting notification permission and calling
   /// `registerForRemoteNotifications()` (iOS) — this only observes the result.
   ///
