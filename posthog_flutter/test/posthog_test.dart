@@ -26,22 +26,13 @@ void main() {
     });
 
     test(
-      'setup passes config and onFeatureFlags callback to platform interface',
+      'setup passes config to platform interface',
       () async {
-        void testCallback(PostHogFeatureFlagsLoaded _) {}
-
-        final config = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
+        final config = PostHogConfig('test_project_token');
 
         await Posthog().setup(config);
 
         expect(fakePlatformInterface.receivedConfig, equals(config));
-        expect(
-          fakePlatformInterface.registeredOnFeatureFlagsCallback,
-          equals(testCallback),
-        );
       },
     );
 

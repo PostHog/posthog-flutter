@@ -151,7 +151,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     // Skipped for a posthog-js stub without onFeatureFlags.
     if (ph != null && (ph as JSObject).has('onFeatureFlags')) {
-      final dartCallback = config.onFeatureFlags;
       // Repeated setup would otherwise deliver each load twice.
       _featureFlagsUnsubscribe?.callAsFunction();
       _featureFlagsUnsubscribe = null;
@@ -167,11 +166,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
           'variants': jsFlagVariants.dartify(),
           'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
         });
-        // First, so a throwing config callback can't starve listeners and a
-        // reset() or close() it starts clears this load.
-        if (FeatureFlagsListeners.instance.deliver(loaded)) {
-          dartCallback?.call(loaded);
-        }
+        FeatureFlagsListeners.instance.deliver(loaded);
       }.toJS;
 
       // posthog-js replays loaded flags synchronously, and a callback may call

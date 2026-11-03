@@ -97,9 +97,8 @@ void main() {
     final received = <PostHogFeatureFlagsLoaded>[];
     listen(received);
 
-    final delivered = listeners.deliver(loaded('a'));
+    listeners.deliver(loaded('a'));
 
     expect(received, isEmpty);
-    expect(delivered, isFalse);
   });
 }

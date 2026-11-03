@@ -38,17 +38,15 @@ class FeatureFlagsListeners {
     return PostHogFeatureFlagsSubscription(() => _listeners.remove(token));
   }
 
-  /// Returns false when a listener's `reset()` or `close()` cleared [loaded]
-  /// mid-delivery, so the caller skips the config callback too.
-  bool deliver(PostHogFeatureFlagsLoaded loaded) {
+  void deliver(PostHogFeatureFlagsLoaded loaded) {
     _last = loaded;
     final generation = _generation;
     for (final entry in _listeners.entries.toList()) {
-      if (generation != _generation) return false;
+      // A listener's reset() or close() cleared this load.
+      if (generation != _generation) return;
       // An earlier listener may have unsubscribed this one.
       if (_listeners.containsKey(entry.key)) _notify(entry.value, loaded);
     }
-    return generation == _generation;
   }
 
   // A throwing listener must not stop the others from getting the load.
