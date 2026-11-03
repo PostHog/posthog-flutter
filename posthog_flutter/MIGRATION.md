@@ -221,6 +221,7 @@ Before you upgrade, make your own proxy:
 
 - forward `/i/v1/analytics/events` and `/i/v1/ai/events`
 - pass `Authorization` (the project token, sent as `Bearer <token>`), every `PostHog-*` header, `Content-Type`, `Content-Encoding` and `User-Agent` through unchanged
+- if your proxy strips other credentials, keep `Authorization` values that start with `Bearer phc_`, `Bearer phs_` or `Bearer phx_`, plus the exact `Bearer <key>` of an older key without a prefix
 - accept request bodies up to 20 MB
 
 If you ignore this on Windows and Linux, a 404 is retried, events stay queued, and the SDK prints one warning, also without `debug`. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides for those platforms.
@@ -248,6 +249,10 @@ Events the native SDK captures itself don't go through Dart callbacks. Use `Post
 ### Network reachability on iOS and macOS
 
 A path that needs user action, such as a VPN waiting for a password, counts as reachable, and queues pause while cellular data is off for the app. Events captured in the first 100 ms after setup may leave out `$network_wifi` and `$network_cellular`. Events still on disk from a `posthog-ios` 2.x SDK are deleted instead of sent.
+
+### Personal API keys
+
+A personal API key (`phx_...`) in `projectToken` now skips `setup()` with one log line, so the SDK doesn't start and the key is never sent. Use your project token (`phc_...`).
 
 ### Windows and Linux
 

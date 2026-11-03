@@ -33,9 +33,14 @@
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`
 - Apply a `$process_person_profile` property or `process_person_profile` option passed with an event to that event on Windows and Linux
+- Skip `setup()` with one log line when `projectToken` is a personal API key (`phx_`), so the key is never sent
+- Stop printing capture's response body in flush error logs on Windows and Linux, and log how many repeated-uuid copies capture dropped
+- Drop a batch whose 2xx response has no readable per-event results on Windows and Linux instead of counting it as delivered, without resending it
+- Log one line per batch that lost events on Windows and Linux, with the endpoint, count and reasons, also for a terminal status, and count a `limited` result as delivered
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
 - Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set on every platform except web — a callback can change the distinct ID and timestamp, and the event keeps its uuid
 - Attach `$exception_steps` before `beforeSend` runs on Windows and Linux so callbacks can read or remove them — steps recorded while a callback runs, or an event a callback renames to `$exception`, no longer get them
 - Add `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
+- Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value

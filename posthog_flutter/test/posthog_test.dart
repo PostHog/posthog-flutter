@@ -44,6 +44,22 @@ void main() {
       },
     );
 
+    for (final token in [' \n\t ', 'phx_personal_api_key']) {
+      test('setup is skipped for the project token "$token"', () async {
+        final lines = <String?>[];
+        final previous = debugPrint;
+        debugPrint = (message, {wrapWidth}) => lines.add(message);
+        try {
+          await Posthog().setup(PostHogConfig(token));
+        } finally {
+          debugPrint = previous;
+        }
+
+        expect(fakePlatformInterface.receivedConfig, isNull);
+        expect(lines, hasLength(1));
+      });
+    }
+
     test('Windows and Linux support is enabled by default', () {
       expect(PostHogConfig('test_project_token').enableWindowsAndLinux, isTrue);
     });
@@ -493,12 +509,19 @@ void main() {
     await Posthog().getFeatureFlag('b', sendFeatureFlagEvent: false);
     await Posthog().isFeatureEnabled('c');
     await Posthog().isFeatureEnabled('d', sendFeatureFlagEvent: true);
+    await Posthog().isFeatureEnabled('e', defaultValue: true);
 
     expect(fake.flagReadCalls, [
       {'method': 'getFeatureFlag', 'key': 'a', 'sendFeatureFlagEvent': null},
       {'method': 'getFeatureFlag', 'key': 'b', 'sendFeatureFlagEvent': false},
       {'method': 'isFeatureEnabled', 'key': 'c', 'sendFeatureFlagEvent': null},
       {'method': 'isFeatureEnabled', 'key': 'd', 'sendFeatureFlagEvent': true},
+      {
+        'method': 'isFeatureEnabled',
+        'key': 'e',
+        'sendFeatureFlagEvent': null,
+        'defaultValue': true,
+      },
     ]);
   });
 
