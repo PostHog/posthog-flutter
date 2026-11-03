@@ -232,6 +232,14 @@ void main() {
       expect(config.toMap()['evaluationContexts'], ['mobile', 'prod']);
     });
 
+    test('toMap forwards featureFlagRequestMaxRetries', () {
+      final config = PostHogConfig('test_project_token');
+      expect(config.toMap()['featureFlagRequestMaxRetries'], 1);
+
+      config.featureFlagRequestMaxRetries = 0;
+      expect(config.toMap()['featureFlagRequestMaxRetries'], 0);
+    });
+
     test('trims whitespace-sensitive config values in config and toMap', () {
       final config = PostHogConfig(' \n test_project_token\t ');
       config.host = ' \nhttps://eu.i.posthog.com/\t ';

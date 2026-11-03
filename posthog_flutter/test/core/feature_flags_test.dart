@@ -514,6 +514,18 @@ void main() {
       expect(server.flagsRequests, hasLength(2));
     });
 
+    for (final (retries, requests) in [(0, 1), (3, 4), (-1, 1)]) {
+      test('featureFlagRequestMaxRetries $retries sends $requests requests',
+          () async {
+        final client = testClient(server,
+            config: testConfig()..featureFlagRequestMaxRetries = retries);
+        server.respond = (_) => const PostHogResponse(HttpStatus.badGateway);
+
+        await client.reloadFeatureFlagsAsync();
+        expect(server.flagsRequests, hasLength(requests));
+      });
+    }
+
     test('time out after ten seconds, and once more after the retry', () {
       final api = InProcessPostHogApi()
         ..respond = (_) => Completer<PostHogResponse>().future;

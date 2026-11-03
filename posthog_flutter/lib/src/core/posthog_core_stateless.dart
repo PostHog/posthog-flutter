@@ -76,7 +76,7 @@ abstract class PostHogCoreStateless {
   // a network error or a gateway timeout.
   static const _fetchRetryCount = 3;
   static const _fetchRetryDelay = Duration(seconds: 3);
-  static const _flagsRetryCount = 1;
+  final int _flagsRetryCount;
   static const _flagsRetryDelay = Duration(milliseconds: 300);
 
   /// The latest consent decision made through this client. It wins over the
@@ -114,6 +114,9 @@ abstract class PostHogCoreStateless {
         _maxQueueSize = config.maxQueueSize < 1 ? 1 : config.maxQueueSize,
         _flushInterval = config.flushInterval,
         _compression = config.compression,
+        _flagsRetryCount = config.featureFlagRequestMaxRetries < 0
+            ? 0
+            : config.featureFlagRequestMaxRetries,
         _defaultOptIn = !config.optOut {
     logger = CoreLogger(_logMsgIfDebug);
     events = SimpleEventEmitter(
