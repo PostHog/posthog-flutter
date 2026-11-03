@@ -510,12 +510,14 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _guard('setAppLanguage', (client) => client.appLanguage = language);
 
   @override
-  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
+  Future<bool> isFeatureEnabled(String key,
+          {bool? sendFeatureFlagEvent, bool? defaultValue}) =>
       _guardWith(
           'isFeatureEnabled',
-          false,
+          defaultValue ?? false,
           (client) =>
               client.isFeatureEnabled(key, sendEvent: sendFeatureFlagEvent) ??
+              defaultValue ??
               false);
 
   @override

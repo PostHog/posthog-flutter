@@ -912,6 +912,15 @@
                                 "name": "sendFeatureFlagEvent",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "bool?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "defaultValue",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool?"
                             }
                         ],
                         "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
@@ -2106,6 +2115,15 @@
                                 "isNamed": true,
                                 "isRequired": false,
                                 "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
+                                "typeName": "bool?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "defaultValue",
                                 "relativePath": "lib/src/posthog_flutter_platform_interface.dart",
                                 "typeName": "bool?"
                             }
@@ -4940,6 +4958,15 @@
                                 "isNamed": true,
                                 "isRequired": false,
                                 "name": "sendFeatureFlagEvent",
+                                "relativePath": "lib/src/posthog.dart",
+                                "typeName": "bool?"
+                            },
+                            {
+                                "isDeprecated": false,
+                                "isExperimental": false,
+                                "isNamed": true,
+                                "isRequired": false,
+                                "name": "defaultValue",
                                 "relativePath": "lib/src/posthog.dart",
                                 "typeName": "bool?"
                             }

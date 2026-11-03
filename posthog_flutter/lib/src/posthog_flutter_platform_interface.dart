@@ -191,7 +191,8 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
   /// nothing by default, because [PosthogObserver] calls it during navigation.
   Future<void> setAppLanguage(String? language) async {}
 
-  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) {
+  Future<bool> isFeatureEnabled(String key,
+      {bool? sendFeatureFlagEvent, bool? defaultValue}) {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');
   }
 
