@@ -2,6 +2,7 @@
 // of your plugin as a separate package, instead of inlining it in the same
 // package as the core of your plugin.
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -11,6 +12,7 @@ import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
+import 'src/feature_flags_listeners.dart';
 import 'src/feature_flags_loaded.dart';
 import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
@@ -35,6 +37,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Copied at setup. Event beforeSend runs here, before posthog-js, the same
   /// way [PosthogFlutterIO] runs it before the platform channel.
   List<BeforeSendCallback> _beforeSendCallbacks = [];
+  JSFunction? _featureFlagsUnsubscribe;
+
+  /// Bumped by each setup() and close(), so a posthog-js registration from an
+  /// earlier one stops delivering even when it can't be unsubscribed.
+  int _featureFlagsGeneration = 0;
 
   // posthog-js has no current screen, so the feature events get it from here
   // the way native SDKs stamp it: the last screen beforeSend accepted, under
@@ -67,8 +74,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object?>? options,
   ) {
     if (cleanEventOptions(options) == null) return;
-    printIfDebug('[PostHog] $method options are not supported on web and '
-        'were dropped.');
+    printIfDebug(
+      '[PostHog] $method options are not supported on web and '
+      'were dropped.',
+    );
   }
 
   static void registerWith(Registrar registrar) {
@@ -140,19 +149,34 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     WebCanvasMaskProvider(config).register();
 
-    if (config.onFeatureFlags != null && ph != null) {
-      final dartCallback = config.onFeatureFlags!;
+    // Skipped for a posthog-js stub without onFeatureFlags.
+    if (ph != null && (ph as JSObject).has('onFeatureFlags')) {
+      // Repeated setup would otherwise deliver each load twice.
+      _featureFlagsUnsubscribe?.callAsFunction();
+      _featureFlagsUnsubscribe = null;
+      final generation = ++_featureFlagsGeneration;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        dartCallback(featureFlagsLoadedFromMap({
+        // The posthog-js loader snippet queues the registration and returns
+        // no unsubscribe, so a later setup() or close() can't remove it.
+        if (generation != _featureFlagsGeneration) return;
+        final loaded = featureFlagsLoadedFromMap({
           'variants': jsFlagVariants.dartify(),
           'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
-        }));
+        });
+        FeatureFlagsListeners.instance.deliver(loaded);
       }.toJS;
 
-      ph.onFeatureFlags(jsCallback);
+      // posthog-js replays loaded flags synchronously, and a callback may call
+      // close() or setup() before this returns the unsubscribe.
+      final unsubscribe = ph.onFeatureFlags(jsCallback);
+      if (generation == _featureFlagsGeneration) {
+        _featureFlagsUnsubscribe = unsubscribe;
+      } else {
+        unsubscribe?.callAsFunction();
+      }
     }
   }
 
@@ -262,8 +286,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userPropertiesSetOnce,
     Map<String, Object?>? options,
   }) async {
-    printIfDebug('[PostHog] captureAi is not supported on web. '
-        'The event "$eventName" was not sent.');
+    printIfDebug(
+      '[PostHog] captureAi is not supported on web. '
+      'The event "$eventName" was not sent.',
+    );
     return null;
   }
 
@@ -274,8 +300,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object?>? options,
     String eventName,
   ) {
-    final optionProperties =
-        eventOptionsToLegacyProperties(options, method: eventName);
+    final optionProperties = eventOptionsToLegacyProperties(
+      options,
+      method: eventName,
+    );
     if (optionProperties.isEmpty) return properties;
     return {...?properties, ...optionProperties};
   }
@@ -400,7 +428,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
           )
         : null;
     final captured = featureEvent(
-        event, flag, flagVariant ?? result?.variant ?? result?.enabled);
+      event,
+      flag,
+      flagVariant ?? result?.variant ?? result?.enabled,
+    );
     if (captured == null) return;
     await capture(
       eventName: event,
@@ -451,8 +482,11 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<bool> isFeatureEnabled(String key,
-      {bool? sendFeatureFlagEvent, bool? defaultValue}) async {
+  Future<bool> isFeatureEnabled(
+    String key, {
+    bool? sendFeatureFlagEvent,
+    bool? defaultValue,
+  }) async {
     final result = await handleWebMethodCall(
       MethodCall('isFeatureEnabled', {
         'key': key,
@@ -466,7 +500,8 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
     return featureFlagsLoadedFromMap(
-        await handleWebMethodCall(const MethodCall('reloadFeatureFlags')));
+      await handleWebMethodCall(const MethodCall('reloadFeatureFlags')),
+    );
   }
 
   @override
@@ -531,10 +566,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String key,
     bool? sendFeatureFlagEvent,
   }) async {
-    return handleWebMethodCall(MethodCall('getFeatureFlag', {
-      'key': key,
-      if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
-    }));
+    return handleWebMethodCall(
+      MethodCall('getFeatureFlag', {
+        'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      }),
+    );
   }
 
   @override
@@ -555,8 +592,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() async {
-    final results =
-        await handleWebMethodCall(const MethodCall('getAllFeatureFlags'));
+    final results = await handleWebMethodCall(
+      const MethodCall('getAllFeatureFlags'),
+    );
     if (results is! List) return null;
     return results
         .map((result) => featureFlagResultFromMap(result, ''))
@@ -572,6 +610,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<void> close() async {
     _currentScreen = null;
+    _featureFlagsUnsubscribe?.callAsFunction();
+    _featureFlagsUnsubscribe = null;
+    _featureFlagsGeneration++;
     return handleWebMethodCall(const MethodCall('close'));
   }
 

@@ -18,7 +18,7 @@
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x
-- **Breaking:** pass a `PostHogFeatureFlagsLoaded` with the enabled flags, their values and whether loading failed to `PostHogConfig.onFeatureFlags` — update callbacks from `() { ... }` to `(loaded) { ... }` or `(_) { ... }`
+- **Breaking:** remove `PostHogConfig.onFeatureFlags` — call `Posthog().onFeatureFlags((loaded) { ... })` before `setup()` instead, which also covers the first load
 - **Breaking:** return the reloaded flags from `reloadFeatureFlags()` as a `Future<PostHogFeatureFlagsLoaded>`
 - **Breaking:** return `null` instead of the raw string for a malformed, empty or whitespace-only `getFeatureFlagResult()` payload on iOS, macOS and Android
 - **Breaking:** keep string payloads passed to `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, as strings on iOS and macOS instead of decoding them to numbers or booleans
@@ -32,6 +32,8 @@
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
+- Add `Posthog().onFeatureFlags()` to get notified after every feature flags load, returning a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`
+- Skip SDK calls with a warning instead of throwing when they run before the Flutter binding is initialized on iOS, macOS and Android
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`
 - Apply a `$process_person_profile` property or `process_person_profile` option passed with an event to that event on Windows and Linux
 - Skip `setup()` with one log line when `projectToken` is a personal API key (`phx_`), so the key is never sent
