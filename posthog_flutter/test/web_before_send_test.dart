@@ -13,6 +13,7 @@ void main() {
 
   final captures = <Map<String, Object?>>[];
   late String distinctId;
+  late bool optedOut;
 
   setUp(() {
     captures.clear();
@@ -29,6 +30,9 @@ void main() {
     );
     distinctId = 'first-user';
     fake.setProperty('get_distinct_id'.toJS, (() => distinctId.toJS).toJS);
+    optedOut = false;
+    fake.setProperty(
+        'has_opted_out_capturing'.toJS, (() => optedOut.toJS).toJS);
     fake.setProperty(
       'captureException'.toJS,
       ((JSAny? error, JSAny? properties) {
@@ -64,6 +68,36 @@ void main() {
         final properties = captures.single['properties'] as Map;
         expect(properties['distinct_id'], 'first-user');
       });
+    });
+
+    test('does not bring back the user who opted out', () async {
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) {
+          optedOut = true;
+          distinctId = r'$posthog_cookieless';
+          return event;
+        },
+      ]));
+
+      await web.capture(eventName: 'checkout');
+
+      expect(captures.single['properties'], isNot(contains('distinct_id')));
+    });
+
+    test('does not send the cookieless id after opting in', () async {
+      distinctId = r'$posthog_cookieless';
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [
+        (event) {
+          distinctId = 'next-user';
+          return event;
+        },
+      ]));
+
+      await web.capture(eventName: 'checkout');
+
+      expect(captures.single['properties'], isNot(contains('distinct_id')));
     });
 
     test('leaves the user alone when the hook does not change it', () async {

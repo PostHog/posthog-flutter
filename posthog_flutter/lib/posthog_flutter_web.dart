@@ -62,10 +62,14 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     );
     // posthog-js builds the event only after the callbacks, so one calling
     // reset() or identify() would otherwise move the event to the new user.
-    // Event properties win over the stored distinct id.
+    // Event properties win over the stored distinct id. A callback changing
+    // consent under cookieless_mode swaps the id on purpose: neither the user
+    // who opted out nor the shared cookieless id may come back.
     if (processed != null &&
         distinctId != null &&
-        distinctId != currentWebDistinctId()) {
+        distinctId != r'$posthog_cookieless' &&
+        distinctId != currentWebDistinctId() &&
+        !(posthog?.has_opted_out_capturing() ?? true)) {
       processed.properties = {
         'distinct_id': distinctId,
         ...?processed.properties,
