@@ -447,6 +447,10 @@ class PostHogConfig {
   ///   sent.
   /// - A callback that captures an event must not do so for that event too, or
   ///   it never finishes.
+  /// - On web, an event whose callback calls `reset()` stays on its user but
+  ///   joins the next user's session and person processing, and its user
+  ///   properties are dropped, because posthog-js builds the event after the
+  ///   callbacks.
   /// - If a callback throws, the event is dropped and later callbacks are not
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
