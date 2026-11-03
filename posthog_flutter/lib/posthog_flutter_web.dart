@@ -169,8 +169,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         });
         // First, so a throwing config callback can't starve listeners and a
         // reset() or close() it starts clears this load.
-        FeatureFlagsListeners.instance.deliver(loaded);
-        dartCallback?.call(loaded);
+        if (FeatureFlagsListeners.instance.deliver(loaded)) {
+          dartCallback?.call(loaded);
+        }
       }.toJS;
 
       // posthog-js replays loaded flags synchronously, and a callback may call

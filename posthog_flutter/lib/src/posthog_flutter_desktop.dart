@@ -182,8 +182,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       final loaded = client.featureFlagsLoaded();
       // First, so a throwing config callback can't starve listeners and a
       // reset() or close() it starts clears this load.
-      FeatureFlagsListeners.instance.deliver(loaded);
-      _config?.onFeatureFlags?.call(loaded);
+      if (FeatureFlagsListeners.instance.deliver(loaded)) {
+        _config?.onFeatureFlags?.call(loaded);
+      }
     });
 
     final stepsConfig = config.errorTrackingConfig.exceptionSteps;

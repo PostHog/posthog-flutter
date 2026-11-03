@@ -135,8 +135,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         final loaded = featureFlagsLoadedFromMap(call.arguments);
         // First, so a throwing config callback can't starve listeners and a
         // reset() or close() it starts clears this load.
-        FeatureFlagsListeners.instance.deliver(loaded);
-        _onFeatureFlagsCallback?.call(loaded);
+        if (FeatureFlagsListeners.instance.deliver(loaded)) {
+          _onFeatureFlagsCallback?.call(loaded);
+        }
         break;
       case 'pushIdentityProvider':
         // Returning a value here is the reply the native SDK awaits.
