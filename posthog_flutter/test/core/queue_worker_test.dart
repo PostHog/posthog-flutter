@@ -7,7 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/logger.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
+import 'package:posthog_flutter/src/core/posthog_core.dart';
 import 'package:posthog_flutter/src/core/queue_worker.dart';
+import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 
 import '../posthog_api_fake.dart';
 
@@ -718,6 +720,50 @@ void main() {
 
       expect((server.flagsRequests.last.body['person_properties'] ?? {}) as Map,
           isNot(contains('email')));
+    });
+
+    group('an event captured while an AI event with \$set is measured', () {
+      late LocalPostHogServer server;
+      late FileStorage storage;
+      late DesktopPostHog client;
+
+      setUp(() async {
+        server = await LocalPostHogServer.start();
+        storage = FileStorage(dir.path, worker: worker);
+        client = testClient(server, storage: storage);
+      });
+
+      PostHogPreparedEvent aiEvent() =>
+          client.prepareEvent(r'$ai_generation', properties: {
+            r'$set': {'plan': 'pro'},
+          })!;
+
+      Future<Map<String, Object?>> sentOptions(String event) async {
+        await client.flush();
+        await client.settled;
+        final sent =
+            server.events.singleWhere((sent) => sent['event'] == event);
+        return Map<String, Object?>.from((sent['options'] ?? const {}) as Map);
+      }
+
+      test('is person-processed', () async {
+        final uuid = client.captureAiPrepared(r'$ai_generation', aiEvent());
+        client.capture('next');
+        expect(await uuid, isNotNull);
+
+        expect(await sentOptions('next'),
+            isNot(contains('process_person_profile')));
+      });
+
+      test('is personless again after reset', () async {
+        final uuid = client.captureAiPrepared(r'$ai_generation', aiEvent());
+        client.reset();
+        client.capture('next');
+        expect(await uuid, isNotNull);
+
+        expect(await sentOptions('next'),
+            containsPair('process_person_profile', false));
+      });
     });
   });
 }

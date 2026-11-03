@@ -62,6 +62,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
   var _personPropertiesResetAt = 0;
   final _personPropertySetAt = <String, int>{};
 
+  /// AI events with person properties the worker is still measuring. Events
+  /// captured meanwhile are person-processed, as they would be after a
+  /// [capture] with the same properties, even if the size limit then drops
+  /// the AI event.
+  var _aiEventsRequestingPerson = 0;
+
   Map<String, PostHogFeatureFlagValue> _bootstrappedFlags = const {};
   Map<String, Object?> _bootstrappedPayloads = const {};
 
@@ -101,6 +107,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   void reset() {
     wrap(() {
       _resetGeneration++;
+      _aiEventsRequestingPerson = 0;
       _sessionProps.clear();
       _flagCallReported.clear();
       _cachedPersonProperties = null;
@@ -488,13 +495,19 @@ abstract class PostHogCore extends PostHogCoreStateless {
       final (:properties, :options, :timestamp) = prepared;
       final generation = _resetGeneration;
       final capturedAt = ++_personPropertyClock;
-      return captureAiStateless(getDistinctId(), event,
-              properties: properties, options: options, timestamp: timestamp)
-          .then((uuid) {
+      final queued = captureAiStateless(getDistinctId(), event,
+          properties: properties, options: options, timestamp: timestamp);
+      final requestsPerson = _requestsPersonProcessing(properties);
+      if (requestsPerson) _aiEventsRequestingPerson++;
+      return queued.then((uuid) {
         if (uuid != null && generation == _resetGeneration) {
           _applyPersonProperties(properties, capturedAt: capturedAt);
         }
         return uuid;
+      }).whenComplete(() {
+        if (requestsPerson && generation == _resetGeneration) {
+          _aiEventsRequestingPerson--;
+        }
       });
     });
     return queued ?? SynchronousFuture(null);
@@ -1149,6 +1162,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   bool _hasPersonProcessing() {
     if (_personProfiles == PostHogPersonProfiles.always) return true;
     if (_personProfiles == PostHogPersonProfiles.never) return false;
+    if (_aiEventsRequestingPerson > 0) return true;
 
     final isIdentified = _isIdentified();
     final hasGroups = _getGroups().isNotEmpty;

@@ -75,6 +75,14 @@ class Posthog {
       );
       return Future<void>.value();
     }
+    // Capture rejects a personal API key, so it is never sent.
+    if (config.projectToken.startsWith('phx_')) {
+      debugPrint(
+        '[PostHog] projectToken is a personal API key (phx_), not a project '
+        'token. Setup skipped.',
+      );
+      return Future<void>.value();
+    }
 
     if (!config.enableWindowsAndLinux &&
         !kIsWeb &&

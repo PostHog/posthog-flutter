@@ -239,6 +239,10 @@ On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`,
 
 A path that needs user action, such as a VPN waiting for a password, counts as reachable, and queues pause while cellular data is off for the app. Events captured in the first 100 ms after setup may leave out `$network_wifi` and `$network_cellular`. Events still on disk from a `posthog-ios` 2.x SDK are deleted instead of sent.
 
+### Personal API keys
+
+A personal API key (`phx_...`) in `projectToken` now skips `setup()` with one log line, so the SDK doesn't start and the key is never sent. Use your project token (`phc_...`).
+
 ### Windows and Linux
 
 - **Property order:** an event's properties are the SDK's, then registered properties, then the event's own, so your value now wins for that event. `beforeSend` runs after that merge, except that `$lib` and `$lib_version` always come from the `PostHog-Sdk-Info` header.
