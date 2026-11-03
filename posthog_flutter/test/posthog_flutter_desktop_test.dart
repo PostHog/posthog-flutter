@@ -1324,6 +1324,30 @@ void main() {
       expect(stepMessagesOf(event), ['custom']);
     });
 
+    test('are visible to beforeSend, which can remove them', () async {
+      final server = await LocalPostHogServer.start();
+      final seen = <Object?>[];
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen.add(event.properties?.remove(r'$exception_steps'));
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.addExceptionStep('recorded');
+      await platform.captureException(error: StateError('removed steps'));
+
+      final event = await server.waitForEvent(r'$exception');
+      expect(seen, [
+        [
+          {r'$message': 'recorded', r'$timestamp': isA<String>()},
+        ],
+      ]);
+      expect(stepMessagesOf(event), isNull);
+    });
+
     test('are not attached while disabled', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
