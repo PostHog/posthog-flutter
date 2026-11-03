@@ -692,6 +692,138 @@ void main() {
       });
     });
   });
+
+  group('PostHogCore while the worker holds its reply', () {
+    late LocalPostHogServer server;
+    late GatedWorker gated;
+
+    setUp(() async {
+      server = await LocalPostHogServer.start();
+      gated = GatedWorker();
+    });
+
+    DesktopPostHog client({int maxQueueSize = 1000, int? aiMaxEventBytes}) =>
+        testClient(server,
+            config: testConfig(
+                maxQueueSize: maxQueueSize, flushInterval: Duration.zero)
+              ..captureAiMaxEventBytes = aiMaxEventBytes,
+            storage: FileStorage(dir.path, worker: gated));
+
+    test('an event captured while a batch is encoded goes out with that flush',
+        () async {
+      final posthog = client();
+      posthog.capture('a');
+      gated.encodeGate = Completer();
+      final flush = posthog.flush();
+      await pumpEventQueue();
+
+      posthog.capture('b');
+      gated.encodeGate!.complete();
+      await flush;
+
+      expect(server.batchRequests, hasLength(2));
+      expect(server.eventNames, ['a', 'b']);
+    });
+
+    test('an event evicted while its batch is encoded is sent once', () async {
+      final posthog = client(maxQueueSize: 1);
+      posthog.capture('a');
+      gated.encodeGate = Completer();
+      final flush = posthog.flush();
+      await pumpEventQueue();
+
+      posthog.capture('b');
+      gated.encodeGate!.complete();
+      await flush;
+      await posthog.settled;
+
+      expect(server.eventNames, ['a', 'b']);
+      expect(Directory(pathOf('posthog_queue')).listSync().whereType<File>(),
+          isEmpty);
+    });
+
+    test('an event evicted while its batch is read is not sent', () async {
+      final posthog = client(maxQueueSize: 1);
+      posthog.capture('a');
+      gated.readGate = Completer();
+      final flush = posthog.flush();
+      await pumpEventQueue();
+
+      posthog.capture('b');
+      gated.readGate!.complete();
+      await flush;
+
+      expect(server.eventNames, ['b']);
+    });
+
+    test('an event captured before reset keeps its distinct id', () async {
+      final posthog = client();
+      final distinctId = posthog.getDistinctId();
+      gated.writeGate = Completer();
+      posthog.capture('a');
+
+      posthog.reset();
+      gated.writeGate!.complete();
+      await posthog.flush();
+
+      expect(server.events.single['distinct_id'], distinctId);
+    });
+
+    test('close while a batch is encoded leaves it for the next client',
+        () async {
+      final posthog = client();
+      posthog.capture('a');
+      gated.encodeGate = Completer();
+      final flush = posthog.flush();
+      await pumpEventQueue();
+
+      posthog.close();
+      gated.encodeGate!.complete();
+      await flush.catchError((Object _) {});
+      await posthog.settled;
+      expect(server.batchRequests, isEmpty);
+
+      await client().flush();
+      expect(server.eventNames, ['a']);
+    });
+
+    test('an AI event measured after close is sent by the next client',
+        () async {
+      final posthog = client();
+      gated.writeGate = Completer();
+      final uuid = posthog.captureAiPrepared(
+          r'$ai_span', posthog.prepareEvent(r'$ai_span')!);
+
+      posthog.close();
+      gated.writeGate!.complete();
+      expect(await uuid, isNotNull);
+      await posthog.settled;
+      await client().flush();
+      expect(
+          [for (final event in server.aiEvents) event['event']], [r'$ai_span']);
+    });
+
+    test('a flush sends the AI events kept, not one dropped for its size',
+        () async {
+      final posthog = client(aiMaxEventBytes: 1000);
+      gated.writeGate = Completer();
+      final dropped = posthog.captureAiPrepared(
+          r'$ai_span',
+          posthog
+              .prepareEvent(r'$ai_span', properties: {'input': 'x' * 2000})!);
+      final kept = posthog.captureAiPrepared(
+          r'$ai_trace', posthog.prepareEvent(r'$ai_trace')!);
+      final flush = posthog.flush();
+
+      gated.writeGate!.complete();
+      await flush;
+
+      expect(await dropped, isNull);
+      expect(await kept, isNotNull);
+      expect([for (final event in server.aiEvents) event['event']],
+          [r'$ai_trace']);
+    });
+  });
 }
 
 class _FailingFirstWrite extends GatedWorker {
