@@ -91,4 +91,14 @@ void main() {
 
     expect(received, isEmpty);
   });
+
+  test('stops delivering a load cleared by an earlier listener', () {
+    subscriptions.add(listeners.add((_) => listeners.clear()));
+    final received = <PostHogFeatureFlagsLoaded>[];
+    listen(received);
+
+    listeners.deliver(loaded('a'));
+
+    expect(received, isEmpty);
+  });
 }

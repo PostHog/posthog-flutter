@@ -40,7 +40,10 @@ class FeatureFlagsListeners {
 
   void deliver(PostHogFeatureFlagsLoaded loaded) {
     _last = loaded;
+    final generation = _generation;
     for (final entry in _listeners.entries.toList()) {
+      // A listener's reset() or close() cleared this load.
+      if (generation != _generation) return;
       // An earlier listener may have unsubscribed this one.
       if (_listeners.containsKey(entry.key)) _notify(entry.value, loaded);
     }
