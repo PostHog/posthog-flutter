@@ -38,6 +38,7 @@
 - Log one line per batch that lost events on Windows and Linux, with the endpoint, count and reasons, also for a terminal status, and count a `limited` result as delivered
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
 - Run queued event encoding, file work and request compression on a background isolate on Windows and Linux so they no longer drop frames
+- Limit AI events waiting to be written on Windows and Linux to about 50 MiB in memory, dropping the oldest first and completing `captureAi` with `null` for them
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
 - Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value
