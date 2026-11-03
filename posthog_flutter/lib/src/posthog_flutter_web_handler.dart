@@ -67,6 +67,8 @@ extension PostHogExtension on PostHog {
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
+  // ignore: non_constant_identifier_names
+  external JSAny? get_property(JSAny name);
   external JSFunction onFeatureFlags(JSFunction callback);
   external void startSessionRecording();
   external void stopSessionRecording();
@@ -299,6 +301,10 @@ Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
 /// The user posthog-js would send an event as right now.
 String? currentWebDistinctId() =>
     posthog?.get_distinct_id()?.dartify() as String?;
+
+/// Whether posthog-js's current user is identified.
+bool currentWebUserIdentified() =>
+    posthog?.get_property(r'$user_state'.toJS)?.dartify() == 'identified';
 
 /// posthog-js capture options carrying `$set` and `$set_once`.
 /// See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts

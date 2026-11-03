@@ -50,6 +50,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }) {
     final distinctId =
         _beforeSendCallbacks.isEmpty ? null : currentWebDistinctId();
+    final wasIdentified = distinctId != null && currentWebUserIdentified();
     final processed = applyBeforeSend(
       _beforeSendCallbacks,
       PostHogEvent(
@@ -60,15 +61,28 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         options: options == null ? null : {...options},
       ),
     );
+    if (processed == null ||
+        distinctId == null ||
+        distinctId == currentWebDistinctId()) {
+      return processed;
+    }
+    // posthog-js stores an event's `$set` as the current user's person
+    // properties for flags, so after a reset() they would reach the next user.
+    // identify() of an anonymous user links the two, so they stay.
+    if (wasIdentified || !currentWebUserIdentified()) {
+      processed
+        ..userProperties = null
+        ..userPropertiesSetOnce = null
+        ..properties = {...?processed.properties}
+        ..properties!.remove(r'$set')
+        ..properties!.remove(r'$set_once');
+    }
     // posthog-js builds the event only after the callbacks, so one calling
     // reset() or identify() would otherwise move the event to the new user.
     // Event properties win over the stored distinct id. A callback changing
     // consent under cookieless_mode swaps the id on purpose: neither the user
     // who opted out nor the shared cookieless id may come back.
-    if (processed != null &&
-        distinctId != null &&
-        distinctId != r'$posthog_cookieless' &&
-        distinctId != currentWebDistinctId() &&
+    if (distinctId != r'$posthog_cookieless' &&
         !(posthog?.has_opted_out_capturing() ?? true)) {
       processed.properties = {
         'distinct_id': distinctId,

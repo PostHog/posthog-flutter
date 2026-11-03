@@ -14,6 +14,7 @@ void main() {
   final captures = <Map<String, Object?>>[];
   late String distinctId;
   late bool optedOut;
+  late String userState;
 
   setUp(() {
     captures.clear();
@@ -31,6 +32,12 @@ void main() {
     distinctId = 'first-user';
     fake.setProperty('get_distinct_id'.toJS, (() => distinctId.toJS).toJS);
     optedOut = false;
+    userState = 'anonymous';
+    fake.setProperty(
+      'get_property'.toJS,
+      ((JSString name) => name.toDart == r'$user_state' ? userState.toJS : null)
+          .toJS,
+    );
     fake.setProperty(
         'has_opted_out_capturing'.toJS, (() => optedOut.toJS).toJS);
     fake.setProperty(
@@ -107,6 +114,73 @@ void main() {
       await web.capture(eventName: 'checkout');
 
       expect(captures.single['properties'], isNot(contains('distinct_id')));
+    });
+  });
+
+  group('a hook that changes the user drops user properties', () {
+    final sends = <String, Future<void> Function(PosthogFlutterWeb)>{
+      'capture': (web) => web.capture(
+            eventName: 'checkout',
+            userProperties: {'email': 'a@example.com'},
+            userPropertiesSetOnce: {'first': 'yes'},
+          ),
+      'screen': (web) => web.screen(screenName: 'Cart'),
+      'captureException': (web) =>
+          web.captureException(error: StateError('boom')),
+    };
+
+    PostHogConfig hooked(void Function() changeUser) =>
+        PostHogConfig('test_token', beforeSend: [
+          (event) {
+            changeUser();
+            return event
+              ..userProperties = {'email': 'a@example.com'}
+              ..userPropertiesSetOnce = {'first': 'yes'};
+          },
+        ]);
+
+    Map<Object?, Object?> sentPersonProperties() {
+      final capture = captures.single;
+      final options = capture['options'] as Map? ?? const {};
+      final properties = capture['properties'] as Map? ?? const {};
+      return {
+        for (final key in [r'$set', r'$set_once'])
+          if (options[key] != null) key: options[key],
+        for (final key in [r'$set', r'$set_once'])
+          if (properties[key] != null) key: properties[key],
+      };
+    }
+
+    sends.forEach((name, send) {
+      test('on $name after reset() of an identified user', () async {
+        userState = 'identified';
+        final web = PosthogFlutterWeb();
+        await web.setup(hooked(() {
+          distinctId = 'next-user';
+          userState = 'anonymous';
+        }));
+
+        await send(web);
+
+        expect(sentPersonProperties(), isEmpty);
+        expect((captures.single['properties'] as Map)['distinct_id'],
+            'first-user');
+      });
+
+      test('on $name not after identify() of an anonymous user', () async {
+        final web = PosthogFlutterWeb();
+        await web.setup(hooked(() {
+          distinctId = 'user-1';
+          userState = 'identified';
+        }));
+
+        await send(web);
+
+        expect(sentPersonProperties(), {
+          r'$set': {'email': 'a@example.com'},
+          r'$set_once': {'first': 'yes'},
+        });
+      });
     });
   });
 
