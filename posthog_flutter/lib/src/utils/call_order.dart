@@ -35,8 +35,7 @@ class CallOrder {
 
   /// Runs [hook] once every earlier call has been handed over, so it sees
   /// the state the app left before capturing, then hands its result to
-  /// [send]. Later calls wait for [send] to finish, so it may itself capture
-  /// (a beforeSend that renames a `$screen` does).
+  /// [send]. Later calls wait for [send] to finish.
   Future<void> event<E>(
     FutureOr<E> Function() hook,
     Future<void> Function(E event) send,
@@ -62,8 +61,8 @@ class CallOrder {
     Future<void> Function(E event) send,
   ) async {
     final timer = Timer(maxWait, () {
-      printIfDebug('[PostHog] beforeSend took longer than '
-          '${maxWait.inSeconds}s; later calls no longer wait for it.');
+      printIfDebug('[PostHog] An event took longer than '
+          '${maxWait.inSeconds}s to hand over; later calls no longer wait for it.');
       turn.ahead.then((_) => turn.end());
     });
     try {

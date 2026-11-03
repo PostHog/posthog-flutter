@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import 'core/file_storage.dart';
+import 'core/posthog_core.dart' show PostHogPreparedEvent;
 import 'core/utils/utils.dart';
 import 'error_tracking/dart_exception_processor.dart';
 import 'feature_flag_result.dart';
@@ -100,18 +101,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return client;
   }
 
-  DesktopPostHog? _clientForContinuation(
-    String op,
-    _ClientScope scope,
-    String distinctId,
-  ) {
+  DesktopPostHog? _clientForContinuation(String op, _ClientScope scope) {
     final client = _clientFor(op);
     if (client == null) return null;
-    if (_clientScope != scope ||
-        client.optedOut ||
-        client.getDistinctId() != distinctId) {
-      printIfDebug('[PostHog] $op dropped: the project, the user or the '
-          'consent changed while beforeSend was running.');
+    if (_clientScope != scope || client.optedOut) {
+      printIfDebug('[PostHog] $op dropped: the project or the consent changed '
+          'while beforeSend was running.');
       return null;
     }
     return client;
@@ -277,8 +272,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (!_hasName(eventName)) return;
         final scope = _clientScope;
         if (scope == null) return;
-        final distinctId = client.getDistinctId();
-        final exceptionSteps = _exceptionSteps;
 
         final prepared = _prepare(
           client,
@@ -295,9 +288,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current = _clientForContinuation('capture', scope, distinctId);
+        final current = _clientForContinuation('capture', scope);
         if (current == null) return;
-        await _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, prepared);
       });
 
   @override
@@ -318,8 +311,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (!_hasName(eventName)) return null;
         final scope = _clientScope;
         if (scope == null) return null;
-        final distinctId = client.getDistinctId();
-        final exceptionSteps = _exceptionSteps;
 
         final prepared = _prepare(
           client,
@@ -336,10 +327,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return null;
         }
 
-        final current = _clientForContinuation('captureAi', scope, distinctId);
+        final current = _clientForContinuation('captureAi', scope);
         if (current == null) return null;
-        return _captureProcessed(current, processed, exceptionSteps, prepared,
-            ai: true);
+        return _captureProcessed(current, processed, prepared, ai: true);
       });
 
   @override
@@ -354,8 +344,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (client.optedOut) return;
         final scope = _clientScope;
         if (scope == null) return;
-        final distinctId = client.getDistinctId();
-        final exceptionSteps = _exceptionSteps;
 
         final prepared = _prepare(
           client,
@@ -367,6 +355,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           options: options,
         );
         if (prepared == null) return;
+        final sessionId = client.getSessionId();
         final processed = _runBeforeSend(prepared.event);
         if (processed == null) {
           printIfDebug(
@@ -374,12 +363,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current = _clientForContinuation('screen', scope, distinctId);
+        final current = _clientForContinuation('screen', scope);
         if (current == null) return;
 
         // A renamed event is no longer a screen view.
         if (processed.event != PostHogEventName.screen) {
-          await _captureProcessed(current, processed, exceptionSteps, prepared);
+          await _captureProcessed(current, processed, prepared);
           return;
         }
 
@@ -390,12 +379,13 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        // Later events that set no `$screen_name` of their own carry this one.
-        if (finalScreenName is String) {
+        // Later events that set no `$screen_name` of their own carry this one,
+        // unless a callback's reset() started a session for the next user.
+        if (finalScreenName is String && current.getSessionId() == sessionId) {
           current.registerForSession(
               {PostHogPropertyName.screenName: finalScreenName});
         }
-        await _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, prepared);
       });
 
   /// Structured logs are not supported on the desktop implementation.
@@ -625,8 +615,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (client.optedOut) return;
         final scope = _clientScope;
         if (scope == null) return;
-        final distinctId = client.getDistinctId();
-        final exceptionSteps = _exceptionSteps;
 
         final exceptionProps = DartExceptionProcessor.processException(
           error: error,
@@ -652,10 +640,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current =
-            _clientForContinuation('captureException', scope, distinctId);
+        final current = _clientForContinuation('captureException', scope);
         if (current == null) return;
-        await _captureProcessed(current, processed, exceptionSteps, prepared);
+        await _captureProcessed(current, processed, prepared);
       });
 
   @override
@@ -757,7 +744,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// [PostHogEvent.userPropertiesSetOnce]. Legacy `$set` and `$set_once`
   /// maps in [properties] stay in [PostHogEvent.properties], so a callback
   /// that removes them there still keeps them off the event.
-  /// The event's time is taken now, before the callbacks run.
+  /// The event's time, uuid and distinct id are taken now, before the
+  /// callbacks run. An `$exception` event gets the exception steps recorded
+  /// up to now, unless it sets its own.
   _PreparedEvent? _prepare(
     DesktopPostHog client,
     String eventName,
@@ -767,10 +756,18 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     Map<String, Object?>? options,
   }) {
     final callerOptions = cleanEventOptions(options);
+    final steps = _exceptionSteps?.steps;
     final prepared = client.prepareEvent(
       eventName,
-      properties:
-          _mergeUserProps(properties, userProperties, userPropertiesSetOnce),
+      properties: _mergeUserProps(
+        eventName == PostHogEventName.exception &&
+                steps != null &&
+                steps.isNotEmpty
+            ? {r'$exception_steps': steps, ...?properties}
+            : properties,
+        userProperties,
+        userPropertiesSetOnce,
+      ),
       options: callerOptions,
     );
     if (prepared == null) return null;
@@ -794,11 +791,11 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         userProperties: _nonNull(userProperties),
         userPropertiesSetOnce: _nonNull(userPropertiesSetOnce),
         options: preparedOptions == null ? null : {...preparedOptions},
+        uuid: prepared.uuid,
+        distinctId: prepared.distinctId,
+        timestamp: DateTime.parse(prepared.timestamp),
       ),
-      timestamp: prepared.timestamp,
-      implicitPersonProcessing:
-          callerOptions?['process_person_profile'] == null,
-      sdkPersonProcessing: preparedOptions?['process_person_profile'],
+      prepared: prepared,
     );
   }
 
@@ -824,40 +821,40 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
 
   /// Queues [event] as the beforeSend callbacks left it, on the AI queue
   /// with [ai], and returns its uuid, or null when it is not queued. The
-  /// client adds nothing to it; an `$exception` event gets the exception
-  /// steps recorded up to now.
+  /// client adds nothing to it. The event keeps the uuid it was prepared
+  /// with; a blank distinct id or a missing timestamp falls back to the
+  /// prepared one.
   FutureOr<String?> _captureProcessed(
     DesktopPostHog client,
     PostHogEvent event,
-    ExceptionStepsBuffer? exceptionSteps,
     _PreparedEvent prepared, {
     bool ai = false,
   }) {
     if (!_hasName(event.event)) return null;
-    final properties = _withExceptionSteps(
-          event.event,
-          exceptionSteps,
-          _mergeUserProps(
-            event.properties,
-            event.userProperties,
-            event.userPropertiesSetOnce,
-          ),
+    final properties = _mergeUserProps(
+          event.properties,
+          event.userProperties,
+          event.userPropertiesSetOnce,
         ) ??
         const {};
     // Options are sent as they are, unknown keys included. An option wins
     // over its legacy property on the event.
-    Map<String, Object?>? options = cleanEventOptions(event.options);
-    // Person properties the callbacks added or removed decide person
-    // processing again, unless a callback changed the SDK's option.
-    if (prepared.implicitPersonProcessing &&
-        options?['process_person_profile'] == prepared.sdkPersonProcessing) {
-      options = client.personProcessingOptions(
-          {...?options}..remove('process_person_profile'), properties);
-    }
+    final options = cleanEventOptions(event.options);
+    final base = prepared.prepared;
+    final distinctId = event.distinctId;
+    final timestamp = event.timestamp;
     final queued = (
       properties: properties,
       options: options,
-      timestamp: prepared.timestamp,
+      timestamp: timestamp == null ||
+              timestamp.isAtSameMomentAs(DateTime.parse(base.timestamp))
+          ? base.timestamp
+          : timestamp.toUtc().toIso8601String(),
+      uuid: base.uuid,
+      distinctId: distinctId == null || distinctId.trim().isEmpty
+          ? base.distinctId
+          : distinctId,
+      requestsPersonProcessing: base.requestsPersonProcessing,
     );
     return ai
         ? client.captureAiPrepared(event.event, queued)
@@ -869,20 +866,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     if (event.isNotEmpty) return true;
     printIfDebug('[PostHog] Event dropped: empty event name');
     return false;
-  }
-
-  /// Uses the originating client's steps even when a same-scope restart
-  /// happened during beforeSend. Explicit event steps take precedence.
-  Map<String, Object?>? _withExceptionSteps(
-    String event,
-    ExceptionStepsBuffer? exceptionSteps,
-    Map<String, Object?>? properties,
-  ) {
-    final steps = exceptionSteps?.steps;
-    if (event != PostHogEventName.exception || steps == null || steps.isEmpty) {
-      return properties;
-    }
-    return {r'$exception_steps': steps, ...?properties};
   }
 
   Map<String, Object?>? _mergeUserProps(
@@ -916,12 +899,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   }
 }
 
-/// An event built for the beforeSend callbacks, with the time it happened,
-/// whether its person processing was left to its properties, and the
-/// `process_person_profile` option the SDK gave it.
+/// An event built for the beforeSend callbacks, and what it was built from.
 typedef _PreparedEvent = ({
   PostHogEvent event,
-  String timestamp,
-  bool implicitPersonProcessing,
-  Object? sdkPersonProcessing,
+  PostHogPreparedEvent prepared,
 });

@@ -415,17 +415,35 @@ class PostHogConfig {
   ///     `config.captureApplicationLifecycleEvents` is enabled
   ///   - Feature flag events (`$feature_flag_called`) when
   ///     `config.sendFeatureFlagEvent` is enabled
-  ///   - Identity events (`$set`) when `identify` is called
+  ///   - Identity events (`$identify`, `$set`, `$create_alias`,
+  ///     `$groupidentify`) from `identify`, `setPersonProperties`, `alias`
+  ///     and `group`
   ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
-  /// - Only user-provided properties are available; system properties (like
-  ///   `$device_type`, `$session_id`) are added by the native SDK at a later
-  ///   stage. On Windows and Linux, the callbacks see the system properties
-  ///   and the options the SDK adds, and can change them for that event,
-  ///   except `$lib` and `$lib_version`, which PostHog sets from the SDK.
+  ///   On iOS, macOS and Android, add a native hook with
+  ///   `PosthogFlutterPlugin.addBeforeSend` (Swift or Kotlin) to filter or
+  ///   edit those events.
+  /// - On iOS, macOS, Android, Windows and Linux, the callbacks see the
+  ///   system properties (like `$device_type` and `$session_id`), the
+  ///   registered properties and the options the SDK adds, and can change
+  ///   them for that event, except `$lib` and `$lib_version`, which PostHog
+  ///   sets from the SDK. On iOS, macOS and Android, registering callbacks
+  ///   adds one more call to the native SDK per event. The native SDK keeps
+  ///   each built event until Dart sends it back, and discards one still
+  ///   waiting after a minute (for example, after a hot restart). On web,
+  ///   only the event's own properties are available; posthog-js adds the
+  ///   rest later.
   ///
   /// **Note:**
-  /// - Callbacks are synchronous. Load anything they need (such as remote
-  ///   config) ahead of time.
+  /// - Callbacks are synchronous and run on the calling isolate, so a slow one
+  ///   blocks the UI. Load anything they need (such as remote config or feature
+  ///   flags) ahead of time; a change made after the callback returns is not
+  ///   sent.
+  /// - A callback that captures an event must not do so for that event too, or
+  ///   it never finishes.
+  /// - On web, an event whose callback calls `reset()` stays on its user but
+  ///   joins the next user's session and person processing, and its user
+  ///   properties are dropped, because posthog-js builds the event after the
+  ///   callbacks.
   /// - If a callback throws, the event is dropped and later callbacks are not
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent

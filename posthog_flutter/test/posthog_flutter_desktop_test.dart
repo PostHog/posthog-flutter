@@ -574,6 +574,207 @@ void main() {
   });
 
   group('beforeSend hook', () {
+    group('that calls the SDK', () {
+      test('can capture another event without running forever', () async {
+        final server = await LocalPostHogServer.start();
+        final seen = <String>[];
+        late final PosthogFlutterDesktop platform;
+        final config = configFor(server)
+          ..beforeSend = [
+            (event) {
+              seen.add(event.event);
+              if (event.event == 'outer') {
+                platform.capture(eventName: 'inner');
+              }
+              return event;
+            },
+          ];
+        platform = await setUpPlatform(config);
+
+        await platform.capture(eventName: 'outer');
+        await server.waitForEvent('inner');
+        await server.waitForEvent('outer');
+
+        expect(seen, ['outer', 'inner']);
+      });
+
+      final calls = <String, Future<void> Function(PosthogFlutterDesktop)>{
+        'reset': (platform) => platform.reset(),
+        'identify': (platform) => platform.identify(userId: 'user-1'),
+        'optOut': (platform) => platform.optOut(),
+        'getDistinctId': (platform) => platform.getDistinctId(),
+        'getFeatureFlag': (platform) => platform.getFeatureFlag(key: 'flag'),
+      };
+
+      calls.forEach((name, call) {
+        test('$name inside the hook does not deadlock', () async {
+          final server = await LocalPostHogServer.start();
+          late final PosthogFlutterDesktop platform;
+          final config = configFor(server)
+            ..beforeSend = [
+              (event) {
+                if (event.event == 'trigger') call(platform);
+                return event;
+              },
+            ];
+          platform = await setUpPlatform(config);
+
+          await platform
+              .capture(eventName: 'trigger')
+              .timeout(const Duration(seconds: 2));
+        });
+      });
+    });
+
+    for (final (name, call)
+        in <(String, Future<void> Function(PosthogFlutterDesktop))>[
+      ('reset', (platform) => platform.reset()),
+      ('identify', (platform) => platform.identify(userId: 'user-1')),
+    ]) {
+      test('$name inside the hook keeps the event on the earlier user',
+          () async {
+        final server = await LocalPostHogServer.start();
+        late final PosthogFlutterDesktop platform;
+        final config = configFor(server)
+          ..beforeSend = [
+            (event) {
+              if (event.event == 'trigger') call(platform);
+              return event;
+            },
+          ];
+        platform = await setUpPlatform(config);
+        final firstUser = await platform.getDistinctId();
+
+        await platform.capture(eventName: 'trigger');
+
+        final event = await server.waitForEvent('trigger');
+        expect(event['distinct_id'], firstUser);
+        expect(await platform.getDistinctId(), isNot(firstUser));
+      });
+    }
+
+    test('reset inside the hook leaves an identified event person-processed',
+        () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'trigger') platform.reset();
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+      await platform.identify(userId: 'user-1');
+
+      await platform.capture(eventName: 'trigger');
+
+      final event = await server.waitForEvent('trigger');
+      expect(event['distinct_id'], 'user-1');
+      expect(_optionsOf(event), isNot(contains('process_person_profile')));
+    });
+
+    test('identify inside the hook leaves an anonymous event personless',
+        () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'trigger') {
+              platform.identify(userId: 'user-1');
+            }
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'trigger');
+
+      final event = await server.waitForEvent('trigger');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+    });
+
+    test('reset inside the hook keeps the screen from the next user', () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == r'$screen') platform.reset();
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.screen(screenName: 'Checkout');
+      await platform.capture(eventName: 'after reset');
+
+      final event = await server.waitForEvent('after reset');
+      expect(_propertiesOf(event), isNot(contains(r'$screen_name')));
+    });
+
+    test('identify inside the hook keeps the screen for later events',
+        () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == r'$screen') {
+              platform.identify(userId: 'user-1');
+            }
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.screen(screenName: 'Checkout');
+      await platform.capture(eventName: 'after identify');
+
+      final event = await server.waitForEvent('after identify');
+      expect(_propertiesOf(event)[r'$screen_name'], 'Checkout');
+    });
+
+    test('optOut inside the hook drops the event', () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'trigger') platform.optOut();
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'trigger');
+      await platform.optIn();
+      await platform.capture(eventName: 'after');
+      await server.waitForEvent('after');
+
+      expect(server.eventNames, isNot(contains('trigger')));
+    });
+
+    test('calls after a burst of events apply in order', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)..beforeSend = [(event) => event];
+      final platform = await setUpPlatform(config);
+      final firstUser = await platform.getDistinctId();
+
+      final sent = [
+        for (var i = 0; i < 100; i++) platform.capture(eventName: 'event $i'),
+        platform.reset(),
+        platform.capture(eventName: 'after reset'),
+      ];
+      await Future.wait(sent);
+
+      final last = await server.waitForEvent('event 99');
+      expect(last['distinct_id'], firstUser);
+      final after = await server.waitForEvent('after reset');
+      expect(after['distinct_id'], isNot(firstUser));
+    });
+
     test('dropping an event keeps it off the wire', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -589,6 +790,55 @@ void main() {
       // the dropped event can no longer be in flight.
       await server.waitForEvent('sentinel event');
       expect(server.eventNames, isNot(contains('dropped event')));
+    });
+
+    test(
+        'a callback sees the uuid, distinct id and timestamp, and can change '
+        'the distinct id and timestamp but not the uuid', () async {
+      final server = await LocalPostHogServer.start();
+      PostHogEvent? seen;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen = PostHogEvent(
+              event: event.event,
+              uuid: event.uuid,
+              distinctId: event.distinctId,
+              timestamp: event.timestamp,
+            );
+            return PostHogEvent(
+              event: event.event,
+              properties: event.properties,
+              distinctId: 'changed-user',
+              timestamp: DateTime.utc(2025, 1, 2, 3, 4, 5, 678),
+            );
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      final distinctId = await platform.getDistinctId();
+
+      await platform.capture(eventName: 'identity');
+
+      final event = await server.waitForEvent('identity');
+      expect(seen!.uuid, isNotNull);
+      expect(seen!.distinctId, distinctId);
+      expect(seen!.timestamp, isNotNull);
+      expect(event['uuid'], seen!.uuid);
+      expect(event['distinct_id'], 'changed-user');
+      expect(event['timestamp'], '2025-01-02T03:04:05.678Z');
+    });
+
+    test('a blank distinct id from a callback keeps the current one', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [(event) => event..distinctId = '  '];
+      final platform = await setUpPlatform(config);
+      final distinctId = await platform.getDistinctId();
+
+      await platform.capture(eventName: 'blank');
+
+      final event = await server.waitForEvent('blank');
+      expect(event['distinct_id'], distinctId);
     });
 
     test('modifications made by a callback are delivered', () async {
@@ -691,6 +941,54 @@ void main() {
       expect(personProperties, isNot(contains('dropped')));
     });
 
+    test(
+        'person properties of an event a callback sends for another distinct '
+        'id stay out of flag evaluation', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..preloadFeatureFlags = false
+        ..beforeSend = [(event) => event..distinctId = 'other-user'];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'other',
+        userProperties: {'email': 'other@example.com'},
+      );
+      await platform.reloadFeatureFlags();
+
+      final event = await server.waitForEvent('other');
+      expect(event['distinct_id'], 'other-user');
+      final personProperties = Map<String, Object?>.from(
+        server.flagsRequests.single.body['person_properties']! as Map,
+      );
+      expect(personProperties, isNot(contains('email')));
+    });
+
+    test(
+        'person properties of an event a callback sends for another distinct '
+        'id leave person processing off for the current user', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'other') event.distinctId = 'other-user';
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'other',
+        userProperties: {'email': 'other@example.com'},
+      );
+      await platform.capture(eventName: 'next');
+
+      final event = await server.waitForEvent('other');
+      expect(event['distinct_id'], 'other-user');
+      final next = await server.waitForEvent('next');
+      expect(_optionsOf(next)['process_person_profile'], isFalse);
+    });
+
     test('a dropped person update does not turn on person processing',
         () async {
       final server = await LocalPostHogServer.start();
@@ -710,7 +1008,7 @@ void main() {
       expect(_optionsOf(event)['process_person_profile'], isFalse);
     });
 
-    test('an event whose person properties are removed is personless',
+    test('removing person properties leaves person processing as prepared',
         () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -723,10 +1021,10 @@ void main() {
       );
 
       final event = await server.waitForEvent('redacted');
-      expect(_optionsOf(event)['process_person_profile'], isFalse);
+      expect(_optionsOf(event), isNot(contains('process_person_profile')));
     });
 
-    test('person properties a callback adds turn on person processing',
+    test('person properties a callback adds leave the event personless',
         () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
@@ -738,8 +1036,47 @@ void main() {
       await platform.capture(eventName: 'signed up');
 
       final event = await server.waitForEvent('signed up');
-      expect(_optionsOf(event), isNot(contains('process_person_profile')));
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
       expect(_propertiesOf(event)[r'$set'], {'email': 'user@example.com'});
+    });
+
+    test('person properties a callback adds leave later events personless',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'signed up') {
+              event.userProperties = {'email': 'user@example.com'};
+            }
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'signed up');
+      await platform.capture(eventName: 'next');
+
+      final next = await server.waitForEvent('next');
+      expect(_optionsOf(next)['process_person_profile'], isFalse);
+    });
+
+    test(
+        'removing person properties keeps person processing on for later events',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [(event) => event..userProperties = null];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'redacted',
+        userProperties: {'email': 'user@example.com'},
+      );
+      await platform.capture(eventName: 'next');
+
+      final next = await server.waitForEvent('next');
+      expect(_optionsOf(next), isNot(contains('process_person_profile')));
     });
 
     test('a callback can turn person processing back on', () async {
@@ -1116,6 +1453,30 @@ void main() {
 
       final event = await server.waitForEvent(r'$exception');
       expect(stepMessagesOf(event), ['custom']);
+    });
+
+    test('are visible to beforeSend, which can remove them', () async {
+      final server = await LocalPostHogServer.start();
+      final seen = <Object?>[];
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen.add(event.properties?.remove(r'$exception_steps'));
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.addExceptionStep('recorded');
+      await platform.captureException(error: StateError('removed steps'));
+
+      final event = await server.waitForEvent(r'$exception');
+      expect(seen, [
+        [
+          {r'$message': 'recorded', r'$timestamp': isA<String>()},
+        ],
+      ]);
+      expect(stepMessagesOf(event), isNull);
     });
 
     test('are not attached while disabled', () async {

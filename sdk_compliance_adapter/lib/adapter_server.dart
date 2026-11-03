@@ -312,6 +312,7 @@ class _CaptureClient extends DesktopPostHog {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
+    String? uuid,
   }) {
     final queued = super.captureStateless(
       distinctId,
@@ -319,6 +320,7 @@ class _CaptureClient extends DesktopPostHog {
       properties: properties,
       options: options,
       timestamp: timestamp,
+      uuid: uuid,
     );
     onCaptured?.call();
     return queued;
@@ -331,16 +333,18 @@ class _CaptureClient extends DesktopPostHog {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
+    String? uuid,
   }) async {
-    final uuid = await super.captureAiStateless(
+    final captured = await super.captureAiStateless(
       distinctId,
       event,
       properties: properties,
       options: options,
       timestamp: timestamp,
+      uuid: uuid,
     );
-    if (uuid != null) onCaptured?.call();
-    return uuid;
+    if (captured != null) onCaptured?.call();
+    return captured;
   }
 
   void _actAs(String distinctId) {
@@ -362,6 +366,9 @@ class _CaptureClient extends DesktopPostHog {
       properties: prepared.properties,
       options: prepared.options,
       timestamp: timestamp,
+      uuid: prepared.uuid,
+      distinctId: prepared.distinctId,
+      requestsPersonProcessing: prepared.requestsPersonProcessing,
     );
   }
 
