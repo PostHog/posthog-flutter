@@ -133,8 +133,9 @@ Map<String, Object?> queuedPropsOf(FileStorage storage, String event) {
   return message['properties'] as Map<String, Object?>;
 }
 
-/// Runs jobs like [QueueWorker.inline], except that writes and deletes wait
-/// for [writeGate] and [deleteGate] while those are set.
+/// Runs jobs like [QueueWorker.inline], except that each kind of job waits
+/// for its gate while that is set: writes for [writeGate], reads for
+/// [readGate], deletes for [deleteGate], request bodies for [encodeGate].
 class GatedWorker implements QueueWorker {
   @override
   CoreLogger? logger;
@@ -142,6 +143,8 @@ class GatedWorker implements QueueWorker {
   final _inline = QueueWorker.inline();
   Completer<void>? writeGate;
   Completer<void>? deleteGate;
+  Completer<void>? readGate;
+  Completer<void>? encodeGate;
   var writes = 0;
   var deletes = 0;
 
@@ -162,19 +165,24 @@ class GatedWorker implements QueueWorker {
   @override
   Future<List<String>> delete(List<String> paths) {
     deletes++;
-    // Like the real worker, a delete never overtakes an earlier write.
-    final gates = [writeGate, deleteGate].nonNulls.map((gate) => gate.future);
+    // Like the real worker, a delete never overtakes an earlier write or read.
+    final gates =
+        [writeGate, readGate, deleteGate].nonNulls.map((gate) => gate.future);
     return gates.isEmpty
         ? _inline.delete(paths)
         : Future.wait(gates).then((_) => _inline.delete(paths));
   }
 
   @override
-  Future<List<QueueReadResult>> read(List<String> paths) => _inline.read(paths);
+  Future<List<QueueReadResult>> read(List<String> paths) =>
+      _after(readGate, () => _inline.read(paths));
 
   @override
   Future<EncodedBody> encodeBody(Object? body, {required bool gzip}) =>
-      _inline.encodeBody(body, gzip: gzip);
+      _after(encodeGate, () => _inline.encodeBody(body, gzip: gzip));
+
+  static Future<T> _after<T>(Completer<void>? gate, Future<T> Function() job) =>
+      gate == null ? job() : gate.future.then((_) => job());
 
   @override
   bool get runsInBackground => false;
