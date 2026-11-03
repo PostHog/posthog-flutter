@@ -3,6 +3,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/core/capture_v1.dart';
@@ -11,6 +14,8 @@ import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
+import 'package:posthog_flutter/src/utils/before_send.dart';
+import 'package:posthog_flutter/src/utils/project_token.dart';
 
 const _adapterVersion = '1.0.0';
 const _defaultFlushAt = 100;
@@ -21,8 +26,14 @@ const _upstreamTimeout = captureAiDefaultTimeout;
 class ComplianceAdapter {
   final _CompliancePlatform platform = _CompliancePlatform();
   HttpServer? _server;
+  DebugPrintCallback? _debugPrint;
 
   Future<HttpServer> start({int port = 8080}) async {
+    final debugPrintBefore = _debugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) platform.state.logLines.add(message);
+      debugPrintBefore(message, wrapWidth: wrapWidth);
+    };
     final server = await HttpServer.bind(InternetAddress.anyIPv4, port);
     _server = server;
     unawaited(_serve(server));
@@ -32,6 +43,7 @@ class ComplianceAdapter {
   Future<void> close() async {
     await platform.resetAdapterState();
     await _server?.close(force: true);
+    if (_debugPrint case final restored?) debugPrint = restored;
   }
 
   Future<void> _serve(HttpServer server) async {
@@ -59,6 +71,10 @@ class ComplianceAdapter {
           'capture_ai_v1',
           'encoding_gzip',
           'event_options',
+          'fail_open',
+          'generated_payloads',
+          'log_capture',
+          'property_layers',
         ],
       });
       return;
@@ -68,7 +84,7 @@ class ComplianceAdapter {
       final body = await _readJson(request);
       final apiKey = body['api_key'] as String?;
       final host = body['host'] as String?;
-      if (apiKey == null || apiKey.isEmpty) {
+      if (apiKey == null) {
         await _sendJson(
             request,
             {
@@ -115,8 +131,26 @@ class ComplianceAdapter {
         );
       }
 
+      final beforeSend = _readNullableObjectMap(body['before_send']);
+      final setProperties =
+          _readObjectMap(beforeSend?['set_properties']) ?? const {};
+      if (beforeSend != null) {
+        config.beforeSend = [
+          (event) =>
+              event..properties = {...?event.properties, ...setProperties},
+        ];
+      }
+
       await platform.resetAdapterState();
-      await platform.configure(config, host: host);
+      if (isUsableProjectToken(apiKey)) {
+        await platform.configure(
+          config,
+          host: host,
+          superProperties: _readNullableObjectMap(body['super_properties']),
+        );
+      } else {
+        platform.disable();
+      }
 
       await _sendJson(request, {'success': true});
       return;
@@ -155,10 +189,14 @@ class ComplianceAdapter {
         return;
       }
 
-      final uuid = platform.capture(
+      final properties = _readNullableObjectMap(body['properties']) ?? {};
+      final padToBytes = _readInt(body['pad_properties_to_bytes']);
+      final uuid = await platform.capture(
         distinctId: distinctId,
         event: event,
-        properties: _readNullableObjectMap(body['properties']),
+        properties: padToBytes == null
+            ? properties
+            : _padProperties(properties, padToBytes, body['marker'] as String?),
         options: _readNullableObjectMap(body['options']),
         timestamp: body['timestamp'] as String?,
         ai: path == '/capture_ai',
@@ -249,13 +287,16 @@ class ComplianceAdapter {
 /// only takes from identify(), and that would add `$identify` events to the
 /// batches the suites count.
 class _CaptureClient extends DesktopPostHog {
-  _CaptureClient(super.config)
-      : super(
+  _CaptureClient(PostHogConfig config)
+      : _beforeSend = config.beforeSend,
+        super(
+          config,
           storage: FileStorage.memory(),
           staticContext: const {},
           timezone: null,
         );
 
+  final List<BeforeSendCallback> _beforeSend;
   Map<String, Object?> _flagsRequestFields = const {};
   String? _flagsUser;
   bool _switchingFlagsUser = false;
@@ -287,14 +328,16 @@ class _CaptureClient extends DesktopPostHog {
     setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
   }
 
-  String? captureFor(
+  /// Captures as the desktop plugin does: the SDK builds the event, then
+  /// the beforeSend callbacks change or drop it.
+  Future<String?> captureFor(
     String distinctId,
     String event,
     Map<String, Object?> properties, {
     Map<String, Object?>? options,
     String? timestamp,
     bool ai = false,
-  }) {
+  }) async {
     _actAs(distinctId);
     final prepared = prepareEvent(
       event,
@@ -302,11 +345,23 @@ class _CaptureClient extends DesktopPostHog {
       options: options,
     );
     if (prepared == null) return null;
+    final processed = await applyBeforeSend(
+      _beforeSend,
+      PostHogEvent(
+        event: event,
+        properties: {
+          for (final MapEntry(:key, :value) in prepared.properties.entries)
+            if (value != null) key: value,
+        },
+        options: prepared.options,
+      ),
+    );
+    if (processed == null) return null;
     return capturePrepared(
-        event,
+        processed.event,
         (
-          properties: prepared.properties,
-          options: prepared.options,
+          properties: processed.properties ?? const {},
+          options: processed.options,
           timestamp: timestamp ?? prepared.timestamp,
         ),
         ai: ai);
@@ -512,10 +567,18 @@ class _CompliancePlatform {
 
   _CaptureClient? _client;
   _RecordingProxy? _proxy;
+  bool _initialized = false;
 
-  bool get isInitialized => _client != null;
+  bool get isInitialized => _initialized;
 
-  Future<void> configure(PostHogConfig config, {required String host}) async {
+  /// Initialized as an app whose setup was skipped: every call is a no-op.
+  void disable() => _initialized = true;
+
+  Future<void> configure(
+    PostHogConfig config, {
+    required String host,
+    Map<String, Object?>? superProperties,
+  }) async {
     final proxy = await _RecordingProxy.start(host, state);
     config.host = proxy.url;
     final client = _CaptureClient(config);
@@ -523,24 +586,28 @@ class _CompliancePlatform {
     client.onCaptured = () => clientState.totalEventsCaptured++;
     client.onSent((count) => clientState.totalEventsSent += count);
     client.onError((error) => clientState.lastError = error.toString());
+    if (superProperties != null) client.register(superProperties);
     _proxy = proxy;
     _client = client;
+    _initialized = true;
   }
 
-  String? capture({
+  Future<String?> capture({
     required String distinctId,
     required String event,
-    Map<String, Object?>? properties,
+    required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
     bool ai = false,
-  }) {
+  }) async {
+    final client = _client;
+    if (client == null) return null;
     final parsedTimestamp =
         timestamp == null ? null : DateTime.tryParse(timestamp);
-    return _client!.captureFor(
+    return client.captureFor(
       distinctId,
       event,
-      properties ?? const {},
+      properties,
       options: options,
       timestamp: parsedTimestamp?.toUtc().toIso8601String(),
       ai: ai,
@@ -566,7 +633,9 @@ class _CompliancePlatform {
     Map<String, Map<String, Object?>>? groupProperties,
     required bool disableGeoip,
   }) async {
-    final result = await _client!.evaluateFlag(
+    final client = _client;
+    if (client == null) return false;
+    final result = await client.evaluateFlag(
       key,
       distinctId: distinctId,
       personProperties: personProperties ?? const {},
@@ -582,6 +651,7 @@ class _CompliancePlatform {
     _client = null;
     await _proxy?.close();
     _proxy = null;
+    _initialized = false;
     state = _AdapterState();
   }
 }
@@ -592,6 +662,7 @@ class _AdapterState {
   int totalRetries = 0;
   String? lastError;
   final requestsMade = <_RequestRecord>[];
+  final logLines = <String>[];
 
   Map<String, Object?> toJson({required int pendingEvents}) => {
         'pending_events': pendingEvents,
@@ -601,6 +672,7 @@ class _AdapterState {
         'last_error': lastError,
         'requests_made':
             requestsMade.map((request) => request.toJson()).toList(),
+        'log_lines': logLines,
       };
 }
 
@@ -665,6 +737,21 @@ Map<String, Map<String, Object?>>? _readNestedObjectMap(Object? value) {
           : Map<String, Object?>.from(nested as Map),
     ),
   );
+}
+
+/// [properties] with a `$test_padding` string, starting with [marker], that
+/// makes them exactly [bytes] long as compact UTF-8 JSON. Payloads that big
+/// can't pass through the harness's request to the adapter.
+Map<String, Object?> _padProperties(
+  Map<String, Object?> properties,
+  int bytes,
+  String? marker,
+) {
+  final prefix = marker ?? '';
+  final padded = {...properties, r'$test_padding': prefix};
+  final missing = bytes - utf8.encode(jsonEncode(padded)).length;
+  padded[r'$test_padding'] = prefix + 'x' * max(0, missing);
+  return padded;
 }
 
 int? _readInt(Object? value) {
