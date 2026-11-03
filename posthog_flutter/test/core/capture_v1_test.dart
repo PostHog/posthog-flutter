@@ -189,6 +189,23 @@ void main() {
       expect(uuid, isNotNull);
       expect(server.aiRequests, hasLength(1));
     });
+
+    test('in the /flags request become U+FFFD', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.setPersonPropertiesForFlags({'plan\uD800': 'pro\uDC00'});
+      client.setGroupPropertiesForFlags({
+        'company': {'name': 'acme\uD83D'},
+      });
+      await client.reloadFeatureFlagsAsync();
+
+      final body = server.flagsRequests.single.body;
+      expect(body['person_properties'], containsPair('plan�', 'pro�'));
+      expect(body['group_properties'], {
+        'company': {'name': 'acme�'},
+      });
+    });
   });
 
   group('captureV1Event', () {
