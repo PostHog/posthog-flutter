@@ -87,6 +87,20 @@ void main() {
           'connection_error');
     });
 
+    test('do not retry a refused flags connection', () async {
+      final closed = await LocalPostHogServer.start();
+      await closed.close();
+      final client = testClient(closed,
+          storage: tempStorage(),
+          config: testConfig()..featureFlagRequestMaxRetries = 5);
+
+      final stopwatch = Stopwatch()..start();
+      await client.reloadFeatureFlagsAsync();
+
+      // Five retries would wait 9.3 seconds in total.
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
+    });
+
     test('aborts a request that becomes available after its timeout', () {
       fakeAsync((async) {
         final opened = Completer<HttpClientRequest>();

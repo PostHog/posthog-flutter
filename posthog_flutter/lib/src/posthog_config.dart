@@ -191,6 +191,9 @@ class PostHogConfig {
   /// Maximum number of retries for a `/flags` request after a network error
   /// or a gateway error (HTTP 502 or 504).
   ///
+  /// The SDK waits 300ms before the first retry and doubles the wait for each
+  /// later one. A refused connection is not retried.
+  ///
   /// Defaults to `1`. Set to `0` to disable retries; negative values are
   /// treated as `0`.
   ///
