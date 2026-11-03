@@ -88,18 +88,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     return client;
   }
 
-  DesktopPostHog? _clientForContinuation(
-    String op,
-    _ClientScope scope,
-    String distinctId,
-  ) {
+  DesktopPostHog? _clientForContinuation(String op, _ClientScope scope) {
     final client = _clientFor(op);
     if (client == null) return null;
-    if (_clientScope != scope ||
-        client.optedOut ||
-        client.getDistinctId() != distinctId) {
-      printIfDebug('[PostHog] $op dropped: the project, the user or the '
-          'consent changed while beforeSend was running.');
+    if (_clientScope != scope || client.optedOut) {
+      printIfDebug('[PostHog] $op dropped: the project or the consent changed '
+          'while beforeSend was running.');
       return null;
     }
     return client;
@@ -260,7 +254,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (!_hasName(eventName)) return;
         final scope = _clientScope;
         if (scope == null) return;
-        final distinctId = client.getDistinctId();
 
         final prepared = _prepare(
           client,
@@ -277,7 +270,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current = _clientForContinuation('capture', scope, distinctId);
+        final current = _clientForContinuation('capture', scope);
         if (current == null) return;
         await _captureProcessed(current, processed, prepared);
       });
@@ -300,7 +293,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (!_hasName(eventName)) return null;
         final scope = _clientScope;
         if (scope == null) return null;
-        final distinctId = client.getDistinctId();
 
         final prepared = _prepare(
           client,
@@ -317,7 +309,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return null;
         }
 
-        final current = _clientForContinuation('captureAi', scope, distinctId);
+        final current = _clientForContinuation('captureAi', scope);
         if (current == null) return null;
         return _captureProcessed(current, processed, prepared, ai: true);
       });
@@ -334,7 +326,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (client.optedOut) return;
         final scope = _clientScope;
         if (scope == null) return;
-        final distinctId = client.getDistinctId();
 
         final prepared = _prepare(
           client,
@@ -346,6 +337,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           options: options,
         );
         if (prepared == null) return;
+        final sessionId = client.getSessionId();
         final processed = _runBeforeSend(prepared.event);
         if (processed == null) {
           printIfDebug(
@@ -353,7 +345,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current = _clientForContinuation('screen', scope, distinctId);
+        final current = _clientForContinuation('screen', scope);
         if (current == null) return;
 
         // A renamed event is no longer a screen view.
@@ -369,8 +361,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        // Later events that set no `$screen_name` of their own carry this one.
-        if (finalScreenName is String) {
+        // Later events that set no `$screen_name` of their own carry this one,
+        // unless a callback's reset() started a session for the next user.
+        if (finalScreenName is String && current.getSessionId() == sessionId) {
           current.registerForSession(
               {PostHogPropertyName.screenName: finalScreenName});
         }
@@ -604,7 +597,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         if (client.optedOut) return;
         final scope = _clientScope;
         if (scope == null) return;
-        final distinctId = client.getDistinctId();
 
         final exceptionProps = DartExceptionProcessor.processException(
           error: error,
@@ -630,8 +622,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        final current =
-            _clientForContinuation('captureException', scope, distinctId);
+        final current = _clientForContinuation('captureException', scope);
         if (current == null) return;
         await _captureProcessed(current, processed, prepared);
       });

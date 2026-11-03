@@ -177,7 +177,7 @@ They serialized the internal platform-channel format and have no replacement. `t
 
 ### `beforeSend` callbacks are synchronous
 
-`BeforeSendCallback` is now `PostHogEvent? Function(PostHogEvent)`, and `BeforeSendLogCallback` is `PostHogLogRecord? Function(PostHogLogRecord)`. An `async` callback is a compile error. Load what it needs ahead of time and read it synchronously.
+`BeforeSendCallback` is now `PostHogEvent? Function(PostHogEvent)`, and `BeforeSendLogCallback` is `PostHogLogRecord? Function(PostHogLogRecord)`. An `async` callback, or one declared to return `FutureOr<PostHogEvent?>`, is a compile error. Load what it needs ahead of time and read it synchronously.
 
 ```dart
 // Before
