@@ -303,21 +303,38 @@ class _CaptureClient extends DesktopPostHog {
   void Function()? onCaptured;
 
   @override
-  String? captureStateless(
+  ({String uuid, Future<bool> queued}) captureStateless(
     String distinctId,
     String event, {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
-    bool ai = false,
   }) {
-    final uuid = super.captureStateless(
+    final queued = super.captureStateless(
       distinctId,
       event,
       properties: properties,
       options: options,
       timestamp: timestamp,
-      ai: ai,
+    );
+    onCaptured?.call();
+    return queued;
+  }
+
+  @override
+  Future<String?> captureAiStateless(
+    String distinctId,
+    String event, {
+    required Map<String, Object?> properties,
+    Map<String, Object?>? options,
+    String? timestamp,
+  }) async {
+    final uuid = await super.captureAiStateless(
+      distinctId,
+      event,
+      properties: properties,
+      options: options,
+      timestamp: timestamp,
     );
     if (uuid != null) onCaptured?.call();
     return uuid;
@@ -345,7 +362,7 @@ class _CaptureClient extends DesktopPostHog {
       options: options,
     );
     if (prepared == null) return null;
-    final processed = await applyBeforeSend(
+    final processed = applyBeforeSend(
       _beforeSend,
       PostHogEvent(
         event: event,
@@ -357,14 +374,14 @@ class _CaptureClient extends DesktopPostHog {
       ),
     );
     if (processed == null) return null;
-    return capturePrepared(
-        processed.event,
-        (
-          properties: processed.properties ?? const {},
-          options: processed.options,
-          timestamp: timestamp ?? prepared.timestamp,
-        ),
-        ai: ai);
+    final queued = (
+      properties: processed.properties ?? const <String, Object?>{},
+      options: processed.options,
+      timestamp: timestamp ?? prepared.timestamp,
+    );
+    return ai
+        ? captureAiPrepared(processed.event, queued)
+        : capturePrepared(processed.event, queued);
   }
 
   Future<PostHogFeatureFlagResult?> evaluateFlag(
