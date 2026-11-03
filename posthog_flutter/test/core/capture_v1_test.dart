@@ -146,6 +146,21 @@ void main() {
       expect(event['options'], containsPair('product_tour_id', 't�'));
     });
 
+    test('in an alias or group ignore the call instead of repairing it',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.alias('user\uD800');
+      client.group('company\uD800', 'acme');
+      client.group('company', 'acme\uD800');
+      client.capture('e');
+      await client.flush();
+
+      expect(server.events.map((event) => event['event']), ['e']);
+      expect(server.events.single['properties'], isNot(contains(r'$groups')));
+    });
+
     test('in registered ids drop the events instead of repairing the ids',
         () async {
       final server = await LocalPostHogServer.start();

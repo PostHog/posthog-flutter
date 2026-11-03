@@ -609,6 +609,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
             'This call will be ignored.');
         return;
       }
+      if (!isWellFormed(alias)) {
+        logger.warn('alias was called with an alias that is not '
+            'well-formed UTF-16. This call will be ignored.');
+        return;
+      }
       if (_ignoredWhileOptedOut('posthog.alias')) return;
       if (!_requirePersonProcessing('posthog.alias')) return;
 
@@ -650,6 +655,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (groupType.trim().isEmpty || groupKey.trim().isEmpty) {
         logger.warn('group was called with an empty group type or key. '
             'This call will be ignored.');
+        return;
+      }
+      if (!isWellFormed(groupType) || !isWellFormed(groupKey)) {
+        logger.warn('group was called with a group type or key that is not '
+            'well-formed UTF-16. This call will be ignored.');
         return;
       }
       if (_ignoredWhileOptedOut('posthog.group')) return;
