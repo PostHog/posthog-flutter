@@ -237,12 +237,17 @@ config.onFeatureFlags = (loaded) {
 
 **This is a silent change if you use a reverse proxy or self-host.** On iOS, macOS, Android, Windows and Linux, events go to `/i/v1/analytics/events` instead of `/batch/`, and `captureAi` events go to `/i/v1/ai/events`. Web keeps using posthog-js and its current endpoints. PostHog Cloud and the managed reverse proxy already serve the new paths.
 
+For the changes every capture v1 SDK shares, such as event options, limits and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/libraries/capture-v1). On iOS, macOS and Android, capture v1 comes from the native SDKs, so the Capture v1 sections of the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#endpoints) guides apply there too.
+
+<!-- TODO(capture-v1): Windows and Linux still lack what the native guides cover: event validation (empty names, 200-byte names and distinct IDs), SDK identity (`$lib` from `PostHog-Sdk-Info`), the session and window ID string rule, the legacy option property table and `beforeSend` options caveat, and retried statuses. -->
+
 Before you upgrade, make your own proxy:
 
 - forward `/i/v1/analytics/events` and `/i/v1/ai/events`
 - pass `Authorization` (the project token, sent as `Bearer <token>`), every `PostHog-*` header, `Content-Type`, `Content-Encoding` and `User-Agent` through unchanged
 - if your proxy strips other credentials, keep `Authorization` values that start with `Bearer phc_`, `Bearer phs_` or `Bearer phx_`, plus the exact `Bearer <key>` of an older key without a prefix
 - accept request bodies up to 20 MB
+- pass PostHog's response body through unchanged, because a 2xx whose body isn't PostHog's `{"results": {...}}` drops the events instead of retrying them
 
 If you ignore this on Windows and Linux, a 404 is retried, events stay queued, and the SDK prints one warning, also without `debug`. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides for those platforms.
 
