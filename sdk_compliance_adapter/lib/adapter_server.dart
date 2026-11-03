@@ -1,4 +1,4 @@
-// ignore_for_file: implementation_imports
+// ignore_for_file: implementation_imports, invalid_use_of_visible_for_testing_member
 
 import 'dart:async';
 import 'dart:convert';
@@ -12,9 +12,11 @@ import 'package:posthog_flutter/src/core/capture_v1.dart';
 import 'package:posthog_flutter/src/core/feature_flags.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
+import 'package:posthog_flutter/src/core/posthog_core.dart';
+import 'package:posthog_flutter/src/posthog_desktop_app_info.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
+import 'package:posthog_flutter/src/posthog_flutter_desktop.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
-import 'package:posthog_flutter/src/utils/before_send.dart';
 import 'package:posthog_flutter/src/utils/project_token.dart';
 
 const _adapterVersion = '1.0.0';
@@ -282,21 +284,22 @@ class ComplianceAdapter {
   }
 }
 
-/// The real client, so the harness tests the SDK's own event building, queue,
-/// flags and requests. The harness sends a distinct id per call, which the SDK
-/// only takes from identify(), and that would add `$identify` events to the
-/// batches the suites count.
+/// The real client, run by the real desktop plugin, so the harness tests the
+/// SDK's own event building, beforeSend, queue, flags and requests. The
+/// harness sends a distinct id and a timestamp per call, which the plugin's
+/// capture() doesn't take: the id would need identify(), which adds
+/// `$identify` events to the batches the suites count.
 class _CaptureClient extends DesktopPostHog {
-  _CaptureClient(PostHogConfig config)
-      : _beforeSend = config.beforeSend,
-        super(
+  _CaptureClient(PostHogConfig config, FileStorage storage)
+      : super(
           config,
-          storage: FileStorage.memory(),
+          storage: storage,
           staticContext: const {},
           timezone: null,
         );
 
-  final List<BeforeSendCallback> _beforeSend;
+  String? nextTimestamp;
+  String? lastUuid;
   Map<String, Object?> _flagsRequestFields = const {};
   String? _flagsUser;
   bool _switchingFlagsUser = false;
@@ -345,44 +348,29 @@ class _CaptureClient extends DesktopPostHog {
     setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
   }
 
-  /// Captures as the desktop plugin does: the SDK builds the event, then
-  /// the beforeSend callbacks change or drop it.
-  Future<String?> captureFor(
-    String distinctId,
-    String event,
-    Map<String, Object?> properties, {
+  @override
+  PostHogPreparedEvent? prepareEvent(
+    String event, {
+    Map<String, Object?>? properties,
     Map<String, Object?>? options,
-    String? timestamp,
-    bool ai = false,
-  }) async {
-    _actAs(distinctId);
-    final prepared = prepareEvent(
-      event,
-      properties: properties,
-      options: options,
+  }) {
+    final prepared =
+        super.prepareEvent(event, properties: properties, options: options);
+    final timestamp = nextTimestamp;
+    if (prepared == null || timestamp == null) return prepared;
+    return (
+      properties: prepared.properties,
+      options: prepared.options,
+      timestamp: timestamp,
     );
-    if (prepared == null) return null;
-    final processed = applyBeforeSend(
-      _beforeSend,
-      PostHogEvent(
-        event: event,
-        properties: {
-          for (final MapEntry(:key, :value) in prepared.properties.entries)
-            if (value != null) key: value,
-        },
-        options: prepared.options,
-      ),
-    );
-    if (processed == null) return null;
-    final queued = (
-      properties: processed.properties ?? const <String, Object?>{},
-      options: processed.options,
-      timestamp: timestamp ?? prepared.timestamp,
-    );
-    return ai
-        ? captureAiPrepared(processed.event, queued)
-        : capturePrepared(processed.event, queued);
   }
+
+  @override
+  Future<String?> capturePrepared(
+    String event,
+    PostHogPreparedEvent prepared,
+  ) =>
+      super.capturePrepared(event, prepared).then((uuid) => lastUuid = uuid);
 
   Future<PostHogFeatureFlagResult?> evaluateFlag(
     String key, {
@@ -582,6 +570,7 @@ class _RecordingProxy {
 class _CompliancePlatform {
   _AdapterState state = _AdapterState();
 
+  PosthogFlutterDesktop? _plugin;
   _CaptureClient? _client;
   _RecordingProxy? _proxy;
   bool _initialized = false;
@@ -598,13 +587,28 @@ class _CompliancePlatform {
   }) async {
     final proxy = await _RecordingProxy.start(host, state);
     config.host = proxy.url;
-    final client = _CaptureClient(config);
+    _CaptureClient? created;
+    final plugin = PosthogFlutterDesktop(
+      appDirectory: () async => null,
+      appInfo: const DesktopAppInfo(),
+      timezone: null,
+      // No OS or app context: the suites expect exact property sets.
+      createClient: (config, storage, _) =>
+          created = _CaptureClient(config, storage),
+    );
+    await plugin.setup(config);
+    final client = created;
+    if (client == null) {
+      await proxy.close();
+      throw StateError('The plugin did not start a client');
+    }
     final clientState = state;
     client.onCaptured = () => clientState.totalEventsCaptured++;
     client.onSent((count) => clientState.totalEventsSent += count);
     client.onError((error) => clientState.lastError = error.toString());
     if (superProperties != null) client.register(superProperties);
     _proxy = proxy;
+    _plugin = plugin;
     _client = client;
     _initialized = true;
   }
@@ -617,18 +621,34 @@ class _CompliancePlatform {
     String? timestamp,
     bool ai = false,
   }) async {
+    final plugin = _plugin;
     final client = _client;
-    if (client == null) return null;
-    final parsedTimestamp =
-        timestamp == null ? null : DateTime.tryParse(timestamp);
-    return client.captureFor(
-      distinctId,
-      event,
-      properties,
-      options: options,
-      timestamp: parsedTimestamp?.toUtc().toIso8601String(),
-      ai: ai,
-    );
+    if (plugin == null || client == null) return null;
+    client._actAs(distinctId);
+    client.nextTimestamp =
+        DateTime.tryParse(timestamp ?? '')?.toUtc().toIso8601String();
+    client.lastUuid = null;
+    final nonNull = {
+      for (final MapEntry(:key, :value) in properties.entries)
+        if (value != null) key: value,
+    };
+    try {
+      if (ai) {
+        return await plugin.captureAi(
+          eventName: event,
+          properties: nonNull,
+          options: options,
+        );
+      }
+      await plugin.capture(
+        eventName: event,
+        properties: nonNull,
+        options: options,
+      );
+      return client.lastUuid;
+    } finally {
+      client.nextTimestamp = null;
+    }
   }
 
   Map<String, Object?> stateJson() =>
@@ -664,7 +684,8 @@ class _CompliancePlatform {
   }
 
   Future<void> resetAdapterState() async {
-    _client?.close();
+    unawaited(_plugin?.close());
+    _plugin = null;
     _client = null;
     await _proxy?.close();
     _proxy = null;
