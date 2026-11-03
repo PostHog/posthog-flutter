@@ -40,3 +40,4 @@
 - Run queued event encoding, file work and request compression on a background isolate on Windows and Linux so they no longer drop frames
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
+- Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value
