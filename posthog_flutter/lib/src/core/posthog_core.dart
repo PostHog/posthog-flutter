@@ -17,11 +17,16 @@ import 'utils/utils.dart';
 import 'uuid.dart';
 
 /// An event built by [PostHogCore.prepareEvent]: its properties, its
-/// capture v1 options and the time it happened, as an ISO 8601 string.
+/// capture v1 options, the time it happened as an ISO 8601 string, its uuid,
+/// the id of the person it is captured for, and whether it was captured with
+/// person properties.
 typedef PostHogPreparedEvent = ({
   Map<String, Object?> properties,
   Map<String, Object?>? options,
   String timestamp,
+  String uuid,
+  String distinctId,
+  bool requestsPersonProcessing,
 });
 
 /// Stateful PostHog client with session management, identity, and feature flags.
@@ -492,36 +497,40 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (_ignoredWhileOptedOut('posthog.capture')) {
         return SynchronousFuture(null);
       }
-      final (:properties, :options, :timestamp) = prepared;
+      final (
+        :properties,
+        :options,
+        :timestamp,
+        :uuid,
+        :distinctId,
+        :requestsPersonProcessing,
+      ) = prepared;
+      final queued = captureAiStateless(distinctId, event,
+          properties: properties,
+          options: options,
+          timestamp: timestamp,
+          uuid: uuid);
+      // Sent for another distinct id, its person properties belong to that
+      // person, not to the current user.
+      if (distinctId != getDistinctId()) return queued;
       final generation = _resetGeneration;
       final capturedAt = ++_personPropertyClock;
-      final queued = captureAiStateless(getDistinctId(), event,
-          properties: properties, options: options, timestamp: timestamp);
-      final requestsPerson = _requestsPersonProcessing(properties);
-      if (requestsPerson) _aiEventsRequestingPerson++;
+      if (requestsPersonProcessing) _aiEventsRequestingPerson++;
       return queued.then((uuid) {
         if (uuid != null && generation == _resetGeneration) {
-          _applyPersonProperties(properties, capturedAt: capturedAt);
+          _applyPersonProperties(properties,
+              requestsPersonProcessing: requestsPersonProcessing,
+              capturedAt: capturedAt);
         }
         return uuid;
       }).whenComplete(() {
-        if (requestsPerson && generation == _resetGeneration) {
+        if (requestsPersonProcessing && generation == _resetGeneration) {
           _aiEventsRequestingPerson--;
         }
       });
     });
     return queued ?? SynchronousFuture(null);
   }
-
-  /// [options] with `process_person_profile: false` added when person
-  /// processing is off and [properties] neither ask for it nor set
-  /// `$process_person_profile`, as [prepareEvent] decides it.
-  Map<String, Object?>? personProcessingOptions(
-    Map<String, Object?>? options,
-    Map<String, Object?> properties,
-  ) =>
-      _personProcessingOptions(options, properties,
-          requested: _requestsPersonProcessing(properties));
 
   PostHogPreparedEvent? _prepareEvent(
     String event, {
@@ -531,6 +540,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     if (_ignoredWhileOptedOut('posthog.capture')) return null;
 
     final allProperties = _enrichProperties(properties);
+    final requestsPersonProcessing = _requestsPersonProcessing(properties);
     // Once an event is person-processed, all later ones are too. A value
     // passed for this event alone doesn't count.
     if (_hasPersonProcessing()) {
@@ -541,9 +551,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
       options: _personProcessingOptions(
         options,
         allProperties,
-        requested: _requestsPersonProcessing(properties),
+        requested: requestsPersonProcessing,
       ),
       timestamp: currentISOTime(),
+      uuid: generateUuidV7(),
+      distinctId: getDistinctId(),
+      requestsPersonProcessing: requestsPersonProcessing,
     );
   }
 
@@ -551,10 +564,25 @@ abstract class PostHogCore extends PostHogCoreStateless {
     String event,
     PostHogPreparedEvent prepared,
   ) {
-    final (:properties, :options, :timestamp) = prepared;
-    final queued = captureStateless(getDistinctId(), event,
-        properties: properties, options: options, timestamp: timestamp);
-    _applyPersonProperties(properties);
+    final (
+      :properties,
+      :options,
+      :timestamp,
+      :uuid,
+      :distinctId,
+      :requestsPersonProcessing,
+    ) = prepared;
+    final queued = captureStateless(distinctId, event,
+        properties: properties,
+        options: options,
+        timestamp: timestamp,
+        uuid: uuid);
+    // A callback can send the event for another distinct id; its person
+    // properties then belong to that person, not to the current user's
+    // person processing, flags or person-properties hash.
+    if (distinctId != getDistinctId()) return queued;
+    _applyPersonProperties(properties,
+        requestsPersonProcessing: requestsPersonProcessing);
     if (event == r'$set' || event == r'$identify') {
       final set = properties[r'$set'];
       final setOnce = properties[r'$set_once'];
@@ -569,15 +597,18 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   /// Applies the person properties of a queued event with [properties]:
   /// taken from the event as queued, after the beforeSend callbacks, so a
-  /// value they removed or an event they or the size limit dropped neither
-  /// reaches /flags nor turns on person processing for later events.
+  /// value they removed doesn't reach /flags. Person processing follows
+  /// [requestsPersonProcessing], what the app captured, like the event itself
+  /// and the native SDKs. An event they or the size limit dropped does
+  /// neither.
   ///
   /// With [capturedAt], person properties set since then are kept.
   void _applyPersonProperties(
     Map<String, Object?> properties, {
+    required bool requestsPersonProcessing,
     int? capturedAt,
   }) {
-    if (_requestsPersonProcessing(properties)) _enablePersonProcessing();
+    if (requestsPersonProcessing) _enablePersonProcessing();
     final set = _asPropertyMap(properties[r'$set']);
     final setOnce = _asPropertyMap(properties[r'$set_once']);
     if (capturedAt == null) {

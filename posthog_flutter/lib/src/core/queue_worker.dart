@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:meta/meta.dart';
 
 import 'logger.dart';
+import 'utils/utils.dart';
 
 /// What [QueueWorker.write] did with an event: its serialized size in
 /// bytes, null when it cannot be encoded; whether it was over the size limit
@@ -76,7 +77,8 @@ abstract class QueueWorker {
   /// could not be deleted. A file that is already gone is not an error.
   Future<List<String>> delete(List<String> paths);
 
-  /// Encodes [body] to JSON and compresses it with gzip when [gzip] is set.
+  /// Encodes [body] to JSON, with each lone UTF-16 surrogate replaced by
+  /// U+FFFD, and compresses it with gzip when [gzip] is set.
   Future<EncodedBody> encodeBody(Object? body, {required bool gzip});
 
   /// Told when the jobs move back to the calling isolate. The worker is
@@ -204,7 +206,7 @@ final class _EncodeBody extends _Job {
 
   @override
   EncodedBody run() {
-    final bytes = utf8.encode(jsonEncode(body));
+    final bytes = utf8.encode(jsonEncodeWellFormed(body));
     return (
       payload: compress ? Uint8List.fromList(gzip.encode(bytes)) : bytes,
       length: bytes.length,

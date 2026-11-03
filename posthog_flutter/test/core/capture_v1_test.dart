@@ -8,6 +8,7 @@ import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/logger.dart';
 import 'package:posthog_flutter/src/core/posthog_core_stateless.dart';
 import 'package:posthog_flutter/src/core/uuid.dart';
+import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
 import '../posthog_api_fake.dart';
@@ -92,6 +93,163 @@ void main() {
           (event['properties']! as Map).keys,
           isNot(anyOf(contains(r'$cookieless_mode'),
               contains(r'$ignore_sent_at'), contains(r'$product_tour_id'))));
+    });
+  });
+
+  group('Lone surrogates', () {
+    test('in a name or id become U+FFFD and the event is sent', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.capture('cut\uD83D');
+      client.capture('session', properties: {r'$session_id': 's\uDE00'});
+      client.capture('window', properties: {r'$window_id': '\uD800w'});
+      client.capture('kept', properties: {'emoji': '\u{1F600}'});
+      client.identify('user\uDC00');
+      client.capture('after identify');
+      await client.flush();
+
+      final events = server.events;
+      expect(events.map((event) => event['event']), [
+        'cut�',
+        'session',
+        'window',
+        'kept',
+        r'$identify',
+        'after identify'
+      ]);
+      expect(events[1]['session_id'], 's�');
+      expect(events[2]['window_id'], '�w');
+      expect(events.last['distinct_id'], 'user�');
+      expect(client.getDistinctId(), 'user\uDC00');
+    });
+
+    test('in a stored distinct id survive a restart unchanged', () async {
+      final server = await LocalPostHogServer.start();
+      final dir = tempDirectory();
+      final earlier = testClient(server, storage: FileStorage(dir.path));
+      earlier.identify('user\uD800');
+      earlier.close();
+
+      final client = testClient(server, storage: FileStorage(dir.path));
+
+      expect(client.getDistinctId(), 'user\uD800');
+    });
+
+    test('in an identified bootstrap id still match identify', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server,
+          config: testConfig(
+              bootstrap: const PostHogBootstrapConfig(
+                  distinctId: 'user\uD800', isIdentifiedId: true)));
+
+      client.identify('user\uD800', userProperties: {'plan': 'pro'});
+      await client.flush();
+
+      final set = server.events.single;
+      expect(set['event'], r'$set');
+      expect(set['distinct_id'], 'user�');
+    });
+
+    test('in a group type leave its flag properties resettable', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.group('company\uD800', 'acme', groupProperties: {'size': 1});
+      client.resetGroupPropertiesForFlags(groupType: 'company\uD800');
+      await client.reloadFeatureFlagsAsync();
+
+      final body = server.flagsRequests.last.body;
+      expect(body['groups'], {'company�': 'acme'});
+      expect(body['group_properties'] ?? const {}, isEmpty);
+    });
+
+    test('in properties and options become U+FFFD, keys included', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.capture('e', properties: {
+        'cut\uD83D': [
+          'a\uDE00',
+          {'k\uDC00': 'v\uD800'},
+        ],
+        'emoji': '\u{1F600}',
+        'escape text': r'\ud800',
+        'unencodable': _LoneSurrogateToString(),
+      }, options: {
+        'product_tour_id': 't\uD800',
+      });
+      await client.flush();
+
+      final event = server.events.single;
+      expect(
+          event['properties'],
+          containsPair('cut�', [
+            'a�',
+            {'k�': 'v�'},
+          ]));
+      expect(event['properties'], containsPair('emoji', '\u{1F600}'));
+      expect(event['properties'], containsPair('escape text', r'\ud800'));
+      expect(event['properties'], containsPair('unencodable', 'o�'));
+      expect(event['options'], containsPair('product_tour_id', 't�'));
+    });
+
+    test('in an alias or group become U+FFFD', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.alias('user\uD800');
+      client.group('company\uD800', 'acme\uDC00');
+      client.capture('e');
+      await client.flush();
+
+      final events = server.events;
+      expect(events.first['properties'], containsPair('alias', 'user�'));
+      expect(events.last['properties'],
+          containsPair(r'$groups', {'company�': 'acme�'}));
+    });
+
+    test('in a registered key leave it removable by unregister', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.register({'k\uD800': 1});
+      client.unregister('k\uD800');
+      client.capture('e');
+      await client.flush();
+
+      expect(server.events.single['properties'], isNot(contains('k�')));
+    });
+
+    test('in an AI event name become U+FFFD', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      final prepared = client.prepareEvent('\$ai_cut\uD83D')!;
+      final uuid = await client.captureAiPrepared('\$ai_cut\uD83D', prepared);
+      await client.flush();
+
+      expect(uuid, isNotNull);
+      expect(server.aiEvents.single['event'], '\$ai_cut�');
+    });
+
+    test('in the /flags request become U+FFFD', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.identify('user\uD800');
+      client.setPersonPropertiesForFlags({'plan\uD800': 'pro\uDC00'});
+      client.setGroupPropertiesForFlags({
+        'company': {'name': 'acme\uD83D'},
+      });
+      await client.reloadFeatureFlagsAsync();
+
+      final body = server.flagsRequests.last.body;
+      expect(body['distinct_id'], 'user�');
+      expect(body['person_properties'], containsPair('plan�', 'pro�'));
+      expect(body['group_properties'], {
+        'company': {'name': 'acme�'},
+      });
     });
   });
 
@@ -602,3 +760,8 @@ void main() {
 }
 
 const _ms = Duration(milliseconds: 1);
+
+class _LoneSurrogateToString {
+  @override
+  String toString() => 'o\uD800';
+}

@@ -1,19 +1,39 @@
 [
   {
-    "method": "screen",
+    "method": "buildEvent",
     "arguments": {
-      "screenName": "Checkout",
+      "eventName": "$screen",
       "properties": {
         "cart_size": 3,
         "route": {
           "source": "email"
         },
-        "snapshot_before_send": "event"
-      }
+        "$screen_name": "Checkout"
+      },
+      "ai": false
     }
   },
   {
-    "method": "capture",
+    "method": "sendBuiltEvent",
+    "arguments": {
+      "event": "$screen",
+      "properties": {
+        "cart_size": 3,
+        "route": {
+          "source": "email"
+        },
+        "$screen_name": "Checkout",
+        "snapshot_before_send": "event"
+      },
+      "distinctId": "snapshot-user",
+      "timestamp": 1709296200000,
+      "options": {},
+      "uuid": "snapshot-uuid",
+      "ai": false
+    }
+  },
+  {
+    "method": "buildEvent",
     "arguments": {
       "eventName": "order completed",
       "properties": {
@@ -26,8 +46,7 @@
           }
         ],
         "placed_at": "2024-03-01 12:30:00.000Z",
-        "$screen_name": "Checkout",
-        "snapshot_before_send": "event"
+        "$screen_name": "Checkout"
       },
       "userProperties": {
         "plan": "pro",
@@ -37,7 +56,41 @@
       "userPropertiesSetOnce": {
         "first_checkout_at": "2024-03-01",
         "signup_source": "invite"
-      }
+      },
+      "ai": false
+    }
+  },
+  {
+    "method": "sendBuiltEvent",
+    "arguments": {
+      "event": "order completed",
+      "properties": {
+        "order_id": "ord_123",
+        "total": 42.5,
+        "items": [
+          {
+            "sku": "sku_1",
+            "quantity": 2
+          }
+        ],
+        "placed_at": "2024-03-01 12:30:00.000Z",
+        "$screen_name": "Checkout",
+        "snapshot_before_send": "event",
+        "$set": {
+          "plan": "pro",
+          "legacy_only": true,
+          "email_verified": true
+        },
+        "$set_once": {
+          "first_checkout_at": "2024-03-01",
+          "signup_source": "invite"
+        }
+      },
+      "distinctId": "snapshot-user",
+      "timestamp": 1709296200000,
+      "options": {},
+      "uuid": "snapshot-uuid",
+      "ai": false
     }
   },
   {

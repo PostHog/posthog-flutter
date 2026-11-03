@@ -360,6 +360,7 @@ abstract class PostHogCoreStateless {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
+    String? uuid,
   }) =>
       _enqueue(
         _analytics,
@@ -371,6 +372,7 @@ abstract class PostHogCoreStateless {
         ),
         options: options,
         timestamp: timestamp,
+        uuid: uuid,
       );
 
   /// Queues [event] on the AI queue, and completes with its uuid, or null
@@ -382,8 +384,9 @@ abstract class PostHogCoreStateless {
     required Map<String, Object?> properties,
     Map<String, Object?>? options,
     String? timestamp,
+    String? uuid,
   }) {
-    final (:uuid, :queued) = _enqueue(
+    final enqueued = _enqueue(
       _ai,
       'capture',
       _buildPayload(
@@ -393,8 +396,9 @@ abstract class PostHogCoreStateless {
       ),
       options: options,
       timestamp: timestamp,
+      uuid: uuid,
     );
-    return queued.then((kept) => kept ? uuid : null);
+    return enqueued.queued.then((kept) => kept ? enqueued.uuid : null);
   }
 
   @protected
@@ -472,7 +476,7 @@ abstract class PostHogCoreStateless {
     try {
       final response = await _fetchWithRetry(
         url,
-        jsonEncode(requestData),
+        jsonEncodeWellFormed(requestData),
         retryCount: _flagsRetryCount,
         retryDelay: _flagsRetryDelay,
         retryCheck: _isRetryableFlagsError,
@@ -525,16 +529,18 @@ abstract class PostHogCoreStateless {
     });
   }
 
-  /// Queues [message] on [lane] and returns its uuid, with whether the queue
-  /// keeps it: the AI queue drops an event over its size limit. Its capture
-  /// v1 [options] are queued with it; the legacy option properties are
-  /// converted only when the request is built, see [captureV1Event].
+  /// Queues [message] on [lane], with [uuid] or a new one, and returns its
+  /// uuid, with whether the queue keeps it: the AI queue drops an event over
+  /// its size limit. Its capture v1 [options] are queued with it; the legacy
+  /// option properties are converted only when the request is built, see
+  /// [captureV1Event].
   ({String uuid, Future<bool> queued}) _enqueue(
     _CaptureLane lane,
     String type,
     Map<String, Object?> message, {
     Map<String, Object?>? options,
     String? timestamp,
+    String? uuid,
   }) {
     final prepared = <String, Object?>{
       ...message,
@@ -546,7 +552,7 @@ abstract class PostHogCoreStateless {
       'library': postHogFlutterSdkName,
       'library_version': postHogFlutterVersion,
       'timestamp': timestamp ?? currentISOTime(),
-      'uuid': generateUuidV7(),
+      'uuid': uuid ?? generateUuidV7(),
     };
 
     final queue = lane.queue;
@@ -669,6 +675,10 @@ abstract class PostHogCoreStateless {
       logger.error('Error while flushing PostHog ${lane.path}', e);
     });
   }
+
+  /// How many events are waiting to be sent, AI events included.
+  @protected
+  int get queuedEventCount => _analytics.queue.length + _ai.queue.length;
 
   /// Flushes the queues of pending events and AI events.
   /// If a flush is already in progress, returns the existing future to avoid
