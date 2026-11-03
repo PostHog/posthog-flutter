@@ -37,7 +37,7 @@
 - Skip `setup()` with one log line when `projectToken` is a personal API key (`phx_`), so the key is never sent
 - Stop printing capture's response body in flush error logs on Windows and Linux, and log how many repeated-uuid copies capture dropped
 - Drop a batch whose 2xx response has no readable per-event results on Windows and Linux instead of counting it as delivered, without resending it
-- Replace lone UTF-16 surrogates with U+FFFD on Windows and Linux, in event names, ids, properties and options, so one such event no longer loses its whole batch; iOS, macOS and Android already send them that way
+- Replace lone UTF-16 surrogates with U+FFFD on Windows and Linux, in event names, ids, properties and options, and in the person and group properties sent for feature flags, so one such event no longer loses its whole batch; iOS, macOS and Android already send them that way
 - Log one line per batch that lost events on Windows and Linux, with the endpoint, count and reasons, also for a terminal status, and count a `limited` result as delivered
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
 - Run queued event encoding, file work and request compression on a background isolate on Windows and Linux so they no longer drop frames
