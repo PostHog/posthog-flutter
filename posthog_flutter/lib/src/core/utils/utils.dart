@@ -114,15 +114,26 @@ String toWellFormed(String value) {
   return units == null ? value : String.fromCharCodes(units);
 }
 
-/// The JSON [value] with [toWellFormed] applied to its strings and keys.
-Object? toWellFormedJson(Object? value) => switch (value) {
+final _loneSurrogateEscape = RegExp(r'\\ud[89a-f]');
+
+/// `jsonEncode(value)` with each lone UTF-16 surrogate replaced by U+FFFD.
+/// `jsonEncode` escapes only lone surrogates as `\udXXX`, so [value] is
+/// copied and re-encoded only when the first encoding has such an escape.
+String jsonEncodeWellFormed(Object? value) {
+  final json = jsonEncode(value);
+  return json.contains(_loneSurrogateEscape)
+      ? jsonEncode(_toWellFormedJson(value))
+      : json;
+}
+
+Object? _toWellFormedJson(Object? value) => switch (value) {
       final String string => toWellFormed(string),
       final Map map => {
           for (final MapEntry(:key, :value) in map.entries)
-            toWellFormed('$key'): toWellFormedJson(value),
+            toWellFormed('$key'): _toWellFormedJson(value),
         },
       final List list => [
-          for (final element in list) toWellFormedJson(element)
+          for (final element in list) _toWellFormedJson(element)
         ],
       _ => value,
     };

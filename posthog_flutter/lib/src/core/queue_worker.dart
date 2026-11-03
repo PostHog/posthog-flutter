@@ -206,7 +206,7 @@ final class _EncodeBody extends _Job {
 
   @override
   EncodedBody run() {
-    final bytes = utf8.encode(jsonEncode(toWellFormedJson(body)));
+    final bytes = utf8.encode(jsonEncodeWellFormed(body));
     return (
       payload: compress ? Uint8List.fromList(gzip.encode(bytes)) : bytes,
       length: bytes.length,

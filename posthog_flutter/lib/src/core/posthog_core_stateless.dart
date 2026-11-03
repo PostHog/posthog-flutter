@@ -472,7 +472,7 @@ abstract class PostHogCoreStateless {
     try {
       final response = await _fetchWithRetry(
         url,
-        jsonEncode(toWellFormedJson(requestData)),
+        jsonEncodeWellFormed(requestData),
         retryCount: _flagsRetryCount,
         retryDelay: _flagsRetryDelay,
         retryCheck: _isRetryableFlagsError,

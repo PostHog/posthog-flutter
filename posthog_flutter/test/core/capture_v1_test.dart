@@ -174,6 +174,7 @@ void main() {
           {'k\uDC00': 'v\uD800'},
         ],
         'emoji': '\u{1F600}',
+        'escape text': r'\ud800',
         'unencodable': _LoneSurrogateToString(),
       }, options: {
         'product_tour_id': 't\uD800',
@@ -188,6 +189,7 @@ void main() {
             {'k�': 'v�'},
           ]));
       expect(event['properties'], containsPair('emoji', '\u{1F600}'));
+      expect(event['properties'], containsPair('escape text', r'\ud800'));
       expect(event['properties'], containsPair('unencodable', 'o�'));
       expect(event['options'], containsPair('product_tour_id', 't�'));
     });
