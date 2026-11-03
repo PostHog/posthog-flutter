@@ -15,6 +15,7 @@ import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
 import 'replay/mask/posthog_mask_controller.dart';
+import 'utils/project_token.dart';
 
 /// Entry point for the PostHog Flutter SDK.
 ///
@@ -73,18 +74,7 @@ class Posthog {
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
   Future<void> setup(PostHogConfig config) async {
-    if (config.projectToken.isEmpty) {
-      debugPrint(
-        '[PostHog] projectToken must not be blank. Setup skipped.',
-      );
-      return Future<void>.value();
-    }
-    // Capture rejects a personal API key, so it is never sent.
-    if (config.projectToken.startsWith('phx_')) {
-      debugPrint(
-        '[PostHog] projectToken is a personal API key (phx_), not a project '
-        'token. Setup skipped.',
-      );
+    if (!isUsableProjectToken(config.projectToken)) {
       return Future<void>.value();
     }
 

@@ -67,6 +67,8 @@ extension PostHogExtension on PostHog {
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
+  // ignore: non_constant_identifier_names
+  external JSAny? get_property(JSAny name);
   // The loader snippet's stub returns undefined until posthog-js loads.
   external JSFunction? onFeatureFlags(JSFunction callback);
   external void startSessionRecording();
@@ -297,6 +299,27 @@ Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
   }
 }
 
+/// The user posthog-js would send an event as right now.
+String? currentWebDistinctId() =>
+    posthog?.get_distinct_id()?.dartify() as String?;
+
+/// Whether posthog-js's current user is identified.
+bool currentWebUserIdentified() =>
+    posthog?.get_property(r'$user_state'.toJS)?.dartify() == 'identified';
+
+/// posthog-js capture options carrying `$set` and `$set_once`.
+/// See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
+Map<String, Object> _personCaptureOptions(Map args) {
+  final userProperties = safeMapConversion(args['userProperties']);
+  final userPropertiesSetOnce = safeMapConversion(
+    args['userPropertiesSetOnce'],
+  );
+  return {
+    if (userProperties.isNotEmpty) '\$set': userProperties,
+    if (userPropertiesSetOnce.isNotEmpty) '\$set_once': userPropertiesSetOnce,
+  };
+}
+
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
   _maybeOverrideSDKInfo();
 
@@ -339,20 +362,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
       _addAppVersionProperties(properties);
-      final userProperties = safeMapConversion(args['userProperties']);
-      final userPropertiesSetOnce = safeMapConversion(
-        args['userPropertiesSetOnce'],
-      );
-
-      // Build options object for posthog-js capture with $set and $set_once
-      // See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
-      final options = <String, Object>{};
-      if (userProperties.isNotEmpty) {
-        options['\$set'] = userProperties;
-      }
-      if (userPropertiesSetOnce.isNotEmpty) {
-        options['\$set_once'] = userPropertiesSetOnce;
-      }
+      final options = _personCaptureOptions(args);
 
       posthog?.capture(
         stringToJSAny(eventName),
@@ -367,7 +377,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       properties.addAll(_getLocationProperties());
       _addAppVersionProperties(properties);
 
-      posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
+      final options = _personCaptureOptions(args);
+      posthog?.capture(
+        stringToJSAny('\$screen'),
+        mapToJSAny(properties),
+        options.isNotEmpty ? mapToJSAny(options) : null,
+      );
       break;
     case 'captureLog':
       final body = args['body'] as String;

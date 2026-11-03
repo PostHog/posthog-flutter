@@ -21,6 +21,23 @@ void main() {
   setUp(() async {
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
+      final arguments = call.arguments;
+      if (call.method == 'buildEvent' && arguments is Map) {
+        return {
+          'event': arguments['eventName'],
+          'uuid': 'snapshot-uuid',
+          'distinctId': 'snapshot-user',
+          'timestamp': 1709296200000,
+          'properties': {
+            ...?(arguments['properties'] as Map?),
+            if (arguments['userProperties'] != null)
+              r'$set': arguments['userProperties'],
+            if (arguments['userPropertiesSetOnce'] != null)
+              r'$set_once': arguments['userPropertiesSetOnce'],
+          },
+          'options': arguments['options'] ?? <String, Object?>{},
+        };
+      }
       return null;
     });
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
@@ -268,17 +285,22 @@ void main() {
     );
 
     final normalizedCalls = calls.map((call) {
-      if (call.method != 'captureException') {
+      final arguments = call.arguments is Map
+          ? Map<String, Object?>.from(call.arguments as Map)
+          : null;
+      final rawProperties = arguments?['properties'];
+      if (arguments == null ||
+          rawProperties is! Map ||
+          !rawProperties.containsKey(r'$exception_list')) {
         return call;
       }
 
-      final arguments = Map<String, Object?>.from(call.arguments as Map);
-      expect(arguments['timestamp'], isA<int>());
-      arguments['timestamp'] = '<timestamp-ms>';
+      if (call.method == 'buildEvent') {
+        expect(arguments['timestamp'], isA<int>());
+        arguments['timestamp'] = '<timestamp-ms>';
+      }
 
-      final properties = Map<String, Object?>.from(
-        arguments['properties'] as Map,
-      );
+      final properties = Map<String, Object?>.from(rawProperties);
       final exceptionList = List<Object?>.from(
         properties[r'$exception_list'] as List,
       );

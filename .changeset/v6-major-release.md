@@ -13,7 +13,10 @@
 - **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter — use `throttleDelay`
 - **Breaking:** remove `PostHogDataMode.cellular` — use `PostHogDataMode.any`
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
-- Keep a `reset()`, `identify()` or `optOut()` made right after an un-awaited `capture()`, `screen()` or `captureException()` from applying to that event first, and stop dropping that event on Windows and Linux
+- Keep a `reset()`, `identify()` or `optOut()` made right after an un-awaited `capture()`, `screen()`, `captureException()`, `captureFeatureView()` or `captureFeatureInteraction()` from applying to that event first, and stop dropping that event on Windows and Linux
+- Run a `beforeSend` callback that renames a screen or exception event once, and keep its `userProperties`
+- Keep `userProperties` and `userPropertiesSetOnce` that a `beforeSend` callback sets on a screen or exception event on web
+- Send an event as its original user when a `beforeSend` callback calls `reset()` or `identify()` on Windows and Linux, instead of dropping it, and on web, instead of sending it as the new user
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
 - **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android — update filters that match it
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
@@ -31,6 +34,8 @@
 - **Breaking:** apply SDK properties, then registered properties, then event properties on Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** always set `$lib` and `$lib_version` from the `PostHog-Sdk-Info` header on Windows and Linux, ignoring changes made in `beforeSend`
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
+- **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
+- **Breaking:** decide person processing before `beforeSend` runs on iOS, macOS, Android, Windows and Linux — a callback that removes `$set` no longer prevents a person profile, and a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
 - Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
@@ -41,10 +46,14 @@
 - Skip `setup()` with one log line when `projectToken` is a personal API key (`phx_`), so the key is never sent
 - Stop printing capture's response body in flush error logs on Windows and Linux, and log how many repeated-uuid copies capture dropped
 - Drop a batch whose 2xx response has no readable per-event results on Windows and Linux instead of counting it as delivered, without resending it
+- Replace lone UTF-16 surrogates with U+FFFD on Windows and Linux, in event names, ids, properties and options, and in the person and group properties sent for feature flags, so one such event no longer loses its whole batch; iOS, macOS and Android already send them that way
 - Log one line per batch that lost events on Windows and Linux, with the endpoint, count and reasons, also for a terminal status, and count a `limited` result as delivered
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
 - Run queued event encoding, file work and request compression on a background isolate on Windows and Linux so they no longer drop frames
 - Limit AI events waiting to be written on Windows and Linux to about 50 MiB in memory, dropping the oldest first and completing `captureAi` with `null` for them
 - Take an event's timestamp before the `beforeSend` callbacks run on Windows and Linux
+- Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set on every platform except web — a callback can change the distinct ID and timestamp, and the event keeps its uuid
+- Attach `$exception_steps` before `beforeSend` runs on Windows and Linux so callbacks can read or remove them — steps recorded while a callback runs, or an event a callback renames to `$exception`, no longer get them
+- Add `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
 - Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value
