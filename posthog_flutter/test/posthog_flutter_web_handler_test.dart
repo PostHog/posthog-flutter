@@ -7,6 +7,7 @@ import 'dart:js_interop_unsafe';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
+import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
 // Browser-only: handleWebMethodCall talks to the posthog-js instance on
@@ -161,6 +162,141 @@ void main() {
         'count': 3,
         'at': '2026-01-02 00:00:00.000Z',
       });
+    });
+  });
+
+  test('PosthogFlutterWeb captureFeatureView captures the native event shape',
+      () async {
+    final calls = <List<Object?>>[];
+    final fake = JSObject();
+    fake.setProperty(
+      'getFeatureFlagResult'.toJS,
+      ((JSString key, JSAny? options) {
+        calls.add(['getFeatureFlagResult', key.toDart, options.dartify()]);
+        return {'key': key.toDart, 'enabled': true, 'variant': 'control'}
+            .jsify();
+      }).toJS,
+    );
+    fake.setProperty(
+      'capture'.toJS,
+      ((JSString event, JSAny? properties, JSAny? options) {
+        final props = properties.dartify()! as Map;
+        calls.add([
+          'capture',
+          event.toDart,
+          props['feature_flag'],
+          props['feature_flag_variant'],
+          options.dartify(),
+        ]);
+      }).toJS,
+    );
+    globalContext.setProperty('posthog'.toJS, fake);
+
+    await PosthogFlutterWeb().captureFeatureView(flag: 'checkout');
+
+    expect(calls, [
+      [
+        'getFeatureFlagResult',
+        'checkout',
+        {'send_event': false}
+      ],
+      [
+        'capture',
+        r'$feature_view',
+        'checkout',
+        'control',
+        {
+          r'$set': {r'$feature_view/checkout': 'control'}
+        },
+      ],
+    ]);
+  });
+
+  test('PosthogFlutterWeb feature events carry the current screen until close',
+      () async {
+    final screenNames = <String, Object?>{};
+    final fake = JSObject();
+    fake.setProperty(
+      'capture'.toJS,
+      ((JSString event, JSAny? properties, JSAny? options) {
+        final props = properties.dartify()! as Map;
+        screenNames[event.toDart] = props[r'$screen_name'];
+      }).toJS,
+    );
+    globalContext.setProperty('posthog'.toJS, fake);
+    final web = PosthogFlutterWeb();
+
+    await web.screen(screenName: 'Cart');
+    await web.captureFeatureInteraction(flag: 'checkout', flagVariant: 'a');
+    expect(screenNames[r'$feature_interaction'], 'Cart');
+
+    await web.close();
+    await web.captureFeatureView(flag: 'checkout', flagVariant: 'a');
+    expect(screenNames[r'$feature_view'], isNull);
+  });
+
+  group('PosthogFlutterWeb sendFeatureFlagEvent', () {
+    late Map<String, Object?> optionsByMethod;
+
+    setUp(() {
+      optionsByMethod = {};
+      final fake = JSObject();
+      for (final method in ['getFeatureFlag', 'isFeatureEnabled']) {
+        fake.setProperty(
+          method.toJS,
+          ((JSString key, JSAny? options) {
+            optionsByMethod[method] = options.dartify();
+            return true.toJS;
+          }).toJS,
+        );
+      }
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    for (final (sendFeatureFlagEvent, expected) in [
+      (null, <String, Object?>{}),
+      (false, {'send_event': false}),
+      (true, {'send_event': true}),
+    ]) {
+      test('maps $sendFeatureFlagEvent to posthog-js options $expected',
+          () async {
+        final web = PosthogFlutterWeb();
+        await web.getFeatureFlag(
+            key: 'flag', sendFeatureFlagEvent: sendFeatureFlagEvent);
+        await web.isFeatureEnabled('flag',
+            sendFeatureFlagEvent: sendFeatureFlagEvent);
+
+        expect(optionsByMethod, {
+          'getFeatureFlag': expected,
+          'isFeatureEnabled': expected,
+        });
+      });
+    }
+  });
+
+  group('PosthogFlutterWeb getAllFeatureFlags', () {
+    test('decodes the posthog-js results', () async {
+      final fake = JSObject();
+      fake.setProperty(
+        'getAllFeatureFlags'.toJS,
+        (() => [
+              {'key': 'on', 'enabled': true},
+              {'key': 'multi', 'enabled': true, 'variant': 'control'},
+            ].jsify()).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+
+      expect(await PosthogFlutterWeb().getAllFeatureFlags(), [
+        const PostHogFeatureFlagResult(key: 'on', enabled: true),
+        const PostHogFeatureFlagResult(
+            key: 'multi', enabled: true, variant: 'control'),
+      ]);
+    });
+
+    test('returns null when posthog-js predates getAllFeatureFlags', () async {
+      globalContext.setProperty('posthog'.toJS, JSObject());
+
+      expect(await PosthogFlutterWeb().getAllFeatureFlags(), isNull);
     });
   });
 

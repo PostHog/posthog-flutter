@@ -40,12 +40,13 @@ Future<T> retriable<T>(
 
 /// Returns [value] as a new structure that `jsonEncode` accepts.
 ///
-/// A [DateTime] becomes its ISO 8601 string in UTC and a [Uri] its string.
+/// Non-finite doubles become null. A [DateTime] becomes its ISO 8601 string
+/// in UTC and a [Uri] its string.
 /// Other values JSON cannot represent are converted like `jsonEncode` does,
 /// through their `toJson()`, or else sent as their `toString()` with a
 /// warning to [logger]. Map keys become strings. With [dropNullMembers],
-/// null-valued map entries are left out at every level, while list
-/// elements keep their positions.
+/// map entries whose converted value is null are left out at every level,
+/// while list elements keep their positions.
 Object? toJsonValue(Object? value, CoreLogger logger,
     {bool dropNullMembers = false}) {
   // The maps and lists being converted: one that contains itself goes to
@@ -56,6 +57,8 @@ Object? toJsonValue(Object? value, CoreLogger logger,
     switch (value) {
       case null || bool() || String() || int() || double(isFinite: true):
         return value;
+      case double():
+        return null;
       case final DateTime date:
         return date.toUtc().toIso8601String();
       case final Uri uri:
@@ -65,7 +68,9 @@ Object? toJsonValue(Object? value, CoreLogger logger,
         try {
           return {
             for (final MapEntry(:key, value: member) in map.entries)
-              if (member != null || !dropNullMembers) '$key': convert(member),
+              if (convert(member) case final converted
+                  when converted != null || !dropNullMembers)
+                '$key': converted,
           };
         } finally {
           converting.remove(map);

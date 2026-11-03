@@ -333,6 +333,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
           y: imageInfo.y,
           width: imageInfo.width,
           height: imageInfo.height,
+          secureAtCapture: imageInfo.secureAtCapture,
         ) ??
         false;
     if (!snapshotSent) {

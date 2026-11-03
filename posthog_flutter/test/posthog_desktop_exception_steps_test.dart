@@ -66,18 +66,77 @@ void main() {
       expect(step['nested'], {'kept': 1});
     });
 
-    test('keeps a step with a number JSON cannot represent, as its string', () {
+    test('omits non-finite object members and preserves null array positions',
+        () {
       final buffer = ExceptionStepsBuffer(maxBytes: 32768);
 
       buffer.add('step', properties: {
         'ratio': double.nan,
         'limits': [double.infinity, double.negativeInfinity],
+        'finite': 42.5,
+        'literal': 'NaN',
       });
 
       final step = buffer.steps.single;
-      expect(step['ratio'], 'NaN');
-      expect(step['limits'], ['Infinity', '-Infinity']);
+      expect(step, isNot(contains('ratio')));
+      expect(step['limits'], [null, null]);
+      expect(step['finite'], 42.5);
+      expect(step['literal'], 'NaN');
     });
+
+    for (final capacity in [1, 2]) {
+      test('retains $capacity non-finite steps whose wire forms fit exactly',
+          () {
+        final expectedStep = <String, Object?>{
+          'nested': {'finite': 42.5},
+          'items': [
+            0,
+            null,
+            {'literal': 'NaN'},
+            null,
+            'after'
+          ],
+          'enabled': false,
+          'literal': 'Infinity',
+          r'$message': 'step 1',
+          r'$timestamp': '2026-01-02T00:00:00.000Z',
+        };
+        final stepBytes = bytesOf(expectedStep);
+        final buffer = ExceptionStepsBuffer(maxBytes: stepBytes * capacity);
+        final nested = {'ratio': double.infinity, 'finite': 42.5};
+        final inArray = {'ratio': double.negativeInfinity, 'literal': 'NaN'};
+        final properties = {
+          'ratio': double.nan,
+          'nested': nested,
+          'items': [0, double.infinity, inArray, null, 'after'],
+          'enabled': false,
+          'literal': 'Infinity',
+        };
+
+        for (var i = 1; i <= capacity; i++) {
+          buffer.add('step $i', properties: properties);
+        }
+
+        expect(messagesOf(buffer),
+            [for (var i = 1; i <= capacity; i++) 'step $i']);
+        for (final step in buffer.steps) {
+          expect(bytesOf(step), stepBytes);
+          expect({
+            ...step,
+            r'$message': 'step 1',
+            r'$timestamp': '2026-01-02T00:00:00.000Z'
+          }, expectedStep);
+        }
+        expect(properties['ratio'], isNaN);
+        expect(nested['ratio'], double.infinity);
+        expect(inArray['ratio'], double.negativeInfinity);
+
+        buffer.add('step ${capacity + 1}', properties: properties);
+
+        expect(messagesOf(buffer),
+            [for (var i = 2; i <= capacity + 1; i++) 'step $i']);
+      });
+    }
 
     test('evicts the oldest steps to stay within the budget', () {
       final probe = ExceptionStepsBuffer(maxBytes: 32768)..add('step 1');

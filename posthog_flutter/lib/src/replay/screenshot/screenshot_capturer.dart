@@ -36,6 +36,10 @@ class ImageInfo {
   /// it if the session rotates mid-flight.
   final String? sessionId;
 
+  /// Whether the Android window had FLAG_SECURE when this frame was captured,
+  /// so the native side masks it even if the flag clears before the send.
+  final bool secureAtCapture;
+
   ImageInfo(
     this.id,
     this.x,
@@ -46,6 +50,7 @@ class ImageInfo {
     this.imageBytes, {
     required this.sessionId,
     required this.generation,
+    this.secureAtCapture = false,
   });
 }
 
@@ -663,10 +668,12 @@ class ScreenshotCapturer {
     if (previousSessionId != null && state.sessionId != previousSessionId) {
       onSessionRotated?.call();
     }
-    return _captureScreenshot(state.sessionId, _sessionGeneration);
+    return _captureScreenshot(
+        state.sessionId, _sessionGeneration, state.secure);
   }
 
-  Future<ImageInfo?> _captureScreenshot(String? sessionId, int generation) {
+  Future<ImageInfo?> _captureScreenshot(
+      String? sessionId, int generation, bool secureAtCapture) {
     final target = _resolveCaptureTarget();
     if (target == null) {
       return Future.value(null);
@@ -917,6 +924,7 @@ class ScreenshotCapturer {
               pngBytes,
               sessionId: sessionId,
               generation: generation,
+              secureAtCapture: secureAtCapture,
             );
             // No status commit here: the sender may still drop this frame, and
             // committing for a never-sent frame breaks playback / freezes dedup.

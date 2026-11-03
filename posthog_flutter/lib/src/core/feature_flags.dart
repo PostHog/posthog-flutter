@@ -245,6 +245,10 @@ class PostHogFlagsStorageFormat {
   final FeatureFlagRequestError? requestError;
   final bool? minimalFlagCalledEvents;
 
+  /// True when no request has loaded flags yet, so [flags] is empty only
+  /// because the record exists to keep [requestError].
+  final bool notLoaded;
+
   const PostHogFlagsStorageFormat({
     required this.flags,
     this.requestId,
@@ -253,6 +257,7 @@ class PostHogFlagsStorageFormat {
     this.quotaLimited,
     this.requestError,
     this.minimalFlagCalledEvents,
+    this.notLoaded = false,
   });
 
   /// The stored state viewed as a flags response ([requestError] is the
@@ -276,6 +281,7 @@ class PostHogFlagsStorageFormat {
         if (requestError != null) 'requestError': requestError!.toJson(),
         if (minimalFlagCalledEvents != null)
           'minimalFlagCalledEvents': minimalFlagCalledEvents,
+        if (notLoaded) 'notLoaded': true,
       };
 
   factory PostHogFlagsStorageFormat.fromJson(
@@ -297,6 +303,7 @@ class PostHogFlagsStorageFormat {
               json['requestError'] as Map<String, Object?>)
           : null,
       minimalFlagCalledEvents: json['minimalFlagCalledEvents'] as bool?,
+      notLoaded: json['notLoaded'] as bool? ?? false,
     );
   }
 }

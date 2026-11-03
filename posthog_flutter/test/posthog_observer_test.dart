@@ -21,6 +21,8 @@ void main() {
   });
 
   tearDown(() {
+    WidgetsBinding.instance
+        .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     fake.screenName = null;
     PosthogObserver.clearCurrentContext();
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
@@ -30,13 +32,15 @@ void main() {
     ScreenNameExtractor nameExtractor = defaultNameExtractor,
     PostHogRouteFilter routeFilter = defaultPostHogRouteFilter,
   }) {
-    final observer = PosthogObserver(
+    return PosthogObserver(
       nameExtractor: nameExtractor,
       routeFilter: routeFilter,
     );
-    addTearDown(() => WidgetsBinding.instance.removeObserver(observer));
-    return observer;
   }
+
+  test('preserves WidgetsBindingObserver compatibility', () {
+    expect(getSut(), isA<WidgetsBindingObserver>());
+  });
 
   test('returns current route name', () {
     final currentRoute = route(const RouteSettings(name: 'Current Route'));
@@ -117,7 +121,8 @@ void main() {
     final sut = getSut();
 
     // Simulate app going to background
-    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+    WidgetsBinding.instance
+        .handleAppLifecycleStateChanged(AppLifecycleState.paused);
 
     sut.didPush(currentRoute, null);
 
@@ -130,7 +135,8 @@ void main() {
     final sut = getSut();
 
     // Simulate app becoming inactive
-    sut.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    WidgetsBinding.instance
+        .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
 
     sut.didPush(currentRoute, null);
 
@@ -143,11 +149,13 @@ void main() {
     final sut = getSut();
 
     // Simulate app going to background and back
-    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+    WidgetsBinding.instance
+        .handleAppLifecycleStateChanged(AppLifecycleState.paused);
     sut.didPush(currentRoute, null);
     expect(fake.screenName, null);
 
-    sut.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    WidgetsBinding.instance
+        .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     sut.didPush(currentRoute, null);
     expect(fake.screenName, 'Current Route');
   });
@@ -174,7 +182,8 @@ void main() {
     final sut = getSut();
 
     // Simulate app going to background
-    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+    WidgetsBinding.instance
+        .handleAppLifecycleStateChanged(AppLifecycleState.paused);
 
     sut.didPop(currentRoute, previousRoute);
 
@@ -188,11 +197,34 @@ void main() {
     final sut = getSut();
 
     // Simulate app going to background
-    sut.didChangeAppLifecycleState(AppLifecycleState.paused);
+    WidgetsBinding.instance
+        .handleAppLifecycleStateChanged(AppLifecycleState.paused);
 
     sut.didReplace(newRoute: newRoute, oldRoute: oldRoute);
 
     expect(fake.screenName, null);
+  });
+
+  // Routers such as auto_route create an observer per nested navigator, and
+  // nothing removes it from the binding when that navigator goes away.
+  testWidgets(
+      'does not stay registered with WidgetsBinding after its navigator is '
+      'disposed', (tester) async {
+    final observer = getSut();
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Navigator(
+          observers: [observer],
+          onGenerateRoute: (_) => route(const RouteSettings(name: 'Home')),
+        ),
+      ),
+    );
+    await tester.pumpWidget(const SizedBox());
+
+    // removeObserver returns true only for an observer still registered.
+    final wasRegistered = tester.binding.removeObserver(observer);
+    expect(wasRegistered, isFalse);
   });
 }
 

@@ -170,6 +170,24 @@ class PostHogConfig {
   /// in your `posthog.init({...})` call instead.
   var preloadFeatureFlags = true;
 
+  /// Evaluation contexts sent with every `/flags` request, so only flags
+  /// tagged with at least one of these contexts are evaluated.
+  ///
+  /// Defaults to `null`, which sends no contexts and evaluates every flag.
+  /// Flags without evaluation contexts are always evaluated. Use this to keep
+  /// flags meant for other apps or environments out of this app's requests.
+  ///
+  /// **Flutter web:** not applied. posthog-js is initialized by your app, so
+  /// set `evaluation_contexts` in your `posthog.init({...})` call instead.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('<YOUR_PROJECT_TOKEN>')
+  ///   ..evaluationContexts = ['mobile-app', 'production'];
+  /// await Posthog().setup(config);
+  /// ```
+  List<String>? evaluationContexts;
+
   /// Whether the SDK captures application lifecycle events automatically.
   ///
   /// Captured events include app opened, backgrounded, installed, and updated
@@ -281,11 +299,14 @@ class PostHogConfig {
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
 
-  /// Whether to automatically register this device's push token with PostHog.
+  /// Whether to automatically register this device's push token or Firebase
+  /// Installation ID (FID) with PostHog.
   ///
   /// On iOS the native SDK swizzles the app delegate's remote-notification
   /// registration callback; on Android it fetches the FCM token at startup when
-  /// `firebase-messaging` is on the classpath. Either way the host app is still
+  /// `firebase-messaging` is on the classpath, or the FID when the app's manifest
+  /// enables `firebase_messaging_installation_id_enabled`. The host app must
+  /// still register with Firebase in FID mode. Either way the host app is still
   /// responsible for requesting notification permission and calling
   /// `registerForRemoteNotifications()` (iOS) — this only observes the result.
   ///
@@ -412,6 +433,14 @@ class PostHogConfig {
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
+  /// - On every platform except Windows and Linux, PostHog calls made after a
+  ///   capture (including `reset()`, `identify()` and getters) wait until its
+  ///   callbacks finish, so the event keeps the user and consent it was
+  ///   captured under. A callback that runs longer than 10 seconds stops
+  ///   holding them back; its event is still sent when it finishes, with the
+  ///   user, super properties, groups and consent current by then. Calls made
+  ///   from inside a callback do not wait, but a callback that waits on a
+  ///   PostHog call made elsewhere stalls until that limit.
   List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, captureDeepLinks integrations
@@ -451,6 +480,7 @@ class PostHogConfig {
       'flushInterval': flushInterval.inSeconds,
       'sendFeatureFlagEvents': sendFeatureFlagEvent,
       'preloadFeatureFlags': preloadFeatureFlags,
+      if (evaluationContexts != null) 'evaluationContexts': evaluationContexts,
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
       'rageClickConfig': rageClickConfig.toMap(),
       'debug': debug,
@@ -1204,9 +1234,11 @@ class PostHogErrorTrackingConfig {
 
   /// Enable automatic capture of isolate errors.
   ///
-  /// Controls whether errors from the current isolate are captured.
-  /// This includes errors from the main isolate and any isolates spawned
-  /// without explicit error handling.
+  /// Only captures errors from the isolate where `Posthog().setup()` runs,
+  /// normally the main isolate. Errors from spawned background isolates are
+  /// not captured automatically. To capture them, call
+  /// `isolate.addPostHogErrorListener()` from the main isolate before resuming
+  /// an isolate spawned paused.
   ///
   /// **Note:**
   /// - Flutter web: Not supported

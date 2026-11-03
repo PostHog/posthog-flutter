@@ -179,6 +179,28 @@ class _SurveyBottomSheetState extends State<SurveyBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final sheet = _buildSheet(context);
+    final fontFamily = widget.appearance.fontFamily;
+    if (fontFamily == null) {
+      return sheet;
+    }
+
+    // Plain Text reads the font from DefaultTextStyle, while buttons and text
+    // fields read it from the theme, so set both. A family the app doesn't
+    // bundle falls back to the default font.
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        textTheme: theme.textTheme.apply(fontFamily: fontFamily),
+      ),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(fontFamily: fontFamily),
+        child: sheet,
+      ),
+    );
+  }
+
+  Widget _buildSheet(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
 
     return PopScope(

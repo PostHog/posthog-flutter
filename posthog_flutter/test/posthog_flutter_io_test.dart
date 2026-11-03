@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
@@ -79,6 +81,109 @@ void main() {
           await posthogFlutterIO.getFeatureFlagResult(key: 'missing'), isNull);
       expect(log.single.method, 'getFeatureFlagResult');
       expect(log.single.arguments, {'key': 'missing', 'sendEvent': true});
+    });
+  });
+
+  group('PosthogFlutterIO feature events', () {
+    test('captureFeatureView and captureFeatureInteraction call the native SDK',
+        () async {
+      await posthogFlutterIO.captureFeatureView(flag: 'a');
+      await posthogFlutterIO.captureFeatureInteraction(
+          flag: 'b', flagVariant: 'control');
+
+      expect(log.map((call) => [call.method, call.arguments]), [
+        [
+          'captureFeatureView',
+          {'flag': 'a'}
+        ],
+        [
+          'captureFeatureInteraction',
+          {'flag': 'b', 'flagVariant': 'control'}
+        ],
+      ]);
+    });
+  });
+
+  group('PosthogFlutterIO exception events', () {
+    test('passes AOT debug images and addresses through the native channel',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await posthogFlutterIO.captureException(
+        error: StateError('sample failure'),
+        stackTrace: StackTrace.fromString('''
+build_id: 'b718850999efbed01ab80642060ddbf3'
+isolate_dso_base: 7000000000
+#0 abs 7000205218 _kDartIsolateSnapshotInstructions+0x20
+'''),
+      );
+
+      final call = log.singleWhere((item) => item.method == 'captureException');
+      final args = Map<String, dynamic>.from(call.arguments as Map);
+      final properties = Map<String, dynamic>.from(args['properties'] as Map);
+      final images = properties['\$debug_images'] as List;
+      expect(images.single, {
+        'debug_id': '098518b7-ef99-d0be-1ab8-0642060ddbf3',
+        'image_addr': '0x7000000000',
+        'type': 'elf',
+      });
+      final exception = (properties['\$exception_list'] as List).single as Map;
+      final frames = (exception['stacktrace'] as Map)['frames'] as List;
+      expect((frames.single as Map)['instruction_addr'], '0x7000205218');
+    });
+  });
+
+  group('PosthogFlutterIO sendFeatureFlagEvent', () {
+    for (final sendFeatureFlagEvent in [null, true, false]) {
+      final expected = {
+        'key': 'flag',
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      };
+
+      test('getFeatureFlag sends $expected', () async {
+        await posthogFlutterIO.getFeatureFlag(
+            key: 'flag', sendFeatureFlagEvent: sendFeatureFlagEvent);
+        expect(log.single.method, 'getFeatureFlag');
+        expect(log.single.arguments, expected);
+      });
+
+      test('isFeatureEnabled sends $expected', () async {
+        await posthogFlutterIO.isFeatureEnabled('flag',
+            sendFeatureFlagEvent: sendFeatureFlagEvent);
+        expect(log.single.method, 'isFeatureEnabled');
+        expect(log.single.arguments, expected);
+      });
+    }
+  });
+
+  group('PosthogFlutterIO getAllFeatureFlags', () {
+    test('decodes the native results', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'getAllFeatureFlags');
+        return [
+          {'key': 'on', 'enabled': true, 'variant': null, 'payload': null},
+          {
+            'key': 'multi',
+            'enabled': true,
+            'variant': 'control',
+            'payload': {'discount': 10}
+          },
+        ];
+      });
+
+      final results = await posthogFlutterIO.getAllFeatureFlags();
+      expect(results, [
+        const PostHogFeatureFlagResult(key: 'on', enabled: true),
+        const PostHogFeatureFlagResult(
+            key: 'multi', enabled: true, variant: 'control'),
+      ]);
+      expect(results![1].payload, {'discount': 10});
+    });
+
+    test('preserves a missing native result', () async {
+      expect(await posthogFlutterIO.getAllFeatureFlags(), isNull);
+      expect(log.single.method, 'getAllFeatureFlags');
     });
   });
 
@@ -1031,6 +1136,45 @@ void main() {
     });
   });
 
+  group('PosthogFlutterIO calls made while an event is in flight', () {
+    List<String> sentAfterSetup() =>
+        log.map((c) => c.method).where((m) => m != 'setup').toList();
+
+    for (final slow in [false, true]) {
+      test(
+          'reach native after events captured before them '
+          '(${slow ? 'async' : 'no'} beforeSend)', () async {
+        await posthogFlutterIO
+            .setup(PostHogConfig('test_project_token', beforeSend: [
+          if (slow)
+            (event) async {
+              await Future<void>.delayed(Duration.zero);
+              return event;
+            },
+        ]));
+
+        final sent = [
+          posthogFlutterIO.capture(eventName: 'checkout'),
+          posthogFlutterIO.screen(screenName: 'Cart'),
+          posthogFlutterIO.captureException(error: StateError('boom')),
+        ];
+        await posthogFlutterIO.reset();
+        await posthogFlutterIO.identify(userId: 'new-user');
+        await posthogFlutterIO.register('plan', 'pro');
+        await Future.wait(sent);
+
+        expect(sentAfterSetup(), [
+          'capture',
+          'screen',
+          'captureException',
+          'reset',
+          'identify',
+          'register',
+        ]);
+      });
+    }
+  });
+
   group('PosthogFlutterIO addExceptionStep', () {
     test('sends message and normalized properties', () async {
       await posthogFlutterIO.addExceptionStep(
@@ -1125,6 +1269,33 @@ void main() {
         'deviceToken': 'token-abc',
         'appId': 'com.example.app',
       });
+    });
+
+    test('registerPushNotificationToken forwards repeated FID registrations',
+        () async {
+      for (var i = 0; i < 2; i++) {
+        await posthogFlutterIO.registerPushNotificationToken(
+          'c1234567890123456789012',
+          appId: 'firebase-project',
+        );
+      }
+
+      expect(log.map((call) => [call.method, call.arguments]), [
+        [
+          'registerPushNotificationToken',
+          {
+            'deviceToken': 'c1234567890123456789012',
+            'appId': 'firebase-project',
+          },
+        ],
+        [
+          'registerPushNotificationToken',
+          {
+            'deviceToken': 'c1234567890123456789012',
+            'appId': 'firebase-project',
+          },
+        ],
+      ]);
     });
 
     test('registerPushNotificationToken omits appId when null', () async {

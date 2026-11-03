@@ -19,6 +19,7 @@ import android.view.PixelCopy
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager.LayoutParams.FLAG_SECURE
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
@@ -259,6 +260,14 @@ class PosthogFlutterPlugin :
                 capture(call, result)
             }
 
+            "captureFeatureView" -> {
+                captureFeatureView(call, result)
+            }
+
+            "captureFeatureInteraction" -> {
+                captureFeatureInteraction(call, result)
+            }
+
             "screen" -> {
                 screen(call, result)
             }
@@ -329,6 +338,10 @@ class PosthogFlutterPlugin :
 
             "getFeatureFlagResult" -> {
                 getFeatureFlagResult(call, result)
+            }
+
+            "getAllFeatureFlags" -> {
+                getAllFeatureFlags(result)
             }
 
             "register" -> {
@@ -460,7 +473,15 @@ class PosthogFlutterPlugin :
         mapOf(
             "isActive" to isSessionReplayActive(),
             "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
+            "secure" to isWindowSecure(),
         )
+
+    private fun isWindowSecure(): Boolean = ((activity?.window?.attributes?.flags ?: 0) and FLAG_SECURE) != 0
+
+    // Dart's capture-time value plus a send-time re-check, so a frame stays masked
+    // if FLAG_SECURE clears (e.g. the secure screen is popped) before it's sent.
+    @VisibleForTesting
+    internal fun isFrameMasked(secureAtCapture: Boolean): Boolean = secureAtCapture || isWindowSecure()
 
     private fun startSessionRecording(
         call: MethodCall,
@@ -602,6 +623,9 @@ class PosthogFlutterPlugin :
                 }
                 posthogConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
                     preloadFeatureFlags = it
+                }
+                posthogConfig.getIfNotNull<List<String>>("evaluationContexts") {
+                    evaluationContexts = it
                 }
                 posthogConfig.getIfNotNull<Boolean>("optOut") {
                     optOut = it
@@ -1310,8 +1334,9 @@ class PosthogFlutterPlugin :
                 val timestampMs = replayTimeMillis()
                 val replayConfig = postHogConfig?.sessionReplayConfig
                 val quality = replayConfig?.screenshotCompressionQuality ?: DEFAULT_SCREENSHOT_COMPRESSION_QUALITY
+                val masked = isFrameMasked(call.argument<Boolean>("secureAtCapture") == true)
                 submitSnapshotWork(result) {
-                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)
+                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality, masked)
                 }
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)
@@ -1682,7 +1707,7 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val featureFlagKey: String = call.argument("key")!!
-            val flag = PostHog.getFeatureFlag(featureFlagKey)
+            val flag = PostHog.getFeatureFlag(featureFlagKey, sendFeatureFlagEvent = call.argument("sendEvent"))
             result.success(flag)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1727,6 +1752,23 @@ class PosthogFlutterPlugin :
             } else {
                 result.success(null)
             }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun getAllFeatureFlags(result: Result) {
+        try {
+            val flagResults =
+                PostHog.getAllFeatureFlags()?.map {
+                    mapOf(
+                        "key" to it.key,
+                        "enabled" to it.enabled,
+                        "variant" to it.variant,
+                        "payload" to it.payload,
+                    )
+                }
+            result.success(flagResults)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -1837,6 +1879,32 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun captureFeatureView(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val flag: String = call.argument("flag")!!
+            PostHog.captureFeatureView(flag, call.argument("flagVariant"))
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureFeatureInteraction(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val flag: String = call.argument("flag")!!
+            PostHog.captureFeatureInteraction(flag, call.argument("flagVariant"))
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
     private fun distinctId(result: Result) {
         try {
             val distinctId: String = PostHog.distinctId()
@@ -1901,7 +1969,7 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val key: String = call.argument("key")!!
-            val isEnabled = PostHog.isFeatureEnabled(key)
+            val isEnabled = PostHog.isFeatureEnabled(key, sendFeatureFlagEvent = call.argument("sendEvent"))
             result.success(isEnabled)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

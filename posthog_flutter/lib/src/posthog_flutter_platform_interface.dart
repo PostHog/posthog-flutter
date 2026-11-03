@@ -121,6 +121,22 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('alias() has not been implemented.');
   }
 
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) {
+    throw UnimplementedError('captureFeatureView() has not been implemented.');
+  }
+
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) {
+    throw UnimplementedError(
+      'captureFeatureInteraction() has not been implemented.',
+    );
+  }
+
   Future<String> getDistinctId() {
     throw UnimplementedError('getDistinctId() has not been implemented.');
   }
@@ -153,7 +169,7 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('unregister() has not been implemented.');
   }
 
-  Future<bool> isFeatureEnabled(String key) {
+  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');
   }
 
@@ -200,7 +216,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('group() has not been implemented.');
   }
 
-  Future<Object?> getFeatureFlag({required String key}) {
+  Future<Object?> getFeatureFlag({
+    required String key,
+    bool? sendFeatureFlagEvent,
+  }) {
     throw UnimplementedError('getFeatureFlag() has not been implemented.');
   }
 
@@ -217,6 +236,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError(
       'getFeatureFlagResult() has not been implemented.',
     );
+  }
+
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() {
+    throw UnimplementedError('getAllFeatureFlags() has not been implemented.');
   }
 
   Future<void> flush() {

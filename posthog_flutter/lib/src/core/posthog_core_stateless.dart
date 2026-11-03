@@ -435,8 +435,10 @@ abstract class PostHogCoreStateless {
           Map<Object?, Object?> properties) =>
       {
         for (final MapEntry(:key, :value) in properties.entries)
-          if (value != null || key == r'$feature_flag_response')
-            '$key': toJsonValue(value, logger, dropNullMembers: true),
+          if (toJsonValue(value, logger, dropNullMembers: true)
+              case final converted
+              when converted != null || key == r'$feature_flag_response')
+            '$key': converted,
       };
 
   void _scheduleFlush() {

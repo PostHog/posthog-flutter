@@ -53,4 +53,14 @@ void main() {
 
     expect(logs.where((line) => line.contains('bootstrap')), hasLength(1));
   });
+
+  test('warns that evaluationContexts is not applied on web', () async {
+    final config = PostHogConfig('test_project_token');
+    config.evaluationContexts = ['mobile'];
+
+    final logs = await setupCapturingLogs(config);
+
+    expect(logs.where((line) => line.contains('evaluationContexts')),
+        hasLength(1));
+  });
 }

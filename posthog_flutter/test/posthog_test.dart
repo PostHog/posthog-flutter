@@ -224,6 +224,14 @@ void main() {
       expect(config.toMap()['sendFeatureFlagEvents'], isFalse);
     });
 
+    test('toMap forwards evaluationContexts only when set', () {
+      final config = PostHogConfig('test_project_token');
+      expect(config.toMap().containsKey('evaluationContexts'), isFalse);
+
+      config.evaluationContexts = ['mobile', 'prod'];
+      expect(config.toMap()['evaluationContexts'], ['mobile', 'prod']);
+    });
+
     test('trims whitespace-sensitive config values in config and toMap', () {
       final config = PostHogConfig(' \n test_project_token\t ');
       config.host = ' \nhttps://eu.i.posthog.com/\t ';
@@ -426,6 +434,49 @@ void main() {
       );
       expect(find.text('child'), findsOneWidget);
     });
+  });
+
+  test(
+      'captureFeatureView and captureFeatureInteraction forward to the platform',
+      () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+
+    await Posthog().captureFeatureView('a');
+    await Posthog().captureFeatureInteraction('b', flagVariant: 'control');
+
+    expect(fake.featureEventCalls, [
+      ['captureFeatureView', 'a', null],
+      ['captureFeatureInteraction', 'b', 'control'],
+    ]);
+  });
+
+  test('getFeatureFlag and isFeatureEnabled forward sendFeatureFlagEvent',
+      () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+
+    await Posthog().getFeatureFlag('a');
+    await Posthog().getFeatureFlag('b', sendFeatureFlagEvent: false);
+    await Posthog().isFeatureEnabled('c');
+    await Posthog().isFeatureEnabled('d', sendFeatureFlagEvent: true);
+
+    expect(fake.flagReadCalls, [
+      {'method': 'getFeatureFlag', 'key': 'a', 'sendFeatureFlagEvent': null},
+      {'method': 'getFeatureFlag', 'key': 'b', 'sendFeatureFlagEvent': false},
+      {'method': 'isFeatureEnabled', 'key': 'c', 'sendFeatureFlagEvent': null},
+      {'method': 'isFeatureEnabled', 'key': 'd', 'sendFeatureFlagEvent': true},
+    ]);
+  });
+
+  test('getAllFeatureFlags returns the platform results unchanged', () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+    expect(await Posthog().getAllFeatureFlags(), isNull);
+
+    final flags = [PostHogFeatureFlagResult(key: 'a', enabled: true)];
+    fake.allFeatureFlags = flags;
+    expect(await Posthog().getAllFeatureFlags(), same(flags));
   });
 
   group('getFeatureFlagResult', () {
