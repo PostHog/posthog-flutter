@@ -127,9 +127,6 @@ Object? toWellFormedJson(Object? value) => switch (value) {
       _ => value,
     };
 
-/// Whether [value] holds no lone UTF-16 surrogate.
-bool isWellFormed(String value) => identical(toWellFormed(value), value);
-
 /// [toJsonValue] for a map, typed as the JSON object it becomes.
 Map<String, Object?> toJsonMap(Map<Object?, Object?> map, CoreLogger logger) =>
     toJsonValue(map, logger) as Map<String, Object?>;

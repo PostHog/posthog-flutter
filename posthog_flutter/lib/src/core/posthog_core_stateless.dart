@@ -352,22 +352,6 @@ abstract class PostHogCoreStateless {
     );
   }
 
-  /// Whether an event with [distinctId], [event] and [properties] is
-  /// dropped when queued, because capture v1 rejects the whole request for
-  /// a lone surrogate in its name or ids (see [captureV1MalformedField]).
-  @protected
-  bool isMalformedForCapture(
-    String distinctId,
-    String event,
-    Map<String, Object?> properties,
-  ) =>
-      captureV1MalformedField({
-        'event': event,
-        'distinct_id': distinctId,
-        'properties': properties,
-      }) !=
-      null;
-
   /// Queues [event] and returns its uuid, with whether the queue keeps it.
   @protected
   ({String uuid, Future<bool> queued}) captureStateless(
@@ -552,14 +536,6 @@ abstract class PostHogCoreStateless {
     Map<String, Object?>? options,
     String? timestamp,
   }) {
-    if (captureV1MalformedField(message) case final field?) {
-      // Never repaired: two broken ids could become the same id.
-      logger.warn(field == 'name'
-          ? 'Dropping an event: its name is not well-formed UTF-16.'
-          : 'Dropping event ${message['event']}: its $field is not '
-              'well-formed UTF-16.');
-      return (uuid: generateUuidV7(), queued: Future.value(false));
-    }
     final prepared = <String, Object?>{
       ...message,
       if (message['properties'] case final Map properties)

@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'logger.dart';
-import 'utils/utils.dart';
 
 /// The capture v1 endpoint for analytics events.
 const captureV1Path = '/i/v1/analytics/events';
@@ -91,26 +90,6 @@ Map<String, Object?> captureV1Event(
     if (options.isNotEmpty) 'options': options,
     'properties': properties,
   };
-}
-
-/// The first of the name, distinct id, session id and window id of the
-/// queued [message] that holds a lone UTF-16 surrogate, or null when none
-/// does. Capture v1 rejects the whole request for one in a top-level field;
-/// inside properties it is accepted.
-String? captureV1MalformedField(Map<String, Object?> message) {
-  final properties = message['properties'];
-  final fields = {
-    'name': message['event'],
-    'distinct id': message['distinct_id'],
-    if (properties is Map) ...{
-      'session id': properties[r'$session_id'],
-      'window id': properties[r'$window_id'],
-    },
-  };
-  for (final MapEntry(:key, :value) in fields.entries) {
-    if (value is String && !isWellFormed(value)) return key;
-  }
-  return null;
 }
 
 /// Removes [key] from [properties] and returns its value when it is a

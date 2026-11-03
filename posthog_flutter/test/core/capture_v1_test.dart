@@ -96,26 +96,31 @@ void main() {
   });
 
   group('Lone surrogates', () {
-    test('drop only the events whose name or ids hold one', () async {
+    test('in a name or id become U+FFFD and the event is sent', () async {
       final server = await LocalPostHogServer.start();
-      final client = testClient(server, config: testConfig(debug: true));
+      final client = testClient(server);
 
-      final lines = printedLines(() {
-        client.capture('cut\uD83D');
-        client.capture('session', properties: {r'$session_id': 's\uDE00'});
-        client.capture('window', properties: {r'$window_id': '\uD800w'});
-        client.capture('kept', properties: {'emoji': '\u{1F600}'});
-        client.identify('user\uDC00');
-        client.capture('after identify');
-      });
+      client.capture('cut\uD83D');
+      client.capture('session', properties: {r'$session_id': 's\uDE00'});
+      client.capture('window', properties: {r'$window_id': '\uD800w'});
+      client.capture('kept', properties: {'emoji': '\u{1F600}'});
+      client.identify('user\uDC00');
+      client.capture('after identify');
       await client.flush();
 
-      expect(server.events.map((event) => event['event']),
-          ['kept', 'after identify']);
-      final drops = lines.where((line) => line.contains('not well-formed'));
-      expect(drops, hasLength(4));
-      expect(drops, everyElement(isNot(matches('[\uD800-\uDFFF]'))));
-      expect(drops, contains(contains('event window: its window id')));
+      final events = server.events;
+      expect(events.map((event) => event['event']), [
+        'cut�',
+        'session',
+        'window',
+        'kept',
+        r'$identify',
+        'after identify'
+      ]);
+      expect(events[1]['session_id'], 's�');
+      expect(events[2]['window_id'], '�w');
+      expect(events.last['distinct_id'], 'user�');
+      expect(client.getDistinctId(), 'user�');
     });
 
     test('in properties and options become U+FFFD, keys included', () async {
@@ -142,35 +147,23 @@ void main() {
             {'k�': 'v�'},
           ]));
       expect(event['properties'], containsPair('emoji', '\u{1F600}'));
-      expect(event['properties'], containsPair('unencodable', 'o\uFFFD'));
+      expect(event['properties'], containsPair('unencodable', 'o�'));
       expect(event['options'], containsPair('product_tour_id', 't�'));
     });
 
-    test('in an alias or group ignore the call instead of repairing it',
-        () async {
+    test('in an alias or group become U+FFFD', () async {
       final server = await LocalPostHogServer.start();
       final client = testClient(server);
 
       client.alias('user\uD800');
-      client.group('company\uD800', 'acme');
-      client.group('company', 'acme\uD800');
+      client.group('company\uD800', 'acme\uDC00');
       client.capture('e');
       await client.flush();
 
-      expect(server.events.map((event) => event['event']), ['e']);
-      expect(server.events.single['properties'], isNot(contains(r'$groups')));
-    });
-
-    test('in registered ids drop the events instead of repairing the ids',
-        () async {
-      final server = await LocalPostHogServer.start();
-      final client = testClient(server);
-
-      client.register({r'$window_id': 'w\uD800'});
-      client.capture('e');
-      await client.flush();
-
-      expect(server.events, isEmpty);
+      final events = server.events;
+      expect(events.first['properties'], containsPair('alias', 'user�'));
+      expect(events.last['properties'],
+          containsPair(r'$groups', {'company�': 'acme�'}));
     });
 
     test('in a registered key leave it removable by unregister', () async {
@@ -182,26 +175,10 @@ void main() {
       client.capture('e');
       await client.flush();
 
-      expect(server.events.single['properties'], isNot(contains('k\uFFFD')));
+      expect(server.events.single['properties'], isNot(contains('k�')));
     });
 
-    test('in a dropped \$set leave later person updates unsuppressed',
-        () async {
-      final server = await LocalPostHogServer.start();
-      final client = testClient(server);
-
-      client.capture(r'$set', properties: {
-        r'$session_id': 's\uD800',
-        r'$set': {'plan': 'pro'},
-      });
-      client.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
-      await client.flush();
-
-      expect(server.events.single['properties'],
-          containsPair(r'$set', {'plan': 'pro'}));
-    });
-
-    test('in an AI event name drop it, and captureAi returns null', () async {
+    test('in an AI event name become U+FFFD', () async {
       final server = await LocalPostHogServer.start();
       final client = testClient(server);
 
@@ -209,8 +186,8 @@ void main() {
       final uuid = await client.captureAiPrepared('\$ai_cut\uD83D', prepared);
       await client.flush();
 
-      expect(uuid, isNull);
-      expect(server.aiRequests, isEmpty);
+      expect(uuid, isNotNull);
+      expect(server.aiRequests, hasLength(1));
     });
   });
 
