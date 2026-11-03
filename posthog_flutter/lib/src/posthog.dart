@@ -506,10 +506,6 @@ class Posthog {
     PostHogInternalEvents.requestReplaySessionReset();
     FeatureFlagsListeners.instance.clear();
     await _posthog.reset();
-    // posthog-js clears registered properties on reset.
-    if (_sentAppLanguage != null) {
-      await _posthog.setAppLanguage(_sentAppLanguage);
-    }
   }
 
   /// Opts the current user out of data collection.

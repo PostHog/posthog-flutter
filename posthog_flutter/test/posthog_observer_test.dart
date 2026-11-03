@@ -102,13 +102,6 @@ void main() {
 
       expect(fake.appLanguageCalls, ['de', 'de']);
     });
-
-    test('is sent again after reset', () async {
-      await Posthog().setAppLanguage('de');
-      await Posthog().reset();
-
-      expect(fake.appLanguageCalls, ['de', 'de']);
-    });
   });
 
   test('preserves WidgetsBindingObserver compatibility', () {

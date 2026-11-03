@@ -69,6 +69,24 @@ void main() {
       expect(unregistered, [r'$app_language']);
     });
 
+    test('registers the language again in the same step as reset', () {
+      final calls = <String>[];
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty('reset'.toJS, (() => calls.add('reset')).toJS);
+      fake.setProperty(
+        'register'.toJS,
+        ((JSAny properties) => calls.add('register ${properties.dartify()}'))
+            .toJS,
+      );
+      final web = PosthogFlutterWeb();
+      web.setAppLanguage('de');
+      calls.clear();
+
+      web.reset();
+
+      expect(calls, ['reset', r'register {$app_language: de}']);
+    });
+
     test('registerWith clears the language persisted by a past launch', () {
       TestWidgetsFlutterBinding.ensureInitialized();
       final previous = PosthogFlutterPlatformInterface.instance;
