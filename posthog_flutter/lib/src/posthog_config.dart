@@ -449,9 +449,11 @@ class PostHogConfig {
   ///   registered properties and the options the SDK adds, and can change
   ///   them for that event, except `$lib` and `$lib_version`, which PostHog
   ///   sets from the SDK. On iOS, macOS and Android, registering callbacks
-  ///   adds one more call to the native SDK per event, and an event whose
-  ///   callbacks take more than a minute can be dropped. On web, only the event's own
-  ///   properties are available; posthog-js adds the rest later.
+  ///   adds one more call to the native SDK per event. The native SDK keeps
+  ///   each built event until Dart sends it back, and discards one still
+  ///   waiting after a minute (for example, after a hot restart). On web,
+  ///   only the event's own properties are available; posthog-js adds the
+  ///   rest later.
   ///
   /// **Note:**
   /// - Callbacks are synchronous. Load anything they need (such as remote
