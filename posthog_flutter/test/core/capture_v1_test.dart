@@ -8,6 +8,7 @@ import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/logger.dart';
 import 'package:posthog_flutter/src/core/posthog_core_stateless.dart';
 import 'package:posthog_flutter/src/core/uuid.dart';
+import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
 
 import '../posthog_api_fake.dart';
@@ -120,7 +121,47 @@ void main() {
       expect(events[1]['session_id'], 's�');
       expect(events[2]['window_id'], '�w');
       expect(events.last['distinct_id'], 'user�');
-      expect(client.getDistinctId(), 'user�');
+      expect(client.getDistinctId(), 'user\uDC00');
+    });
+
+    test('in a stored distinct id survive a restart unchanged', () async {
+      final server = await LocalPostHogServer.start();
+      final dir = tempDirectory();
+      final earlier = testClient(server, storage: FileStorage(dir.path));
+      earlier.identify('user\uD800');
+      earlier.close();
+
+      final client = testClient(server, storage: FileStorage(dir.path));
+
+      expect(client.getDistinctId(), 'user\uD800');
+    });
+
+    test('in an identified bootstrap id still match identify', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server,
+          config: testConfig(
+              bootstrap: const PostHogBootstrapConfig(
+                  distinctId: 'user\uD800', isIdentifiedId: true)));
+
+      client.identify('user\uD800', userProperties: {'plan': 'pro'});
+      await client.flush();
+
+      final set = server.events.single;
+      expect(set['event'], r'$set');
+      expect(set['distinct_id'], 'user�');
+    });
+
+    test('in a group type leave its flag properties resettable', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.group('company\uD800', 'acme', groupProperties: {'size': 1});
+      client.resetGroupPropertiesForFlags(groupType: 'company\uD800');
+      await client.reloadFeatureFlagsAsync();
+
+      final body = server.flagsRequests.last.body;
+      expect(body['groups'], {'company�': 'acme'});
+      expect(body['group_properties'] ?? const {}, isEmpty);
     });
 
     test('in properties and options become U+FFFD, keys included', () async {
@@ -187,20 +228,22 @@ void main() {
       await client.flush();
 
       expect(uuid, isNotNull);
-      expect(server.aiRequests, hasLength(1));
+      expect(server.aiEvents.single['event'], '\$ai_cut�');
     });
 
     test('in the /flags request become U+FFFD', () async {
       final server = await LocalPostHogServer.start();
       final client = testClient(server);
 
+      client.identify('user\uD800');
       client.setPersonPropertiesForFlags({'plan\uD800': 'pro\uDC00'});
       client.setGroupPropertiesForFlags({
         'company': {'name': 'acme\uD83D'},
       });
       await client.reloadFeatureFlagsAsync();
 
-      final body = server.flagsRequests.single.body;
+      final body = server.flagsRequests.last.body;
+      expect(body['distinct_id'], 'user�');
       expect(body['person_properties'], containsPair('plan�', 'pro�'));
       expect(body['group_properties'], {
         'company': {'name': 'acme�'},

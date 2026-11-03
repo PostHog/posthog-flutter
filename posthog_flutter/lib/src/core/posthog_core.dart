@@ -356,9 +356,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
             'This call will be ignored.');
         return;
       }
-      // Stored repaired, as the platform channel stores it on iOS, macOS and
-      // Android, so the flags request carries the id events are sent with.
-      distinctId = toWellFormed(distinctId);
       if (_ignoredWhileOptedOut('posthog.identify')) return;
       if (!_requirePersonProcessing('posthog.identify')) return;
 
@@ -604,7 +601,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
             'This call will be ignored.');
         return;
       }
-      alias = toWellFormed(alias);
       if (_ignoredWhileOptedOut('posthog.alias')) return;
       if (!_requirePersonProcessing('posthog.alias')) return;
 
@@ -648,8 +644,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
             'This call will be ignored.');
         return;
       }
-      groupType = toWellFormed(groupType);
-      groupKey = toWellFormed(groupKey);
       if (_ignoredWhileOptedOut('posthog.group')) return;
       if (!_requirePersonProcessing('posthog.group')) return;
 
