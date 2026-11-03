@@ -28,8 +28,8 @@ import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
-import com.posthog.PostHogFeatureFlagsCallback
 import com.posthog.PostHogFeatureFlagsLoaded
+import com.posthog.PostHogFeatureFlagsSubscription
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
@@ -93,6 +93,12 @@ class PosthogFlutterPlugin :
     // Out-of-process covers (Custom Tabs, Google Pay) are intentionally missed.
     @Volatile
     private var isHostActivityStopped = false
+
+    // Dart's feature flags lifecycle, sent with setup, reset and close. Each
+    // flags notification carries the one current when it fired, so Dart can
+    // drop loads from before a reset or close.
+    @Volatile
+    private var flagsGeneration = 0
 
     // A count, not a boolean: under multi-resume (Android 10+ split-screen)
     // two non-host activities can be resumed at once, and pausing one must
@@ -162,6 +168,8 @@ class PosthogFlutterPlugin :
 
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
+    private var featureFlagsSubscription: PostHogFeatureFlagsSubscription? = null
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         if (bitmapExportExecutor.isShutdown) {
             bitmapExportExecutor = Executors.newSingleThreadExecutor()
@@ -172,6 +180,16 @@ class PosthogFlutterPlugin :
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
 
         this.applicationContext = flutterPluginBinding.applicationContext
+        // Before initPlugin, so this also catches the first load of a native auto-init.
+        featureFlagsSubscription?.unsubscribe()
+        featureFlagsSubscription =
+            PostHog.onFeatureFlags { loaded ->
+                Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
+                invokeFlutterMethod(
+                    "onFeatureFlagsCallback",
+                    loaded.toFlutterMap() + ("generation" to flagsGeneration),
+                )
+            }
         initPlugin()
 
         channel.setMethodCallHandler(this)
@@ -278,6 +296,7 @@ class PosthogFlutterPlugin :
             }
 
             "reset" -> {
+                updateFlagsGeneration(call)
                 reset(result)
             }
 
@@ -358,6 +377,7 @@ class PosthogFlutterPlugin :
             }
 
             "close" -> {
+                updateFlagsGeneration(call)
                 close(result)
             }
 
@@ -554,6 +574,7 @@ class PosthogFlutterPlugin :
                 return
             }
 
+            updateFlagsGeneration(call)
             setupPostHog(args)
 
             result.success(null)
@@ -841,12 +862,6 @@ class PosthogFlutterPlugin :
                         )
                     }
                 }
-
-                onFeatureFlags =
-                    PostHogFeatureFlagsCallback { loaded ->
-                        Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
-                        invokeFlutterMethod("onFeatureFlagsCallback", loaded.toFlutterMap())
-                    }
             }
 
         lastBuiltConfig = config
@@ -987,6 +1002,8 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopOcclusionDetector()
+        featureFlagsSubscription?.unsubscribe()
+        featureFlagsSubscription = null
         channel.setMethodCallHandler(null)
         pushChannelCandidates.remove(channel)
         if (activeChannel === channel) {
@@ -2224,6 +2241,10 @@ class PosthogFlutterPlugin :
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
+    }
+
+    private fun updateFlagsGeneration(call: MethodCall) {
+        call.argument<Int>("flagsGeneration")?.let { flagsGeneration = it }
     }
 
     private fun close(result: Result) {

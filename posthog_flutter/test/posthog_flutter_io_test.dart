@@ -3,10 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
+import 'package:posthog_flutter/src/posthog.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
+import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 
 // Simplified void callback for feature flags
@@ -242,33 +245,13 @@ isolate_dso_base: 7000000000
   });
 
   group('PosthogFlutterIO onFeatureFlags via setup', () {
-    test(
-      'setup initializes method call handler and registers callback if provided',
-      () async {
-        bool callbackInvoked = false;
-        void testCallback(PostHogFeatureFlagsLoaded _) {
-          callbackInvoked = true;
-        }
-
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        // To verify handler is set, we trigger the callback from native side
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            const MethodCall('onFeatureFlagsCallback', {}),
-          ),
-          (ByteData? data) {},
-        );
-        expect(callbackInvoked, isTrue);
-        expect(log.any((call) => call.method == 'setup'), isTrue);
-      },
-    );
+    // The native SDKs tag each load with the generation they last got.
+    Map<String, Object?> nativeFlagsArgs(Map<String, Object?> args,
+            {int? generation}) =>
+        {
+          ...args,
+          'generation': generation ?? FeatureFlagsListeners.instance.generation,
+        };
 
     test('setup sends projectToken', () async {
       testConfig = PostHogConfig(' \n test_project_token\t ');
@@ -296,20 +279,42 @@ isolate_dso_base: 7000000000
       },
     );
 
-    test('passes the native flags to the callback', () async {
+    test('passes empty flags to listeners for malformed native args', () async {
+      FeatureFlagsListeners.instance.clear();
       final received = <PostHogFeatureFlagsLoaded>[];
-      await posthogFlutterIO.setup(
-          PostHogConfig('test_project_token', onFeatureFlags: received.add));
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
         channel.name,
-        channel.codec.encodeMethodCall(const MethodCall(
+        channel.codec.encodeMethodCall(
+          MethodCall(
+              'onFeatureFlagsCallback', nativeFlagsArgs({'variants': 123})),
+        ),
+        (ByteData? data) {},
+      );
+
+      expect(received.single.variants, isEmpty);
+    });
+
+    test('passes the native flags to onFeatureFlags listeners', () async {
+      FeatureFlagsListeners.instance.clear();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(MethodCall(
           'onFeatureFlagsCallback',
-          {
+          nativeFlagsArgs({
             'variants': {'on': true, 'variant': 'test', 'off': false},
             'errorsLoading': true,
-          },
+          }),
         )),
         (ByteData? data) {},
       );
@@ -319,25 +324,118 @@ isolate_dso_base: 7000000000
       expect(received.single.errorsLoading, isTrue);
     });
 
-    test('passes empty flags to the callback for malformed native args',
-        () async {
+    Future<void> sendNativeFlags({int? generation}) =>
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .handlePlatformMessage(
+          channel.name,
+          channel.codec.encodeMethodCall(MethodCall(
+            'onFeatureFlagsCallback',
+            nativeFlagsArgs({
+              'variants': {'old-user-only': true},
+              'errorsLoading': false,
+            }, generation: generation),
+          )),
+          (ByteData? data) {},
+        );
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('drops a native load sent before the $name reached native',
+          () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        final subscription = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(subscription.unsubscribe);
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+        final before = FeatureFlagsListeners.instance.generation;
+
+        await transition();
+        await sendNativeFlags(generation: before);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(received, isEmpty);
+        expect((log.last.arguments as Map)['flagsGeneration'],
+            FeatureFlagsListeners.instance.generation);
+      });
+    }
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('a $name started by a listener is not undone by the load', () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        Future<void>? pending;
+        final starter =
+            FeatureFlagsListeners.instance.add((_) => pending ??= transition());
+        addTearDown(starter.unsubscribe);
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+
+        await sendNativeFlags();
+        await pending;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        final subscription = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(subscription.unsubscribe);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(received, isEmpty);
+      });
+    }
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('a $name started by a listener keeps the load from the rest',
+          () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+        Future<void>? pending;
+        final first =
+            FeatureFlagsListeners.instance.add((_) => pending ??= transition());
+        final second = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(first.unsubscribe);
+        addTearDown(second.unsubscribe);
+
+        await sendNativeFlags();
+        await pending;
+
+        expect(received, isEmpty);
+      });
+    }
+
+    void mockReload(Future<Object?> Function() reload) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return call.method == 'reloadFeatureFlags' ? reload() : null;
+      });
+    }
+
+    const reloaded = {
+      'variants': {'manual': true},
+      'errorsLoading': false,
+    };
+
+    test('reload result is left to the native notification', () async {
+      FeatureFlagsListeners.instance.clear();
+      mockReload(() async => reloaded);
       final received = <PostHogFeatureFlagsLoaded>[];
-      await posthogFlutterIO.setup(
-          PostHogConfig('test_project_token', onFeatureFlags: received.add));
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
 
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-        channel.name,
-        channel.codec.encodeMethodCall(
-          const MethodCall('onFeatureFlagsCallback', {'variants': 123}),
-        ),
-        (ByteData? data) {},
-      );
+      await posthogFlutterIO.reloadFeatureFlags();
 
-      expect(received.single.variants, isEmpty);
+      expect(received, isEmpty);
     });
 
-    test('does not invoke callback when no callback is registered', () async {
+    test('replies to a native load with no listener registered', () async {
       // Setup without callback
       testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
@@ -347,7 +445,7 @@ isolate_dso_base: 7000000000
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
-          const MethodCall('onFeatureFlagsCallback', {}),
+          MethodCall('onFeatureFlagsCallback', nativeFlagsArgs({})),
         ),
         (ByteData? data) => reply = data,
       );

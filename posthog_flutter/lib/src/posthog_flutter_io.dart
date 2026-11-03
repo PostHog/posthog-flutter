@@ -3,6 +3,7 @@ import 'dart:async';
 import 'util/platform_io_stub.dart'
     if (dart.library.io) 'util/platform_io_real.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
@@ -19,6 +20,7 @@ import 'utils/flutter_version.dart';
 import 'utils/property_normalizer.dart';
 
 import 'feature_flag_result.dart';
+import 'feature_flags_listeners.dart';
 import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_severity.dart';
 import 'posthog_config.dart';
@@ -30,13 +32,17 @@ import 'posthog_internal_events.dart';
 /// An implementation of [PosthogFlutterPlatformInterface] that uses method channels.
 class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   PosthogFlutterIO() {
-    _methodChannel.setMethodCallHandler(_handleMethodCall);
+    _installMethodCallHandler();
   }
+
+  static const _handlerRetryInterval = Duration(milliseconds: 500);
+  static const _maxHandlerRetries = 120;
 
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('posthog_flutter');
 
-  OnFeatureFlagsCallback? _onFeatureFlagsCallback;
+  bool _handlerInstalled = false;
+  Timer? _handlerRetry;
 
   PushIdentityProvider? _pushIdentityProvider;
 
@@ -48,8 +54,41 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
   final _order = CallOrder();
 
-  Future<dynamic> _invoke(String method, [Object? arguments]) =>
-      _order.run(() => _methodChannel.invokeMethod(method, arguments));
+  Future<dynamic> _invoke(String method, [Object? arguments]) {
+    if (!_installMethodCallHandler()) {
+      // Callers already fall back on a PlatformException. Waiting for the
+      // binding instead would hang an app awaiting setup() before creating it.
+      return Future<dynamic>.error(PlatformException(
+        code: 'binding_not_initialized',
+        message: 'Skipped $method: the Flutter binding is not initialized.',
+      ));
+    }
+    return _order.run(() => _methodChannel.invokeMethod(method, arguments));
+  }
+
+  /// Returns whether the channel is ready. Without a binding it isn't, and the
+  /// timer covers apps whose native SDK auto-inits and that make no later call.
+  /// Native loads sent in the meantime wait in the channel's buffer.
+  bool _installMethodCallHandler() {
+    if (_handlerInstalled) return true;
+    try {
+      _methodChannel.setMethodCallHandler(_handleMethodCall);
+      _handlerInstalled = true;
+      _handlerRetry?.cancel();
+    } catch (_) {
+      if (_handlerRetry == null) {
+        debugPrint(
+          '[PostHog] Call WidgetsFlutterBinding.ensureInitialized() before '
+          'setup(). SDK calls are skipped until the binding is initialized.',
+        );
+        _handlerRetry = Timer.periodic(_handlerRetryInterval, (timer) {
+          if (timer.tick >= _maxHandlerRetries) timer.cancel();
+          _installMethodCallHandler();
+        });
+      }
+    }
+    return _handlerInstalled;
+  }
 
   /// Applies the beforeSend callbacks to an event in order.
   /// Returns the possibly modified event, or null if any callback drops it.
@@ -83,8 +122,16 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         await cleanupSurveys();
         return null;
       case 'onFeatureFlagsCallback':
-        _onFeatureFlagsCallback
-            ?.call(featureFlagsLoadedFromMap(call.arguments));
+        final arguments = call.arguments;
+        // Sent before the native SDK got the latest reset() or close(), so
+        // these may be the previous user's flags.
+        if (arguments is! Map ||
+            arguments['generation'] !=
+                FeatureFlagsListeners.instance.generation) {
+          break;
+        }
+        FeatureFlagsListeners.instance
+            .deliver(featureFlagsLoadedFromMap(call.arguments));
         break;
       case 'pushIdentityProvider':
         // Returning a value here is the reply the native SDK awaits.
@@ -201,6 +248,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     SurveyService().hideSurvey();
   }
 
+  Map<String, Object> _flagsGenerationArguments() =>
+      {'flagsGeneration': FeatureFlagsListeners.instance.generation};
+
   /// Flutter to Native Calls
   ///
   @override
@@ -212,7 +262,6 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return;
     }
 
-    _onFeatureFlagsCallback = config.onFeatureFlags;
     _pushIdentityProvider = config.pushIdentityProvider;
     _beforeSendCallbacks = config.beforeSend;
 
@@ -220,6 +269,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       await _invoke('setup', {
         ...config.toMap(),
         ...flutterVersionSetupArguments(),
+        ..._flagsGenerationArguments(),
       });
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on setup: $exception');
@@ -602,7 +652,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      await _invoke('reset');
+      await _invoke('reset', _flagsGenerationArguments());
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on reset: $exception');
     }
@@ -1006,7 +1056,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     }
 
     try {
-      return await _invoke('close');
+      return await _invoke('close', _flagsGenerationArguments());
     } on PlatformException catch (exception) {
       printIfDebug('Exeption on close: $exception');
     }

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_app_info.dart';
@@ -841,7 +842,7 @@ void main() {
     test('properties the callbacks remove stay removed', () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
+      final flagsLoaded = _firstFlagsLoad();
       Map<String, Object?>? seen;
       final removed = [
         r'$feature/variant-flag',
@@ -849,9 +850,6 @@ void main() {
         r'$recording_status',
       ];
       final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        }
         ..beforeSend = [
           (event) {
             seen = {...?event.properties};
@@ -861,7 +859,7 @@ void main() {
           },
         ];
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       await platform.capture(eventName: 'scrubbed');
 
@@ -897,12 +895,9 @@ void main() {
     test('SDK-internal events bypass the callbacks', () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
+      final flagsLoaded = _firstFlagsLoad();
       final seenEventNames = <String>[];
       final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        }
         ..beforeSend = [
           (event) {
             seenEventNames.add(event.event);
@@ -910,7 +905,7 @@ void main() {
           },
         ];
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       await platform.getFeatureFlagResult(key: 'variant-flag');
       await platform.capture(eventName: 'user event');
@@ -2062,13 +2057,10 @@ void main() {
         () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
+      final flagsLoaded = _firstFlagsLoad();
+      final config = configFor(server);
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       final silent = await platform.getFeatureFlagResult(
         key: 'variant-flag',
@@ -2092,13 +2084,10 @@ void main() {
         () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
+      final flagsLoaded = _firstFlagsLoad();
+      final config = configFor(server);
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       await platform.captureFeatureView(flag: 'variant-flag');
       await platform.captureFeatureInteraction(
@@ -2128,13 +2117,10 @@ void main() {
         () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
+      final flagsLoaded = _firstFlagsLoad();
+      final config = configFor(server);
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
       final distinctId = await platform.getDistinctId();
 
       unawaited(platform.captureFeatureView(flag: 'variant-flag'));
@@ -2153,13 +2139,9 @@ void main() {
               'off-flag': {'key': 'off-flag', 'enabled': false},
             },
           });
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
-      final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      final flagsLoaded = _firstFlagsLoad();
+      final platform = await setUpPlatform(configFor(server));
+      await flagsLoaded;
 
       expect(await platform.isFeatureEnabled('missing', defaultValue: true),
           isTrue);
@@ -2175,13 +2157,9 @@ void main() {
     test(r'$feature_flag_called does not report the defaultValue', () async {
       final server = await LocalPostHogServer.start();
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
-      final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      final flagsLoaded = _firstFlagsLoad();
+      final platform = await setUpPlatform(configFor(server));
+      await flagsLoaded;
 
       await platform.isFeatureEnabled('missing', defaultValue: true);
 
@@ -2204,13 +2182,10 @@ void main() {
     test(r'sendFeatureFlagEvent false skips $feature_flag_called', () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
+      final flagsLoaded = _firstFlagsLoad();
+      final config = configFor(server);
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       expect(
           await platform.isFeatureEnabled('variant-flag',
@@ -2230,14 +2205,10 @@ void main() {
         () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..sendFeatureFlagEvent = false
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
+      final flagsLoaded = _firstFlagsLoad();
+      final config = configFor(server)..sendFeatureFlagEvent = false;
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       expect(
           await platform.getFeatureFlag(key: 'variant-flag'), 'test-variant');
@@ -2290,9 +2261,10 @@ void main() {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
       final announced = <PostHogFeatureFlagsLoaded>[];
-      final platform = await setUpPlatform(configFor(server)
-        ..preloadFeatureFlags = false
-        ..onFeatureFlags = announced.add);
+      final subscription = FeatureFlagsListeners.instance.add(announced.add);
+      addTearDown(subscription.unsubscribe);
+      final platform =
+          await setUpPlatform(configFor(server)..preloadFeatureFlags = false);
 
       final loaded = await platform.reloadFeatureFlags();
       expect(loaded.variants, {'variant-flag': 'test-variant'});
@@ -2310,14 +2282,10 @@ void main() {
         () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
-      final flagsLoaded = Completer<void>();
-      final config = configFor(server)
-        ..sendFeatureFlagEvent = false
-        ..onFeatureFlags = (_) {
-          if (!flagsLoaded.isCompleted) flagsLoaded.complete();
-        };
+      final flagsLoaded = _firstFlagsLoad();
+      final config = configFor(server)..sendFeatureFlagEvent = false;
       final platform = await setUpPlatform(config);
-      await flagsLoaded.future;
+      await flagsLoaded;
 
       expect(
           (await platform.getFeatureFlagResult(key: 'variant-flag'))?.variant,
@@ -2338,9 +2306,10 @@ void main() {
       final server = await LocalPostHogServer.start();
       server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
       final announced = <PostHogFeatureFlagsLoaded>[];
-      final platform = await setUpPlatform(configFor(server)
-        ..preloadFeatureFlags = false
-        ..onFeatureFlags = announced.add);
+      final subscription = FeatureFlagsListeners.instance.add(announced.add);
+      addTearDown(subscription.unsubscribe);
+      final platform =
+          await setUpPlatform(configFor(server)..preloadFeatureFlags = false);
 
       final loaded = await platform.reloadFeatureFlags();
       expect(loaded.variants, {'variant-flag': 'test-variant'});
@@ -2351,6 +2320,40 @@ void main() {
       expect(failed.variants, {'variant-flag': 'test-variant'});
       expect(failed.errorsLoading, isTrue);
       expect(announced.last.errorsLoading, isTrue);
+    });
+
+    test('onFeatureFlags listeners receive each load', () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      final platform =
+          await setUpPlatform(configFor(server)..preloadFeatureFlags = false);
+
+      await platform.reloadFeatureFlags();
+
+      expect(received.last.variants, {'variant-flag': 'test-variant'});
+    });
+
+    test('a reset started by a listener is not undone by the load', () async {
+      final server = await LocalPostHogServer.start();
+      server.respond = (_) => PostHogResponse.json(_variantFlagResponse());
+      FeatureFlagsListeners.instance.clear();
+      // What reset() and close() do before reaching the platform.
+      final starter = FeatureFlagsListeners.instance
+          .add((_) => FeatureFlagsListeners.instance.clear());
+      addTearDown(starter.unsubscribe);
+      final platform =
+          await setUpPlatform(configFor(server)..preloadFeatureFlags = false);
+
+      await platform.reloadFeatureFlags();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received, isEmpty);
     });
 
     test('onFeatureFlags reports the flags cached by the previous launch',
@@ -2367,15 +2370,15 @@ void main() {
       final platform = createPlatform(appDirectory: appDirectory);
       final payloads = <Future<Object?>>[];
       final announced = Completer<void>();
-      await platform.setup(configFor(server)
-        ..preloadFeatureFlags = false
-        ..onFeatureFlags = (_) {
-          payloads.add(platform
-              .getFeatureFlagResult(
-                  key: 'variant-flag', sendFeatureFlagEvent: false)
-              .then((result) => result?.payload));
-          if (!announced.isCompleted) announced.complete();
-        });
+      final subscription = FeatureFlagsListeners.instance.add((_) {
+        payloads.add(platform
+            .getFeatureFlagResult(
+                key: 'variant-flag', sendFeatureFlagEvent: false)
+            .then((result) => result?.payload));
+        if (!announced.isCompleted) announced.complete();
+      });
+      addTearDown(subscription.unsubscribe);
+      await platform.setup(configFor(server)..preloadFeatureFlags = false);
       await announced.future;
 
       expect(await Future.wait(payloads), [
@@ -2385,6 +2388,16 @@ void main() {
           reason: 'the cached flags need no request of their own');
     });
   });
+}
+
+Future<void> _firstFlagsLoad() {
+  FeatureFlagsListeners.instance.clear();
+  final loaded = Completer<void>();
+  final subscription = FeatureFlagsListeners.instance.add((_) {
+    if (!loaded.isCompleted) loaded.complete();
+  });
+  addTearDown(subscription.unsubscribe);
+  return loaded.future;
 }
 
 Map<String, Object?> _propertiesOf(Map<String, Object?> event) =>
