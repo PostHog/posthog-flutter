@@ -386,6 +386,30 @@ isolate_dso_base: 7000000000
       });
     }
 
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('a $name started by a listener keeps the load from the rest',
+          () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+        Future<void>? pending;
+        final first =
+            FeatureFlagsListeners.instance.add((_) => pending ??= transition());
+        final second = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(first.unsubscribe);
+        addTearDown(second.unsubscribe);
+
+        await sendNativeFlags();
+        await pending;
+
+        expect(received, isEmpty);
+      });
+    }
+
     void mockReload(Future<Object?> Function() reload) {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
