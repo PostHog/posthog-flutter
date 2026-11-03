@@ -356,6 +356,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
             'This call will be ignored.');
         return;
       }
+      if (!isWellFormed(distinctId)) {
+        logger.warn('identify was called with a distinct id that is not '
+            'well-formed UTF-16. This call will be ignored.');
+        return;
+      }
       if (_ignoredWhileOptedOut('posthog.identify')) return;
       if (!_requirePersonProcessing('posthog.identify')) return;
 
@@ -552,8 +557,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
     PostHogPreparedEvent prepared,
   ) {
     final (:properties, :options, :timestamp) = prepared;
-    final queued = captureStateless(getDistinctId(), event,
+    final distinctId = getDistinctId();
+    final queued = captureStateless(distinctId, event,
         properties: properties, options: options, timestamp: timestamp);
+    // A dropped event changes no person state.
+    if (isMalformedForCapture(distinctId, event, properties)) return queued;
     _applyPersonProperties(properties);
     if (event == r'$set' || event == r'$identify') {
       final set = properties[r'$set'];

@@ -110,9 +110,10 @@ void main() {
       });
       await client.flush();
 
-      expect(server.events.map((event) => event['event']), ['kept']);
+      expect(server.events.map((event) => event['event']),
+          ['kept', 'after identify']);
       final drops = lines.where((line) => line.contains('not well-formed'));
-      expect(drops, hasLength(5));
+      expect(drops, hasLength(4));
       expect(drops, everyElement(isNot(matches('[\uD800-\uDFFF]'))));
       expect(drops, contains(contains('event window: its window id')));
     });
@@ -141,6 +142,46 @@ void main() {
           ]));
       expect(event['properties'], containsPair('emoji', '\u{1F600}'));
       expect(event['options'], containsPair('product_tour_id', 't�'));
+    });
+
+    test('in registered ids drop the events instead of repairing the ids',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.register({r'$window_id': 'w\uD800'});
+      client.capture('e');
+      await client.flush();
+
+      expect(server.events, isEmpty);
+    });
+
+    test('in a registered key leave it removable by unregister', () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.register({'k\uD800': 1});
+      client.unregister('k\uD800');
+      client.capture('e');
+      await client.flush();
+
+      expect(server.events.single['properties'], isNot(contains('k\uFFFD')));
+    });
+
+    test('in a dropped \$set leave later person updates unsuppressed',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final client = testClient(server);
+
+      client.capture(r'$set', properties: {
+        r'$session_id': 's\uD800',
+        r'$set': {'plan': 'pro'},
+      });
+      client.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+      await client.flush();
+
+      expect(server.events.single['properties'],
+          containsPair(r'$set', {'plan': 'pro'}));
     });
 
     test('in an AI event name drop it, and captureAi returns null', () async {

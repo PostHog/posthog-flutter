@@ -352,6 +352,22 @@ abstract class PostHogCoreStateless {
     );
   }
 
+  /// Whether an event with [distinctId], [event] and [properties] is
+  /// dropped when queued, because capture v1 rejects the whole request for
+  /// a lone surrogate in its name or ids (see [captureV1MalformedField]).
+  @protected
+  bool isMalformedForCapture(
+    String distinctId,
+    String event,
+    Map<String, Object?> properties,
+  ) =>
+      captureV1MalformedField({
+        'event': event,
+        'distinct_id': distinctId,
+        'properties': properties,
+      }) !=
+      null;
+
   /// Queues [event] and returns its uuid, with whether the queue keeps it.
   @protected
   ({String uuid, Future<bool> queued}) captureStateless(
@@ -627,7 +643,8 @@ abstract class PostHogCoreStateless {
           Map<Object?, Object?> properties) =>
       {
         for (final MapEntry(:key, :value) in properties.entries)
-          if (toJsonValue(value, logger, dropNullMembers: true)
+          if (toJsonValue(value, logger,
+                  dropNullMembers: true, repairSurrogates: true)
               case final converted
               when converted != null || key == r'$feature_flag_response')
             toWellFormed('$key'): converted,
