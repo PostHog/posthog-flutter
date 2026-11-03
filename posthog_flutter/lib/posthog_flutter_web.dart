@@ -48,7 +48,9 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? userPropertiesSetOnce,
     Map<String, Object?>? options,
   }) {
-    return applyBeforeSend(
+    final distinctId =
+        _beforeSendCallbacks.isEmpty ? null : currentWebDistinctId();
+    final processed = applyBeforeSend(
       _beforeSendCallbacks,
       PostHogEvent(
         event: eventName,
@@ -58,6 +60,18 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         options: options == null ? null : {...options},
       ),
     );
+    // posthog-js builds the event only after the callbacks, so one calling
+    // reset() or identify() would otherwise move the event to the new user.
+    // Event properties win over the stored distinct id.
+    if (processed != null &&
+        distinctId != null &&
+        distinctId != currentWebDistinctId()) {
+      processed.properties = {
+        'distinct_id': distinctId,
+        ...?processed.properties,
+      };
+    }
+    return processed;
   }
 
   /// posthog-js sends these calls' events without event properties, so

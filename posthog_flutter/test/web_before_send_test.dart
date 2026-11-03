@@ -12,6 +12,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   final captures = <Map<String, Object?>>[];
+  late String distinctId;
 
   setUp(() {
     captures.clear();
@@ -26,6 +27,8 @@ void main() {
         });
       }).toJS,
     );
+    distinctId = 'first-user';
+    fake.setProperty('get_distinct_id'.toJS, (() => distinctId.toJS).toJS);
     fake.setProperty(
       'captureException'.toJS,
       ((JSAny? error, JSAny? properties) {
@@ -36,6 +39,41 @@ void main() {
       }).toJS,
     );
     globalContext.setProperty('posthog'.toJS, fake);
+  });
+
+  group('a hook that changes the user', () {
+    final sends = <String, Future<void> Function(PosthogFlutterWeb)>{
+      'capture': (web) => web.capture(eventName: 'checkout'),
+      'screen': (web) => web.screen(screenName: 'Cart'),
+      'captureException': (web) =>
+          web.captureException(error: StateError('boom')),
+    };
+
+    sends.forEach((name, send) {
+      test('keeps $name on the earlier user', () async {
+        final web = PosthogFlutterWeb();
+        await web.setup(PostHogConfig('test_token', beforeSend: [
+          (event) {
+            distinctId = 'next-user';
+            return event;
+          },
+        ]));
+
+        await send(web);
+
+        final properties = captures.single['properties'] as Map;
+        expect(properties['distinct_id'], 'first-user');
+      });
+    });
+
+    test('leaves the user alone when the hook does not change it', () async {
+      final web = PosthogFlutterWeb();
+      await web.setup(PostHogConfig('test_token', beforeSend: [(e) => e]));
+
+      await web.capture(eventName: 'checkout');
+
+      expect(captures.single['properties'], isNot(contains('distinct_id')));
+    });
   });
 
   group('a hook that sets user properties without renaming', () {

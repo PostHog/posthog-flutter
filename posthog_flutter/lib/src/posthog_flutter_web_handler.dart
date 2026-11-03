@@ -296,6 +296,10 @@ Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
   }
 }
 
+/// The user posthog-js would send an event as right now.
+String? currentWebDistinctId() =>
+    posthog?.get_distinct_id()?.dartify() as String?;
+
 /// posthog-js capture options carrying `$set` and `$set_once`.
 /// See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
 Map<String, Object> _personCaptureOptions(Map args) {
