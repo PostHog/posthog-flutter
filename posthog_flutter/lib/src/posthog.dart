@@ -586,7 +586,8 @@ class Posthog {
   ///
   /// Your value wins over the observer's and survives [reset]. It's kept in
   /// memory, so call it again on the next launch. Compare `$locale`, which is
-  /// the device language.
+  /// the device language, or on iOS and macOS a language picked for the app in
+  /// Settings.
   ///
   /// The [language] is a BCP 47 tag, such as `de` or `pt-BR`. Pass `null` to go
   /// back to the observer's value.

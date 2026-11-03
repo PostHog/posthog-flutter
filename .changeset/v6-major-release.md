@@ -15,7 +15,7 @@
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
 - Keep a `reset()`, `identify()` or `optOut()` made right after an un-awaited `capture()`, `screen()` or `captureException()` from applying to that event first, and stop dropping that event on Windows and Linux
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
-- **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, and stop it following a per-app language on Android — update filters that match it
+- **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android — update filters that match it
 - **Breaking:** rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x
