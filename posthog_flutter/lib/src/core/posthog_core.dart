@@ -182,16 +182,15 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   /// The [options] of an event with [properties], with
-  /// `process_person_profile: false` added when person processing is off,
-  /// the event is not [requested] to update the person, and neither an
-  /// option nor a `$process_person_profile` property says otherwise.
+  /// `process_person_profile: false` added when the event doesn't [update]
+  /// the person, and neither an option nor a `$process_person_profile`
+  /// property says otherwise.
   Map<String, Object?>? _personProcessingOptions(
     Map<String, Object?>? options,
     Map<String, Object?> properties, {
-    required bool requested,
+    required bool update,
   }) {
-    if (requested ||
-        _hasPersonProcessing() ||
+    if (update ||
         properties[r'$process_person_profile'] != null ||
         options?['process_person_profile'] != null) {
       return options;
@@ -469,12 +468,19 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// [options] with `process_person_profile: false` added when person
   /// processing is off and [properties] neither ask for it nor set
   /// `$process_person_profile`, as [prepareEvent] decides it.
+  ///
+  /// [hadPersonProcessing] is [hasPersonProcessing] when the event was
+  /// prepared: an event keeps the state of the user it belongs to.
   Map<String, Object?>? personProcessingOptions(
     Map<String, Object?>? options,
-    Map<String, Object?> properties,
-  ) =>
+    Map<String, Object?> properties, {
+    required bool hadPersonProcessing,
+  }) =>
       _personProcessingOptions(options, properties,
-          requested: _requestsPersonProcessing(properties));
+          update: hadPersonProcessing || _requestsPersonProcessing(properties));
+
+  /// Whether events of the current user update their person profile.
+  bool get hasPersonProcessing => _hasPersonProcessing();
 
   PostHogPreparedEvent? _prepareEvent(
     String event, {
@@ -494,7 +500,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       options: _personProcessingOptions(
         options,
         allProperties,
-        requested: _requestsPersonProcessing(properties),
+        update: _hasPersonProcessing() || _requestsPersonProcessing(properties),
       ),
       timestamp: currentISOTime(),
     );

@@ -343,6 +343,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           options: options,
         );
         if (prepared == null) return;
+        final sessionId = client.getSessionId();
         final processed = _runBeforeSend(prepared.event);
         if (processed == null) {
           printIfDebug(
@@ -367,8 +368,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
           return;
         }
 
-        // Later events that set no `$screen_name` of their own carry this one.
-        if (finalScreenName is String) {
+        // Later events that set no `$screen_name` of their own carry this one,
+        // unless a callback's reset() started a session for the next user.
+        if (finalScreenName is String && current.getSessionId() == sessionId) {
           current.registerForSession(
               {PostHogPropertyName.screenName: finalScreenName});
         }
@@ -761,6 +763,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       implicitPersonProcessing:
           callerOptions?['process_person_profile'] == null,
       sdkPersonProcessing: preparedOptions?['process_person_profile'],
+      hadPersonProcessing: client.hasPersonProcessing,
     );
   }
 
@@ -815,7 +818,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     if (prepared.implicitPersonProcessing &&
         options?['process_person_profile'] == prepared.sdkPersonProcessing) {
       options = client.personProcessingOptions(
-          {...?options}..remove('process_person_profile'), properties);
+          {...?options}..remove('process_person_profile'), properties,
+          hadPersonProcessing: prepared.hadPersonProcessing);
     }
     return client.capturePrepared(
         event.event,
@@ -888,4 +892,5 @@ typedef _PreparedEvent = ({
   String timestamp,
   bool implicitPersonProcessing,
   Object? sdkPersonProcessing,
+  bool hadPersonProcessing,
 });

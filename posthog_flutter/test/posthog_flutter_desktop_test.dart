@@ -573,6 +573,89 @@ void main() {
       });
     }
 
+    test('reset inside the hook leaves an identified event person-processed',
+        () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'trigger') platform.reset();
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+      await platform.identify(userId: 'user-1');
+
+      await platform.capture(eventName: 'trigger');
+
+      final event = await server.waitForEvent('trigger');
+      expect(event['distinct_id'], 'user-1');
+      expect(_optionsOf(event), isNot(contains('process_person_profile')));
+    });
+
+    test('identify inside the hook leaves an anonymous event personless',
+        () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'trigger') {
+              platform.identify(userId: 'user-1');
+            }
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.capture(eventName: 'trigger');
+
+      final event = await server.waitForEvent('trigger');
+      expect(_optionsOf(event)['process_person_profile'], isFalse);
+    });
+
+    test('reset inside the hook keeps the screen from the next user', () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == r'$screen') platform.reset();
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.screen(screenName: 'Checkout');
+      await platform.capture(eventName: 'after reset');
+
+      final event = await server.waitForEvent('after reset');
+      expect(_propertiesOf(event), isNot(contains(r'$screen_name')));
+    });
+
+    test('identify inside the hook keeps the screen for later events',
+        () async {
+      final server = await LocalPostHogServer.start();
+      late final PosthogFlutterDesktop platform;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == r'$screen') {
+              platform.identify(userId: 'user-1');
+            }
+            return event;
+          },
+        ];
+      platform = await setUpPlatform(config);
+
+      await platform.screen(screenName: 'Checkout');
+      await platform.capture(eventName: 'after identify');
+
+      final event = await server.waitForEvent('after identify');
+      expect(_propertiesOf(event)[r'$screen_name'], 'Checkout');
+    });
+
     test('optOut inside the hook drops the event', () async {
       final server = await LocalPostHogServer.start();
       late final PosthogFlutterDesktop platform;
