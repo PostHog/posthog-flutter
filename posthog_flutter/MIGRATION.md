@@ -177,7 +177,7 @@ They serialized the internal platform-channel format and have no replacement. `t
 
 ### `beforeSend` callbacks are synchronous
 
-`BeforeSendCallback` is now `PostHogEvent? Function(PostHogEvent)`, and `BeforeSendLogCallback` is `PostHogLogRecord? Function(PostHogLogRecord)`. An `async` callback is a compile error. Load what it needs ahead of time and read it synchronously.
+`BeforeSendCallback` is now `PostHogEvent? Function(PostHogEvent)`, and `BeforeSendLogCallback` is `PostHogLogRecord? Function(PostHogLogRecord)`. An `async` callback, or one declared to return `FutureOr<PostHogEvent?>`, is a compile error. Load what it needs ahead of time and read it synchronously.
 
 ```dart
 // Before
@@ -206,6 +206,7 @@ These affect only code that calls, extends or fakes `PosthogFlutterPlatformInter
 - `captureAi()` is new. The base class throws `UnimplementedError` unless you override it.
 - `isFeatureEnabled()` takes `defaultValue`.
 - `reloadFeatureFlags()` returns a `Future<PostHogFeatureFlagsLoaded>`.
+- `setAppLanguage(String? language)` is new. The base class does nothing unless you override it.
 
 ```dart
 // Before
@@ -217,22 +218,28 @@ Future<void> disable() async {}
 Future<void> optOut() async {}
 ```
 
-### `onFeatureFlags` and `reloadFeatureFlags()`
+### `PostHogConfig.onFeatureFlags` is removed
 
-`PostHogConfig.onFeatureFlags` now receives a `PostHogFeatureFlagsLoaded`, and `reloadFeatureFlags()` returns a `Future<PostHogFeatureFlagsLoaded>`. It has `flags`, `variants` and `errorsLoading`.
+Call `Posthog().onFeatureFlags()` before `setup()`, which also covers the first load. The callback receives a `PostHogFeatureFlagsLoaded`, with `flags`, `variants` and `errorsLoading`, and `reloadFeatureFlags()` now returns a `Future<PostHogFeatureFlagsLoaded>`.
 
 ```dart
 // Before
+final config = PostHogConfig('<project_token>', onFeatureFlags: () {
+  // ...
+});
+// or
 config.onFeatureFlags = () {
   // ...
 };
+await Posthog().setup(config);
 
 // After
-config.onFeatureFlags = (loaded) {
+Posthog().onFeatureFlags((loaded) {
   if (!loaded.errorsLoading) {
     // Use loaded.variants
   }
-};
+});
+await Posthog().setup(config);
 ```
 
 ## Behavior changes
@@ -290,9 +297,27 @@ On iOS, macOS and Android, a malformed, empty or whitespace-only payload from `g
 
 On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
 
+### `beforeSend` on iOS, macOS and Android
+
+**This is a silent change.** Callbacks now get the event the native SDK built, including its system properties, such as `$device_type` and `$session_id`, registered properties and options, such as the `process_person_profile: false` the SDK adds while person processing is off. Their changes are final. In 5.x they saw only the properties and options you passed, so a callback that loops over or strips every property now also touches the SDK's. `PostHogEvent` also has `uuid`, `distinctId` and `timestamp`, set on every platform except web. A callback can change the distinct ID and timestamp, and the event keeps its uuid.
+
+**Person processing is decided before the callbacks run.** In 5.x, a callback that removed `$set` prevented a person profile. Now the event is still person-processed, and so are later events. Return `null` to drop an event that must not create a profile. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
+
+Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Map<String, dynamic>>`. Any other list is `List<dynamic>`, even a `List<String>` you passed to `capture`, so cast its items instead of the list.
+
+Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin for those.
+
 ### Lifecycle events on iOS and macOS
 
 `Application Installed`, `Application Updated` and `Application Opened` no longer include `version` and `build`. Update insights, cohorts and filters that use them to `$app_version` and `$app_build`. Android still sends them.
+
+### `$locale` and `$app_language`
+
+`$locale` now means the device's language, with its region, on iOS, Android, macOS, Windows and Linux: `de-CH` instead of `de` on iOS, macOS, Windows and Linux. On Android it no longer follows a per-app language or `Locale.setDefault()`. On older Android versions, Hebrew, Indonesian and Yiddish values also change from legacy codes, such as `in-ID` to `id-ID`. If a user picks a language for your app in iOS Settings, iOS reports that language as the first preferred language, so `$locale` follows it.
+
+Update cohorts, insights and actions that match `$locale`: a filter on `$locale = de` stops matching `de-CH`. To keep matching a language, use a regex such as `^de(-|$)`, because "contains" also matches `en-DE`. Events already stored keep the old values. Feature flags aren't affected: the SDK doesn't send `$locale` or `$app_language` with flag requests, so flags only see these if you set them as person properties yourself.
+
+The new `$app_language` property is the language your app shows. `PosthogObserver` reports the locale exactly as your `MaterialApp` resolved it every time a route changes. An app that doesn't declare `supportedLocales` reports `en-US`, and one declaring `Locale('en')` reports `en`, so use a regex such as `^en(-|$)` to match English. Native detection is off because Flutter apps translate in Dart. If you translate outside `Localizations`, don't use the observer, or want to send another value, call `Posthog().setAppLanguage('de')`.
 
 ### Network reachability on iOS and macOS
 
@@ -315,7 +340,8 @@ Capture v1 checks each event on its own and drops only the invalid ones, so the 
 - PostHog drops an event whose distinct ID is over 200 UTF-8 bytes. Legacy capture shortened the ID to 200 characters and kept the event. If you identify users with a long ID, such as a JWT or a long email address, shorten or hash it before you upgrade. Otherwise every event for that user is dropped.
 - `identify` with an empty or whitespace-only distinct ID is ignored, as in 5.x.
 - A `NaN` or infinite `double` property value is removed and the event is still sent, as in 5.x. Inside a list, it's sent as `null`.
-- The SDK drops an event whose name, distinct ID, `$session_id` or `$window_id` holds a lone UTF-16 surrogate, such as a string cut in the middle of an emoji, and sends the rest of the batch. With `debug` on, it logs the drop. A lone surrogate in a property or option becomes U+FFFD and the event is sent. `identify` with a distinct ID that holds one is ignored, so the ID isn't saved. In 5.x, legacy capture rejected the whole batch for a lone surrogate anywhere in it. <!-- TODO(capture-v1): lands with #703; remove this line if #703 doesn't merge before release. -->
+- The SDK drops an event whose name, distinct ID, `$session_id` or `$window_id` holds a lone UTF-16 surrogate, such as a string cut in the middle of an emoji, and sends the rest of the batch. With `debug` on, it logs the drop.
+- A lone surrogate in a property or option becomes U+FFFD and the event is sent. `identify`, `alias` and `group` with an ID that holds one are ignored, so the ID isn't saved. In 5.x, legacy capture rejected the whole batch for a lone surrogate anywhere in it. On iOS, macOS and Android, the event is sent with U+FFFD in place of each lone surrogate.
 - The SDK doesn't report these drops to your code. With `debug` on, it logs how many events PostHog dropped and why (see [Logs](#logs)).
 
 #### SDK identity
@@ -360,15 +386,12 @@ When the event is sent, the SDK removes each one from `properties` and uses it f
 - There are no global options. To set one for every event, register its legacy option property, for example `Posthog().register(r'$cookieless_mode', true)`.
 - A registered legacy option property also reaches `$identify`, `$create_alias` and `$groupidentify`. If it turns person processing off, PostHog accepts those events and then drops them with an ingestion warning, and the SDK doesn't report it.
 - Person processing is sent as the `process_person_profile: false` option only while it's off, instead of a `$process_person_profile` property on every event.
+- Person processing is decided before `beforeSend` runs, as on iOS, macOS and Android. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 - Events still queued on disk by 5.x are sent to capture v1 after the update, with their legacy option properties moved to options.
 
 **Review your `beforeSend` callbacks for the new event shape.** On Windows and Linux, `beforeSend` sees the options the SDK adds, including `process_person_profile: false`. A callback that returns a new `PostHogEvent` or replaces `event.options` without that key turns person processing on for that event. A legacy option property that a callback adds doesn't replace an option that is already set. `beforeSend` doesn't see `$identify`, `$create_alias`, `$groupidentify` or `$feature_flag_called`.
 
-On iOS, macOS and Android, `beforeSend` sees only the options you passed. The native SDK adds its own options after the hook.
-
-<!-- TODO(capture-v1): if #682 lands in 6.0, the Dart beforeSend on iOS, macOS and Android sees the event the native SDK built, including its options; update the line above. -->
-
-<!-- TODO(capture-v1): on Windows and Linux, `$exception_steps` is added to `$exception` events after `beforeSend`, so a hook can't remove it (KNOWN-GAP against SD-25c, Eli's Option 1 moves it before the hook). Document it here or fix it before release. -->
+`$exception_steps` is added to `$exception` events before `beforeSend` runs, so a callback can read or remove it. Steps recorded while a callback runs, and an event a callback renames to `$exception`, don't get them.
 
 #### Retries
 
@@ -415,7 +438,7 @@ All of these log only with `debug` on, except the 404 warning.
 
 #### Timestamps and IDs
 
-- An event's timestamp is taken before `beforeSend` runs.
+- An event's timestamp is taken before `beforeSend` runs, and a callback can change it.
 - Timestamps are UTC with 3 or 6 fractional digits, as in 5.x. The SDK doesn't check for future timestamps.
 - Event uuids, request IDs and anonymous distinct IDs are UUID v7. You can't set an event's uuid, so events never repeat one.
 
@@ -439,6 +462,9 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 - An `options` argument on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` in `beforeSend`. `process_person_profile`, `cookieless_mode`, `disable_skew_correction` and `product_tour_id` win over their legacy option properties (`$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`). Other keys are sent unchanged. On web, known keys are sent as those legacy option properties and other keys are dropped. On web, `process_person_profile` has no effect, and the options of `identify`, `setPersonProperties`, `alias` and `group` are dropped.
 - `captureAi` for `$ai_*` events. It returns the event's UUID, or `null` when the event isn't admitted. On web it sends nothing and returns `null`.
+- `Posthog().onFeatureFlags()` to get notified after every feature flags load. It returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`. You can register it before `WidgetsFlutterBinding.ensureInitialized()`, but other SDK calls, including `setup()`, are skipped with a warning until the binding is initialized.
+- `$app_language` and `Posthog().setAppLanguage()`. See [`$locale` and `$app_language`](#locale-and-app_language).
+- `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin, to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events.
 - `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes` for `captureAi` requests. They don't apply on web.
 
 ## Upgrade checklist
@@ -451,8 +477,9 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 - [ ] If you run your own reverse proxy or self-host, serve `/i/v1/analytics/events` and `/i/v1/ai/events` first.
 - [ ] Shorten or hash distinct IDs over 200 UTF-8 bytes.
 - [ ] Make `beforeSend` callbacks, including `PostHogLogsConfig.beforeSend`, synchronous.
-- [ ] On Windows and Linux, review your `beforeSend` callbacks for the new event shape.
-- [ ] Update `onFeatureFlags` callbacks to take a `PostHogFeatureFlagsLoaded`.
+- [ ] Review your `beforeSend` callbacks for the new event shape, which includes the SDK's properties and options on every platform except web, and for person processing decided before they run.
+- [ ] Replace `PostHogConfig.onFeatureFlags` with `Posthog().onFeatureFlags()` before `setup()`.
+- [ ] Update cohorts, insights and actions that match `$locale`, which now includes the region. Use `$app_language` for the language your app shows.
 - [ ] Move anything that reads `version` or `build` on iOS and macOS lifecycle events to `$app_version` and `$app_build`.
 - [ ] If you set `sendFeatureFlagEvent = false`, check whether anything relies on `$feature_flag_called` from `getFeatureFlagResult()`.
 - [ ] Add `sendFeatureFlagEvent: false` wherever you replace `getFeatureFlagPayload()`.
