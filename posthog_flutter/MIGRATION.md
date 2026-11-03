@@ -466,7 +466,6 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 ## Upgrade checklist
 
-- [ ] Update cohorts, insights and actions that match `$locale`, which now includes the region. Use `$app_language` for the language your app shows.
 - [ ] Use Flutter 3.41 or later and make sure Swift Package Manager is on.
 - [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
 - [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.
