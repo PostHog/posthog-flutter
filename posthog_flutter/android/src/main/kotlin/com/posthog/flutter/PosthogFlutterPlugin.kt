@@ -1955,8 +1955,7 @@ class PosthogFlutterPlugin :
                     distinctId = call.argument<String>("distinctId")?.takeIf { it.isNotBlank() } ?: built.distinctId,
                     properties = properties?.toMutableMap() ?: mutableMapOf(),
                     timestamp = timestampMs?.let { Date(it) } ?: built.timestamp,
-                    options = options?.toMutableMap() ?: mutableMapOf(),
-                )
+                ).also { it.options = options?.toMutableMap() ?: mutableMapOf() }
             val sent = PostHog.sendBuiltEventForWrapper(event, ai = call.argument("ai") ?: false)
             result.success(sent?.toString())
         } catch (e: Throwable) {
