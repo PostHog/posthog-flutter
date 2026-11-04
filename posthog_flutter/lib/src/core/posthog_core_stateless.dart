@@ -705,8 +705,7 @@ abstract class PostHogCoreStateless {
       // Peeked again after every request, so events queued in the meantime
       // go out with the same flush. The queue sizes the batch before
       // reading it, so events past the batch are not decoded.
-      final batch =
-          await queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
+      final batch = await _nextBatch(lane);
       if (_closed) break;
       if (batch.isEmpty) {
         // The next peek waits for the event still being written.
@@ -716,6 +715,20 @@ abstract class PostHogCoreStateless {
       }
       if (!await _sendBatch(lane, batch)) break;
     }
+  }
+
+  /// The events of the request waiting to be retried, alone, so that the
+  /// retry keeps its request id and `created_at`; otherwise the next batch
+  /// from the front of the queue. Once one of the events to retry is gone,
+  /// e.g. dropped to make room, the request starts over as a new one.
+  Future<List<PostHogQueuedEvent>> _nextBatch(_CaptureLane lane) async {
+    final retryIds = lane.retryIds;
+    lane.retryIds = null;
+    if (retryIds != null) {
+      final retry = await lane.queue.peekIds(retryIds);
+      if (retry != null) return retry;
+    }
+    return lane.queue.peek(lane.maxBatchSize, maxBytes: captureV1MaxBatchBytes);
   }
 
   /// Sends [batch] to capture v1 and removes from the queue the events that
@@ -766,6 +779,7 @@ abstract class PostHogCoreStateless {
       // until the next capture (forever in an idle app after an offline
       // failure).
       if (_isTransientCaptureError(e)) {
+        lane.retryIds = [for (final queued in batch) queued.id];
         _backOff(lane, e is PostHogFetchHttpError ? e.retryAfter : null);
       } else {
         queue.remove([for (final queued in batch) queued.id]);
@@ -793,6 +807,10 @@ abstract class PostHogCoreStateless {
       return true;
     }
 
+    lane.retryIds = [
+      for (final queued in batch)
+        if (retryUuids.contains(queued.event['uuid'])) queued.id,
+    ];
     // Counts only: uuids and server details can identify users.
     logger.info('Capture asked to retry ${batch.length - delivered.length} '
         'of ${batch.length} events.');
@@ -1142,6 +1160,10 @@ class _CaptureLane {
   /// The identity of the last request whose events are still to be
   /// retried. Kept in memory: after a restart the retry is a new request.
   CaptureV1Identity? pendingIdentity;
+
+  /// The queue ids of the events of [pendingIdentity], which the next
+  /// request sends alone, before any newer event.
+  List<String>? retryIds;
 
   /// Flushes in a row whose batch failed with a transient error or had
   /// events the server asked to retry. Each one pauses the queue for longer,
