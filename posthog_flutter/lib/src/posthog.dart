@@ -28,8 +28,8 @@ class Posthog {
   PostHogConfig? _config;
 
   /// Set when [optOut] stops an in-progress Flutter replay. [optIn] consumes
-  /// it so opt-in starts a new recording, and a replay the caller already
-  /// stopped is left stopped.
+  /// it to re-arm Flutter capture for the recording native opt-in restarts,
+  /// and a replay the caller already stopped is left stopped.
   bool _restartSessionReplayOnEnable = false;
 
   /// Returns the singleton PostHog client instance.
@@ -399,19 +399,17 @@ class Posthog {
   Future<void> optOut() async {
     // Uninstall Flutter-specific integrations when opting out
     _uninstallFlutterIntegrations();
-    Future<void>? stopReplay;
     // Skipped on web: posthog-js drops replay while opted out, and restarting
     // it on optIn would override a replay disabled in posthog.init.
     if (!kIsWeb && PostHogInternalEvents.sessionRecordingActive.value) {
       _restartSessionReplayOnEnable = true;
       PostHogInternalEvents.sessionRecordingActive.value = false;
-      // Native stopSessionRecording is a no-op once the SDK is already opted
-      // out, so it is sent first. Not awaited before disable, so a capture()
-      // right after an un-awaited optOut() still reaches native after it.
-      stopReplay = _posthog.stopSessionRecording();
     }
 
-    await Future.wait([if (stopReplay != null) stopReplay, _posthog.disable()]);
+    // Native opt-out stops replay itself. A native stopSessionRecording() here
+    // would record that the app stopped replay, so native opt-in would not
+    // restart it.
+    await _posthog.disable();
   }
 
   /// Opts the current user back in to data collection.
@@ -430,9 +428,8 @@ class Posthog {
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
     if (restartReplay) {
-      // On iOS, startSessionRecording is ignored while the SDK is still opted
-      // out, so the platform opt-in has to finish first.
-      await startSessionRecording(resumeCurrent: false);
+      PostHogInternalEvents.requestReplaySessionReset();
+      PostHogInternalEvents.sessionRecordingActive.value = true;
     }
   }
 
@@ -651,16 +648,17 @@ class Posthog {
         groupProperties: groupProperties,
       );
 
-  /// Registers this device's push token so PostHog Workflows can target it.
+  /// Registers this device's push token or Firebase Installation ID (FID) so
+  /// PostHog Workflows can target it.
   ///
-  /// Both platforms register a token automatically at startup when
+  /// Both platforms register automatically at startup when
   /// [PostHogConfig.capturePushNotificationSubscriptions] is enabled, so the
-  /// main reason to call this is a token refresh, which that startup fetch
-  /// cannot see.
+  /// main reason to call this is a later Firebase registration or token refresh,
+  /// which that startup fetch cannot see.
   ///
-  /// [appId] identifies the app the token belongs to: the Firebase
-  /// `project_id` for an FCM token, the APNs bundle id for an APNs token. It is
-  /// what tells PostHog which provider to deliver through — the platform is
+  /// [appId] identifies the app the identifier belongs to: the Firebase
+  /// `project_id` for an FCM token or FID, the APNs bundle id for an APNs token.
+  /// It tells PostHog which provider to deliver through — the platform is
   /// only recorded alongside it. Leave it `null` and iOS falls back to the
   /// bundle id while Android falls back to the default `FirebaseApp`'s project
   /// id, so pass it explicitly if your app does not use Firebase or registers
@@ -669,17 +667,28 @@ class Posthog {
   ///
   /// **The default is APNs on iOS and FCM on Android**, matching what
   /// [PostHogConfig.capturePushNotificationSubscriptions] registers on its own.
-  /// `firebase_messaging`'s `onTokenRefresh` yields an FCM token on both
-  /// platforms, so forwarding it unguarded pairs an FCM token with the iOS
-  /// bundle id and delivery fails:
+  /// On Android, enabling `firebase_messaging_installation_id_enabled` in the
+  /// app's manifest switches automatic registration to FIDs. Pass the FID to
+  /// this method unchanged; no identifier type parameter is needed.
+  ///
+  /// With `firebase_messaging` 17+, enable that manifest flag and forward
+  /// `onRegistered` after [setup] completes, then register with Firebase:
   ///
   /// ```dart
   /// if (Platform.isAndroid) {
-  ///   FirebaseMessaging.instance.onTokenRefresh.listen(
-  ///     (token) => Posthog().registerPushNotificationToken(token),
+  ///   FirebaseMessaging.instance.onRegistered.listen(
+  ///     (fid) => Posthog().registerPushNotificationToken(fid),
   ///   );
+  ///   await FirebaseMessaging.instance.register();
   /// }
   /// ```
+  ///
+  /// On Android, explicit calls refresh the subscription even when the FID
+  /// hasn't changed; automatic startup registration still deduplicates it.
+  /// For older `firebase_messaging` versions, forward `onTokenRefresh` instead
+  /// and leave FID mode disabled. Neither Firebase callback should be forwarded
+  /// unguarded on iOS: pairing a Firebase identifier with the default APNs
+  /// bundle id causes delivery to fail.
   ///
   /// **Using FCM on both platforms** is supported — pass the Firebase
   /// `project_id` as [appId] on iOS too — but you must set

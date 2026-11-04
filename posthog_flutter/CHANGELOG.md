@@ -1,5 +1,23 @@
 ## Next
 
+## 5.58.4
+
+### Patch Changes
+
+- 2dd8d8d: Raise the Android SDK minimum to 3.75.0 to support Firebase Installation ID (FID) push registration when `firebase_messaging_installation_id_enabled` is enabled. With `firebase_messaging` 17+, forward `onRegistered` to the existing `registerPushNotificationToken` method; explicit Android registrations refresh the subscription even when the FID is unchanged. iOS continues to use APNs by default.
+
+## 5.58.3
+
+### Patch Changes
+
+- 5b85326: Fix session replay after `optIn()` continuing the session that was active while opted out, and raise the minimum PostHog iOS SDK to 3.92.3.
+
+## 5.58.2
+
+### Patch Changes
+
+- ce069ea: Keep events in call order on every platform except Windows and Linux while an async `beforeSend` runs. A `reset()`, `identify()`, `alias()`, `register()`, `group()`, `optIn()` or `optOut()` made after an un-awaited `capture()`, `screen()` or `captureException()` now applies after that event, so the event goes out with the user, super properties, groups and consent it was captured under, as in the native SDKs. While a `beforeSend` callback runs, later PostHog calls (getters included) wait for it; one that runs longer than 10 seconds stops holding them back, and its event is still sent when it finishes, with the user, super properties, groups and consent current by then.
+
 ## 5.58.1
 
 ### Patch Changes
