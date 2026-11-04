@@ -96,7 +96,8 @@ class PostHogFlutterSurveysDelegateTest {
             mapOf(
                 "presentationId" to assertNotNull(presentation["presentationId"]),
                 "index" to index,
-            ) + (response?.let { mapOf("response" to it) } ?: emptyMap()),
+            ) +
+                (response?.let { mapOf("response" to it) } ?: emptyMap()),
             result,
         )
         return result

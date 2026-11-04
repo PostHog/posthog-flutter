@@ -5,10 +5,10 @@ void main() {
   test('screenshot controls preserve native defaults', () {
     final config = PostHogSessionReplayConfig();
 
-    expect(config.screenshotScale, 1.0);
+    expect(config.screenshotScale, isNull);
     expect(config.screenshotCompressionQuality, 30);
     expect(config.screenshotColorMode, PostHogScreenshotColorMode.argb8888);
-    expect(config.toMap(), containsPair('screenshotScale', 1.0));
+    expect(config.toMap(), isNot(contains('screenshotScale')));
     expect(config.toMap(), containsPair('screenshotCompressionQuality', 30));
     expect(config.toMap(), containsPair('screenshotColorMode', 'argb8888'));
   });
@@ -26,10 +26,18 @@ void main() {
     expect(replay['screenshotColorMode'], 'rgb565');
   });
 
+  test('an explicit screenshot scale of 1.0 is sent to the native SDK', () {
+    final config = PostHogConfig('test_project_token')
+      ..sessionReplayConfig.screenshotScale = 1.0;
+
+    final replay = config.toMap()['sessionReplayConfig'] as Map;
+    expect(replay['screenshotScale'], 1.0);
+  });
+
   test('screenshot scale clamps finite values and normalizes non-finite values',
       () {
     final config = PostHogSessionReplayConfig();
-    for (final entry in <(double, double)>[
+    for (final entry in <(double?, double?)>[
       (-1, 0.1),
       (0, 0.1),
       (0.1, 0.1),
@@ -37,10 +45,12 @@ void main() {
       (0.5, 0.5),
       (1, 1),
       (2, 1),
-      (double.nan, 1),
-      (double.infinity, 1),
-      (double.negativeInfinity, 1),
+      (double.nan, null),
+      (double.infinity, null),
+      (double.negativeInfinity, null),
+      (null, null),
     ]) {
+      config.screenshotScale = 0.5;
       config.screenshotScale = entry.$1;
       expect(config.screenshotScale, entry.$2);
       expect(config.toMap()['screenshotScale'], entry.$2);
