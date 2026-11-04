@@ -67,6 +67,8 @@ class Posthog {
   /// For Android and iOS, if you are performing a manual setup,
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
+  ///
+  /// posthog-capability: setup
   Future<void> setup(PostHogConfig config) {
     if (config.projectToken.isEmpty) {
       debugPrint(
@@ -152,6 +154,8 @@ class Posthog {
   ///   userPropertiesSetOnce: {"date_of_first_log_in": "2024-03-01"}
   /// );
   /// ```
+  ///
+  /// posthog-capability: identify
   Future<void> identify({
     required String userId,
     Map<String, Object>? userProperties,
@@ -184,6 +188,8 @@ class Posthog {
   ///   userPropertiesToSetOnce: {"date_of_first_login": "2024-03-01"}
   /// );
   /// ```
+  ///
+  /// posthog-capability: set-person-properties
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
@@ -221,6 +227,8 @@ class Posthog {
   ///    }
   ///   );
   /// ```
+  ///
+  /// posthog-capability: capture
   Future<void> capture({
     required String eventName,
     Map<String, Object>? properties,
@@ -250,6 +258,8 @@ class Posthog {
   /// The optional [properties] are additional screen event properties.
   ///
   /// Returns a [Future] that completes when the screen event has been queued.
+  ///
+  /// posthog-capability: screen
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
@@ -298,6 +308,8 @@ class Posthog {
   ///   attributes: {'order_id': 'ord_789'},
   /// );
   /// ```
+  ///
+  /// posthog-capability: logs
   Future<void> captureLog({
     required String body,
     PostHogLogSeverity level = PostHogLogSeverity.info,
@@ -359,6 +371,8 @@ class Posthog {
   /// Posthog().logger.info('user signed in', {'method': 'google'});
   /// Posthog().logger.error('payment failed', {'error_code': 'E001'});
   /// ```
+  ///
+  /// posthog-capability: logs
   PostHogLogger get logger => _logger ??= PostHogLogger(
         (body, level, attributes) =>
             captureLog(body: body, level: level, attributes: attributes),
@@ -372,11 +386,15 @@ class Posthog {
   /// The [alias] is the additional distinct ID to associate with the user.
   ///
   /// Returns a [Future] that completes when the alias call has been queued.
+  ///
+  /// posthog-capability: alias
   Future<void> alias({required String alias}) => _posthog.alias(alias: alias);
 
   /// Returns the registered `distinctId` property.
   ///
   /// Returns an empty string if the platform cannot provide a distinct ID.
+  ///
+  /// posthog-capability: get-distinct-id
   Future<String> getDistinctId() => _posthog.getDistinctId();
 
   /// Resets all cached properties including the `distinctId`.
@@ -384,6 +402,8 @@ class Posthog {
   /// The SDK will behave as if it has been [setup] for the first time.
   ///
   /// Returns a [Future] that completes when the reset request has been queued.
+  ///
+  /// posthog-capability: reset
   Future<void> reset() async {
     // Bumped before the platform call because native rotates inside that round
     // trip.
@@ -418,6 +438,8 @@ class Posthog {
   /// this starts a new recording.
   ///
   /// Returns a [Future] that completes when the opt-in request has been queued.
+  ///
+  /// posthog-capability: opt-in
   Future<void> optIn() async {
     final config = _config;
     if (config != null) {
@@ -446,6 +468,8 @@ class Posthog {
   Future<void> enable() => optIn();
 
   /// Returns whether the current user has opted out of data collection.
+  ///
+  /// posthog-capability: is-opt-out
   Future<bool> isOptOut() => _posthog.isOptOut();
 
   /// Enables or disables verbose logs about the inner workings of the SDK.
@@ -453,6 +477,8 @@ class Posthog {
   /// Set [enabled] to `true` to enable debug logs, or `false` to disable them.
   ///
   /// Returns a [Future] that completes when the debug setting has been applied.
+  ///
+  /// posthog-capability: debug
   Future<void> debug(bool enabled) => _posthog.debug(enabled);
 
   /// Registers a super property sent with all following events.
@@ -461,6 +487,8 @@ class Posthog {
   /// [key]. The [value] must be supported by the platform channel serializer.
   ///
   /// Returns a [Future] that completes when the property has been registered.
+  ///
+  /// posthog-capability: register
   Future<void> register(String key, Object value) =>
       _posthog.register(key, value);
 
@@ -469,6 +497,8 @@ class Posthog {
   /// The [key] identifies the property to stop sending with future events.
   ///
   /// Returns a [Future] that completes when the property has been removed.
+  ///
+  /// posthog-capability: unregister
   Future<void> unregister(String key) => _posthog.unregister(key);
 
   /// Returns whether a boolean feature flag is enabled.
@@ -492,6 +522,8 @@ class Posthog {
   ///   // show the new checkout without recording a flag exposure
   /// }
   /// ```
+  ///
+  /// posthog-capability: is-feature-enabled
   Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
       _posthog.isFeatureEnabled(key,
           sendFeatureFlagEvent: sendFeatureFlagEvent);
@@ -499,6 +531,8 @@ class Posthog {
   /// Reloads feature flags for the current user.
   ///
   /// Returns a [Future] that completes when the reload request has been queued.
+  ///
+  /// posthog-capability: reload-feature-flags
   Future<void> reloadFeatureFlags() => _posthog.reloadFeatureFlags();
 
   /// Sets person properties that are used only for feature flag evaluation.
@@ -527,6 +561,8 @@ class Posthog {
   /// });
   /// final result = await Posthog().getFeatureFlagResult("my_flag");
   /// ```
+  ///
+  /// posthog-capability: set-person-properties-for-flags
   Future<void> setPersonPropertiesForFlags(
     Map<String, Object> userProperties, {
     bool reloadFeatureFlags = true,
@@ -547,6 +583,8 @@ class Posthog {
   /// the properties (defaults to `true`). When `true`, the returned [Future]
   /// awaits the reload before completing (on iOS/Android, after flags finish
   /// loading; on web, best-effort).
+  ///
+  /// posthog-capability: reset-person-properties-for-flags
   Future<void> resetPersonPropertiesForFlags({
     bool reloadFeatureFlags = true,
   }) async {
@@ -579,6 +617,8 @@ class Posthog {
   ///   {"name": "ACME Corp", "is_enterprise": true},
   /// );
   /// ```
+  ///
+  /// posthog-capability: set-group-properties-for-flags
   Future<void> setGroupPropertiesForFlags(
     String groupType,
     Map<String, Object> groupProperties, {
@@ -603,6 +643,8 @@ class Posthog {
   /// the properties (defaults to `true`). When `true`, the returned [Future]
   /// awaits the reload before completing (on iOS/Android, after flags finish
   /// loading; on web, best-effort).
+  ///
+  /// posthog-capability: reset-group-properties-for-flags
   Future<void> resetGroupPropertiesForFlags({
     String? groupType,
     bool reloadFeatureFlags = true,
@@ -637,6 +679,8 @@ class Posthog {
   ///    "name": "ACME Corp"
   /// });
   /// ```
+  ///
+  /// posthog-capability: group
   Future<void> group({
     required String groupType,
     required String groupKey,
@@ -799,6 +843,8 @@ class Posthog {
   ///   // show the red button without recording a flag exposure
   /// }
   /// ```
+  ///
+  /// posthog-capability: get-feature-flag
   Future<Object?> getFeatureFlag(String key, {bool? sendFeatureFlagEvent}) =>
       _posthog.getFeatureFlag(
           key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);
@@ -821,6 +867,8 @@ class Posthog {
   ///   final payload = result.payload; // Associated payload data
   /// }
   /// ```
+  ///
+  /// posthog-capability: get-feature-flag-result
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult(
     String key, {
     bool sendEvent = true,
@@ -847,6 +895,8 @@ class Posthog {
   ///   print('${flag.key}: ${flag.variant ?? flag.enabled}');
   /// }
   /// ```
+  ///
+  /// posthog-capability: get-feature-flags
   Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() =>
       _posthog.getAllFeatureFlags();
 
@@ -854,6 +904,8 @@ class Posthog {
   ///
   /// Returns `null` when the flag does not exist, has no payload, or the payload
   /// cannot be loaded.
+  ///
+  /// posthog-capability: get-feature-flag-payload
   @Deprecated(
     'Use getFeatureFlagResult instead, which returns both value and payload.',
   )
@@ -905,6 +957,8 @@ class Posthog {
   /// Flushes queued events immediately where supported by the platform.
   ///
   /// Returns a [Future] that completes when the flush request has finished.
+  ///
+  /// posthog-capability: flush
   Future<void> flush() => _posthog.flush();
 
   /// Captures an exception with optional custom properties.
@@ -917,6 +971,8 @@ class Posthog {
   /// The optional [properties] are added to the `$exception` event.
   ///
   /// Returns a [Future] that completes when the exception event has been queued.
+  ///
+  /// posthog-capability: capture-exception
   Future<void> captureException({
     required Object error,
     StackTrace? stackTrace,
@@ -940,6 +996,8 @@ class Posthog {
   /// The optional [properties] are added to the `$exception` event.
   ///
   /// Returns a [Future] that completes when the exception event has been queued.
+  ///
+  /// posthog-capability: capture-exception
   Future<void> captureRunZonedGuardedError({
     required Object error,
     StackTrace? stackTrace,
@@ -992,6 +1050,8 @@ class Posthog {
   ///   properties: {'screen': 'cart'},
   /// );
   /// ```
+  ///
+  /// posthog-capability: exception-steps
   Future<void> addExceptionStep(
     String message, {
     Map<String, Object>? properties,
@@ -1028,6 +1088,8 @@ class Posthog {
   ///
   /// **Note:** After calling `close()`, surveys will not be rendered until the
   /// SDK is re-initialized and the next navigation event occurs.
+  ///
+  /// posthog-capability: shutdown
   Future<void> close() {
     _config = null;
     _currentScreen = null;
@@ -1049,6 +1111,8 @@ class Posthog {
   ///
   /// Returns `null` when no session is active or the platform cannot provide a
   /// session ID.
+  ///
+  /// posthog-capability: get-session-id
   Future<String?> getSessionId() => _posthog.getSessionId();
 
   /// Starts session recording.
@@ -1065,6 +1129,8 @@ class Posthog {
   /// Returns a [Future] that completes when the start request has been sent.
   ///
   /// **Windows/Linux:** not supported.
+  ///
+  /// posthog-capability: start-session-recording
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     if (!resumeCurrent) {
       // The new recording must send its own meta event rather than inherit the
@@ -1082,6 +1148,8 @@ class Posthog {
   /// Returns a [Future] that completes when the stop request has been sent.
   ///
   /// **Windows/Linux:** not supported.
+  ///
+  /// posthog-capability: stop-session-recording
   Future<void> stopSessionRecording() async {
     await _posthog.stopSessionRecording();
     PostHogInternalEvents.sessionRecordingActive.value = false;
@@ -1093,6 +1161,8 @@ class Posthog {
   /// current platform.
   ///
   /// **Windows/Linux:** not supported.
+  ///
+  /// posthog-capability: is-session-replay-active
   Future<bool> isSessionReplayActive() => _posthog.isSessionReplayActive();
 
   Posthog._internal();

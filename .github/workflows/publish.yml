@@ -160,6 +160,32 @@ jobs:
           git tag -a "$NEW_VERSION" -m "$NEW_VERSION"
           git push origin "$NEW_VERSION"
 
+      # The reference headings come from the sdk-specs capabilities.
+      - name: Check out sdk-specs
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PostHog/sdk-specs
+          path: .sdk-specs
+          persist-credentials: false
+
+      - name: Generate references
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        run: |
+          dart pub global activate dartdoc_modern 1.1.7
+          dart scripts/generate-markdown-reference.dart --sdk-specs .sdk-specs
+
+      - name: Commit generated references
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
+        with:
+          commit_message: 'Update generated references'
+          repo: ${{ github.repository }}
+          branch: main
+          file_pattern: references/
+        env:
+          GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
+
       - name: Send failure event to PostHog
         if: ${{ failure() }}
         continue-on-error: true
