@@ -1,5 +1,11 @@
 ## Next
 
+## 5.60.0
+
+### Minor Changes
+
+- 96e5209: Add `PostHogConfig.featureFlagRequestMaxRetries` to set how many times a failed `/flags` request is retried on iOS, Android, macOS, Windows, and Linux
+
 ## 5.59.0
 
 ### Minor Changes

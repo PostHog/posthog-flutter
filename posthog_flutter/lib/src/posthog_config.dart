@@ -156,6 +156,27 @@ class PostHogConfig {
   /// ```
   List<String>? evaluationContexts;
 
+  /// Maximum number of retries for a `/flags` request after a network error
+  /// or a gateway error (HTTP 502 or 504).
+  ///
+  /// The SDK waits 300ms before the first retry and doubles the wait for each
+  /// later one. A refused connection is not retried.
+  ///
+  /// Defaults to `1`. Set to `0` to disable retries; negative values are
+  /// treated as `0`.
+  ///
+  /// **Flutter web:** not applied. posthog-js is initialized by your app, so
+  /// set `feature_flag_request_max_retries` in your `posthog.init({...})` call
+  /// instead.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('<YOUR_PROJECT_TOKEN>')
+  ///   ..featureFlagRequestMaxRetries = 3;
+  /// await Posthog().setup(config);
+  /// ```
+  var featureFlagRequestMaxRetries = 1;
+
   /// Whether the SDK captures application lifecycle events automatically.
   ///
   /// Captured events include app opened, backgrounded, installed, and updated
