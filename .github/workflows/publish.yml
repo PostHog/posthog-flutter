@@ -182,6 +182,8 @@ jobs:
           python-version: '3.13'
 
       - name: Generate references
+        # Best-effort: a failure never blocks the release. Run generate-references.yml to retry.
+        continue-on-error: true
         if: steps.commit-version-bump.outputs.commit-hash != ''
         run: |
           python3 -m pip install --quiet -r scripts/requirements.txt
