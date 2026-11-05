@@ -271,7 +271,7 @@ You need to change code if your app does any of these:
 - identifies users with a distinct ID over 200 UTF-8 bytes, such as a JWT
 - captures events whose name is over 200 UTF-8 bytes
 - sets `projectToken` to a personal API key (`phx_...`)
-- sets `$lib` or `$lib_version` and expects PostHog to store that value
+- on Android, Windows or Linux, sets `$lib` or `$lib_version` and expects PostHog to store that value
 - reads `$session_id` or `$window_id` from the raw request body, for example in a proxy
 - relies on a `Retry-After` longer than 30 seconds
 - registers or passes a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expects the SDK's value to win
