@@ -395,7 +395,7 @@ jobs:
           git clone --depth 1 -b chore/v4-remove-deprecated https://github.com/PostHog/posthog-android.git "$RUNNER_TEMP/posthog-android"
           cd "$RUNNER_TEMP/posthog-android"
           sed -i 's/^coreVersion=.*/coreVersion=7.0.0/; s/^androidVersion=.*/androidVersion=4.0.0/' gradle.properties
-          ./gradlew :posthog:publishToMavenLocal :posthog-android:publishToMavenLocal
+          ./gradlew :posthog:publishToMavenLocal :posthog-android:publishToMavenLocal -x signMavenPublication
           mkdir -p ~/.gradle/init.d
           printf 'allprojects { repositories { mavenLocal() } }\n' > ~/.gradle/init.d/maven-local.gradle
 
