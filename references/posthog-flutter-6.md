@@ -23,6 +23,9 @@ tableOfContents:
   - value: "Alias"
     url: alias
     depth: 0
+  - value: "Capture AI"
+    url: capture-ai
+    depth: 0
   - value: "Capture exception"
     url: capture-exception
     depth: 0
@@ -61,6 +64,9 @@ tableOfContents:
     depth: 0
   - value: "Is session replay active"
     url: is-session-replay-active
+    depth: 0
+  - value: "On feature flags"
+    url: on-feature-flags
     depth: 0
   - value: "Opt in"
     url: opt-in
@@ -397,6 +403,50 @@ event, as described on capture.
 
 Returns a Future that completes when the alias call has been queued.
 
+## Capture AI
+
+### `Posthog.captureAi`
+
+```dart
+Future<String?> captureAi({required String eventName, Map<String, Object>? properties, Map<String, Object>? userProperties, Map<String, Object>? userPropertiesSetOnce, Map<String, Object?>? options})
+```
+
+Captures an AI observability event, such as `$ai_generation`,
+`$ai_span`, `$ai_trace` or `$ai_embedding`, and sends it to PostHog's AI
+endpoint, which accepts much larger events than capture.
+
+Takes the same arguments as capture and goes through the same
+PostHogConfig.beforeSend callbacks. The event is queued separately from
+other events and sent unchanged: the SDK doesn't redact or truncate
+prompts, outputs or media. PostHog drops an event sent here whose name
+doesn't start with `$ai_`. capture never sends events here, even ones
+named `$ai_*`.
+
+Returns the event's UUID once the SDK has admitted it to the AI queue.
+`null` means the event was not admitted and will not be sent:
+
+- a PostHogConfig.beforeSend callback dropped it,
+- it is over PostHogConfig.captureAiMaxEventBytes,
+- the SDK is disabled, not set up or opted out, or
+- the platform is web (see below).
+
+**Platforms:** supported on iOS, macOS, Android, Windows and Linux. On
+web, `captureAi` is a no-op: it sends nothing, logs a debug message and
+returns `null`.
+
+**Example**
+
+```dart
+  await Posthog().captureAi(
+    eventName: r'$ai_generation',
+    properties: {
+      r'$ai_trace_id': traceId,
+      r'$ai_model': 'gpt-4o',
+      r'$ai_provider': 'openai',
+    },
+  );
+```
+
 ## Capture exception
 
 ### `Posthog.captureException`
@@ -726,6 +776,45 @@ current platform.
 
 **Windows/Linux:** not supported.
 
+## On feature flags
+
+### `Posthog.onFeatureFlags`
+
+```dart
+PostHogFeatureFlagsSubscription onFeatureFlags(OnFeatureFlagsCallback callback)
+```
+
+Registers a `callback` that's invoked whenever feature flags are loaded
+or updated.
+
+It's invoked after the SDK loads flags at startup (including from
+bootstrap values), after reloadFeatureFlags, and after calls that
+reload flags such as identify, group or reset. If a load fails,
+PostHogFeatureFlagsLoaded.errorsLoading is `true` and the values are
+the last known flags. If flags have already loaded when you register,
+it's also invoked with the current values shortly afterwards.
+
+You can register before setup, even before
+`WidgetsFlutterBinding.ensureInitialized()`, and the callback stays
+registered across close and setup. Treat each invocation as "flags may have
+changed", not as an exactly-once event.
+
+Returns a subscription; call
+PostHogFeatureFlagsSubscription.unsubscribe to stop receiving updates.
+
+**Example:**
+
+```dart
+final subscription = Posthog().onFeatureFlags((loaded) {
+  if (loaded.variants['new-checkout'] == 'test') {
+    // Show the test variant.
+  }
+});
+
+// Later, stop listening.
+subscription.unsubscribe();
+```
+
 ## Opt in
 
 ### `Posthog.optIn`
@@ -1052,48 +1141,6 @@ Posthog()
 
 Returns the singleton PostHog client instance.
 
-### `Posthog.captureAi`
-
-```dart
-Future<String?> captureAi({required String eventName, Map<String, Object>? properties, Map<String, Object>? userProperties, Map<String, Object>? userPropertiesSetOnce, Map<String, Object?>? options})
-```
-
-Captures an AI observability event, such as `$ai_generation`,
-`$ai_span`, `$ai_trace` or `$ai_embedding`, and sends it to PostHog's AI
-endpoint, which accepts much larger events than capture.
-
-Takes the same arguments as capture and goes through the same
-PostHogConfig.beforeSend callbacks. The event is queued separately from
-other events and sent unchanged: the SDK doesn't redact or truncate
-prompts, outputs or media. PostHog drops an event sent here whose name
-doesn't start with `$ai_`. capture never sends events here, even ones
-named `$ai_*`.
-
-Returns the event's UUID once the SDK has admitted it to the AI queue.
-`null` means the event was not admitted and will not be sent:
-
-- a PostHogConfig.beforeSend callback dropped it,
-- it is over PostHogConfig.captureAiMaxEventBytes,
-- the SDK is disabled, not set up or opted out, or
-- the platform is web (see below).
-
-**Platforms:** supported on iOS, macOS, Android, Windows and Linux. On
-web, `captureAi` is a no-op: it sends nothing, logs a debug message and
-returns `null`.
-
-**Example**
-
-```dart
-  await Posthog().captureAi(
-    eventName: r'$ai_generation',
-    properties: {
-      r'$ai_trace_id': traceId,
-      r'$ai_model': 'gpt-4o',
-      r'$ai_provider': 'openai',
-    },
-  );
-```
-
 ### `Posthog.captureFeatureInteraction`
 
 ```dart
@@ -1191,43 +1238,6 @@ taps carry an identifier.
 `subtitle` is iOS only and ignored on Android, which has no such field.
 
 Not supported on Flutter web, Windows or Linux.
-
-### `Posthog.onFeatureFlags`
-
-```dart
-PostHogFeatureFlagsSubscription onFeatureFlags(OnFeatureFlagsCallback callback)
-```
-
-Registers a `callback` that's invoked whenever feature flags are loaded
-or updated.
-
-It's invoked after the SDK loads flags at startup (including from
-bootstrap values), after reloadFeatureFlags, and after calls that
-reload flags such as identify, group or reset. If a load fails,
-PostHogFeatureFlagsLoaded.errorsLoading is `true` and the values are
-the last known flags. If flags have already loaded when you register,
-it's also invoked with the current values shortly afterwards.
-
-You can register before setup, even before
-`WidgetsFlutterBinding.ensureInitialized()`, and the callback stays
-registered across close and setup. Treat each invocation as "flags may have
-changed", not as an exactly-once event.
-
-Returns a subscription; call
-PostHogFeatureFlagsSubscription.unsubscribe to stop receiving updates.
-
-**Example:**
-
-```dart
-final subscription = Posthog().onFeatureFlags((loaded) {
-  if (loaded.variants['new-checkout'] == 'test') {
-    // Show the test variant.
-  }
-});
-
-// Later, stop listening.
-subscription.unsubscribe();
-```
 
 ### `Posthog.optOut`
 
