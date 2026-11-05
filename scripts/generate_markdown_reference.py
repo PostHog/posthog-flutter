@@ -61,10 +61,19 @@ class Docs:
     def entry(self, symbol: dict, label: str, level: int) -> str:
         page = self.page(symbol)
         sig = page.select_one("section.multi-line-signature")
-        code = " ".join(sig.get_text().split()) if sig else f"{KEYWORD.get(symbol['kind'], '')} {symbol['name']}".strip()
+        for label in sig.select(".features") if sig else []:  # "final", "getter/setter pair"
+            label.decompose()
+        code = tidy(" ".join(sig.get_text().split())) if sig else f"{KEYWORD.get(symbol['kind'], '')} {symbol['name']}".strip()
         parts = [f"{'#' * level} `{label}`", f"```dart\n{code}\n```"]
         parts += [markdown(page.select_one(s)) for s in ("section.desc", "section#values") if page.select_one(s)]
         return "\n\n".join(p for p in parts if p)
+
+
+def tidy(signature: str) -> str:
+    """Drops the spaces dartdoc's line breaks leave just inside brackets and before a closing one."""
+    for a, b in (("( ", "("), (" )", ")"), ("{ ", "{"), (", }", "}"), (", )", ")"), ("[ ", "["), (", ]", "]")):
+        signature = signature.replace(a, b)
+    return signature
 
 
 def markdown(node) -> str:
@@ -75,9 +84,12 @@ def markdown(node) -> str:
         dl.replace_with(BeautifulSoup("<ul>" + "".join(f"<li><code>{n}</code>: {d}</li>" for n, d in zip(items, docs)) + "</ul>", "html.parser"))
     for h in node.find_all(["h2", "h3"]):
         h.name = "h5"
+    for text in node.find_all(string=True):  # braces in prose only; code keeps them
+        if not text.find_parent(["code", "pre"]):
+            text.replace_with(str(text).translate(MDX))
     md = markdownify(str(node), strip=["a"], heading_style="ATX", bullets="-", code_language="dart")
     lines = [l for l in md.split("\n") if not l.strip().startswith(TAG)]
-    return "\n".join(lines).strip().translate(MDX).replace("<br>", "<br />")
+    return "\n".join(lines).strip().replace("<br>", "<br />")
 
 
 def capabilities(checkout: str) -> dict[str, str]:
