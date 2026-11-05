@@ -21,8 +21,14 @@ import java.util.UUID
  * Separate surveys delegate to avoid class loading issues in the main plugin
  */
 class PostHogFlutterSurveysDelegate(
-    private val channel: MethodChannel,
+    channel: MethodChannel,
 ) : PostHogSurveysResumeAwareDelegate {
+    // The native SDK holds the first delegate it gets, so the plugin keeps this instance across
+    // repeated setup() calls. An engine re-attach builds a new method channel, and the plugin
+    // re-points this field to it, because a survey sent on the detached channel never appears.
+    @Volatile
+    internal var channel: MethodChannel = channel
+
     override val supportsSurveyResume: Boolean = true
 
     @Volatile
