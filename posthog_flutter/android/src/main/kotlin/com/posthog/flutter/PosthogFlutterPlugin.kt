@@ -1956,12 +1956,13 @@ class PosthogFlutterPlugin :
             val options: Map<String, Any?>? = call.argument("options")
             val timestampMs: Long? = call.argument<Number>("timestamp")?.toLong()
             val event =
-                built.copy(
-                    event = call.argument("event")!!,
-                    distinctId = call.argument<String>("distinctId")?.takeIf { it.isNotBlank() } ?: built.distinctId,
-                    properties = properties?.toMutableMap() ?: mutableMapOf(),
-                    timestamp = timestampMs?.let { Date(it) } ?: built.timestamp,
-                ).also { it.options = options?.toMutableMap() ?: mutableMapOf() }
+                built
+                    .copy(
+                        event = call.argument("event")!!,
+                        distinctId = call.argument<String>("distinctId")?.takeIf { it.isNotBlank() } ?: built.distinctId,
+                        properties = properties?.toMutableMap() ?: mutableMapOf(),
+                        timestamp = timestampMs?.let { Date(it) } ?: built.timestamp,
+                    ).also { it.options = options?.toMutableMap() ?: mutableMapOf() }
             val sent = PostHog.sendBuiltEventForWrapper(event, ai = call.argument("ai") ?: false)
             result.success(sent?.toString())
         } catch (e: Throwable) {
