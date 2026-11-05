@@ -7,10 +7,12 @@ void main() {
   test('calls before the binding fall back, then setup reaches native',
       () async {
     final posthog = Posthog();
-    final config = PostHogConfig('test-token');
+    final config = PostHogConfig('test-token', beforeSend: [(event) => event]);
 
     await posthog.setup(config);
     await posthog.capture(eventName: 'early');
+    await posthog.screen(screenName: 'early');
+    expect(await posthog.captureAi(eventName: r'$ai_generation'), isNull);
     await posthog.identify(userId: 'early');
     await posthog.captureException(error: StateError('early'));
     expect(await posthog.isFeatureEnabled('flag'), isFalse);

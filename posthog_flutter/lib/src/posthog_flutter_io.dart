@@ -63,13 +63,16 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     if (!_installMethodCallHandler()) {
       // Callers already fall back on a PlatformException. Waiting for the
       // binding instead would hang an app awaiting setup() before creating it.
-      return Future<dynamic>.error(PlatformException(
-        code: 'binding_not_initialized',
-        message: 'Skipped $method: the Flutter binding is not initialized.',
-      ));
+      return Future<dynamic>.error(_bindingNotInitialized(method));
     }
     return _order.run(() => _methodChannel.invokeMethod(method, arguments));
   }
+
+  static PlatformException _bindingNotInitialized(String method) =>
+      PlatformException(
+        code: 'binding_not_initialized',
+        message: 'Skipped $method: the Flutter binding is not initialized.',
+      );
 
   /// Returns whether the channel is ready. Without a binding it isn't, and the
   /// timer covers apps whose native SDK auto-inits and that make no later call.
@@ -107,6 +110,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
     bool ai = false,
     String? eventName,
   }) async {
+    if (!_installMethodCallHandler()) {
+      throw _bindingNotInitialized('buildEvent');
+    }
     // setup() replaces the callbacks at once but reaches native after this
     // event, which must not run under the next setup's filters.
     final callbacks = _beforeSendCallbacks;
