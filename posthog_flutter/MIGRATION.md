@@ -271,7 +271,6 @@ You need to change code if your app does any of these:
 - identifies users with a distinct ID over 200 UTF-8 bytes, such as a JWT
 - captures events whose name is over 200 UTF-8 bytes
 - sets `projectToken` to a personal API key (`phx_...`)
-- on Android, Windows or Linux, sets `$lib` or `$lib_version` and expects PostHog to store that value
 - reads `$session_id` or `$window_id` from the raw request body, for example in a proxy
 - relies on a `Retry-After` longer than 30 seconds
 - registers or passes a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expects the SDK's value to win
@@ -346,12 +345,6 @@ Capture v1 checks each event on its own and drops only the invalid ones, so the 
 - A `NaN` or infinite `double` property value is removed and the event is still sent, as in 5.x. Inside a list, it's sent as `null`.
 - A lone UTF-16 surrogate, such as a string cut in the middle of an emoji, becomes U+FFFD and the event is sent. This covers the event name, distinct ID, `$session_id`, `$window_id`, properties and options, the IDs passed to `identify`, `alias` and `group`, and the person and group properties sent to `/flags`. The SDK keeps each ID as you passed it and repairs only what it sends. In 5.x, legacy capture rejected the whole batch for a lone surrogate anywhere in it. iOS, macOS and Android already send the event with U+FFFD in place of each lone surrogate.
 - The SDK doesn't report these drops to your code. With `debug` on, it logs how many events PostHog dropped and why (see [Logs](#logs)).
-
-#### SDK identity
-
-PostHog sets `$lib` and `$lib_version` from the `PostHog-Sdk-Info` request header, `posthog-flutter/<version>`.
-The SDK removes `$lib` and `$lib_version` from the properties it sends.
-A value you set in properties, in a registered property or in `beforeSend` doesn't reach PostHog.
 
 #### Property precedence
 
