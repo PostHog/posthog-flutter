@@ -397,8 +397,9 @@ jobs:
           sed -i 's/^coreVersion=.*/coreVersion=7.0.0/; s/^androidVersion=.*/androidVersion=4.0.0/' gradle.properties
           # posthog-android requires signing when CI=true, and there is no key here.
           CI=false ./gradlew :posthog:publishToMavenLocal :posthog-android:publishToMavenLocal
-          mkdir -p ~/.gradle/init.d
-          printf 'allprojects { repositories { mavenLocal() } }\n' > ~/.gradle/init.d/maven-local.gradle
+          cd "$GITHUB_WORKSPACE"
+          python3 -c "p='example/android/build.gradle.kts'; s=open(p).read(); open(p,'w').write(s.replace('repositories {\n        google()', 'repositories {\n        mavenLocal()\n        google()', 1))"
+          grep -n mavenLocal example/android/build.gradle.kts
 
       - name: Build Android
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
