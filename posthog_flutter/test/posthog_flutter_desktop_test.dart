@@ -248,6 +248,17 @@ void main() {
       expect(_propertiesOf(event), isNot(contains(r'$set')));
     });
 
+    test(r'sends $app_language', () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+
+      await platform.setAppLanguage('fr');
+      await platform.capture(eventName: 'translated');
+
+      final event = await server.waitForEvent('translated');
+      expect(_propertiesOf(event)[r'$app_language'], 'fr');
+    });
+
     test(r'reports the platform language as $locale', () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
@@ -257,7 +268,7 @@ void main() {
       final event = await server.waitForEvent('localized event');
       expect(
         _propertiesOf(event)[r'$locale'],
-        PlatformDispatcher.instance.locale.languageCode,
+        PlatformDispatcher.instance.locale.toLanguageTag(),
       );
     });
 

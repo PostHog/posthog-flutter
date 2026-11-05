@@ -536,6 +536,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             config.setBeforeSend(beforeSend)
         }
 
+        // Flutter apps translate in Dart, so the app bundle doesn't say what's shown
+        config.detectAppLanguage = false
+
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
         postHogVersion = postHogFlutterVersion
@@ -615,6 +618,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             register(call, result: result)
         case "unregister":
             unregister(call, result: result)
+        case "setAppLanguage":
+            PostHogSDK.shared.setAppLanguage((call.arguments as? [String: Any])?["language"] as? String)
+            result(nil)
         case "flush":
             flush(result)
         case "captureException":

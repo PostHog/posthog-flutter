@@ -38,6 +38,72 @@ void main() {
     );
   }
 
+  group('app language', () {
+    setUp(() async {
+      await Posthog().setAppLanguage(null);
+      await Posthog().reportResolvedAppLanguage(null);
+      fake.appLanguageCalls.clear();
+    });
+
+    Widget app(Locale locale, GlobalKey<NavigatorState> navigator) =>
+        WidgetsApp(
+          navigatorKey: navigator,
+          color: const Color(0xFF000000),
+          locale: locale,
+          supportedLocales: const [Locale('en'), Locale('de')],
+          localizationsDelegates: const [
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          localeResolutionCallback: (locale, supported) => supported.firstWhere(
+            (it) => it.languageCode == locale?.languageCode,
+            orElse: () => supported.first,
+          ),
+          navigatorObservers: [getSut()],
+          pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
+            settings: settings,
+            pageBuilder: (context, _, __) => builder(context),
+          ),
+          home: const SizedBox(),
+        );
+
+    testWidgets('reports the locale the app resolved, not the requested one',
+        (tester) async {
+      await tester.pumpWidget(app(
+        const Locale('fr', 'FR'),
+        GlobalKey<NavigatorState>(),
+      ));
+
+      expect(fake.appLanguageCalls, ['en']);
+    });
+
+    testWidgets('picks up a language change on the next route', (tester) async {
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(app(const Locale('en'), navigator));
+      await tester.pumpWidget(app(const Locale('de'), navigator));
+      await tester.pump();
+
+      navigator.currentState!.push(route(const RouteSettings(name: 'next')));
+      await tester.pumpAndSettle();
+
+      expect(fake.appLanguageCalls, ['en', 'de']);
+    });
+
+    test('the value the app set wins over the resolved locale', () async {
+      await Posthog().setAppLanguage(' pt_BR ');
+      await Posthog().reportResolvedAppLanguage('en');
+      await Posthog().setAppLanguage(null);
+
+      expect(fake.appLanguageCalls, ['pt-BR', 'en']);
+    });
+
+    test('is sent again after setup', () async {
+      await Posthog().setAppLanguage('de');
+      await Posthog().setup(PostHogConfig('phc_test'));
+
+      expect(fake.appLanguageCalls, ['de', 'de']);
+    });
+  });
+
   test('preserves WidgetsBindingObserver compatibility', () {
     expect(getSut(), isA<WidgetsBindingObserver>());
   });

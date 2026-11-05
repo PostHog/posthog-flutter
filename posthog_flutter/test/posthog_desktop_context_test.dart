@@ -73,21 +73,21 @@ void main() {
     });
   });
 
-  group('languageCodeOf', () {
-    test('reports the language without the region', () {
-      expect(languageCodeOf(const Locale('en', 'US')), 'en');
+  group('localeTagOf', () {
+    test('reports the full language tag', () {
+      expect(localeTagOf(const Locale('en', 'US')), 'en-US');
       expect(
-        languageCodeOf(
+        localeTagOf(
           const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
         ),
-        'zh',
+        'zh-Hans',
       );
     });
 
     test('omits locales that name no language', () {
-      expect(languageCodeOf(const Locale.fromSubtags()), isNull);
-      expect(languageCodeOf(const Locale('C')), isNull);
-      expect(languageCodeOf(const Locale('POSIX')), isNull);
+      expect(localeTagOf(const Locale.fromSubtags()), isNull);
+      expect(localeTagOf(const Locale('C')), isNull);
+      expect(localeTagOf(const Locale('POSIX')), isNull);
     });
   });
 }

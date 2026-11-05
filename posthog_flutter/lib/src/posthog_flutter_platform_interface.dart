@@ -187,6 +187,10 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('unregister() has not been implemented.');
   }
 
+  /// Sets or, with `null`, clears the `$app_language` event property. Does
+  /// nothing by default, because [PosthogObserver] calls it during navigation.
+  Future<void> setAppLanguage(String? language) async {}
+
   Future<bool> isFeatureEnabled(String key,
       {bool? sendFeatureFlagEvent, bool? defaultValue}) {
     throw UnimplementedError('isFeatureEnabled() has not been implemented.');

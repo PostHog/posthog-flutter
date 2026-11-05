@@ -384,6 +384,10 @@ class PosthogFlutterPlugin :
                 unregister(call, result)
             }
 
+            "setAppLanguage" -> {
+                setAppLanguage(call, result)
+            }
+
             "debug" -> {
                 debug(call, result)
             }
@@ -870,6 +874,8 @@ class PosthogFlutterPlugin :
                     }
                 }
 
+                // Flutter apps translate in Dart, so native resources don't say what's shown
+                detectAppLanguage = false
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
 
@@ -2256,6 +2262,18 @@ class PosthogFlutterPlugin :
                 return
             }
             PostHog.registerPushNotificationToken(deviceToken, appId)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun setAppLanguage(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            PostHog.setAppLanguage(call.argument("language"))
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
