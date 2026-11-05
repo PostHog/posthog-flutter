@@ -59,9 +59,9 @@ void main() {
         expect(event['session_id'], client.getSessionId());
         expect(event['options'], {'process_person_profile': false});
         final properties = event['properties']! as Map;
+        expect(properties[r'$lib'], postHogFlutterSdkName);
+        expect(properties[r'$lib_version'], postHogFlutterVersion);
         for (final moved in [
-          r'$lib',
-          r'$lib_version',
           r'$session_id',
           r'$process_person_profile',
         ]) {
@@ -792,7 +792,12 @@ void main() {
       'timestamp': '2026-10-01T12:00:00.000Z',
       'session_id': '0199aa00-0000-7000-8000-000000000001',
       'options': {'process_person_profile': true},
-      'properties': {'plan': 'pro', r'$is_identified': true},
+      'properties': {
+        'plan': 'pro',
+        r'$lib': 'posthog-flutter',
+        r'$lib_version': '5.56.2',
+        r'$is_identified': true,
+      },
     });
     expect(Directory('${dir.path}/posthog_queue').listSync(), isEmpty);
   });

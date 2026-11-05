@@ -30,6 +30,8 @@ void main() {
       expect(
         properties.keys,
         unorderedEquals([
+          r'$lib',
+          r'$lib_version',
           r'$feature_flag',
           r'$feature_flag_response',
           r'$feature_flag_has_experiment',

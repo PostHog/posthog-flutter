@@ -446,8 +446,7 @@ class PostHogConfig {
   /// - On iOS, macOS, Android, Windows and Linux, the callbacks see the
   ///   system properties (like `$device_type` and `$session_id`), the
   ///   registered properties and the options the SDK adds, and can change
-  ///   them for that event, except `$lib` and `$lib_version`, which PostHog
-  ///   sets from the SDK. On iOS, macOS and Android, registering callbacks
+  ///   them for that event. On iOS, macOS and Android, registering callbacks
   ///   adds one more call to the native SDK per event. The native SDK keeps
   ///   each built event until Dart sends it back, and discards one still
   ///   waiting after a minute (for example, after a hot restart). On web,

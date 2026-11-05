@@ -47,9 +47,9 @@ const legacyOptionProperties = <String, String>{
 
 /// Shapes a queued event for capture v1.
 ///
-/// `$session_id` and `$window_id` move to the event root, and `$lib` and
-/// `$lib_version` are left out: the server reads them from the
-/// `PostHog-Sdk-Info` header.
+/// `$session_id` and `$window_id` move to the event root. `$lib` and
+/// `$lib_version` stay in the properties, so an event queued by an earlier
+/// version keeps the version that captured it.
 ///
 /// The legacy option properties are moved into `options` here, when the
 /// request is built, so that events queued by earlier versions are converted
@@ -63,9 +63,7 @@ Map<String, Object?> captureV1Event(
   final properties = <String, Object?>{
     if (queued['properties'] case final Map stored)
       for (final MapEntry(:key, :value) in stored.entries) '$key': value,
-  }
-    ..remove(r'$lib')
-    ..remove(r'$lib_version');
+  };
 
   final options = <String, Object?>{
     if (queued['options'] case final Map stored)

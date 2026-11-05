@@ -98,7 +98,7 @@ void main() {
       expect(event['distinct_id'], isA<String>());
       expect(event['session_id'], isA<String>());
       final properties = Map<String, Object?>.from(event['properties']! as Map);
-      expect(properties, isNot(contains(r'$lib')));
+      expect(properties[r'$lib'], postHogFlutterSdkName);
       expect(properties, isNot(contains(r'$session_id')));
       expect(properties[r'$device_type'], 'Desktop');
       expect(properties[r'$app_version'], '1.2.3');
