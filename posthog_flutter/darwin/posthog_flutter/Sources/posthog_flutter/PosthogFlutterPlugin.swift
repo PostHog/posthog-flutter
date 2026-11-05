@@ -226,6 +226,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         if let evaluationContexts = posthogConfig["evaluationContexts"] as? [String] {
             config.evaluationContexts = evaluationContexts
         }
+        if let featureFlagRequestMaxRetries = posthogConfig["featureFlagRequestMaxRetries"] as? Int {
+            config.featureFlagRequestMaxRetries = featureFlagRequestMaxRetries
+        }
         if let optOut = posthogConfig["optOut"] as? Bool {
             config.optOut = optOut
         }

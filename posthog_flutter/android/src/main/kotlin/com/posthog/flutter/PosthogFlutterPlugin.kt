@@ -627,6 +627,9 @@ class PosthogFlutterPlugin :
                 posthogConfig.getIfNotNull<List<String>>("evaluationContexts") {
                     evaluationContexts = it
                 }
+                posthogConfig.getIfNotNull<Int>("featureFlagRequestMaxRetries") {
+                    featureFlagRequestMaxRetries = it
+                }
                 posthogConfig.getIfNotNull<Boolean>("optOut") {
                     optOut = it
                 }

@@ -124,6 +124,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         'Set evaluation_contexts in your posthog.init({...}) call instead.',
       );
     }
+    if (config.featureFlagRequestMaxRetries != 1) {
+      printIfDebug(
+        'Warning: PostHogConfig.featureFlagRequestMaxRetries is not applied on Flutter web. '
+        'Set feature_flag_request_max_retries in your posthog.init({...}) call instead.',
+      );
+    }
     if (config.bootstrap != null) {
       printIfDebug(
         'Warning: PostHogConfig.bootstrap is not applied on Flutter web. '

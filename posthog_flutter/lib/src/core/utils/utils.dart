@@ -12,17 +12,23 @@ String removeTrailingSlash(String url) {
 String currentISOTime() => DateTime.now().toUtc().toIso8601String();
 
 /// Retries an async function with configurable options.
+///
+/// Waits [retryDelay] before every retry, or, with [maxRetryDelay], doubles
+/// it for each retry after the first up to [maxRetryDelay].
 Future<T> retriable<T>(
   Future<T> Function() fn, {
   required int retryCount,
   required Duration retryDelay,
   required bool Function(Object) retryCheck,
+  Duration? maxRetryDelay,
 }) async {
   Object? lastError;
 
   for (var i = 0; i < retryCount + 1; i++) {
     if (i > 0) {
-      await Future.delayed(retryDelay);
+      await Future.delayed(maxRetryDelay == null
+          ? retryDelay
+          : _backoffDelay(retryDelay, i, maxRetryDelay));
     }
 
     try {
@@ -139,4 +145,13 @@ String getPersonPropertiesHash(
         ? deepSortKeys(userPropertiesToSetOnce)
         : null,
   });
+}
+
+/// [initial] doubled for each retry after the first, capped at [max].
+Duration _backoffDelay(Duration initial, int retry, Duration max) {
+  var delay = initial;
+  for (var i = 1; i < retry && delay < max; i++) {
+    delay *= 2;
+  }
+  return delay < max ? delay : max;
 }

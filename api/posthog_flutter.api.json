@@ -2504,6 +2504,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "featureFlagRequestMaxRetries",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "int"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "captureApplicationLifecycleEvents",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"

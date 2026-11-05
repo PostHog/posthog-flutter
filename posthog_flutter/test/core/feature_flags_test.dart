@@ -514,6 +514,40 @@ void main() {
       expect(server.flagsRequests, hasLength(2));
     });
 
+    for (final (retries, requests) in [(0, 1), (3, 4), (-1, 1)]) {
+      test('featureFlagRequestMaxRetries $retries sends $requests requests',
+          () async {
+        final client = testClient(server,
+            config: testConfig()..featureFlagRequestMaxRetries = retries);
+        server.respond = (_) => const PostHogResponse(HttpStatus.badGateway);
+
+        await client.reloadFeatureFlagsAsync();
+        expect(server.flagsRequests, hasLength(requests));
+      });
+    }
+
+    test('double the wait before each later retry', () {
+      final api = InProcessPostHogApi()
+        ..respond = (_) => const PostHogResponse(HttpStatus.badGateway);
+      fakeAsync((async) {
+        final client = testClient(api,
+            storage: tempStorage(),
+            config: testConfig()..featureFlagRequestMaxRetries = 3);
+
+        client.reloadFeatureFlagsAsync();
+        final sentAt = <int>[];
+        for (var ms = 0; ms <= 2100; ms++) {
+          async.flushMicrotasks();
+          while (sentAt.length < api.flagsRequests.length) {
+            sentAt.add(ms);
+          }
+          async.elapse(const Duration(milliseconds: 1));
+        }
+
+        expect(sentAt, [0, 300, 900, 2100]);
+      });
+    });
+
     test('time out after ten seconds, and once more after the retry', () {
       final api = InProcessPostHogApi()
         ..respond = (_) => Completer<PostHogResponse>().future;

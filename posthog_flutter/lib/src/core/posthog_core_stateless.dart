@@ -53,9 +53,18 @@ bool _isTransientFetchError(Object err) =>
 
 /// Only transport failures and gateway errors are worth retrying for
 /// `/flags`: any other status is the server's answer for this evaluation.
+/// A refused connection is the server's answer too, so it is not retried.
 bool _isRetryableFlagsError(Object err) =>
-    err is PostHogFetchNetworkError ||
+    (err is PostHogFetchNetworkError && !_isConnectionRefused(err.cause)) ||
     (err is PostHogFetchHttpError && (err.status == 502 || err.status == 504));
+
+/// `ECONNREFUSED` on macOS and Linux; Windows reports `WSAECONNREFUSED`
+/// (10061) or `ERROR_CONNECTION_REFUSED` (1225).
+const _connectionRefusedCodes = {61, 111, 10061, 1225};
+
+bool _isConnectionRefused(Object? cause) =>
+    cause is SocketException &&
+    _connectionRefusedCodes.contains(cause.osError?.errorCode);
 
 /// Base stateless PostHog client: the queue of events, consent, super
 /// properties and the requests to PostHog.
@@ -76,8 +85,9 @@ abstract class PostHogCoreStateless {
   // a network error or a gateway timeout.
   static const _fetchRetryCount = 3;
   static const _fetchRetryDelay = Duration(seconds: 3);
-  static const _flagsRetryCount = 1;
+  final int _flagsRetryCount;
   static const _flagsRetryDelay = Duration(milliseconds: 300);
+  static const _flagsMaxRetryDelay = Duration(seconds: 30);
 
   /// The latest consent decision made through this client. It wins over the
   /// stored one: [clearPersistedOptOut] removes the stored decision while
@@ -114,6 +124,9 @@ abstract class PostHogCoreStateless {
         _maxQueueSize = config.maxQueueSize < 1 ? 1 : config.maxQueueSize,
         _flushInterval = config.flushInterval,
         _compression = config.compression,
+        _flagsRetryCount = config.featureFlagRequestMaxRetries < 0
+            ? 0
+            : config.featureFlagRequestMaxRetries,
         _defaultOptIn = !config.optOut {
     logger = CoreLogger(_logMsgIfDebug);
     events = SimpleEventEmitter(
@@ -349,6 +362,7 @@ abstract class PostHogCoreStateless {
         jsonEncode(requestData),
         retryCount: _flagsRetryCount,
         retryDelay: _flagsRetryDelay,
+        maxRetryDelay: _flagsMaxRetryDelay,
         retryCheck: _isRetryableFlagsError,
       );
       final json = jsonDecode(response) as Map<String, Object?>;
@@ -562,6 +576,7 @@ abstract class PostHogCoreStateless {
     String body, {
     int retryCount = _fetchRetryCount,
     Duration retryDelay = _fetchRetryDelay,
+    Duration? maxRetryDelay,
     bool Function(Object error) retryCheck = _isTransientFetchError,
     bool honorRetryAfter = false,
   }) async {
@@ -593,6 +608,7 @@ abstract class PostHogCoreStateless {
       },
       retryCount: retryCount,
       retryDelay: retryDelay,
+      maxRetryDelay: maxRetryDelay,
       retryCheck: (error) =>
           !_closed &&
           retryCheck(error) &&
