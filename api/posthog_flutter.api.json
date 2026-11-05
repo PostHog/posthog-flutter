@@ -3263,7 +3263,7 @@
                         "isWriteable": true,
                         "name": "screenshotScale",
                         "relativePath": "lib/src/posthog_config.dart",
-                        "typeName": "double"
+                        "typeName": "double?"
                     },
                     {
                         "entryPoints": [],

@@ -68,7 +68,7 @@ void main() {
         ),
       );
 
-  Future<PostHogConfig> mount(WidgetTester tester, double scale,
+  Future<PostHogConfig> mount(WidgetTester tester, double? scale,
       {Size size = const Size(101, 99), bool waitForSnapshot = true}) async {
     final config = PostHogConfig('test_project_token')
       ..sessionReplay = true
@@ -103,10 +103,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  for (final scale in [1.0, 0.5, 0.333, 0.1]) {
-    testWidgets('Android scale $scale preserves geometry and masks',
+  for (final configured in <double?>[null, 1.0, 0.5, 0.333, 0.1]) {
+    final scale = configured ?? 1.0;
+    testWidgets('Android scale $configured preserves geometry and masks',
         (tester) async {
-      final config = await mount(tester, scale);
+      final config = await mount(tester, configured);
       final full =
           calls.firstWhere((call) => call.method == 'sendFullSnapshot');
       final args = full.arguments as Map;

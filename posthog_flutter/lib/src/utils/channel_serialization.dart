@@ -134,7 +134,7 @@ extension PostHogSessionReplayConfigSerialization
       'maskAllPlatformViews': maskAllPlatformViews,
       'captureNativeScreens': captureNativeScreens,
       'verifyScreenshotMaskAlignment': verifyScreenshotMaskAlignment,
-      'screenshotScale': screenshotScale,
+      if (screenshotScale != null) 'screenshotScale': screenshotScale,
       'screenshotCompressionQuality': screenshotCompressionQuality,
       'screenshotColorMode': screenshotColorMode.name,
       if (sampleRate != null) 'sampleRate': sampleRate,
