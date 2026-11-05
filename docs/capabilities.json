@@ -34,15 +34,17 @@
   "Posthog.startSessionRecording": "start-session-recording",
   "Posthog.stopSessionRecording": "stop-session-recording",
   "Posthog.unregister": "unregister",
+  "next": {
+    "Posthog.captureAi": "capture-ai",
+    "Posthog.onFeatureFlags": "on-feature-flags"
+  },
   "utils": [
     "Posthog.Posthog.new",
-    "Posthog.captureAi",
     "Posthog.captureFeatureInteraction",
     "Posthog.captureFeatureView",
     "Posthog.capturePushNotificationOpened",
     "Posthog.disable",
     "Posthog.enable",
-    "Posthog.onFeatureFlags",
     "Posthog.optOut",
     "Posthog.registerPushNotificationToken",
     "Posthog.setAppLanguage",
