@@ -15,6 +15,7 @@ extension PostHogConfigSerialization on PostHogConfig {
       'sendFeatureFlagEvents': sendFeatureFlagEvent,
       'preloadFeatureFlags': preloadFeatureFlags,
       if (evaluationContexts != null) 'evaluationContexts': evaluationContexts,
+      'featureFlagRequestMaxRetries': featureFlagRequestMaxRetries,
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
       'rageClickConfig': rageClickConfig.toMap(),
       'debug': debug,

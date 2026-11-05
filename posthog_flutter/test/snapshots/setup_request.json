@@ -10,6 +10,7 @@
       "flushInterval": 15,
       "sendFeatureFlagEvents": false,
       "preloadFeatureFlags": false,
+      "featureFlagRequestMaxRetries": 1,
       "captureApplicationLifecycleEvents": false,
       "rageClickConfig": {
         "enabled": true,
