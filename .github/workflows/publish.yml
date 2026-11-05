@@ -174,6 +174,8 @@ jobs:
         run: |
           python3 -m pip install --quiet -r scripts/requirements.txt
           python3 scripts/generate_markdown_reference.py --sdk-specs .sdk-specs
+          # Stage the pages, so a new page shows in git status as a file, not as an untracked folder.
+          git add references
 
       - name: Commit generated references
         if: steps.commit-version-bump.outputs.commit-hash != ''
