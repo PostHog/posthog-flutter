@@ -169,6 +169,18 @@ jobs:
           path: .sdk-specs
           persist-credentials: false
 
+      # The generator runs `flutter pub get` and `dart doc`. Same pinned action as ci.yml.
+      - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        with:
+          channel: 'stable'
+
+      # Ubuntu's system Python refuses a plain pip install (externally managed).
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        with:
+          python-version: '3.13'
+
       - name: Generate references
         if: steps.commit-version-bump.outputs.commit-hash != ''
         run: |
