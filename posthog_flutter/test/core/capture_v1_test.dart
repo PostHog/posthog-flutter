@@ -483,28 +483,67 @@ void main() {
       });
     });
 
-    test('starts a new request when new events join a retried batch', () {
+    for (final (name, firstResponse) in [
+      (
+        'a partial retry',
+        (PostHogRequest request) => PostHogResponse.results(
+            request, (name) => name == 'retried' ? 'retry' : null),
+      ),
+      (
+        'a failed request',
+        (PostHogRequest _) => const PostHogResponse(HttpStatus.badGateway),
+      ),
+    ]) {
+      test('resends $name alone, then sends newer events as a new request', () {
+        final api = InProcessPostHogApi();
+        final storage = tempStorage();
+        api.respond = (request) => api.batchRequests.length == 1
+            ? firstResponse(request)
+            : PostHogResponse.results(request, (_) => 'ok');
+        fakeAsync((async) {
+          final client = testClient(api, storage: storage);
+          client.capture('retried');
+          client.flush().catchError((Object _) {});
+          async.elapse(Duration.zero);
+          client.capture('joined');
+          async.elapse(const Duration(seconds: 1));
+
+          final [first, retry, next] = api.batchRequests;
+          expect(retry.eventNames, ['retried']);
+          expect(retry.headers['posthog-request-id'],
+              first.headers['posthog-request-id']);
+          expect(retry.headers['posthog-attempt'], '2');
+          expect(retry.body['created_at'], first.body['created_at']);
+          expect(next.eventNames, ['joined']);
+          expect(next.headers['posthog-request-id'],
+              isNot(first.headers['posthog-request-id']));
+          expect(next.headers['posthog-attempt'], '1');
+          expect(getQueue(storage), isEmpty);
+        });
+      });
+    }
+
+    test('starts a new request once an event to retry is dropped', () {
       final api = InProcessPostHogApi();
       final storage = tempStorage();
       api.respond = (request) => api.batchRequests.length == 1
-          ? PostHogResponse.results(
-              request, (name) => name == 'retried' ? 'retry' : null,
-              headers: {'Retry-After': '5'})
+          ? const PostHogResponse(HttpStatus.badGateway)
           : PostHogResponse.results(request, (_) => 'ok');
       fakeAsync((async) {
-        final client = testClient(api, storage: storage);
-        client.capture('retried');
-        client.flush();
+        final client = testClient(api,
+            config: testConfig(maxQueueSize: 2), storage: storage);
+        client.capture('dropped');
+        client.capture('kept');
+        client.flush().catchError((Object _) {});
         async.elapse(Duration.zero);
         client.capture('joined');
-        async.elapse(const Duration(seconds: 5));
+        async.elapse(const Duration(seconds: 1));
 
         final [first, second] = api.batchRequests;
-        expect(second.eventNames, ['retried', 'joined']);
+        expect(second.eventNames, ['kept', 'joined']);
         expect(second.headers['posthog-request-id'],
             isNot(first.headers['posthog-request-id']));
         expect(second.headers['posthog-attempt'], '1');
-        expect(getQueue(storage), isEmpty);
       });
     });
 

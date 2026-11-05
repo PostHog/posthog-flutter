@@ -417,17 +417,17 @@ void main() {
           expect(queuedEvents(storage), ['first', 'second']);
 
           async.elapse(const Duration(seconds: 1));
-          expect(api.batchRequests, hasLength(2));
-          expect(api.batchRequests.last.eventNames, ['first', 'second']);
-          expect(api.batchRequests.last.events.first['uuid'], original['uuid']);
-          expect(api.batchRequests.last.events.first['timestamp'],
-              original['timestamp']);
+          final [_, retry, next] = api.batchRequests;
+          expect(retry.eventNames, ['first']);
+          expect(retry.events.single['uuid'], original['uuid']);
+          expect(retry.events.single['timestamp'], original['timestamp']);
+          expect(next.eventNames, ['second']);
           expect(getQueue(storage), isEmpty);
 
           client.capture('third');
           client.capture('fourth');
           async.elapse(Duration.zero);
-          expect(api.batchRequests, hasLength(3),
+          expect(api.batchRequests, hasLength(4),
               reason: 'the previous pause does not apply after a success');
         });
       });
@@ -522,10 +522,11 @@ void main() {
         async.elapse(const Duration(seconds: 19));
         expect(api.batchRequests, hasLength(1));
         async.elapse(const Duration(seconds: 1));
-        final events = api.batchRequests.last.events;
-        expect(events.map((event) => event['event']), ['before', 'after']);
-        expect(events[0]['distinct_id'], previousId);
-        expect(events[1]['distinct_id'], nextId);
+        final [_, before, after] = api.batchRequests;
+        expect(before.eventNames, ['before']);
+        expect(before.events.single['distinct_id'], previousId);
+        expect(after.eventNames, ['after']);
+        expect(after.events.single['distinct_id'], nextId);
       });
     });
 
@@ -546,8 +547,9 @@ void main() {
         client.flush();
         client.flush();
         async.elapse(Duration.zero);
-        expect(api.batchRequests, hasLength(2));
-        expect(api.batchRequests.last.eventNames, ['first', 'second']);
+        final [_, retry, next] = api.batchRequests;
+        expect(retry.eventNames, ['first']);
+        expect(next.eventNames, ['second']);
       });
     });
 
