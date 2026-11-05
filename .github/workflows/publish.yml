@@ -162,6 +162,8 @@ jobs:
 
       # The reference headings come from the sdk-specs capabilities.
       - name: Check out sdk-specs
+        # Best-effort: a failure never blocks the release. Run generate-references.yml to retry.
+        continue-on-error: true
         if: steps.commit-version-bump.outputs.commit-hash != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
