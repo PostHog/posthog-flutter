@@ -2,9 +2,9 @@
 
 `dart doc` (part of the Dart SDK) writes one HTML page per symbol and an index.json that lists every
 symbol with its kind and enclosing type. BeautifulSoup reads each page's signature and description,
-and markdownify turns the description into Markdown. Our code only groups symbols by the
-`posthog-capability: <slug>` line in their doc comment, in the PostHog/sdk-specs README's order, and
-writes front matter. Untagged Posthog members go to SDK utils.
+and markdownify turns the description into Markdown. Our code only groups Posthog members by the
+sdk-specs capability docs/capabilities.json gives them, in the PostHog/sdk-specs README's order, and
+writes front matter. Members it lists under `utils` go to SDK utils.
 
     pip install -r scripts/requirements.txt
     python3 scripts/generate_markdown_reference.py --sdk-specs DIR [--major 6]
@@ -23,7 +23,6 @@ ROOT = Path(__file__).resolve().parents[1]
 PKG = ROOT / "posthog_flutter"
 LIBRARY = "posthog_flutter"
 FIRST = ["setup", "capture", "identify"]
-TAG = "posthog-capability:"
 # Public client classes get their own H2; every other public type goes in Types.
 CLIENTS = "PostHogLogger PosthogObserver PostHogWidget PostHogMaskWidget PostHogUnmaskWidget PostHogPlatformView PostHogIsolateExtension".split()
 # dartdoc's index.json kinds.
@@ -51,13 +50,6 @@ class Docs:
             and not s.get("overriddenDepth") and s["name"] not in OBJECT
         ]
 
-    def tag(self, symbol: dict) -> str | None:
-        desc = self.page(symbol).select_one("section.desc")
-        for p in desc.select("p") if desc else []:
-            if p.get_text().strip().startswith(TAG):
-                return p.get_text().strip()[len(TAG) :].strip()
-        return None
-
     def entry(self, symbol: dict, label: str, level: int) -> str:
         page = self.page(symbol)
         sig = page.select_one("section.multi-line-signature")
@@ -77,7 +69,7 @@ def tidy(signature: str) -> str:
 
 
 def markdown(node) -> str:
-    """A dartdoc section as Markdown, without the capability tag. Links become plain text."""
+    """A dartdoc section as Markdown. Links become plain text."""
     for dl in node.select("dl"):  # enum values and properties become `name: description` lists
         items = [(dt.select_one(".name") or dt).get_text().strip() for dt in dl.select("dt")]
         docs = [(dd.p or dd).decode_contents() for dd in dl.select("dd")]
@@ -88,8 +80,7 @@ def markdown(node) -> str:
         if not text.find_parent(["code", "pre"]):
             text.replace_with(str(text).translate(MDX))
     md = markdownify(str(node), strip=["a"], heading_style="ATX", bullets="-", code_language="dart")
-    lines = [l for l in md.split("\n") if not l.strip().startswith(TAG)]
-    return "\n".join(lines).strip().replace("<br>", "<br />")
+    return md.strip().replace("<br>", "<br />")
 
 
 def capabilities(checkout: str) -> dict[str, str]:
@@ -105,19 +96,28 @@ def capabilities(checkout: str) -> dict[str, str]:
     return {s: titles[s][0].upper() + titles[s][1:] for s in order if s in titles}
 
 
-def reference(docs: Docs, caps: dict[str, str]) -> list[str]:
+def reference(docs: Docs, caps: dict[str, str], current: bool) -> list[str]:
     top = sorted(
         (s for s in docs.index if s.get("enclosedBy", {}).get("name") == LIBRARY and s["kind"] in (CLASS, ENUM, EXTENSION, TYPEDEF, FUNCTION)),
         key=lambda s: s["name"],
     )
     sdk = next(s for s in top if s["name"] == "Posthog")
+    mapped = json.loads((ROOT / "docs/capabilities.json").read_text())
+    listed, upcoming = set(mapped.pop("utils")), mapped.pop("next", {})
+    members = {f"Posthog.{m['name']}": m for m in docs.members(sdk)}
+    for name in mapped if current else []:  # the next major may remove methods
+        if name not in members:
+            raise SystemExit(f"docs/capabilities.json: {name} is not a Posthog member")
+    mapped |= upcoming
     tagged: dict[str, list[str]] = {}
     utils = []
-    for m in docs.members(sdk):
-        found, text = docs.tag(m), docs.entry(m, f"Posthog.{m['name']}", 3)
+    for name, m in members.items():
+        found = mapped.get(name)
         if found and found not in caps:
-            raise SystemExit(f"{m['href']}: unknown capability {found}")
-        (tagged.setdefault(found, []) if found else utils).append(text)
+            raise SystemExit(f"docs/capabilities.json: {name} has unknown capability {found}")
+        if not found and name not in listed:
+            raise SystemExit(f"docs/capabilities.json: map {name} to a capability or list it in utils")
+        (tagged.setdefault(found, []) if found else utils).append(docs.entry(m, name, 3))
     out = []
     for slug, title in caps.items():
         if slug in tagged:
@@ -187,7 +187,7 @@ def main() -> None:
         subprocess.run(["dart", "doc", "--output", tmp], cwd=PKG, check=True, stdout=subprocess.DEVNULL)
         docs = Docs(Path(tmp))
         body = ["## Getting started", nest((ROOT / "docs/getting-started.md").read_text())]
-        body += reference(docs, capabilities(opts.sdk_specs))
+        body += reference(docs, capabilities(opts.sdk_specs), declared >= major)
     (ROOT / "references").mkdir(exist_ok=True)
     title = f"PostHog Flutter SDK {major}.x" + ("" if declared >= major else " (experimental)")
     write(f"posthog-flutter-{major}.md", [front_matter(title, body), *body])
