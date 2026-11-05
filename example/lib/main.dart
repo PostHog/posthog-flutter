@@ -796,7 +796,7 @@ class InitialScreenState extends State<InitialScreen> {
                       _result = result?.payload?.toString();
                     });
                   },
-                  child: const Text("getFeatureFlagPayload"),
+                  child: const Text("getFeatureFlagResult payload"),
                 ),
                 ElevatedButton(
                   onPressed: () async {
