@@ -172,8 +172,8 @@ jobs:
       - name: Generate references
         if: steps.commit-version-bump.outputs.commit-hash != ''
         run: |
-          dart pub global activate dartdoc_modern 1.1.7
-          dart scripts/generate-markdown-reference.dart --sdk-specs .sdk-specs
+          python3 -m pip install --quiet -r scripts/requirements.txt
+          python3 scripts/generate_markdown_reference.py --sdk-specs .sdk-specs
 
       - name: Commit generated references
         if: steps.commit-version-bump.outputs.commit-hash != ''
