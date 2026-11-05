@@ -259,7 +259,9 @@ Web doesn't move to capture v1 in this release. It keeps posthog-js and its curr
 
 For the changes every capture v1 SDK shares, such as event options, limits and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/libraries/capture-v1). On iOS, macOS and Android, capture v1 comes from the native SDKs, so the Capture v1 sections of the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#endpoints) guides apply there too. Windows and Linux are covered [below](#capture-v1-on-windows-and-linux).
 
-<!-- TODO(capture-v1): the iOS `#capture-v1` and Android `#endpoints` / `#hosts-without-capture-v1` anchors exist only on the posthog-ios and posthog-android `feat/v4-capture-v1` branches, not on `main` yet. Check these links once both 4.0 guides merge. -->
+On every platform except web, an event's properties are now the SDK's, then registered properties, then the ones you pass, so your value wins over the SDK's for that event. In 5.x, the SDK's values won.
+
+<!-- TODO(capture-v1): the iOS `#capture-v1` and Android `#endpoints` / `#hosts-without-capture-v1` anchors exist only on the posthog-ios and posthog-android `chore/v4-remove-deprecated` branches, not on `main` yet. Check these links once both 4.0 guides merge. -->
 
 #### Checklist
 
@@ -272,7 +274,7 @@ You need to change code if your app does any of these:
 - sets `$lib` or `$lib_version` and expects PostHog to store that value
 - reads `$session_id` or `$window_id` from the raw request body, for example in a proxy
 - relies on a `Retry-After` longer than 30 seconds
-- on Windows or Linux, registers or passes a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expects the SDK's value to win
+- registers or passes a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expects the SDK's value to win
 - on Windows or Linux, returns a `PostHogEvent` from `beforeSend` without the event's `options`
 - on Windows or Linux, alerts on the SDK's debug log lines
 - on Windows or Linux, calls `exit()` without awaiting the calls before it or `Posthog().close()`
@@ -293,9 +295,11 @@ The SDK doesn't fall back to `/batch/`. On Windows and Linux, a 404 is retried, 
 
 ### Feature flag payloads
 
-On iOS, macOS and Android, a malformed, empty or whitespace-only payload from `getFeatureFlagResult()` is now `null` instead of the raw string. On Android, a JSON `null` payload is also `null` instead of the string `"null"`.
+On iOS, macOS and Android, a malformed (such as a plain-text `hello`), empty or whitespace-only payload from `getFeatureFlagResult()` is now `null` instead of the raw string. On Android, a JSON `null` payload is also `null` instead of the string `"null"`.
 
 On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
+
+On iOS and macOS, `isFeatureEnabled()` returns `false` for a flag whose variant is an empty string.
 
 ### `beforeSend` on iOS, macOS and Android
 
