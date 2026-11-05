@@ -5,9 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_event.dart';
+import 'package:posthog_flutter/src/posthog.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
+import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 
 // Simplified void callback for feature flags
@@ -36,6 +40,12 @@ void main() {
       // Simulate setup call success
       if (methodCall.method == 'setup') {
         return null;
+      }
+      if (methodCall.method == 'buildEvent') {
+        return nativeBuiltEvent(methodCall.arguments as Map);
+      }
+      if (methodCall.method == 'sendBuiltEvent') {
+        return (methodCall.arguments as Map)['uuid'];
       }
       return null;
     });
@@ -243,33 +253,13 @@ isolate_dso_base: 7000000000
   });
 
   group('PosthogFlutterIO onFeatureFlags via setup', () {
-    test(
-      'setup initializes method call handler and registers callback if provided',
-      () async {
-        bool callbackInvoked = false;
-        void testCallback() {
-          callbackInvoked = true;
-        }
-
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        // To verify handler is set, we trigger the callback from native side
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            const MethodCall('onFeatureFlagsCallback', {}),
-          ),
-          (ByteData? data) {},
-        );
-        expect(callbackInvoked, isTrue);
-        expect(log.any((call) => call.method == 'setup'), isTrue);
-      },
-    );
+    // The native SDKs tag each load with the generation they last got.
+    Map<String, Object?> nativeFlagsArgs(Map<String, Object?> args,
+            {int? generation}) =>
+        {
+          ...args,
+          'generation': generation ?? FeatureFlagsListeners.instance.generation,
+        };
 
     test('setup sends projectToken', () async {
       testConfig = PostHogConfig(' \n test_project_token\t ');
@@ -297,97 +287,163 @@ isolate_dso_base: 7000000000
       },
     );
 
-    test(
-      'invokes callback when native sends onFeatureFlagsCallback event',
-      () async {
-        bool callbackInvoked = false;
-
-        void testCallback() {
-          callbackInvoked = true;
-        }
-
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        // Native sends empty map (iOS/Android behavior)
-        final mockNativeArgs = <String, dynamic>{};
-
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-          ),
-          (ByteData? data) {},
-        );
-
-        expect(callbackInvoked, isTrue);
-      },
-    );
-
-    test(
-      'invokes callback when native sends onFeatureFlagsCallback with empty map (mobile behavior)',
-      () async {
-        bool callbackInvoked = false;
-
-        void testCallback() {
-          callbackInvoked = true;
-        }
-
-        testConfig = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
-        await posthogFlutterIO.setup(testConfig);
-
-        // Simulate mobile sending an empty map
-        final mockNativeArgs = <String, dynamic>{};
-
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-          channel.name,
-          channel.codec.encodeMethodCall(
-            MethodCall('onFeatureFlagsCallback', mockNativeArgs),
-          ),
-          (ByteData? data) {},
-        );
-
-        expect(callbackInvoked, isTrue);
-      },
-    );
-
-    test('invokes callback even with malformed native args', () async {
-      bool callbackInvoked = false;
-
-      void testCallback() {
-        callbackInvoked = true;
-      }
-
-      testConfig =
-          PostHogConfig('test_project_token', onFeatureFlags: testCallback);
-      await posthogFlutterIO.setup(testConfig);
-
-      // Simulate native sending malformed arguments - callback should still be invoked
-      final mockNativeArgsMalformed = {
-        'flags': 123, // Invalid type, but callback is void so it doesn't matter
-      };
+    test('passes empty flags to listeners for malformed native args', () async {
+      FeatureFlagsListeners.instance.clear();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
 
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
-          MethodCall('onFeatureFlagsCallback', mockNativeArgsMalformed),
+          MethodCall(
+              'onFeatureFlagsCallback', nativeFlagsArgs({'variants': 123})),
         ),
         (ByteData? data) {},
       );
 
-      expect(callbackInvoked, isTrue);
+      expect(received.single.variants, isEmpty);
     });
 
-    test('does not invoke callback when no callback is registered', () async {
+    test('passes the native flags to onFeatureFlags listeners', () async {
+      FeatureFlagsListeners.instance.clear();
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(MethodCall(
+          'onFeatureFlagsCallback',
+          nativeFlagsArgs({
+            'variants': {'on': true, 'variant': 'test', 'off': false},
+            'errorsLoading': true,
+          }),
+        )),
+        (ByteData? data) {},
+      );
+
+      expect(received.single.variants, {'on': true, 'variant': 'test'});
+      expect(received.single.flags, ['on', 'variant']);
+      expect(received.single.errorsLoading, isTrue);
+    });
+
+    Future<void> sendNativeFlags({int? generation}) =>
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .handlePlatformMessage(
+          channel.name,
+          channel.codec.encodeMethodCall(MethodCall(
+            'onFeatureFlagsCallback',
+            nativeFlagsArgs({
+              'variants': {'old-user-only': true},
+              'errorsLoading': false,
+            }, generation: generation),
+          )),
+          (ByteData? data) {},
+        );
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('drops a native load sent before the $name reached native',
+          () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        final subscription = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(subscription.unsubscribe);
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+        final before = FeatureFlagsListeners.instance.generation;
+
+        await transition();
+        await sendNativeFlags(generation: before);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(received, isEmpty);
+        expect((log.last.arguments as Map)['flagsGeneration'],
+            FeatureFlagsListeners.instance.generation);
+      });
+    }
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('a $name started by a listener is not undone by the load', () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        Future<void>? pending;
+        final starter =
+            FeatureFlagsListeners.instance.add((_) => pending ??= transition());
+        addTearDown(starter.unsubscribe);
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+
+        await sendNativeFlags();
+        await pending;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        final subscription = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(subscription.unsubscribe);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(received, isEmpty);
+      });
+    }
+
+    for (final (name, transition) in <(String, Future<void> Function())>[
+      ('reset', () => Posthog().reset()),
+      ('close', () => Posthog().close()),
+    ]) {
+      test('a $name started by a listener keeps the load from the rest',
+          () async {
+        FeatureFlagsListeners.instance.clear();
+        PosthogFlutterPlatformInterface.instance = posthogFlutterIO;
+        final received = <PostHogFeatureFlagsLoaded>[];
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+        Future<void>? pending;
+        final first =
+            FeatureFlagsListeners.instance.add((_) => pending ??= transition());
+        final second = FeatureFlagsListeners.instance.add(received.add);
+        addTearDown(first.unsubscribe);
+        addTearDown(second.unsubscribe);
+
+        await sendNativeFlags();
+        await pending;
+
+        expect(received, isEmpty);
+      });
+    }
+
+    void mockReload(Future<Object?> Function() reload) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return call.method == 'reloadFeatureFlags' ? reload() : null;
+      });
+    }
+
+    const reloaded = {
+      'variants': {'manual': true},
+      'errorsLoading': false,
+    };
+
+    test('reload result is left to the native notification', () async {
+      FeatureFlagsListeners.instance.clear();
+      mockReload(() async => reloaded);
+      final received = <PostHogFeatureFlagsLoaded>[];
+      final subscription = FeatureFlagsListeners.instance.add(received.add);
+      addTearDown(subscription.unsubscribe);
+
+      await posthogFlutterIO.reloadFeatureFlags();
+
+      expect(received, isEmpty);
+    });
+
+    test('replies to a native load with no listener registered', () async {
       // Setup without callback
       testConfig = PostHogConfig('test_project_token');
       await posthogFlutterIO.setup(testConfig);
@@ -397,7 +453,7 @@ isolate_dso_base: 7000000000
           .handlePlatformMessage(
         channel.name,
         channel.codec.encodeMethodCall(
-          const MethodCall('onFeatureFlagsCallback', {}),
+          MethodCall('onFeatureFlagsCallback', nativeFlagsArgs({})),
         ),
         (ByteData? data) => reply = data,
       );
@@ -537,6 +593,134 @@ isolate_dso_base: 7000000000
     });
   });
 
+  group('PosthogFlutterIO event options', () {
+    const options = <String, Object?>{
+      'process_person_profile': false,
+      'custom_key': 'kept',
+      'unset_key': null,
+    };
+    const sent = {'process_person_profile': false, 'custom_key': 'kept'};
+
+    Map<String, dynamic> argsOf(String method) => Map<String, dynamic>.from(
+          log.singleWhere((c) => c.method == method).arguments as Map,
+        );
+
+    setUp(() async {
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+    });
+
+    final callsByMethod = <String, Future<void> Function(PosthogFlutterIO)>{
+      'capture': (io) => io.capture(eventName: 'clicked', options: options),
+      'screen': (io) => io.screen(screenName: 'Home', options: options),
+      'captureException': (io) =>
+          io.captureException(error: StateError('boom'), options: options),
+      'identify': (io) => io.identify(userId: 'user-1', options: options),
+      'setPersonProperties': (io) => io.setPersonProperties(
+            userPropertiesToSet: {'plan': 'pro'},
+            options: options,
+          ),
+      'alias': (io) => io.alias(alias: 'alias-1', options: options),
+      'group': (io) =>
+          io.group(groupType: 'company', groupKey: 'acme', options: options),
+      'captureAi': (io) =>
+          io.captureAi(eventName: r'$ai_generation', options: options),
+    };
+
+    for (final entry in callsByMethod.entries) {
+      test('${entry.key} sends the options without unset keys', () async {
+        await entry.value(posthogFlutterIO);
+        expect(argsOf(entry.key)['options'], sent);
+      });
+    }
+
+    test('calls without options send no options argument', () async {
+      await posthogFlutterIO.capture(eventName: 'clicked');
+      await posthogFlutterIO.alias(alias: 'alias-1', options: {'k': null});
+      expect(argsOf('capture'), isNot(contains('options')));
+      expect(argsOf('alias'), isNot(contains('options')));
+    });
+
+    test('captureAi sends the event and returns the native uuid', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return call.method == 'captureAi' ? 'uuid-1' : null;
+      });
+
+      final uuid = await posthogFlutterIO.captureAi(
+        eventName: r'$ai_generation',
+        properties: {r'$ai_model': 'gpt-4o'},
+        userProperties: {'plan': 'pro'},
+      );
+
+      expect(uuid, 'uuid-1');
+      expect(argsOf('captureAi'), {
+        'eventName': r'$ai_generation',
+        'properties': {r'$ai_model': 'gpt-4o'},
+        'userProperties': {'plan': 'pro'},
+      });
+      expect(log.where((c) => c.method == 'capture'), isEmpty);
+    });
+
+    test('beforeSend sees and can change the options', () async {
+      final seen = <Map<String, Object?>?>[];
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            seen.add({...?event.options});
+            event.options = {...?event.options, 'product_tour_id': 'tour-1'}
+              ..remove('custom_key');
+            return event;
+          },
+        ],
+      ));
+
+      await posthogFlutterIO.captureAi(
+          eventName: r'$ai_span', options: options);
+      await posthogFlutterIO.screen(screenName: 'Home', options: options);
+
+      expect(seen, [sent, sent]);
+      const changed = {
+        'process_person_profile': false,
+        'product_tour_id': 'tour-1',
+      };
+      final sends = log.where((c) => c.method == 'sendBuiltEvent').toList();
+      expect(sends.map((c) => (c.arguments as Map)['options']),
+          [changed, changed]);
+    });
+
+    test('a screen renamed by beforeSend keeps its options', () async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) {
+            if (event.event == r'$screen') event.event = 'screen viewed';
+            return event;
+          },
+        ],
+      ));
+
+      await posthogFlutterIO.screen(screenName: 'Home', options: options);
+
+      expect(argsOf('sendBuiltEvent')['event'], 'screen viewed');
+      expect(argsOf('sendBuiltEvent')['options'], sent);
+    });
+
+    test('captureAi dropped by beforeSend returns null', () async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [(event) => null],
+      ));
+
+      expect(
+        await posthogFlutterIO.captureAi(eventName: r'$ai_generation'),
+        isNull,
+      );
+      expect(log.where((c) => c.method == 'sendBuiltEvent'), isEmpty);
+    });
+  });
+
   group('PosthogFlutterIO beforeSend callback', () {
     test(
       'capture sends event unchanged when no beforeSend registered',
@@ -570,9 +754,9 @@ isolate_dso_base: 7000000000
 
       await posthogFlutterIO.capture(eventName: 'original_event');
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'modified_event');
+      expect(args['event'], 'modified_event');
     });
 
     test('beforeSend can modify properties', () async {
@@ -592,7 +776,7 @@ isolate_dso_base: 7000000000
         properties: {'original': true},
       );
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
       expect(args['properties'], {'modified': true});
     });
@@ -614,9 +798,11 @@ isolate_dso_base: 7000000000
         userProperties: {'name': 'Original Name'},
       );
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['userProperties'], {'name': 'Modified Name'});
+      expect(args['properties'], {
+        r'$set': {'name': 'Modified Name'}
+      });
     });
 
     test('beforeSend can modify userPropertiesSetOnce', () async {
@@ -636,10 +822,10 @@ isolate_dso_base: 7000000000
         userPropertiesSetOnce: {'last_logged_in_at': '2024-01-01'},
       );
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['userPropertiesSetOnce'], {
-        'last_logged_in_at': '2025-01-01',
+      expect(args['properties'], {
+        r'$set_once': {'last_logged_in_at': '2025-01-01'},
       });
     });
 
@@ -650,7 +836,7 @@ isolate_dso_base: 7000000000
 
       await posthogFlutterIO.capture(eventName: 'dropped_event');
 
-      final captureCalls = log.where((c) => c.method == 'capture');
+      final captureCalls = log.where((c) => c.method == 'sendBuiltEvent');
       expect(captureCalls, isEmpty);
     });
 
@@ -669,12 +855,13 @@ isolate_dso_base: 7000000000
       await posthogFlutterIO.capture(eventName: 'drop me');
       await posthogFlutterIO.capture(eventName: 'keep me');
 
-      final captureCalls = log.where((c) => c.method == 'capture').toList();
+      final captureCalls =
+          log.where((c) => c.method == 'sendBuiltEvent').toList();
       expect(captureCalls.length, 1);
       final args = Map<String, dynamic>.from(
         captureCalls.first.arguments as Map,
       );
-      expect(args['eventName'], 'keep me');
+      expect(args['event'], 'keep me');
     });
 
     test('beforeSend exception drops event and stops the chain', () async {
@@ -710,7 +897,7 @@ isolate_dso_base: 7000000000
       );
 
       expect(callOrder, ['transform', 'throw']);
-      expect(log, isEmpty);
+      expect(log.where((c) => c.method == 'sendBuiltEvent'), isEmpty);
     });
 
     test('multiple beforeSend callbacks are applied in order', () async {
@@ -744,9 +931,9 @@ isolate_dso_base: 7000000000
 
       await posthogFlutterIO.capture(eventName: 'original');
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'original_first_second_third');
+      expect(args['event'], 'original_first_second_third');
       expect(callOrder, [1, 2, 3]);
     });
 
@@ -805,10 +992,12 @@ isolate_dso_base: 7000000000
           properties: {'event_prop': 'value'},
         );
 
-        final captureCall = log.firstWhere((c) => c.method == 'capture');
+        final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
         final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-        expect(args['properties'], {'event_prop': 'value'});
-        expect(args['userProperties'], {'developer_name': 'John'});
+        expect(args['properties'], {
+          'event_prop': 'value',
+          r'$set': {'developer_name': 'John'},
+        });
       },
     );
 
@@ -834,10 +1023,12 @@ isolate_dso_base: 7000000000
           properties: {'event_prop': 'value'},
         );
 
-        final captureCall = log.firstWhere((c) => c.method == 'capture');
+        final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
         final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-        expect(args['properties'], {'event_prop': 'value'});
-        expect(args['userPropertiesSetOnce'], {'first_seen': '2025-01-01'});
+        expect(args['properties'], {
+          'event_prop': 'value',
+          r'$set_once': {'first_seen': '2025-01-01'},
+        });
       },
     );
 
@@ -862,13 +1053,15 @@ isolate_dso_base: 7000000000
         userProperties: {'from_direct': 'direct_value', 'shared': 'direct'},
       );
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['properties'], {'event_prop': 'value'});
-      expect(args['userProperties'], {
-        'from_legacy': 'legacy_value',
-        'from_direct': 'direct_value',
-        'shared': 'direct',
+      expect(args['properties'], {
+        'event_prop': 'value',
+        r'$set': {
+          'from_legacy': 'legacy_value',
+          'from_direct': 'direct_value',
+          'shared': 'direct',
+        },
       });
     });
 
@@ -889,224 +1082,204 @@ isolate_dso_base: 7000000000
         userProperties: {'name': 'John'},
       );
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
+      final captureCall = log.firstWhere((c) => c.method == 'sendBuiltEvent');
       final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args.containsKey('userProperties'), isFalse);
+      expect(args['properties'], isNot(contains(r'$set')));
     });
+  });
 
-    test('async beforeSend can modify event', () async {
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) async {
-            await Future.delayed(const Duration(milliseconds: 10));
-            event.event = 'async_modified_event';
-            return event;
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
+  group('PosthogFlutterIO beforeSend on the native-built event', () {
+    Map<String, dynamic> argsOf(String method) => Map<String, dynamic>.from(
+          log.singleWhere((c) => c.method == method).arguments as Map,
+        );
 
-      await posthogFlutterIO.capture(eventName: 'original_event');
+    Future<void> setUpWith(BeforeSendCallback callback) => posthogFlutterIO
+        .setup(PostHogConfig('test_project_token', beforeSend: [callback]));
 
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
-      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'async_modified_event');
-    });
-
-    test('async beforeSend can drop event by returning null', () async {
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) async {
-            await Future.delayed(const Duration(milliseconds: 100));
-            return null;
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
-
-      await posthogFlutterIO.capture(eventName: 'dropped_event');
-
-      final captureCalls = log.where((c) => c.method == 'capture');
-      expect(captureCalls, isEmpty);
-    });
-
-    test('mixed sync and async beforeSend callbacks work correctly', () async {
-      final callOrder = <String>[];
-
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) {
-            callOrder.add('sync1');
-            event.event = '${event.event}_sync1';
-            return event;
-          },
-          (event) async {
-            await Future.delayed(const Duration(milliseconds: 100));
-            callOrder.add('async1');
-            event.event = '${event.event}_async1';
-            return event;
-          },
-          (event) {
-            callOrder.add('sync2');
-            event.event = '${event.event}_sync2';
-            return event;
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
-
-      await posthogFlutterIO.capture(eventName: 'original');
-
-      final captureCall = log.firstWhere((c) => c.method == 'capture');
-      final args = Map<String, dynamic>.from(captureCall.arguments as Map);
-      expect(args['eventName'], 'original_sync1_async1_sync2');
-      expect(callOrder, ['sync1', 'async1', 'sync2']);
-    });
-
-    test('async beforeSend exception drops event without throwing', () async {
-      testConfig = PostHogConfig(
-        'test_project_token',
-        beforeSend: [
-          (event) async {
-            await Future<void>.delayed(Duration.zero);
-            throw Exception('Async error');
-          },
-        ],
-      );
-      await posthogFlutterIO.setup(testConfig);
+    test('without callbacks an event takes one native call', () async {
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
       log.clear();
 
-      await expectLater(
-        posthogFlutterIO.capture(
-          eventName: 'test_event',
-          properties: {'key': 'value'},
-        ),
-        completes,
-      );
+      await posthogFlutterIO.capture(eventName: 'clicked');
 
-      expect(log, isEmpty);
+      expect(log.map((c) => c.method), ['capture']);
     });
 
-    test(
-      'async beforeSend drops event and stops chain when returning null',
-      () async {
-        final callOrder = <int>[];
+    test('callbacks see what the native SDK added', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        if (call.method != 'buildEvent') return null;
+        return {
+          ...nativeBuiltEvent(call.arguments as Map),
+          'properties': {
+            r'$lib': 'posthog-flutter',
+            'plan': 'pro',
+            r'$set': {'name': 'Ada'},
+          },
+        };
+      });
+      PostHogEvent? seen;
+      await setUpWith((event) => seen = event);
 
-        testConfig = PostHogConfig(
-          'test_project_token',
-          beforeSend: [
-            (event) async {
-              callOrder.add(1);
-              await Future.delayed(const Duration(milliseconds: 100));
-              return null; // Drop event
+      await posthogFlutterIO.capture(eventName: 'clicked');
+
+      expect(seen!.uuid, 'built-uuid');
+      expect(seen!.distinctId, 'user-1');
+      expect(seen!.timestamp, DateTime.utc(2026));
+      expect(seen!.properties, {r'$lib': 'posthog-flutter', 'plan': 'pro'});
+      expect(seen!.userProperties, {'name': 'Ada'});
+    });
+
+    test('callbacks can cast nested values from the native SDK', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        if (call.method != 'buildEvent') return null;
+        return {
+          ...nativeBuiltEvent(call.arguments as Map),
+          'properties': <Object?, Object?>{
+            r'$exception_list': <Object?>[
+              <Object?, Object?>{
+                'type': 'StateError',
+                'stacktrace': <Object?, Object?>{
+                  'frames': <Object?>[
+                    <Object?, Object?>{'in_app': true},
+                  ],
+                },
+              },
+            ],
+            'bytes': Int32List.fromList([1, 2]),
+            'empty': <Object?>[],
+          },
+        };
+      });
+      await setUpWith((event) {
+        final list =
+            event.properties![r'$exception_list'] as List<Map<String, dynamic>>;
+        final stack = list.single['stacktrace'] as Map<String, dynamic>;
+        final frames = stack['frames'] as List<Map<String, dynamic>>;
+        frames.single['in_app'] = false;
+        return event;
+      });
+
+      await posthogFlutterIO.capture(eventName: 'failed');
+
+      final sent = log.singleWhere((c) => c.method == 'sendBuiltEvent');
+      expect((sent.arguments as Map)['properties'], {
+        r'$exception_list': [
+          {
+            'type': 'StateError',
+            'stacktrace': {
+              'frames': [
+                {'in_app': false},
+              ],
             },
-            (event) {
-              callOrder.add(2); // Should not be called
-              return event;
-            },
-          ],
-        );
-        await posthogFlutterIO.setup(testConfig);
+          },
+        ],
+        'bytes': [1, 2],
+        'empty': <Object?>[],
+      });
+    });
 
-        await posthogFlutterIO.capture(eventName: 'test_event');
+    test('sends what the callbacks return with the built uuid', () async {
+      await setUpWith((event) => PostHogEvent(
+            event: 'renamed',
+            properties: {'a': 1},
+            distinctId: 'user-2',
+            timestamp: DateTime.utc(2025),
+          ));
 
-        final captureCalls = log.where((c) => c.method == 'capture');
-        expect(captureCalls, isEmpty);
-        expect(callOrder, [1]); // Only first callback should have been called
-      },
-    );
+      await posthogFlutterIO.capture(eventName: 'clicked');
 
-    test(
-      'multiple events with async beforeSend are captured in order when capture is awaited',
-      () async {
-        testConfig = PostHogConfig(
-          'test_project_token',
-          beforeSend: [
-            (event) async {
-              // Add delay only for second event
-              if (event.event == 'event_2') {
-                await Future.delayed(const Duration(milliseconds: 500));
-              }
-              return event;
-            },
-          ],
-        );
-        await posthogFlutterIO.setup(testConfig);
+      expect(argsOf('sendBuiltEvent'), {
+        'event': 'renamed',
+        'properties': {'a': 1},
+        'distinctId': 'user-2',
+        'timestamp': DateTime.utc(2025).millisecondsSinceEpoch,
+        'options': <String, Object?>{},
+        'uuid': 'built-uuid',
+        'ai': false,
+      });
+    });
 
-        await posthogFlutterIO.capture(eventName: 'event_1');
-        await posthogFlutterIO.capture(eventName: 'event_2');
-        await posthogFlutterIO.capture(eventName: 'event_3');
+    test('captureAi builds and sends on the AI lane', () async {
+      await setUpWith((event) => event);
 
-        final captureCalls = log.where((c) => c.method == 'capture').toList();
-        expect(captureCalls.length, 3);
+      final uuid =
+          await posthogFlutterIO.captureAi(eventName: r'$ai_generation');
 
-        final event1Args = Map<String, dynamic>.from(
-          captureCalls[0].arguments as Map,
-        );
-        final event2Args = Map<String, dynamic>.from(
-          captureCalls[1].arguments as Map,
-        );
-        final event3Args = Map<String, dynamic>.from(
-          captureCalls[2].arguments as Map,
-        );
+      expect(uuid, 'built-uuid');
+      expect(argsOf('buildEvent')['ai'], isTrue);
+      expect(argsOf('sendBuiltEvent')['ai'], isTrue);
+    });
 
-        final eventOrder = [
-          event1Args['eventName'],
-          event2Args['eventName'],
-          event3Args['eventName'],
-        ];
-        expect(eventOrder, ['event_1', 'event_2', 'event_3']);
-      },
-    );
+    test('screen builds a \$screen event with its name', () async {
+      PostHogEvent? seen;
+      await setUpWith((event) => seen = event);
 
-    test(
-      'multiple events with async beforeSend are captured out of order when capture is NOT awaited',
-      () async {
-        final releaseFirst = Completer<void>();
-        testConfig = PostHogConfig(
-          'test_project_token',
-          beforeSend: [
-            (event) async {
-              if (event.event == 'event_1') {
-                await releaseFirst.future;
-              }
-              return event;
-            },
-          ],
-        );
-        await posthogFlutterIO.setup(testConfig);
+      await posthogFlutterIO.screen(screenName: 'Home', properties: {'a': 1});
 
-        final first = posthogFlutterIO.capture(eventName: 'event_1');
-        await posthogFlutterIO.capture(eventName: 'event_2');
-        await posthogFlutterIO.capture(eventName: 'event_3');
-        expect(log.where((c) => c.method == 'capture'), hasLength(2));
-        releaseFirst.complete();
-        await first;
+      expect(argsOf('buildEvent'), {
+        'eventName': r'$screen',
+        'properties': {'a': 1, r'$screen_name': 'Home'},
+        'ai': false,
+      });
+      expect(seen!.event, r'$screen');
+      expect(seen!.properties, {'a': 1, r'$screen_name': 'Home'});
+    });
 
-        final captureCalls = log.where((c) => c.method == 'capture').toList();
-        expect(captureCalls.length, 3);
+    test('capturing \$screen keeps capture semantics', () async {
+      PostHogEvent? seen;
+      await setUpWith((event) => seen = event);
 
-        final event1Args = Map<String, dynamic>.from(
-          captureCalls[0].arguments as Map,
-        );
-        final event2Args = Map<String, dynamic>.from(
-          captureCalls[1].arguments as Map,
-        );
-        final event3Args = Map<String, dynamic>.from(
-          captureCalls[2].arguments as Map,
-        );
+      await posthogFlutterIO.capture(
+        eventName: r'$screen',
+        userProperties: {'plan': 'pro'},
+      );
 
-        final eventOrder = [
-          event1Args['eventName'],
-          event2Args['eventName'],
-          event3Args['eventName'],
-        ];
-        expect(eventOrder, ['event_2', 'event_3', 'event_1']);
-      },
-    );
+      expect(argsOf('buildEvent')['eventName'], isNot(r'$screen'));
+      expect(argsOf('buildEvent')['eventName'], startsWith(r'$'));
+      expect(seen!.event, r'$screen');
+      expect(seen!.userProperties, {'plan': 'pro'});
+      expect(argsOf('sendBuiltEvent')['event'], r'$screen');
+    });
+
+    test('captureException builds with its own timestamp', () async {
+      await setUpWith((event) => event);
+
+      await posthogFlutterIO.captureException(error: StateError('boom'));
+
+      expect(argsOf('buildEvent')['eventName'], r'$exception');
+      expect(argsOf('buildEvent')['timestamp'], isA<int>());
+    });
+
+    test('a dropped event is discarded, not sent', () async {
+      await setUpWith((event) => null);
+
+      await posthogFlutterIO.capture(eventName: 'clicked');
+
+      expect(argsOf('discardBuiltEvent'), {'uuid': 'built-uuid'});
+      expect(log.where((c) => c.method == 'sendBuiltEvent'), isEmpty);
+    });
+
+    test('an event the native SDK skips never reaches the callbacks', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        return null;
+      });
+      var called = false;
+      await setUpWith((event) {
+        called = true;
+        return event;
+      });
+
+      await posthogFlutterIO.capture(eventName: 'clicked');
+
+      expect(called, isFalse);
+      expect(log.where((c) => c.method == 'sendBuiltEvent'), isEmpty);
+    });
   });
 
   group('PosthogFlutterIO captureLog', () {
@@ -1191,22 +1364,14 @@ isolate_dso_base: 7000000000
     });
   });
 
-  group('PosthogFlutterIO calls made while an event is in flight', () {
-    List<String> sentAfterSetup() =>
-        log.map((c) => c.method).where((m) => m != 'setup').toList();
-
-    for (final slow in [false, true]) {
+  group('PosthogFlutterIO calls made right after an event', () {
+    for (final hooked in [false, true]) {
       test(
-          'reach native after events captured before them '
-          '(${slow ? 'async' : 'no'} beforeSend)', () async {
-        await posthogFlutterIO
-            .setup(PostHogConfig('test_project_token', beforeSend: [
-          if (slow)
-            (event) async {
-              await Future<void>.delayed(Duration.zero);
-              return event;
-            },
-        ]));
+          'reach native after the event '
+          '(${hooked ? 'with' : 'without'} beforeSend)', () async {
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token',
+            beforeSend: [if (hooked) (event) => event]));
+        log.clear();
 
         final sent = [
           posthogFlutterIO.capture(eventName: 'checkout'),
@@ -1214,20 +1379,215 @@ isolate_dso_base: 7000000000
           posthogFlutterIO.captureException(error: StateError('boom')),
         ];
         await posthogFlutterIO.reset();
-        await posthogFlutterIO.identify(userId: 'new-user');
-        await posthogFlutterIO.register('plan', 'pro');
         await Future.wait(sent);
 
-        expect(sentAfterSetup(), [
-          'capture',
-          'screen',
-          'captureException',
+        expect(log.map((c) => c.method), [
+          if (hooked) ...[
+            for (var i = 0; i < 3; i++) ...['buildEvent', 'sendBuiltEvent'],
+          ] else ...[
+            'capture',
+            'screen',
+            'captureException'
+          ],
           'reset',
-          'identify',
-          'register',
         ]);
       });
     }
+
+    test('an event keeps the callbacks set when it was captured', () async {
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', beforeSend: [(event) => null]));
+      log.clear();
+
+      final sent = posthogFlutterIO.capture(eventName: 'checkout');
+      await posthogFlutterIO.setup(PostHogConfig('test_project_token'));
+      await sent;
+
+      expect(log.map((c) => c.method),
+          ['buildEvent', 'discardBuiltEvent', 'setup']);
+    });
+
+    final lifecycleCalls = <String, Future<void> Function()>{
+      'disable': () => posthogFlutterIO.optOut(),
+      'close': () => posthogFlutterIO.close(),
+      'setup': () =>
+          posthogFlutterIO.setup(PostHogConfig('test_project_token')),
+    };
+    lifecycleCalls.forEach((method, call) {
+      test('$method waits for an event between its build and send', () async {
+        await posthogFlutterIO.setup(PostHogConfig('test_project_token',
+            beforeSend: [(event) => event]));
+        log.clear();
+
+        final sent = posthogFlutterIO.capture(eventName: 'checkout');
+        await call();
+        await sent;
+
+        expect(
+            log.map((c) => c.method), ['buildEvent', 'sendBuiltEvent', method]);
+      });
+    });
+  });
+
+  group('PosthogFlutterIO hook that renames an event', () {
+    final renames = <String, Future<void> Function(PosthogFlutterIO)>{
+      'screen': (io) => io.screen(screenName: 'Checkout'),
+      'captureException': (io) =>
+          io.captureException(error: StateError('boom')),
+    };
+
+    renames.forEach((name, send) {
+      test('$name runs the hook once and keeps its user properties', () async {
+        var runs = 0;
+        await posthogFlutterIO
+            .setup(PostHogConfig('test_project_token', beforeSend: [
+          (event) {
+            runs++;
+            event.event = 'renamed';
+            event.userProperties = {'source': 'hook'};
+            return event;
+          },
+        ]));
+        log.clear();
+
+        await send(posthogFlutterIO);
+
+        expect(runs, 1);
+        expect(log.where((c) => c.method == 'buildEvent'), hasLength(1));
+        final args = Map<String, dynamic>.from(log
+            .singleWhere((c) => c.method == 'sendBuiltEvent')
+            .arguments as Map);
+        expect(args['event'], 'renamed');
+        expect((args['properties'] as Map)[r'$set'], {'source': 'hook'});
+      });
+    });
+  });
+
+  group('PosthogFlutterIO hook that calls the SDK', () {
+    Future<void> setUpWith(
+      PostHogEvent? Function(PostHogEvent event) hook,
+    ) async {
+      await posthogFlutterIO
+          .setup(PostHogConfig('test_project_token', beforeSend: [hook]));
+      log.clear();
+    }
+
+    test('can capture another event without running forever', () async {
+      final seen = <String>[];
+      await setUpWith((event) {
+        seen.add(event.event);
+        if (event.event == 'outer') {
+          posthogFlutterIO.capture(eventName: 'inner');
+        }
+        return event;
+      });
+
+      await posthogFlutterIO.capture(eventName: 'outer');
+      await pumpEventQueue();
+
+      expect(seen, ['outer', 'inner']);
+      expect(
+        log
+            .where((c) => c.method == 'sendBuiltEvent')
+            .map((c) => (c.arguments as Map)['event']),
+        unorderedEquals(['inner', 'outer']),
+      );
+    });
+
+    final calls = <String, Future<void> Function(PosthogFlutterIO)>{
+      'reset': (io) => io.reset(),
+      'identify': (io) => io.identify(userId: 'user-1'),
+      'optOut': (io) => io.optOut(),
+      'close': (io) => io.close(),
+      'getFeatureFlag': (io) => io.getFeatureFlag(key: 'flag'),
+      'getDistinctId': (io) => io.getDistinctId(),
+      'isOptOut': (io) => io.isOptOut(),
+    };
+
+    calls.forEach((name, call) {
+      test('$name inside the hook does not deadlock the event', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (methodCall) async {
+          log.add(methodCall);
+          return switch (methodCall.method) {
+            'distinctId' => 'user-1',
+            'isOptOut' => false,
+            'buildEvent' => nativeBuiltEvent(methodCall.arguments as Map),
+            'sendBuiltEvent' => (methodCall.arguments as Map)['uuid'],
+            _ => null,
+          };
+        });
+        await setUpWith((event) {
+          call(posthogFlutterIO);
+          return event;
+        });
+
+        await posthogFlutterIO
+            .capture(eventName: 'checkout')
+            .timeout(const Duration(seconds: 2));
+        await pumpEventQueue();
+
+        expect(log.map((c) => c.method), contains('sendBuiltEvent'));
+      });
+    });
+
+    test('an error in unawaited work does not drop the event', () async {
+      final errors = <Object>[];
+      await runZonedGuarded(() async {
+        await setUpWith((event) {
+          Future<void>.error(StateError('late failure'));
+          return event;
+        });
+        await posthogFlutterIO.capture(eventName: 'checkout');
+        await pumpEventQueue();
+      }, (error, _) => errors.add(error));
+
+      expect(errors, hasLength(1));
+      expect(log.map((c) => c.method), ['buildEvent', 'sendBuiltEvent']);
+    });
+
+    test('a change made after the hook returned is not sent', () async {
+      await setUpWith((event) {
+        Future<void>.delayed(Duration.zero, () {
+          event.properties?['late'] = true;
+        });
+        return event;
+      });
+
+      await posthogFlutterIO
+          .capture(eventName: 'checkout', properties: {'plan': 'pro'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final args =
+          log.singleWhere((c) => c.method == 'sendBuiltEvent').arguments as Map;
+      expect(args['properties'], {'plan': 'pro'});
+    });
+  });
+
+  group('PosthogFlutterIO calls after a burst of events', () {
+    test('keep the order the app made them in', () async {
+      await posthogFlutterIO.setup(
+          PostHogConfig('test_project_token', beforeSend: [(event) => event]));
+      log.clear();
+
+      final sent = <Future<void>>[];
+      final expected = <String>[];
+      for (var i = 0; i < 1000; i++) {
+        sent.add(posthogFlutterIO.capture(eventName: 'event $i'));
+        expected.add('event $i');
+        if (i % 100 == 99) {
+          sent.add(posthogFlutterIO.reset());
+          expected.add('reset');
+        }
+      }
+      await Future.wait(sent);
+
+      expect(
+        log.where((c) => c.method != 'buildEvent').map((c) =>
+            c.method == 'reset' ? 'reset' : (c.arguments as Map)['event']),
+        expected,
+      );
+    });
   });
 
   group('PosthogFlutterIO addExceptionStep', () {
@@ -1467,4 +1827,22 @@ isolate_dso_base: 7000000000
       expect(await mintIdentityToken(), isNull);
     });
   });
+}
+
+/// What the native `buildEvent` handler returns for [args], without adding
+/// SDK properties.
+Map<String, Object?> nativeBuiltEvent(Map args, {String uuid = 'built-uuid'}) {
+  return {
+    'event': args['eventName'],
+    'uuid': uuid,
+    'distinctId': 'user-1',
+    'timestamp': args['timestamp'] ?? 1767225600000,
+    'properties': {
+      ...?(args['properties'] as Map?),
+      if (args['userProperties'] != null) r'$set': args['userProperties'],
+      if (args['userPropertiesSetOnce'] != null)
+        r'$set_once': args['userPropertiesSetOnce'],
+    },
+    'options': args['options'] ?? <String, Object?>{},
+  };
 }

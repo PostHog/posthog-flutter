@@ -1,6 +1,9 @@
 // ignore_for_file: avoid_dynamic_calls, avoid_annotating_with_dynamic
 
+import 'dart:async';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
+import 'dart:math' show max;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
@@ -64,7 +67,10 @@ extension PostHogExtension on PostHog {
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
   external JSAny? get_session_id();
-  external void onFeatureFlags(JSFunction callback);
+  // ignore: non_constant_identifier_names
+  external JSAny? get_property(JSAny name);
+  // The loader snippet's stub returns undefined until posthog-js loads.
+  external JSFunction? onFeatureFlags(JSFunction callback);
   external void startSessionRecording();
   external void stopSessionRecording();
   external bool sessionRecordingStarted();
@@ -72,8 +78,18 @@ extension PostHogExtension on PostHog {
   external void set_config(JSAny config);
   external JSObject? get config;
   external SessionManager? get sessionManager;
+  external FeatureFlags? get featureFlags;
   // ignore: non_constant_identifier_names
   external void _overrideSDKInfo(JSAny sdkName, JSAny sdkVersion);
+}
+
+// Feature flags JS interop
+@JS()
+@staticInterop
+class FeatureFlags {}
+
+extension FeatureFlagsExtension on FeatureFlags {
+  external JSObject getFlagVariants();
 }
 
 // SessionManager JS interop
@@ -122,6 +138,15 @@ Map<String, dynamic> safeMapConversion(dynamic mapData) {
 JSAny? _flagOptions(Map<dynamic, dynamic> args) {
   final sendEvent = args['sendEvent'] as bool?;
   return {if (sendEvent != null) 'send_event': sendEvent}.jsify();
+}
+
+Object? readFeatureFlagResult(String key, {bool? sendEvent}) {
+  return posthog
+      ?.getFeatureFlagResult(
+        stringToJSAny(key),
+        {if (sendEvent != null) 'send_event': sendEvent}.jsify(),
+      )
+      ?.dartify();
 }
 
 bool _sdkInfoOverridden = false;
@@ -200,6 +225,101 @@ String _exceptionMessage(Map<String, Object?> properties) {
   return 'Exception';
 }
 
+/// posthog-js's pause between `/flags` retries.
+const _flagsRetryDelayMs = 500;
+
+/// Reloads feature flags and completes with the flags that reload loaded.
+///
+/// posthog-js 1.438.2+ has `reloadFeatureFlagsAsync()`, which settles after
+/// this reload's own request, even when another request is already in flight.
+/// Anything but a successful load reports the current flags with
+/// `errorsLoading` set.
+///
+/// Older posthog-js completes with the next flags posthog-js reports. It skips
+/// the request without calling back when flags are disabled (completes right
+/// away), and while reloading is paused or after repeated network failures
+/// (completes once every request attempt posthog-js may make, including its
+/// retries, would have timed out, plus one more request timeout).
+Future<Map<String, Object?>> _reloadFeatureFlags(PostHog? ph) async {
+  final featureFlags = ph?.featureFlags;
+  if (ph == null || featureFlags == null) {
+    return {'variants': null, 'errorsLoading': true};
+  }
+  Map<String, Object?> currentFlags({required bool errorsLoading}) => {
+        'variants': featureFlags.getFlagVariants().dartify(),
+        'errorsLoading': errorsLoading
+      };
+
+  final flagsObject = featureFlags as JSObject;
+  if (flagsObject.has('reloadFeatureFlagsAsync')) {
+    final result = await flagsObject
+        .callMethod<JSPromise<JSObject?>>('reloadFeatureFlagsAsync'.toJS)
+        .toDart;
+    final status = result?.getProperty<JSString?>('status'.toJS)?.toDart;
+    return currentFlags(errorsLoading: status != 'loaded');
+  }
+
+  final config = ph.config;
+  if (config
+          ?.getProperty<JSAny?>('advanced_disable_feature_flags'.toJS)
+          ?.dartify() ==
+      true) {
+    return currentFlags(errorsLoading: true);
+  }
+
+  final reloaded = Completer<Map<String, Object?>>();
+  var subscribed = false;
+  final unsubscribe = ph
+      .onFeatureFlags((JSArray flags, JSObject variants, [JSObject? context]) {
+    // onFeatureFlags replays the current flags synchronously: skip them.
+    if (!subscribed || reloaded.isCompleted) return;
+    reloaded.complete({
+      'variants': variants.dartify(),
+      'errorsLoading': (context?.dartify() as Map?)?['errorsLoading'] == true,
+    });
+  }.toJS);
+  subscribed = true;
+  ph.reloadFeatureFlags();
+
+  int? configInt(String key) =>
+      (config?.getProperty<JSAny?>(key.toJS)?.dartify() as num?)?.toInt();
+  final requestTimeoutMs = configInt('feature_flag_request_timeout_ms') ?? 3000;
+  // posthog-js retries a timed-out /flags request within the same reload,
+  // 500 ms apart, so a successful retry can land well after one timeout.
+  final retries = max(0, configInt('feature_flag_request_max_retries') ?? 1);
+  try {
+    return await reloaded.future.timeout(
+      Duration(
+          milliseconds:
+              (retries + 2) * requestTimeoutMs + retries * _flagsRetryDelayMs),
+      onTimeout: () => currentFlags(errorsLoading: true),
+    );
+  } finally {
+    unsubscribe?.callAsFunction();
+  }
+}
+
+/// The user posthog-js would send an event as right now.
+String? currentWebDistinctId() =>
+    posthog?.get_distinct_id()?.dartify() as String?;
+
+/// Whether posthog-js's current user is identified.
+bool currentWebUserIdentified() =>
+    posthog?.get_property(r'$user_state'.toJS)?.dartify() == 'identified';
+
+/// posthog-js capture options carrying `$set` and `$set_once`.
+/// See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
+Map<String, Object> _personCaptureOptions(Map args) {
+  final userProperties = safeMapConversion(args['userProperties']);
+  final userPropertiesSetOnce = safeMapConversion(
+    args['userPropertiesSetOnce'],
+  );
+  return {
+    if (userProperties.isNotEmpty) '\$set': userProperties,
+    if (userPropertiesSetOnce.isNotEmpty) '\$set_once': userPropertiesSetOnce,
+  };
+}
+
 Future<dynamic> handleWebMethodCall(MethodCall call) async {
   _maybeOverrideSDKInfo();
 
@@ -242,20 +362,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final properties = safeMapConversion(args['properties']);
       properties.addAll(_getLocationProperties());
       _addAppVersionProperties(properties);
-      final userProperties = safeMapConversion(args['userProperties']);
-      final userPropertiesSetOnce = safeMapConversion(
-        args['userPropertiesSetOnce'],
-      );
-
-      // Build options object for posthog-js capture with $set and $set_once
-      // See: https://github.com/PostHog/posthog-js/blob/main/packages/types/src/capture.ts
-      final options = <String, Object>{};
-      if (userProperties.isNotEmpty) {
-        options['\$set'] = userProperties;
-      }
-      if (userPropertiesSetOnce.isNotEmpty) {
-        options['\$set_once'] = userPropertiesSetOnce;
-      }
+      final options = _personCaptureOptions(args);
 
       posthog?.capture(
         stringToJSAny(eventName),
@@ -270,7 +377,12 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       properties.addAll(_getLocationProperties());
       _addAppVersionProperties(properties);
 
-      posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
+      final options = _personCaptureOptions(args);
+      posthog?.capture(
+        stringToJSAny('\$screen'),
+        mapToJSAny(properties),
+        options.isNotEmpty ? mapToJSAny(options) : null,
+      );
       break;
     case 'captureLog':
       final body = args['body'] as String;
@@ -335,8 +447,7 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       );
       break;
     case 'reloadFeatureFlags':
-      posthog?.reloadFeatureFlags();
-      break;
+      return _reloadFeatureFlags(posthog);
     case 'setPersonPropertiesForFlags':
       final userProperties = safeMapConversion(args['userProperties']);
       // reload is orchestrated by the Dart layer, so disable it here.
@@ -379,14 +490,10 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
           posthog?.getFeatureFlag(stringToJSAny(key), _flagOptions(args));
       return featureFlag?.dartify();
     case 'getFeatureFlagResult':
-      final key = args['key'] as String;
-      final sendEvent = args['sendEvent'] as bool?;
-
-      final result = posthog?.getFeatureFlagResult(
-        stringToJSAny(key),
-        {if (sendEvent != null) 'send_event': sendEvent}.jsify(),
+      return readFeatureFlagResult(
+        args['key'] as String,
+        sendEvent: args['sendEvent'] as bool?,
       );
-      return result?.dartify();
     case 'getAllFeatureFlags':
       try {
         return posthog?.getAllFeatureFlags()?.dartify();
@@ -407,6 +514,14 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final key = args['key'] as String;
 
       posthog?.unregister(stringToJSAny(key));
+      break;
+    case 'setAppLanguage':
+      final language = args['language'] as String?;
+      if (language == null) {
+        posthog?.unregister(stringToJSAny(r'$app_language'));
+      } else {
+        posthog?.register(mapToJSAny({r'$app_language': language}));
+      }
       break;
     case 'getSessionId':
       final sessionId = posthog?.get_session_id()?.dartify() as String?;

@@ -95,6 +95,49 @@ Object? toJsonValue(Object? value, CoreLogger logger,
   return convert(value);
 }
 
+/// [value] with each lone UTF-16 surrogate replaced by U+FFFD, or [value]
+/// itself when it has none. `jsonEncode` writes a lone surrogate as a
+/// `\ud800` escape, which capture v1 rejects in a top-level field.
+String toWellFormed(String value) {
+  List<int>? units;
+  for (var i = 0; i < value.length; i++) {
+    final unit = value.codeUnitAt(i);
+    if (unit & 0xF800 != 0xD800) continue;
+    if (unit < 0xDC00 &&
+        i + 1 < value.length &&
+        value.codeUnitAt(i + 1) & 0xFC00 == 0xDC00) {
+      i++;
+      continue;
+    }
+    (units ??= List.of(value.codeUnits))[i] = 0xFFFD;
+  }
+  return units == null ? value : String.fromCharCodes(units);
+}
+
+final _loneSurrogateEscape = RegExp(r'\\ud[89a-f]');
+
+/// `jsonEncode(value)` with each lone UTF-16 surrogate replaced by U+FFFD.
+/// `jsonEncode` escapes only lone surrogates as `\udXXX`, so [value] is
+/// copied and re-encoded only when the first encoding has such an escape.
+String jsonEncodeWellFormed(Object? value) {
+  final json = jsonEncode(value);
+  return json.contains(_loneSurrogateEscape)
+      ? jsonEncode(_toWellFormedJson(value))
+      : json;
+}
+
+Object? _toWellFormedJson(Object? value) => switch (value) {
+      final String string => toWellFormed(string),
+      final Map map => {
+          for (final MapEntry(:key, :value) in map.entries)
+            toWellFormed('$key'): _toWellFormedJson(value),
+        },
+      final List list => [
+          for (final element in list) _toWellFormedJson(element)
+        ],
+      _ => value,
+    };
+
 /// [toJsonValue] for a map, typed as the JSON object it becomes.
 Map<String, Object?> toJsonMap(Map<Object?, Object?> map, CoreLogger logger) =>
     toJsonValue(map, logger) as Map<String, Object?>;

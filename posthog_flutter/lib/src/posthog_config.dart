@@ -14,9 +14,9 @@ import 'replay/mask/posthog_text_mask.dart';
 /// that are about to be captured. Return a possibly modified event to send it,
 /// or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+/// Callbacks are synchronous, as in the native SDKs, so the event is sent
+/// with the user and properties it was captured under.
+typedef BeforeSendCallback = PostHogEvent? Function(
   PostHogEvent event,
 );
 
@@ -27,9 +27,8 @@ typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
 /// attributes that are about to be captured. Return a possibly modified record
 /// to send it, or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogLogRecord?>`).
-typedef BeforeSendLogCallback = FutureOr<PostHogLogRecord?> Function(
+/// Callbacks are synchronous, as in the native SDKs.
+typedef BeforeSendLogCallback = PostHogLogRecord? Function(
   PostHogLogRecord record,
 );
 
@@ -196,6 +195,56 @@ class PostHogConfig {
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
 
+  /// How [Posthog.captureAi] request bodies are compressed, separately from
+  /// [compression].
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default (gzip).
+  PostHogCompression? captureAiCompression;
+
+  /// Maximum number of [Posthog.captureAi] events kept in their on-disk queue
+  /// before the oldest are dropped.
+  ///
+  /// AI events can be megabytes, so the default (100) is lower than
+  /// [maxQueueSize]. The queue also keeps at most 50 MiB of AI events,
+  /// whatever this is set to. A value of `0` or less uses the default.
+  ///
+  /// When it is full, the oldest events are dropped.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  int? captureAiMaxQueueSize;
+
+  /// Timeout of a [Posthog.captureAi] request: how long it may go without
+  /// network activity. On iOS, macOS and Android it is sent to the native SDK
+  /// in whole seconds (a positive value under one second is sent as one
+  /// second).
+  ///
+  /// AI requests can carry several MB, so the default (60 seconds) is
+  /// longer than for other requests. [Duration.zero] or less uses the
+  /// default.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  Duration? captureAiTimeout;
+
+  /// Maximum size, in bytes, of a [Posthog.captureAi] event. The SDK drops a
+  /// larger event and [Posthog.captureAi] returns `null`.
+  ///
+  /// Use it to lower the limit. PostHog drops AI events whose properties are
+  /// over 8 MiB, so a larger value, or a value of `0` or less, uses the
+  /// default. By default the SDK drops a serialized event over 8 MiB plus
+  /// 64 KiB for the rest of the event, measured before compression. A set
+  /// value limits the whole serialized event.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  int? captureAiMaxEventBytes;
+
   /// Whether the SDK is enabled on Windows and Linux.
   ///
   /// Windows and Linux support is experimental. Defaults to `true`.
@@ -261,12 +310,6 @@ class PostHogConfig {
   /// posthog-js instance, so configure `bootstrap` in your `posthog.init({...})`
   /// call instead.
   PostHogBootstrapConfig? bootstrap;
-
-  /// Callback to be invoked when feature flags are loaded.
-  ///
-  /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
-  /// callback to access the loaded flag values.
-  OnFeatureFlagsCallback? onFeatureFlags;
 
   /// Whether to automatically register this device's push token or Firebase
   /// Installation ID (FID) with PostHog.
@@ -364,23 +407,6 @@ class PostHogConfig {
   /// ];
   /// ```
   ///
-  /// **Example (async callback):**
-  /// ```dart
-  /// config.beforeSend = [
-  ///   (event) async {
-  ///     // Perform async operations
-  ///     final shouldSend = await checkIfEventAllowed(event.event);
-  ///     if (!shouldSend) {
-  ///       return null; // Drop the event
-  ///     }
-  ///     // Enrich event with async data
-  ///     final extraData = await fetchExtraContext();
-  ///     event.properties = {...?event.properties, ...extraData};
-  ///     return event;
-  ///   },
-  /// ];
-  /// ```
-  ///
   /// **Limitations:**
   /// - These callbacks do NOT intercept native-initiated events such as:
   ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is
@@ -389,27 +415,39 @@ class PostHogConfig {
   ///     `config.captureApplicationLifecycleEvents` is enabled
   ///   - Feature flag events (`$feature_flag_called`) when
   ///     `config.sendFeatureFlagEvent` is enabled
-  ///   - Identity events (`$set`) when `identify` is called
+  ///   - Identity events (`$identify`, `$set`, `$create_alias`,
+  ///     `$groupidentify`) from `identify`, `setPersonProperties`, `alias`
+  ///     and `group`
   ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
-  /// - Only user-provided properties are available; system properties (like
-  ///   `$device_type`, `$session_id`) are added by the native SDK at a later
-  ///   stage.
+  ///   On iOS, macOS and Android, add a native hook with
+  ///   `PosthogFlutterPlugin.addBeforeSend` (Swift or Kotlin) to filter or
+  ///   edit those events.
+  /// - On iOS, macOS, Android, Windows and Linux, the callbacks see the
+  ///   system properties (like `$device_type` and `$session_id`), the
+  ///   registered properties and the options the SDK adds, and can change
+  ///   them for that event, except `$lib` and `$lib_version`, which PostHog
+  ///   sets from the SDK. On iOS, macOS and Android, registering callbacks
+  ///   adds one more call to the native SDK per event. The native SDK keeps
+  ///   each built event until Dart sends it back, and discards one still
+  ///   waiting after a minute (for example, after a hot restart). On web,
+  ///   only the event's own properties are available; posthog-js adds the
+  ///   rest later.
   ///
   /// **Note:**
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogEvent?>`)
+  /// - Callbacks are synchronous and run on the calling isolate, so a slow one
+  ///   blocks the UI. Load anything they need (such as remote config or feature
+  ///   flags) ahead of time; a change made after the callback returns is not
+  ///   sent.
+  /// - A callback that captures an event must not do so for that event too, or
+  ///   it never finishes.
+  /// - On web, an event whose callback calls `reset()` stays on its user but
+  ///   joins the next user's session and person processing, and its user
+  ///   properties are dropped, because posthog-js builds the event after the
+  ///   callbacks.
   /// - If a callback throws, the event is dropped and later callbacks are not
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
-  /// - On every platform except Windows and Linux, PostHog calls made after a
-  ///   capture (including `reset()`, `identify()` and getters) wait until its
-  ///   callbacks finish, so the event keeps the user and consent it was
-  ///   captured under. A callback that runs longer than 10 seconds stops
-  ///   holding them back; its event is still sent when it finishes, with the
-  ///   user, super properties, groups and consent current by then. Calls made
-  ///   from inside a callback do not wait, but a callback that waits on a
-  ///   PostHog call made elsewhere stalls until that limit.
   List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, captureDeepLinks integrations
@@ -418,14 +456,10 @@ class PostHogConfig {
   ///
   /// The [projectToken] is trimmed before it is stored.
   ///
-  /// The optional [onFeatureFlags] callback is invoked when feature flags finish
-  /// loading.
-  ///
   /// The optional [beforeSend] callbacks are copied into [beforeSend] and run in
   /// order before Dart-captured events are sent.
   PostHogConfig(
     String projectToken, {
-    this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
   })  : projectToken = projectToken.trim(),
         beforeSend = beforeSend ?? [];
@@ -585,8 +619,7 @@ class PostHogLogsConfig {
   ///   native SDKs' own `beforeSend`. Dart callbacks cannot cross the platform
   ///   channel, and running it here gives identical behavior everywhere
   ///   (including web). This mirrors the event [PostHogConfig.beforeSend].
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogLogRecord?>`).
+  /// - Callbacks are synchronous.
   /// - A callback that throws is logged, and the record is dropped.
   /// - The W3C trace fields (`traceId`, `spanId`, `traceFlags`) are **not**
   ///   part of [PostHogLogRecord] and are not visible here. They pass straight

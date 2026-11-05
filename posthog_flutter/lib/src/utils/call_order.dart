@@ -4,14 +4,13 @@ import '../util/logging.dart';
 
 /// Hands calls to the underlying SDK in the order the app made them.
 ///
-/// The native SDKs and posthog-js run beforeSend synchronously inside
-/// capture, so an event always goes out with the user, super properties,
-/// groups and consent it was captured under. Flutter's beforeSend can be
-/// async. While one runs, later calls such as reset() or identify() wait here
+/// An event always has to go out with the user, super properties, groups and
+/// consent it was captured under, but handing it over can take more than one
+/// async step. While it does, later calls such as reset() or optOut() wait here
 /// until the event has been handed over, so they still apply after it.
 class CallOrder {
-  /// A beforeSend that runs longer than this stops holding back later calls.
-  /// Its event is still sent when the callbacks finish.
+  /// An event that takes longer than this stops holding back later calls. It
+  /// is still sent when it is ready.
   static const maxWait = Duration(seconds: 10);
 
   // Set while a turn is being used: calls made from beforeSend, or from the
@@ -36,8 +35,7 @@ class CallOrder {
 
   /// Runs [hook] once every earlier call has been handed over, so it sees
   /// the state the app left before capturing, then hands its result to
-  /// [send]. Later calls wait for [send] to finish, so it may itself capture
-  /// (a beforeSend that renames a `$screen` does).
+  /// [send]. Later calls wait for [send] to finish.
   Future<void> event<E>(
     FutureOr<E> Function() hook,
     Future<void> Function(E event) send,
@@ -63,8 +61,8 @@ class CallOrder {
     Future<void> Function(E event) send,
   ) async {
     final timer = Timer(maxWait, () {
-      printIfDebug('[PostHog] beforeSend took longer than '
-          '${maxWait.inSeconds}s; later calls no longer wait for it.');
+      printIfDebug('[PostHog] An event took longer than '
+          '${maxWait.inSeconds}s to hand over; later calls no longer wait for it.');
       turn.ahead.then((_) => turn.end());
     });
     try {

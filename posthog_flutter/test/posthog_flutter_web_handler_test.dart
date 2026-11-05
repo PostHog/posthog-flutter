@@ -6,8 +6,10 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
 // Browser-only: handleWebMethodCall talks to the posthog-js instance on
@@ -32,6 +34,69 @@ void main() {
 
   Map<Object?, Object?> readOptions() =>
       capturedOptions!.dartify()! as Map<Object?, Object?>;
+
+  group('handleWebMethodCall setAppLanguage', () {
+    late List<Object?> registered;
+    late List<String> unregistered;
+
+    setUp(() {
+      registered = [];
+      unregistered = [];
+      final fake = JSObject();
+      fake.setProperty(
+        'register'.toJS,
+        ((JSAny properties) {
+          registered.add(properties.dartify());
+        }).toJS,
+      );
+      fake.setProperty(
+        'unregister'.toJS,
+        ((JSString key) {
+          unregistered.add(key.toDart);
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('registers a language and unregisters null', () async {
+      final web = PosthogFlutterWeb();
+      await web.setAppLanguage('de');
+      await web.setAppLanguage(null);
+
+      expect(registered, [
+        {r'$app_language': 'de'}
+      ]);
+      expect(unregistered, [r'$app_language']);
+    });
+
+    test('registers the language again in the same step as reset', () {
+      final calls = <String>[];
+      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
+      fake.setProperty('reset'.toJS, (() => calls.add('reset')).toJS);
+      fake.setProperty(
+        'register'.toJS,
+        ((JSAny properties) => calls.add('register ${properties.dartify()}'))
+            .toJS,
+      );
+      final web = PosthogFlutterWeb();
+      web.setAppLanguage('de');
+      calls.clear();
+
+      web.reset();
+
+      expect(calls, ['reset', r'register {$app_language: de}']);
+    });
+
+    test('registerWith clears the language persisted by a past launch', () {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final previous = PosthogFlutterPlatformInterface.instance;
+      addTearDown(() => PosthogFlutterPlatformInterface.instance = previous);
+
+      PosthogFlutterWeb.registerWith(webPluginRegistrar);
+
+      expect(unregistered, [r'$app_language']);
+    });
+  });
 
   group('handleWebMethodCall captureLog', () {
     test('remaps trace fields to snake_case for posthog-js', () async {
@@ -77,6 +142,152 @@ void main() {
       expect(options['trace_flags'], 0);
       expect(options.containsKey('trace_id'), isFalse);
       expect(options.containsKey('span_id'), isFalse);
+    });
+  });
+
+  group('handleWebMethodCall reloadFeatureFlags', () {
+    late JSFunction? listener;
+    late int reloads;
+    late int unsubscribes;
+
+    /// Installs a fake posthog-js whose reload answers with [answer], if any.
+    void installFake({
+      Map<String, Object?> config = const {},
+      ({Map<String, Object> variants, bool errorsLoading})? answer,
+      Duration answerAfter = Duration.zero,
+      String? asyncStatus,
+    }) {
+      listener = null;
+      reloads = 0;
+      unsubscribes = 0;
+      var current = {'cached': true}.jsify()!;
+      final featureFlags = JSObject()
+        ..setProperty('getFlagVariants'.toJS, (() => current).toJS);
+      if (asyncStatus != null) {
+        featureFlags.setProperty(
+          'reloadFeatureFlagsAsync'.toJS,
+          (() => Future(() {
+                current = {'fresh': 'v2'}.jsify()!;
+                return {'status': asyncStatus}.jsify();
+              }).toJS).toJS,
+        );
+      }
+      final fake = JSObject()
+        ..setProperty('featureFlags'.toJS, featureFlags)
+        ..setProperty('config'.toJS, config.jsify())
+        ..setProperty(
+          'onFeatureFlags'.toJS,
+          ((JSFunction callback) {
+            listener = callback;
+            callback.callAsFunction(null, <String>[].jsify(), current);
+            return (() => unsubscribes++).toJS;
+          }).toJS,
+        )
+        ..setProperty(
+          'reloadFeatureFlags'.toJS,
+          (() {
+            reloads++;
+            if (answer == null) return;
+            Future.delayed(
+                answerAfter,
+                () => listener?.callAsFunction(
+                      null,
+                      answer.variants.keys.toList().jsify(),
+                      answer.variants.jsify(),
+                      {'errorsLoading': answer.errorsLoading}.jsify(),
+                    ));
+          }).toJS,
+        );
+      globalContext.setProperty('posthog'.toJS, fake);
+    }
+
+    test('completes with the flags the reload delivers, not the replayed ones',
+        () async {
+      installFake(answer: (variants: {'fresh': 'v2'}, errorsLoading: true));
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': true,
+      });
+      expect(unsubscribes, 1);
+    });
+
+    test('awaits reloadFeatureFlagsAsync when posthog-js has it', () async {
+      installFake(asyncStatus: 'loaded');
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': false,
+      });
+      expect(reloads, 0);
+    });
+
+    test('reports an error when reloadFeatureFlagsAsync skips the request',
+        () async {
+      installFake(asyncStatus: 'skipped');
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result['errorsLoading'], isTrue);
+    });
+
+    test('completes right away with an error when flags are disabled',
+        () async {
+      installFake(config: {'advanced_disable_feature_flags': true});
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'cached': true},
+        'errorsLoading': true,
+      });
+      expect(reloads, 0);
+    });
+
+    test('waits for a reload that posthog-js retries after a timeout',
+        () async {
+      // Past twice the request timeout, but within one retry after 500 ms.
+      installFake(
+        config: {'feature_flag_request_timeout_ms': 20},
+        answer: (variants: {'fresh': 'v2'}, errorsLoading: false),
+        answerAfter: const Duration(milliseconds: 300),
+      );
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': false,
+      });
+    });
+
+    test('completes with an error when posthog-js never calls back', () async {
+      installFake(config: {'feature_flag_request_timeout_ms': 5});
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'cached': true},
+        'errorsLoading': true,
+      });
+      expect(reloads, 1);
+      expect(unsubscribes, 1);
     });
   });
 

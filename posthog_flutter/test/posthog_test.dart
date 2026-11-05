@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:posthog_flutter/src/feature_flags_listeners.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_internal_events.dart';
 import 'package:posthog_flutter/src/replay/mask/posthog_mask_controller.dart';
@@ -25,24 +26,50 @@ void main() {
     });
 
     test(
-      'setup passes config and onFeatureFlags callback to platform interface',
+      'setup passes config to platform interface',
       () async {
-        void testCallback() {}
-
-        final config = PostHogConfig(
-          'test_project_token',
-          onFeatureFlags: testCallback,
-        );
+        final config = PostHogConfig('test_project_token');
 
         await Posthog().setup(config);
 
         expect(fakePlatformInterface.receivedConfig, equals(config));
-        expect(
-          fakePlatformInterface.registeredOnFeatureFlagsCallback,
-          equals(testCallback),
-        );
       },
     );
+
+    for (final entry in <String, Future<void> Function()>{
+      'reset': () => Posthog().reset(),
+      'close': () => Posthog().close(),
+    }.entries) {
+      test('onFeatureFlags does not replay flags loaded before ${entry.key}',
+          () async {
+        FeatureFlagsListeners.instance.deliver(PostHogFeatureFlagsLoaded(
+            variants: {'flag': true}, errorsLoading: false));
+        await entry.value();
+        final received = <PostHogFeatureFlagsLoaded>[];
+        final subscription = Posthog().onFeatureFlags(received.add);
+        addTearDown(subscription.unsubscribe);
+
+        await pumpEventQueue();
+
+        expect(received, isEmpty);
+      });
+    }
+
+    for (final token in [' \n\t ', 'phx_personal_api_key']) {
+      test('setup is skipped for the project token "$token"', () async {
+        final lines = <String?>[];
+        final previous = debugPrint;
+        debugPrint = (message, {wrapWidth}) => lines.add(message);
+        try {
+          await Posthog().setup(PostHogConfig(token));
+        } finally {
+          debugPrint = previous;
+        }
+
+        expect(fakePlatformInterface.receivedConfig, isNull);
+        expect(lines, hasLength(1));
+      });
+    }
 
     test('Windows and Linux support is enabled by default', () {
       expect(PostHogConfig('test_project_token').enableWindowsAndLinux, isTrue);
@@ -212,6 +239,50 @@ void main() {
         }
       },
     );
+  });
+
+  group('Posthog event options', () {
+    late PosthogFlutterPlatformFake fake;
+    const options = {'process_person_profile': false};
+
+    setUp(() async {
+      fake = PosthogFlutterPlatformFake();
+      PosthogFlutterPlatformInterface.instance = fake;
+      await Posthog().close();
+    });
+
+    test('each event method passes its options to the platform', () async {
+      final posthog = Posthog();
+      await posthog.capture(eventName: 'clicked', options: options);
+      await posthog.screen(screenName: 'Home', options: options);
+      await posthog.identify(userId: 'user-1', options: options);
+      await posthog.alias(alias: 'alias-1', options: options);
+      await posthog.group(
+          groupType: 'company', groupKey: 'acme', options: options);
+      await posthog.captureAi(eventName: r'$ai_span', options: options);
+      await posthog.captureException(
+          error: StateError('boom'), options: options);
+      await posthog.setPersonProperties(
+        userPropertiesToSet: {'plan': 'pro'},
+        options: options,
+      );
+
+      expect(fake.optionsCalls, [
+        ('capture', options),
+        ('screen', options),
+        ('identify', options),
+        ('alias', options),
+        ('group', options),
+        ('captureAi', options),
+      ]);
+      expect(fake.capturedExceptions.single.options, options);
+      expect(fake.setPersonPropertiesCalls.single['options'], options);
+    });
+
+    test('captureAi returns the platform result', () async {
+      fake.captureAiResult = 'uuid-1';
+      expect(await Posthog().captureAi(eventName: r'$ai_trace'), 'uuid-1');
+    });
   });
 
   group('PostHogConfig', () {

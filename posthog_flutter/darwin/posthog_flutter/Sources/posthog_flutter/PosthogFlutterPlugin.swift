@@ -44,6 +44,37 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private static var instance: PosthogFlutterPlugin?
     private var channel: FlutterMethodChannel?
 
+    // Events built for the Dart beforeSend callbacks, keyed by uuid, until Dart
+    // sends or drops them. Main-thread confined, like the channel callbacks.
+    // An event whose callbacks haven't finished after builtEventTimeout is
+    // dropped on the next build, so a callback that never completes can't
+    // keep it in memory.
+    // setup and close clear it, so a build can't be sent through a reconfigured SDK.
+    private var builtEvents: [String: (event: PostHogEvent, builtAt: TimeInterval)] = [:]
+    private static let builtEventTimeout: TimeInterval = 60
+
+    private static let nativeBeforeSendLock = NSLock()
+    private static var nativeBeforeSend: [BeforeSendBlock] = []
+    private var featureFlagsSubscription: PostHogFeatureFlagsSubscription?
+
+    // Dart's feature flags lifecycle, sent with setup, reset and close. Each
+    // flags notification carries the one current when it fired, so Dart can
+    // drop loads from before a reset or close.
+    private let flagsGenerationLock = NSLock()
+    private var flagsGenerationValue = 0
+    private var flagsGeneration: Int {
+        get {
+            flagsGenerationLock.lock()
+            defer { flagsGenerationLock.unlock() }
+            return flagsGenerationValue
+        }
+        set {
+            flagsGenerationLock.lock()
+            flagsGenerationValue = newValue
+            flagsGenerationLock.unlock()
+        }
+    }
+
     // Mint route for pushIdentityProvider, anchored to the engine whose setup()
     // installed the provider. A live owner is never displaced; provider-enabled
     // engines stay candidates so detach promotes the most recent survivor instead
@@ -55,21 +86,45 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     private static var pushChannelCandidates: [FlutterMethodChannel] = []
     private static var pushChannel: FlutterMethodChannel?
 
+    /// Adds a native `beforeSend` block that runs on every event the PostHog iOS
+    /// or macOS SDK sends, including the ones Dart never sees.
+    ///
+    /// Dart `PostHogConfig.beforeSend` callbacks run only on events captured from
+    /// Dart. Events the native SDK captures itself, such as crashes, app
+    /// lifecycle events, `$feature_flag_called`, `$identify` and session replay,
+    /// reach only native blocks. Blocks run in the order they're added, after the
+    /// Dart callbacks. Return the event, changed or not, to send it, or `nil` to
+    /// drop it. No blocks are added by default.
+    ///
+    /// Add blocks before the SDK is set up: before `Posthog().setup()` runs in
+    /// Dart, or before the plugin registers when the SDK is set up from
+    /// `Info.plist`. Blocks added later apply from the next setup.
+    ///
+    /// ```swift
+    /// // AppDelegate.swift, before GeneratedPluginRegistrant.register(with: self)
+    /// PosthogFlutterPlugin.addBeforeSend { event in
+    ///     event.event == "Application Backgrounded" ? nil : event
+    /// }
+    /// ```
+    public static func addBeforeSend(_ block: @escaping BeforeSendBlock) {
+        nativeBeforeSendLock.lock()
+        defer { nativeBeforeSendLock.unlock() }
+        nativeBeforeSend.append(block)
+    }
+
     public static func getInstance() -> PosthogFlutterPlugin? {
         instance
     }
 
     override init() {
         super.init()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(featureFlagsDidUpdate),
-            name: PostHogSDK.didReceiveFeatureFlags,
-            object: nil
-        )
+        featureFlagsSubscription = PostHogSDK.shared.onFeatureFlags { [weak self] loaded in
+            self?.featureFlagsDidUpdate(loaded)
+        }
     }
 
     deinit {
+        featureFlagsSubscription?.unsubscribe()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -88,8 +143,20 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
     }
 
-    @objc func featureFlagsDidUpdate() {
-        invokeFlutterMethod("onFeatureFlagsCallback", arguments: [String: Any]())
+    func featureFlagsDidUpdate(_ loaded: PostHogFeatureFlagsLoaded) {
+        var arguments = Self.featureFlagsLoadedMap(loaded)
+        arguments["generation"] = flagsGeneration
+        invokeFlutterMethod("onFeatureFlagsCallback", arguments: arguments)
+    }
+
+    private func updateFlagsGeneration(_ call: FlutterMethodCall) {
+        if let generation = (call.arguments as? [String: Any])?["flagsGeneration"] as? Int {
+            flagsGeneration = generation
+        }
+    }
+
+    private static func featureFlagsLoadedMap(_ loaded: PostHogFeatureFlagsLoaded) -> [String: Any] {
+        ["variants": loaded.variants, "errorsLoading": loaded.errorsLoading]
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.posthog.PosthogFlutterPlugin",
@@ -239,6 +306,25 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             default:
                 break
             }
+        }
+        if let captureAiCompression = posthogConfig["captureAiCompression"] as? String {
+            switch captureAiCompression {
+            case "gzip":
+                config.captureAiCompression = .gzip
+            case "none":
+                config.captureAiCompression = .none
+            default:
+                break
+            }
+        }
+        if let captureAiMaxQueueSize = posthogConfig["captureAiMaxQueueSize"] as? Int {
+            config.captureAiMaxQueueSize = captureAiMaxQueueSize
+        }
+        if let captureAiTimeoutSeconds = posthogConfig["captureAiTimeoutSeconds"] as? Int {
+            config.captureAiTimeout = TimeInterval(captureAiTimeoutSeconds)
+        }
+        if let captureAiMaxEventBytes = posthogConfig["captureAiMaxEventBytes"] as? Int {
+            config.captureAiMaxEventBytes = captureAiMaxEventBytes
         }
         if let dataMode = posthogConfig["dataMode"] as? String {
             switch dataMode {
@@ -443,9 +529,15 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             }
         }
 
-        if let flutterVersionBeforeSend = flutterVersionBeforeSend(posthogConfig) {
-            config.setBeforeSend(flutterVersionBeforeSend)
+        nativeBeforeSendLock.lock()
+        let beforeSend = [flutterVersionBeforeSend(posthogConfig)].compactMap { $0 } + nativeBeforeSend
+        nativeBeforeSendLock.unlock()
+        if !beforeSend.isEmpty {
+            config.setBeforeSend(beforeSend)
         }
+
+        // Flutter apps translate in Dart, so the app bundle doesn't say what's shown
+        config.detectAppLanguage = false
 
         // Update SDK name and version
         postHogSdkName = "posthog-flutter"
@@ -463,6 +555,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "setup":
+            updateFlagsGeneration(call)
             setup(call, result: result)
         case "getFeatureFlag":
             getFeatureFlag(call, result: result)
@@ -478,8 +571,16 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             setPersonProperties(call, result: result)
         case "capture":
             capture(call, result: result)
+        case "captureAi":
+            captureAi(call, result: result)
         case "screen":
             screen(call, result: result)
+        case "buildEvent":
+            buildEvent(call, result: result)
+        case "sendBuiltEvent":
+            sendBuiltEvent(call, result: result)
+        case "discardBuiltEvent":
+            discardBuiltEvent(call, result: result)
         case "captureLog":
             captureLog(call, result: result)
         case "alias":
@@ -491,6 +592,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         case "distinctId":
             distinctId(result)
         case "reset":
+            updateFlagsGeneration(call)
             reset(result)
         case "enable":
             enable(result)
@@ -516,6 +618,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             register(call, result: result)
         case "unregister":
             unregister(call, result: result)
+        case "setAppLanguage":
+            PostHogSDK.shared.setAppLanguage((call.arguments as? [String: Any])?["language"] as? String)
+            result(nil)
         case "flush":
             flush(result)
         case "captureException":
@@ -523,6 +628,7 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         case "addExceptionStep":
             addExceptionStep(call, result: result)
         case "close":
+            updateFlagsGeneration(call)
             close(result)
         case "sendMetaEvent":
             sendMetaEvent(call, result: result)
@@ -1332,6 +1438,7 @@ extension PosthogFlutterPlugin {
         result: @escaping FlutterResult
     ) {
         if let args = call.arguments as? [String: Any] {
+            builtEvents.removeAll()
             PosthogFlutterPlugin.setupPostHog(args, anchor: self)
             result(nil)
         } else {
@@ -1429,11 +1536,13 @@ extension PosthogFlutterPlugin {
         {
             let userProperties = args["userProperties"] as? [String: Any]
             let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
 
             PostHogSDK.shared.identify(
                 userId,
                 userProperties: userProperties,
-                userPropertiesSetOnce: userPropertiesSetOnce
+                userPropertiesSetOnce: userPropertiesSetOnce,
+                options: options
             )
             result(nil)
         } else {
@@ -1448,10 +1557,12 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any] {
             let userPropertiesToSet = args["userPropertiesToSet"] as? [String: Any]
             let userPropertiesToSetOnce = args["userPropertiesToSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
 
             PostHogSDK.shared.setPersonProperties(
                 userPropertiesToSet: userPropertiesToSet,
-                userPropertiesToSetOnce: userPropertiesToSetOnce
+                userPropertiesToSetOnce: userPropertiesToSetOnce,
+                options: options
             )
             result(nil)
         } else {
@@ -1469,13 +1580,39 @@ extension PosthogFlutterPlugin {
             let properties = args["properties"] as? [String: Any]
             let userProperties = args["userProperties"] as? [String: Any]
             let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
             PostHogSDK.shared.capture(
                 eventName,
                 properties: properties,
                 userProperties: userProperties,
-                userPropertiesSetOnce: userPropertiesSetOnce
+                userPropertiesSetOnce: userPropertiesSetOnce,
+                options: options
             )
             result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func captureAi(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let eventName = args["eventName"] as? String
+        {
+            let properties = args["properties"] as? [String: Any]
+            let userProperties = args["userProperties"] as? [String: Any]
+            let userPropertiesSetOnce = args["userPropertiesSetOnce"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
+            let uuid = PostHogSDK.shared.captureAi(
+                eventName,
+                properties: properties,
+                userProperties: userProperties,
+                userPropertiesSetOnce: userPropertiesSetOnce,
+                options: options
+            )
+            result(uuid)
         } else {
             _badArgumentError(result)
         }
@@ -1489,14 +1626,103 @@ extension PosthogFlutterPlugin {
            let screenName = args["screenName"] as? String
         {
             let properties = args["properties"] as? [String: Any]
+            let options = args["options"] as? [String: Any]
             PostHogSDK.shared.screen(
                 screenName,
-                properties: properties
+                properties: properties,
+                options: options
             )
             result(nil)
         } else {
             _badArgumentError(result)
         }
+    }
+
+    /// Builds the event a capture, screen or captureException call would send,
+    /// for the Dart beforeSend callbacks, and returns it to Dart. Returns nil
+    /// when the SDK skips it.
+    private func buildEvent(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+              let eventName = args["eventName"] as? String
+        else {
+            _badArgumentError(result)
+            return
+        }
+        let timestamp = (args["timestamp"] as? Int64).map {
+            Date(timeIntervalSince1970: TimeInterval($0) / 1000.0)
+        }
+        let built = PostHogSDK.shared.buildEventForWrapper(
+            event: eventName,
+            distinctId: nil,
+            properties: args["properties"] as? [String: Any],
+            userProperties: args["userProperties"] as? [String: Any],
+            userPropertiesSetOnce: args["userPropertiesSetOnce"] as? [String: Any],
+            groups: nil,
+            options: args["options"] as? [String: Any],
+            timestamp: timestamp,
+            ai: args["ai"] as? Bool ?? false
+        )
+        guard let built else {
+            result(nil)
+            return
+        }
+        let uuid = built.uuid.uuidString.lowercased()
+        let now = ProcessInfo.processInfo.systemUptime
+        builtEvents = builtEvents.filter { now - $0.value.builtAt < Self.builtEventTimeout }
+        builtEvents[uuid] = (built, now)
+        result([
+            "event": built.event,
+            "uuid": uuid,
+            "distinctId": built.distinctId,
+            "timestamp": Int64((built.timestamp.timeIntervalSince1970 * 1000).rounded()),
+            "properties": built.properties,
+            "options": built.options,
+        ])
+    }
+
+    /// Sends an event from `buildEvent` as the Dart beforeSend callbacks left
+    /// it. Returns its uuid once queued, or nil.
+    private func sendBuiltEvent(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        guard let args = call.arguments as? [String: Any],
+              let uuid = args["uuid"] as? String,
+              let eventName = args["event"] as? String
+        else {
+            _badArgumentError(result)
+            return
+        }
+        guard let built = builtEvents.removeValue(forKey: uuid)?.event else {
+            result(nil)
+            return
+        }
+        built.event = eventName
+        built.properties = args["properties"] as? [String: Any] ?? [:]
+        built.options = args["options"] as? [String: Any] ?? [:]
+        if let distinctId = args["distinctId"] as? String,
+           !distinctId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            built.distinctId = distinctId
+        }
+        if let timestampMs = args["timestamp"] as? Int64 {
+            built.timestamp = Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
+        }
+        result(PostHogSDK.shared.sendBuiltEventForWrapper(built, ai: args["ai"] as? Bool ?? false))
+    }
+
+    /// Drops an event from `buildEvent` that a Dart beforeSend callback dropped.
+    private func discardBuiltEvent(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let uuid = (call.arguments as? [String: Any])?["uuid"] as? String {
+            builtEvents.removeValue(forKey: uuid)
+        }
+        result(nil)
     }
 
     private func captureLog(
@@ -1550,7 +1776,8 @@ extension PosthogFlutterPlugin {
         if let args = call.arguments as? [String: Any],
            let alias = args["alias"] as? String
         {
-            PostHogSDK.shared.alias(alias)
+            let options = args["options"] as? [String: Any]
+            PostHogSDK.shared.alias(alias, options: options)
             result(nil)
         } else {
             _badArgumentError(result)
@@ -1627,9 +1854,9 @@ extension PosthogFlutterPlugin {
     private func reloadFeatureFlags(_ result: @escaping FlutterResult) {
         // Resolve the Dart Future only once flags have actually finished loading.
         // The native callback fires on a background thread, so hop to main for Flutter.
-        PostHogSDK.shared.reloadFeatureFlags {
+        PostHogSDK.shared.reloadFeatureFlags { loaded in
             DispatchQueue.main.async {
-                result(nil)
+                result(Self.featureFlagsLoadedMap(loaded))
             }
         }
     }
@@ -1692,7 +1919,8 @@ extension PosthogFlutterPlugin {
            let groupKey = args["groupKey"] as? String
         {
             let groupProperties = args["groupProperties"] as? [String: Any]
-            PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties)
+            let options = args["options"] as? [String: Any]
+            PostHogSDK.shared.group(type: groupType, key: groupKey, groupProperties: groupProperties, options: options)
             result(nil)
         } else {
             _badArgumentError(result)
@@ -1796,6 +2024,7 @@ extension PosthogFlutterPlugin {
         }
 
         let properties = arguments["properties"] as? [String: Any]
+        let options = arguments["options"] as? [String: Any]
 
         // Extract timestamp from Flutter and convert to Date
         var timestamp: Date? = nil
@@ -1804,7 +2033,7 @@ extension PosthogFlutterPlugin {
         }
 
         // Use capture method with timestamp to ensure Flutter timestamp is used
-        PostHogSDK.shared.capture("$exception", properties: properties, timestamp: timestamp)
+        PostHogSDK.shared.capture("$exception", properties: properties, timestamp: timestamp, options: options)
         result(nil)
     }
 
@@ -1822,6 +2051,7 @@ extension PosthogFlutterPlugin {
     }
 
     private func close(_ result: @escaping FlutterResult) {
+        builtEvents.removeAll()
         PostHogSDK.shared.close()
         result(nil)
     }

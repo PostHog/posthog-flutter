@@ -28,9 +28,9 @@ void main() {
       await client.reloadFeatureFlagsAsync();
       await client.flush();
 
-      final properties = server.events.single['properties']! as Map;
-      expect(properties['plan'], 'pro');
-      expect(properties[r'$process_person_profile'], isFalse);
+      final event = server.events.single;
+      expect((event['properties']! as Map)['plan'], 'pro');
+      expect(event['options'], {'process_person_profile': false});
       expect(server.flagsRequests.last.body['groups'], isEmpty);
 
       client.group('company', 'acme');
@@ -53,7 +53,7 @@ void main() {
     client.capture('purchase');
     await client.reloadFeatureFlagsAsync();
 
-    expect(queuedProps(storage, 0)[r'$process_person_profile'], isTrue);
+    expect(queuedOptions(storage, 0)['process_person_profile'], isNull);
     expect(server.flagsRequests.last.body['groups'], {'company': 'acme'});
   });
 
@@ -121,6 +121,16 @@ void main() {
     expect(queuedEvents(storage), [r'$set']);
   });
 
+  test('a personless identify does not update the marker', () {
+    final storage = tempStorage();
+    final client = testClient(server, storage: storage);
+    client.register({r'$process_person_profile': false});
+    client.identify('user', userProperties: {'plan': 'A'});
+    client.unregister(r'$process_person_profile');
+    client.setPersonProperties(userPropertiesToSet: {'plan': 'A'});
+    expect(queuedEvents(storage), [r'$identify', r'$set']);
+  });
+
   test('opt-out does not update the marker for the latest person update', () {
     final storage = tempStorage();
     final client = testClient(server, storage: storage);
@@ -151,7 +161,7 @@ void main() {
   });
 
   test(
-      'session properties take precedence after caller properties and before registered properties',
+      'session properties lose to registered properties and to caller properties',
       () {
     final storage = tempStorage();
     final client = testClient(server, storage: storage);
@@ -159,6 +169,6 @@ void main() {
     client.registerForSession({'plan': 'session', 'screen': 'Checkout'});
     client.capture('purchase', properties: {'plan': 'event'});
     expect(queuedProps(storage, 0)['plan'], 'event');
-    expect(queuedProps(storage, 0)['screen'], 'Checkout');
+    expect(queuedProps(storage, 0)['screen'], 'registered');
   });
 }

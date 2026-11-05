@@ -21,9 +21,6 @@ Future<void> main() async {
   final config = PostHogConfig(
     'phc_6lqCaCDCBEWdIGieihq5R2dZpPVbAUFISA75vFZow06',
   );
-  config.onFeatureFlags = () {
-    debugPrint('[PostHog] Feature flags loaded!');
-  };
 
   config.beforeSend = [
     (event) {
@@ -81,6 +78,12 @@ Future<void> main() async {
 
 Future<void> _initAndRun(PostHogConfig config) async {
   WidgetsFlutterBinding.ensureInitialized();
+  Posthog().onFeatureFlags((loaded) {
+    debugPrint(
+      '[PostHog] Feature flags loaded: ${loaded.variants}, '
+      'errorsLoading: ${loaded.errorsLoading}',
+    );
+  });
   await Posthog().setup(config);
   runApp(const MyApp());
 }
