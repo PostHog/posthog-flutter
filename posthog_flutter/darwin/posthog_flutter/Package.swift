@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
-        .package(url: "https://github.com/PostHog/posthog-ios", "4.0.0" ..< "5.0.0"),
+        .package(url: "https://github.com/PostHog/posthog-ios", branch: "feat/v4-capture-v1"),
     ],
     targets: [
         .target(
