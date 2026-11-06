@@ -268,6 +268,7 @@ On every platform except web, an event's properties are now the SDK's, then regi
 You need to change code if your app does any of these:
 
 - sends events to a self-hosted PostHog or a reverse proxy that doesn't serve `/i/v1/analytics/events` and `/i/v1/ai/events`
+- sends events through a reverse proxy set up from PostHog's proxy guides before 29 October 2026, which strips `Authorization`
 - identifies users with a distinct ID over 200 UTF-8 bytes, such as a JWT
 - captures events whose name is over 200 UTF-8 bytes
 - sets `projectToken` to a personal API key (`phx_...`)
@@ -288,7 +289,7 @@ Before you upgrade, make your own proxy:
 - accept request bodies up to 20 MB. AI requests are often larger than 1 MB, the default limit in nginx and ingress-nginx.
 - pass PostHog's response body through unchanged, because a 2xx whose body isn't PostHog's `{"results": {...}}` drops the events instead of retrying them
 
-PostHog's managed reverse proxy already does this. See the [proxy guides](https://posthog.com/docs/advanced/proxy).
+PostHog's managed reverse proxy already does this and needs no change. A proxy set up from PostHog's [proxy guides](https://posthog.com/docs/advanced/proxy) before 29 October 2026 strips `Authorization`, so PostHog answers `401` and the events are dropped. Update it from the current guide.
 
 The SDK doesn't fall back to `/batch/`. On Windows and Linux, a 404 is retried, events stay queued until the route is served, and the SDK prints one warning, also without `debug`. Other statuses that aren't retried, such as 401, 403 or 405, drop the batch. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides for those platforms.
 
