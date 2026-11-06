@@ -543,6 +543,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }
 
   static const _appLanguageHookMarker = '__posthogFlutterAppLanguage';
+  static const _originalSetConfig = '__posthogFlutterOriginalSetConfig';
 
   // Runs first, like the native SDKs, so the app's before_send sees the value.
   // A registered or per-event $app_language is already on the event and wins.
@@ -621,24 +622,25 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       final config = instance.getProperty<JSAny?>('config'.toJS);
       final setConfig = instance.getProperty<JSAny?>('set_config'.toJS);
       if (!config.isA<JSObject>() || !setConfig.isA<JSFunction>()) return;
-      var wrapped = setConfig as JSFunction;
-      if (!wrapped.has(_appLanguageHookMarker)) {
-        final original = wrapped;
-        wrapped = ((JSAny? update) {
-          if (update.isA<JSObject>() &&
-              (update as JSObject).has('before_send')) {
-            // A copy, since the app's update may be frozen.
-            update = globalContext
-                .getProperty<JSObject>('Object'.toJS)
-                .callMethod<JSObject>('assign'.toJS, JSObject(), update)
-              ..setProperty('before_send'.toJS,
-                  _withAppLanguageHook(update.getProperty('before_send'.toJS)));
-          }
-          return original.callAsFunction(instance, update);
-        }).toJS
-          ..setProperty(_appLanguageHookMarker.toJS, true.toJS);
-        instance.setProperty('set_config'.toJS, wrapped);
+      var original = setConfig as JSFunction;
+      // Rewrapped each time, so a new plugin instance after a web hot restart
+      // replaces the earlier one's wrapper.
+      if (original.has(_originalSetConfig)) {
+        original = original.getProperty<JSFunction>(_originalSetConfig.toJS);
       }
+      final wrapped = ((JSAny? update) {
+        if (update.isA<JSObject>() && (update as JSObject).has('before_send')) {
+          // A copy, since the app's update may be frozen.
+          update = globalContext
+              .getProperty<JSObject>('Object'.toJS)
+              .callMethod<JSObject>('assign'.toJS, JSObject(), update)
+            ..setProperty('before_send'.toJS,
+                _withAppLanguageHook(update.getProperty('before_send'.toJS)));
+        }
+        return original.callAsFunction(instance, update);
+      }).toJS
+        ..setProperty(_originalSetConfig.toJS, original);
+      instance.setProperty('set_config'.toJS, wrapped);
       wrapped.callAsFunction(
         instance,
         JSObject()

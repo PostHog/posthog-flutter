@@ -182,6 +182,16 @@ void main() {
 
       expect(send(instance)[r'$app_language'], 'de');
     });
+
+    test('a new plugin instance replaces the earlier hook', () async {
+      final instance = createInstance();
+      globalContext.setProperty('posthog'.toJS, instance);
+
+      await PosthogFlutterWeb().setAppLanguage('de');
+      await PosthogFlutterWeb().setAppLanguage('fr');
+
+      expect(send(instance)[r'$app_language'], 'fr');
+    });
   });
 
   group('handleWebMethodCall captureLog', () {
