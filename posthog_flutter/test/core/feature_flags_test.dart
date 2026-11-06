@@ -274,6 +274,20 @@ void main() {
       expect(client.isFeatureEnabled('missing'), isNull);
     });
 
+    test('an empty variant reads as disabled', () async {
+      final client = testClient(server);
+      server.respond = (_) => _flagsResponse(
+          {'empty-variant': _flag('empty-variant', variant: '')});
+      await client.reloadFeatureFlagsAsync();
+
+      expect(client.isFeatureEnabled('empty-variant'), isFalse);
+      final result =
+          client.getFeatureFlagResult('empty-variant', sendEvent: false);
+      expect(result?.enabled, isFalse);
+      expect(result?.variant, '');
+      expect(client.featureFlagsLoaded().flags, isEmpty);
+    });
+
     test('payloads accompany only enabled flags', () async {
       final client = testClient(server);
       server.respond = (_) => _flagsResponse({

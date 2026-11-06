@@ -1102,7 +1102,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         : null;
     return PostHogFeatureFlagResult(
       key: key,
-      enabled: flagValue is String ? true : flagValue as bool,
+      enabled: flagValue is String ? flagValue.isNotEmpty : flagValue as bool,
       variant: flagValue is String ? flagValue : null,
       payload: payload,
     );
@@ -1144,7 +1144,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     final response = getFeatureFlag(key, sendEvent: sendEvent);
     if (response == null) return null;
     if (response is bool) return response;
-    return true; // String variants are truthy
+    return (response as String).isNotEmpty;
   }
 
   void _reloadFeatureFlags() {
