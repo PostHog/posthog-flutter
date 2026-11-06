@@ -627,8 +627,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         wrapped = ((JSAny? update) {
           if (update.isA<JSObject>() &&
               (update as JSObject).has('before_send')) {
-            update.setProperty('before_send'.toJS,
-                _withAppLanguageHook(update.getProperty('before_send'.toJS)));
+            // A copy, since the app's update may be frozen.
+            update = globalContext
+                .getProperty<JSObject>('Object'.toJS)
+                .callMethod<JSObject>('assign'.toJS, JSObject(), update)
+              ..setProperty('before_send'.toJS,
+                  _withAppLanguageHook(update.getProperty('before_send'.toJS)));
           }
           return original.callAsFunction(instance, update);
         }).toJS

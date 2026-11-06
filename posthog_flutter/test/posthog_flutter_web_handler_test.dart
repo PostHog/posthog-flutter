@@ -167,6 +167,21 @@ void main() {
       expect(send(instance)[r'$app_language'], 'de');
       expect(seen, {r'$app_language': 'de'});
     });
+
+    test('accepts a frozen set_config update', () async {
+      final instance = createInstance();
+      globalContext.setProperty('posthog'.toJS, instance);
+
+      await PosthogFlutterWeb().setAppLanguage('de');
+      final update = JSObject()
+        ..setProperty('before_send'.toJS, ((JSObject event) => event).toJS);
+      globalContext
+          .getProperty<JSObject>('Object'.toJS)
+          .callMethod('freeze'.toJS, update);
+      instance.callMethod('set_config'.toJS, update);
+
+      expect(send(instance)[r'$app_language'], 'de');
+    });
   });
 
   group('handleWebMethodCall captureLog', () {
