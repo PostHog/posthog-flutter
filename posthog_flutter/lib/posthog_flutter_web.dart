@@ -554,13 +554,44 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       if (properties.isA<JSObject>() &&
           (properties as JSObject)
               .getProperty<JSAny?>(r'$app_language'.toJS)
-              .isUndefinedOrNull) {
+              .isUndefinedOrNull &&
+          !_excludesAppLanguage(event!, properties)) {
         properties.setProperty(r'$app_language'.toJS, language.toJS);
       }
     } catch (e) {
       printIfDebug('[PostHog] Failed to add \$app_language: $e');
     }
     return event;
+  }
+
+  // posthog-js applies property_denylist and strips minimal $feature_flag_called
+  // events to an allowlist before before_send runs, so honor both here.
+  bool _excludesAppLanguage(JSObject event, JSObject properties) {
+    final ph = posthog as JSObject?;
+    if (ph == null) return false;
+    final config = ph.getProperty<JSAny?>('config'.toJS);
+    if (config.isA<JSObject>()) {
+      final denylist =
+          (config as JSObject).getProperty<JSAny?>('property_denylist'.toJS);
+      if (denylist.isA<JSArray>() &&
+          (denylist as JSArray<JSAny?>)
+              .toDart
+              .any((p) => p.dartify() == r'$app_language')) {
+        return true;
+      }
+    }
+    return event.getProperty<JSAny?>('event'.toJS).dartify() ==
+            r'$feature_flag_called' &&
+        properties
+                .getProperty<JSAny?>(r'$feature_flag_has_experiment'.toJS)
+                .dartify() ==
+            false &&
+        ph.has('get_property') &&
+        ph
+                .callMethod<JSAny?>(
+                    'get_property'.toJS, r'$minimal_flag_called_events'.toJS)
+                .dartify() ==
+            true;
   }
 
   void _installAppLanguageHook() {

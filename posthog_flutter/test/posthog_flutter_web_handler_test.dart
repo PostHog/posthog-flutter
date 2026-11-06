@@ -36,8 +36,12 @@ void main() {
   group('PosthogFlutterWeb setAppLanguage', () {
     late List<String> persisted;
 
-    JSObject createInstance({JSFunction? appBeforeSend}) {
-      final config = JSObject();
+    JSObject createInstance(
+        {JSFunction? appBeforeSend,
+        List<String> denylist = const [],
+        bool minimalFlagCalledEvents = false}) {
+      final config = JSObject()
+        ..setProperty('property_denylist'.toJS, denylist.jsify());
       if (appBeforeSend != null) {
         config.setProperty('before_send'.toJS, appBeforeSend);
       }
@@ -52,6 +56,12 @@ void main() {
           'push'.toJS,
           ((JSFunction fn) => fn.callAsFunction(instance)).toJS,
         )
+        ..setProperty(
+          'get_property'.toJS,
+          ((JSString key) => (key.toDart == r'$minimal_flag_called_events' &&
+                  minimalFlagCalledEvents)
+              .toJS).toJS,
+        )
         ..setProperty('reset'.toJS, (() {}).toJS)
         ..setProperty(
             'register'.toJS, ((JSAny _) => persisted.add('register')).toJS)
@@ -61,15 +71,16 @@ void main() {
     }
 
     Map<Object?, Object?> send(JSObject instance,
-        [Map<String, Object> properties = const {}]) {
+        [Map<String, Object> properties = const {}, String event = 'e']) {
       final config = instance.getProperty<JSObject>('config'.toJS);
-      JSAny? event = {'event': 'e', 'properties': properties}.jsify();
+      JSAny? captured = {'event': event, 'properties': properties}.jsify();
       for (final fn in config
           .getProperty<JSArray<JSFunction>>('before_send'.toJS)
           .toDart) {
-        event = fn.callAsFunction(null, event);
+        captured = fn.callAsFunction(null, captured);
       }
-      return (event.dartify()! as Map)['properties'] as Map<Object?, Object?>;
+      return (captured.dartify()! as Map)['properties']
+          as Map<Object?, Object?>;
     }
 
     setUp(() => persisted = []);
@@ -115,6 +126,29 @@ void main() {
       expect(hooks.length, 2);
       expect(send(instance)[r'$app_language'], 'pt-BR');
       expect(seen, {r'$app_language': 'pt-BR'});
+    });
+
+    test('skips a denylisted language', () async {
+      final instance = createInstance(denylist: [r'$app_language']);
+      globalContext.setProperty('posthog'.toJS, instance);
+
+      await PosthogFlutterWeb().setAppLanguage('de');
+
+      expect(send(instance).containsKey(r'$app_language'), isFalse);
+    });
+
+    test('skips minimal flag-called events', () async {
+      final instance = createInstance(minimalFlagCalledEvents: true);
+      globalContext.setProperty('posthog'.toJS, instance);
+
+      await PosthogFlutterWeb().setAppLanguage('de');
+
+      Map<Object?, Object?> flagCalled(bool hasExperiment) => send(
+          instance,
+          {r'$feature_flag_has_experiment': hasExperiment},
+          r'$feature_flag_called');
+      expect(flagCalled(false).containsKey(r'$app_language'), isFalse);
+      expect(flagCalled(true)[r'$app_language'], 'de');
     });
   });
 
