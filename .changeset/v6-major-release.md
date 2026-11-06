@@ -27,7 +27,7 @@
 - **Breaking:** rename `getFeatureFlagResult(sendEvent:)` to `getFeatureFlagResult(sendFeatureFlagEvent:)`
 - **Breaking:** change `getFeatureFlagResult()` to follow `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux when `sendFeatureFlagEvent` is omitted — pass `sendFeatureFlagEvent: true` to keep capturing `$feature_flag_called`
 - **Breaking:** return `null` instead of the raw string for a malformed (such as a plain-text `hello`), empty or whitespace-only `getFeatureFlagResult()` payload on iOS, macOS and Android, and for a JSON `null` payload on Android
-- **Breaking:** return `false` from `isFeatureEnabled()` for a flag whose variant is an empty string on iOS and macOS
+- **Breaking:** return `false` from `isFeatureEnabled()` without `defaultValue` for a flag whose variant is an empty string on iOS and macOS
 - **Breaking:** keep string payloads passed to `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, as strings on iOS and macOS instead of decoding them to numbers or booleans
 - **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android — update filters that match it
 - **Breaking:** pause sending on iOS and macOS while cellular data is off for the app, and delete events a `posthog-ios` 2.x SDK left on disk instead of sending them
