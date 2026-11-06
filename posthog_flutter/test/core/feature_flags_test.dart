@@ -602,6 +602,7 @@ void main() {
             'on-flag': _flag('on-flag'),
             'variant-flag': _flag('variant-flag', variant: 'test'),
             'off-flag': _flag('off-flag', enabled: false),
+            'empty-variant-flag': _flag('empty-variant-flag', variant: ''),
           });
       await client.reloadFeatureFlagsAsync();
 
@@ -610,6 +611,7 @@ void main() {
       final props = queuedProps(storage, 0);
       expect(props[r'$active_feature_flags'], ['on-flag', 'variant-flag']);
       expect(props[r'$feature/off-flag'], isFalse);
+      expect(props[r'$feature/empty-variant-flag'], '');
     });
 
     test('is left out when no flag is enabled', () async {

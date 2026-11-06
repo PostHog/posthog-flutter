@@ -139,7 +139,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
     final featureFlags = _getFeatureFlags() ?? const {};
     final activeFeatureFlags = [
       for (final entry in featureFlags.entries)
-        if (entry.value != false) entry.key,
+        // An empty variant reads as disabled.
+        if (entry.value != false && entry.value != '') entry.key,
     ];
 
     return {

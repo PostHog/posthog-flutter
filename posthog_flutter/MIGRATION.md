@@ -299,7 +299,7 @@ On iOS, macOS and Android, a malformed (such as a plain-text `hello`), empty or 
 
 On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
 
-A flag whose variant is an empty string reads as disabled on iOS, macOS, Android, Windows and Linux, as it already did on web. `isFeatureEnabled()` returns `false`, with or without `defaultValue`, `getFeatureFlagResult()` returns `enabled: false`, and `onFeatureFlags` listeners and `reloadFeatureFlags()` leave the flag out. `variant` and `getFeatureFlag()` still return `""`.
+A flag whose variant is an empty string reads as disabled on iOS, macOS, Android, Windows and Linux, as it already did on web. `isFeatureEnabled()` returns `false`, with or without `defaultValue`, `getFeatureFlagResult()` returns `enabled: false`, `onFeatureFlags` listeners and `reloadFeatureFlags()` leave the flag out, and so does `$active_feature_flags` on captured events. `variant`, `getFeatureFlag()` and the event's `$feature/<key>` property still return `""`.
 
 ### `beforeSend` on iOS, macOS and Android
 
