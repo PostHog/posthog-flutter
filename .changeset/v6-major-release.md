@@ -37,7 +37,7 @@
 - Add `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`
-- Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself
+- Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself (not on web yet)
 - Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
 - Skip `setup()` with one log line when `projectToken` is a personal API key (`phx_`), so the key is never sent

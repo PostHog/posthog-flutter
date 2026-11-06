@@ -39,11 +39,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   List<BeforeSendCallback> _beforeSendCallbacks = [];
   JSFunction? _featureFlagsUnsubscribe;
 
-  // posthog-js has no $app_language. A registered super property would
-  // persist across launches, be cleared by reset() and replace one the app
-  // registered, so a before_send hook adds this to each event instead.
-  String? _appLanguage;
-
   /// Bumped by each setup() and close(), so a posthog-js registration from an
   /// earlier one stops delivering even when it can't be unsubscribed.
   int _featureFlagsGeneration = 0;
@@ -534,125 +529,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<void> unregister(String key) async {
     return handleWebMethodCall(MethodCall('unregister', {'key': key}));
-  }
-
-  @override
-  Future<void> setAppLanguage(String? language) async {
-    _appLanguage = language;
-    if (language != null) _installAppLanguageHook();
-  }
-
-  static const _appLanguageHookMarker = '__posthogFlutterAppLanguage';
-  static const _originalSetConfig = '__posthogFlutterOriginalSetConfig';
-
-  // Runs first, like the native SDKs, so the app's before_send sees the value.
-  // A registered or per-event $app_language is already on the event and wins.
-  JSObject? _addAppLanguage(JSObject? event) {
-    final language = _appLanguage;
-    if (language == null) return event;
-    try {
-      final properties = event?.getProperty<JSAny?>('properties'.toJS);
-      if (properties.isA<JSObject>() &&
-          (properties as JSObject)
-              .getProperty<JSAny?>(r'$app_language'.toJS)
-              .isUndefinedOrNull &&
-          !_excludesAppLanguage(event!, properties)) {
-        properties.setProperty(r'$app_language'.toJS, language.toJS);
-      }
-    } catch (e) {
-      printIfDebug('[PostHog] Failed to add \$app_language: $e');
-    }
-    return event;
-  }
-
-  // posthog-js applies property_denylist and strips minimal $feature_flag_called
-  // events to an allowlist before before_send runs, so honor both here.
-  bool _excludesAppLanguage(JSObject event, JSObject properties) {
-    final ph = posthog as JSObject?;
-    if (ph == null) return false;
-    final config = ph.getProperty<JSAny?>('config'.toJS);
-    if (config.isA<JSObject>()) {
-      final denylist =
-          (config as JSObject).getProperty<JSAny?>('property_denylist'.toJS);
-      if (denylist.isA<JSArray>() &&
-          (denylist as JSArray<JSAny?>)
-              .toDart
-              .any((p) => p.dartify() == r'$app_language')) {
-        return true;
-      }
-    }
-    return event.getProperty<JSAny?>('event'.toJS).dartify() ==
-            r'$feature_flag_called' &&
-        properties
-                .getProperty<JSAny?>(r'$feature_flag_has_experiment'.toJS)
-                .dartify() ==
-            false &&
-        ph.has('get_property') &&
-        ph
-                .callMethod<JSAny?>(
-                    'get_property'.toJS, r'$minimal_flag_called_events'.toJS)
-                .dartify() ==
-            true;
-  }
-
-  late final JSFunction _appLanguageHook = _addAppLanguage.toJS
-    ..setProperty(_appLanguageHookMarker.toJS, true.toJS);
-
-  bool _isAppLanguageHook(JSAny? fn) =>
-      fn.isA<JSFunction>() && (fn as JSObject).has(_appLanguageHookMarker);
-
-  JSArray<JSAny?> _withAppLanguageHook(JSAny? hooks) => <JSAny?>[
-        _appLanguageHook,
-        if (hooks.isA<JSArray>())
-          ...(hooks as JSArray<JSAny?>)
-              .toDart
-              .where((fn) => !_isAppLanguageHook(fn))
-        else if (!hooks.isUndefinedOrNull && !_isAppLanguageHook(hooks))
-          hooks,
-      ].toJS;
-
-  void _installAppLanguageHook() {
-    final ph = posthog as JSObject?;
-    if (ph == null || !ph.has('push')) return;
-    // The loader snippet queues a pushed function until posthog.init() and
-    // runs it before the queued method calls. A loaded posthog-js runs it now.
-    // set_config is wrapped so a later before_send, queued or not, keeps the
-    // hook first.
-    final install = (JSObject instance) {
-      final config = instance.getProperty<JSAny?>('config'.toJS);
-      final setConfig = instance.getProperty<JSAny?>('set_config'.toJS);
-      if (!config.isA<JSObject>() || !setConfig.isA<JSFunction>()) return;
-      var original = setConfig as JSFunction;
-      // Rewrapped each time, so a new plugin instance after a web hot restart
-      // replaces the earlier one's wrapper.
-      if (original.has(_originalSetConfig)) {
-        original = original.getProperty<JSFunction>(_originalSetConfig.toJS);
-      }
-      final wrapped = ((JSAny? update) {
-        if (update.isA<JSObject>() && (update as JSObject).has('before_send')) {
-          // A copy, since the app's update may be frozen.
-          update = globalContext
-              .getProperty<JSObject>('Object'.toJS)
-              .callMethod<JSObject>('assign'.toJS, JSObject(), update)
-            ..setProperty('before_send'.toJS,
-                _withAppLanguageHook(update.getProperty('before_send'.toJS)));
-        }
-        return original.callAsFunction(instance, update);
-      }).toJS
-        ..setProperty(_originalSetConfig.toJS, original);
-      instance.setProperty('set_config'.toJS, wrapped);
-      wrapped.callAsFunction(
-        instance,
-        JSObject()
-          ..setProperty('before_send'.toJS,
-              (config as JSObject).getProperty<JSAny?>('before_send'.toJS)),
-      );
-    }.toJSCaptureThis;
-    try {
-      ph.callMethod('push'.toJS, install);
-    } catch (e) {
-      printIfDebug('[PostHog] Failed to add the \$app_language hook: $e');
-    }
   }
 
   @override
