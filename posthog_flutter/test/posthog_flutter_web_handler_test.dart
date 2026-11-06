@@ -6,10 +6,8 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:posthog_flutter/posthog_flutter_web.dart';
 import 'package:posthog_flutter/src/feature_flag_result.dart';
-import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_flutter_web_handler.dart';
 
 // Browser-only: handleWebMethodCall talks to the posthog-js instance on
@@ -35,66 +33,88 @@ void main() {
   Map<Object?, Object?> readOptions() =>
       capturedOptions!.dartify()! as Map<Object?, Object?>;
 
-  group('handleWebMethodCall setAppLanguage', () {
-    late List<Object?> registered;
-    late List<String> unregistered;
+  group('PosthogFlutterWeb setAppLanguage', () {
+    late List<String> persisted;
 
-    setUp(() {
-      registered = [];
-      unregistered = [];
-      final fake = JSObject();
-      fake.setProperty(
-        'register'.toJS,
-        ((JSAny properties) {
-          registered.add(properties.dartify());
-        }).toJS,
-      );
-      fake.setProperty(
-        'unregister'.toJS,
-        ((JSString key) {
-          unregistered.add(key.toDart);
-        }).toJS,
-      );
-      globalContext.setProperty('posthog'.toJS, fake);
-    });
+    JSObject createInstance({JSFunction? appBeforeSend}) {
+      final config = JSObject();
+      if (appBeforeSend != null) {
+        config.setProperty('before_send'.toJS, appBeforeSend);
+      }
+      final instance = JSObject()..setProperty('config'.toJS, config);
+      instance
+        ..setProperty(
+          'set_config'.toJS,
+          ((JSObject update) => config.setProperty('before_send'.toJS,
+              update.getProperty<JSAny?>('before_send'.toJS))).toJS,
+        )
+        ..setProperty(
+          'push'.toJS,
+          ((JSFunction fn) => fn.callAsFunction(instance)).toJS,
+        )
+        ..setProperty('reset'.toJS, (() {}).toJS)
+        ..setProperty(
+            'register'.toJS, ((JSAny _) => persisted.add('register')).toJS)
+        ..setProperty(
+            'unregister'.toJS, ((JSAny _) => persisted.add('unregister')).toJS);
+      return instance;
+    }
 
-    test('registers a language and unregisters null', () async {
+    Map<Object?, Object?> send(JSObject instance,
+        [Map<String, Object> properties = const {}]) {
+      final config = instance.getProperty<JSObject>('config'.toJS);
+      JSAny? event = {'event': 'e', 'properties': properties}.jsify();
+      for (final fn in config
+          .getProperty<JSArray<JSFunction>>('before_send'.toJS)
+          .toDart) {
+        event = fn.callAsFunction(null, event);
+      }
+      return (event.dartify()! as Map)['properties'] as Map<Object?, Object?>;
+    }
+
+    setUp(() => persisted = []);
+
+    test('adds the language to events without persisting it', () async {
+      final instance = createInstance();
+      globalContext.setProperty('posthog'.toJS, instance);
       final web = PosthogFlutterWeb();
+
       await web.setAppLanguage('de');
+      await web.reset();
+
+      expect(send(instance)[r'$app_language'], 'de');
+      expect(send(instance, {r'$app_language': 'fr'})[r'$app_language'], 'fr');
+      expect(persisted, isEmpty);
+
       await web.setAppLanguage(null);
 
-      expect(registered, [
-        {r'$app_language': 'de'}
-      ]);
-      expect(unregistered, [r'$app_language']);
+      expect(send(instance).containsKey(r'$app_language'), isFalse);
     });
 
-    test('registers the language again in the same step as reset', () {
-      final calls = <String>[];
-      final fake = globalContext.getProperty<JSObject>('posthog'.toJS);
-      fake.setProperty('reset'.toJS, (() => calls.add('reset')).toJS);
-      fake.setProperty(
-        'register'.toJS,
-        ((JSAny properties) => calls.add('register ${properties.dartify()}'))
-            .toJS,
-      );
+    test('runs ahead of the app before_send once the loader snippet inits',
+        () async {
+      Object? seen;
+      final appBeforeSend = ((JSObject event) {
+        seen = (event.dartify()! as Map)['properties'];
+        return event;
+      }).toJS;
+      final snippet = JSArray<JSAny?>();
+      globalContext.setProperty('posthog'.toJS, snippet);
       final web = PosthogFlutterWeb();
-      web.setAppLanguage('de');
-      calls.clear();
 
-      web.reset();
+      await web.setAppLanguage('de');
+      await web.setAppLanguage('pt-BR');
+      final instance = createInstance(appBeforeSend: appBeforeSend);
+      for (final queued in snippet.toDart) {
+        (queued! as JSFunction).callAsFunction(instance);
+      }
 
-      expect(calls, ['reset', r'register {$app_language: de}']);
-    });
-
-    test('registerWith clears the language persisted by a past launch', () {
-      TestWidgetsFlutterBinding.ensureInitialized();
-      final previous = PosthogFlutterPlatformInterface.instance;
-      addTearDown(() => PosthogFlutterPlatformInterface.instance = previous);
-
-      PosthogFlutterWeb.registerWith(webPluginRegistrar);
-
-      expect(unregistered, [r'$app_language']);
+      final hooks = instance
+          .getProperty<JSObject>('config'.toJS)
+          .getProperty<JSArray>('before_send'.toJS);
+      expect(hooks.length, 2);
+      expect(send(instance)[r'$app_language'], 'pt-BR');
+      expect(seen, {r'$app_language': 'pt-BR'});
     });
   });
 

@@ -38,6 +38,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// way [PosthogFlutterIO] runs it before the platform channel.
   List<BeforeSendCallback> _beforeSendCallbacks = [];
   JSFunction? _featureFlagsUnsubscribe;
+
+  // posthog-js has no $app_language. A registered super property would
+  // persist across launches, be cleared by reset() and replace one the app
+  // registered, so a before_send hook adds this to each event instead.
   String? _appLanguage;
 
   /// Bumped by each setup() and close(), so a posthog-js registration from an
@@ -121,9 +125,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     );
     final instance = PosthogFlutterWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
-
-    // posthog-js persists registered properties, but $app_language lasts one launch.
-    posthog?.unregister(stringToJSAny(r'$app_language'));
 
     // Set the platform instance so that Posthog() can call methods directly
     // on the web implementation instead of going through the method channel.
@@ -499,16 +500,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reset() async {
-    final language = _appLanguage;
-    // posthog-js clears registered properties on reset. Registering in the
-    // same synchronous step keeps $app_language on a capture() made without
-    // awaiting reset().
-    await Future.wait([
-      handleWebMethodCall(const MethodCall('reset')),
-      if (language != null)
-        handleWebMethodCall(
-            MethodCall('setAppLanguage', {'language': language})),
-    ]);
+    return handleWebMethodCall(const MethodCall('reset'));
   }
 
   @override
@@ -547,8 +539,61 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<void> setAppLanguage(String? language) async {
     _appLanguage = language;
-    return handleWebMethodCall(
-        MethodCall('setAppLanguage', {'language': language}));
+    if (language != null) _installAppLanguageHook();
+  }
+
+  static const _appLanguageHookMarker = '__posthogFlutterAppLanguage';
+
+  // Runs first, like the native SDKs, so the app's before_send sees the value.
+  // A registered or per-event $app_language is already on the event and wins.
+  JSObject? _addAppLanguage(JSObject? event) {
+    final language = _appLanguage;
+    if (language == null) return event;
+    try {
+      final properties = event?.getProperty<JSAny?>('properties'.toJS);
+      if (properties.isA<JSObject>() &&
+          (properties as JSObject)
+              .getProperty<JSAny?>(r'$app_language'.toJS)
+              .isUndefinedOrNull) {
+        properties.setProperty(r'$app_language'.toJS, language.toJS);
+      }
+    } catch (e) {
+      printIfDebug('[PostHog] Failed to add \$app_language: $e');
+    }
+    return event;
+  }
+
+  void _installAppLanguageHook() {
+    final ph = posthog as JSObject?;
+    if (ph == null || !ph.has('push')) return;
+    final hook = _addAppLanguage.toJS
+      ..setProperty(_appLanguageHookMarker.toJS, true.toJS);
+    bool isHook(JSAny? fn) =>
+        fn.isA<JSFunction>() && (fn as JSObject).has(_appLanguageHookMarker);
+    // The loader snippet queues a pushed function until posthog.init() and
+    // runs it before the queued captures. A loaded posthog-js runs it now.
+    final install = (JSObject instance) {
+      final config = instance.getProperty<JSAny?>('config'.toJS);
+      if (!config.isA<JSObject>()) return;
+      final existing =
+          (config as JSObject).getProperty<JSAny?>('before_send'.toJS);
+      final hooks = <JSAny?>[
+        hook,
+        if (existing.isA<JSArray>())
+          ...(existing as JSArray<JSAny?>).toDart.where((fn) => !isHook(fn))
+        else if (!existing.isUndefinedOrNull && !isHook(existing))
+          existing,
+      ];
+      instance.callMethod(
+        'set_config'.toJS,
+        JSObject()..setProperty('before_send'.toJS, hooks.toJS),
+      );
+    }.toJSCaptureThis;
+    try {
+      ph.callMethod('push'.toJS, install);
+    } catch (e) {
+      printIfDebug('[PostHog] Failed to add the \$app_language hook: $e');
+    }
   }
 
   @override
