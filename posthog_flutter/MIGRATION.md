@@ -45,7 +45,7 @@ Other plugins that only support CocoaPods keep working: Flutter installs them th
 
 If every plugin in your app supports Swift Package Manager, you can remove CocoaPods. This is optional. Follow [Flutter's steps](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers#how-to-remove-cocoapods-integration).
 
-**Add-to-app:** Flutter doesn't support Swift Package Manager in Flutter modules yet ([flutter/flutter#146957](https://github.com/flutter/flutter/issues/146957)), and its build stops for a plugin without a podspec. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until Flutter adds support.
+**Add-to-app:** `flutter build swift-package` still installs a Flutter module's plugins with CocoaPods on current stable releases, so it stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'` because posthog_flutter has no podspec. Flutter fixed this in [flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590), which isn't in a stable release yet. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until it is.
 
 ### Android
 
@@ -298,7 +298,7 @@ On iOS, macOS and Android, a malformed (such as a plain-text `hello`), empty or 
 
 On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
 
-On iOS and macOS, `isFeatureEnabled()` returns `false` for a flag whose variant is an empty string.
+On iOS and macOS, `isFeatureEnabled()` without `defaultValue` returns `false` for a flag whose variant is an empty string. With `defaultValue`, and in `getFeatureFlagResult()`, the flag is still enabled.
 
 ### `beforeSend` on iOS, macOS and Android
 
