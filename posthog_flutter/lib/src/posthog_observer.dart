@@ -105,6 +105,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
     if (context != null) {
       _currentContext = context;
       SurveyService().onContextAvailable();
+      Posthog().reportResolvedAppLanguage(
+        Localizations.maybeLocaleOf(context)?.toLanguageTag(),
+      );
     }
   }
 

@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.PixelCopy
 import android.view.SurfaceView
@@ -28,7 +29,9 @@ import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
-import com.posthog.PostHogOnFeatureFlags
+import com.posthog.PostHogEvent
+import com.posthog.PostHogFeatureFlagsLoaded
+import com.posthog.PostHogFeatureFlagsSubscription
 import com.posthog.android.PostHogAndroid
 import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.internal.getApplicationInfo
@@ -62,6 +65,8 @@ private const val END_DEBOUNCE_TICKS = 1
 
 private const val BRIDGE_FAILURE_STRIKE_LIMIT = 3
 
+private const val BUILT_EVENT_TIMEOUT_MS = 60_000L
+
 /** PosthogFlutterPlugin */
 class PosthogFlutterPlugin :
     FlutterPlugin,
@@ -80,6 +85,14 @@ class PosthogFlutterPlugin :
 
     private var postHogConfig: PostHogAndroidConfig? = null
 
+    // Events built for the Dart beforeSend callbacks, keyed by uuid, until Dart
+    // sends or drops them. Main-thread confined, like the channel callbacks.
+    // An event whose callbacks haven't finished after BUILT_EVENT_TIMEOUT_MS is
+    // dropped on the next build, so a callback that never completes can't keep
+    // it in memory.
+    // setup and close clear it, so a build can't be sent through a reconfigured SDK.
+    private val builtEvents = mutableMapOf<String, Pair<PostHogEvent, Long>>()
+
     // Test seam: captures the built config even if setup() throws (mock Context in
     // unit tests). postHogConfig is only published on success, so production readers
     // never see an uninstalled config.
@@ -92,6 +105,12 @@ class PosthogFlutterPlugin :
     // Out-of-process covers (Custom Tabs, Google Pay) are intentionally missed.
     @Volatile
     private var isHostActivityStopped = false
+
+    // Dart's feature flags lifecycle, sent with setup, reset and close. Each
+    // flags notification carries the one current when it fired, so Dart can
+    // drop loads from before a reset or close.
+    @Volatile
+    private var flagsGeneration = 0
 
     // A count, not a boolean: under multi-resume (Android 10+ split-screen)
     // two non-host activities can be resumed at once, and pausing one must
@@ -161,6 +180,8 @@ class PosthogFlutterPlugin :
 
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
+    private var featureFlagsSubscription: PostHogFeatureFlagsSubscription? = null
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         if (bitmapExportExecutor.isShutdown) {
             bitmapExportExecutor = Executors.newSingleThreadExecutor()
@@ -171,6 +192,16 @@ class PosthogFlutterPlugin :
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
 
         this.applicationContext = flutterPluginBinding.applicationContext
+        // Before initPlugin, so this also catches the first load of a native auto-init.
+        featureFlagsSubscription?.unsubscribe()
+        featureFlagsSubscription =
+            PostHog.onFeatureFlags { loaded ->
+                Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
+                invokeFlutterMethod(
+                    "onFeatureFlagsCallback",
+                    loaded.toFlutterMap() + ("generation" to flagsGeneration),
+                )
+            }
         initPlugin()
 
         channel.setMethodCallHandler(this)
@@ -187,21 +218,10 @@ class PosthogFlutterPlugin :
                 return
             }
 
-            val projectToken =
-                (
-                    bundle.getString("com.posthog.posthog.PROJECT_TOKEN")
-                        ?: bundle.getString("com.posthog.posthog.API_KEY")
-                )?.trim()
-
-            if (!bundle.containsKey("com.posthog.posthog.PROJECT_TOKEN") && bundle.containsKey("com.posthog.posthog.API_KEY")) {
-                Log.w(
-                    "PostHog",
-                    "com.posthog.posthog.API_KEY is deprecated and will be removed in the next major version. Use com.posthog.posthog.PROJECT_TOKEN instead!",
-                )
-            }
+            val projectToken = bundle.getString("com.posthog.posthog.PROJECT_TOKEN")?.trim()
 
             if (projectToken.isNullOrEmpty()) {
-                Log.e("PostHog", "Either com.posthog.posthog.PROJECT_TOKEN or com.posthog.posthog.API_KEY must be provided!")
+                Log.e("PostHog", "com.posthog.posthog.PROJECT_TOKEN must be provided!")
                 return
             }
 
@@ -226,7 +246,6 @@ class PosthogFlutterPlugin :
 
             val posthogConfig = mutableMapOf<String, Any>()
             posthogConfig["projectToken"] = projectToken
-            posthogConfig["apiKey"] = projectToken
             posthogConfig["host"] = host
             posthogConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
             posthogConfig["debug"] = debug
@@ -260,6 +279,10 @@ class PosthogFlutterPlugin :
                 capture(call, result)
             }
 
+            "captureAi" -> {
+                captureAi(call, result)
+            }
+
             "captureFeatureView" -> {
                 captureFeatureView(call, result)
             }
@@ -270,6 +293,18 @@ class PosthogFlutterPlugin :
 
             "screen" -> {
                 screen(call, result)
+            }
+
+            "buildEvent" -> {
+                buildEvent(call, result)
+            }
+
+            "sendBuiltEvent" -> {
+                sendBuiltEvent(call, result)
+            }
+
+            "discardBuiltEvent" -> {
+                discardBuiltEvent(call, result)
             }
 
             "captureLog" -> {
@@ -285,6 +320,7 @@ class PosthogFlutterPlugin :
             }
 
             "reset" -> {
+                updateFlagsGeneration(call)
                 reset(result)
             }
 
@@ -332,10 +368,6 @@ class PosthogFlutterPlugin :
                 getFeatureFlag(call, result)
             }
 
-            "getFeatureFlagPayload" -> {
-                getFeatureFlagPayload(call, result)
-            }
-
             "getFeatureFlagResult" -> {
                 getFeatureFlagResult(call, result)
             }
@@ -350,6 +382,10 @@ class PosthogFlutterPlugin :
 
             "unregister" -> {
                 unregister(call, result)
+            }
+
+            "setAppLanguage" -> {
+                setAppLanguage(call, result)
             }
 
             "debug" -> {
@@ -369,6 +405,7 @@ class PosthogFlutterPlugin :
             }
 
             "close" -> {
+                updateFlagsGeneration(call)
                 close(result)
             }
 
@@ -565,6 +602,8 @@ class PosthogFlutterPlugin :
                 return
             }
 
+            builtEvents.clear()
+            updateFlagsGeneration(call)
             setupPostHog(args)
 
             result.success(null)
@@ -574,19 +613,9 @@ class PosthogFlutterPlugin :
     }
 
     private fun setupPostHog(posthogConfig: Map<String, Any>) {
-        val projectToken =
-            (
-                (posthogConfig["projectToken"] as String?)
-                    ?: (posthogConfig["apiKey"] as String?)
-            )?.trim()
-        if (!posthogConfig.containsKey("projectToken") && posthogConfig.containsKey("apiKey")) {
-            Log.w(
-                "PostHog",
-                "apiKey is deprecated and will be removed in the next major version. Use projectToken instead!",
-            )
-        }
+        val projectToken = (posthogConfig["projectToken"] as String?)?.trim()
         if (projectToken.isNullOrEmpty()) {
-            Log.e("PostHog", "Either projectToken or apiKey must be provided!")
+            Log.e("PostHog", "projectToken must be provided!")
             return
         }
 
@@ -645,6 +674,21 @@ class PosthogFlutterPlugin :
                         "gzip" -> compression = PostHogCompression.GZIP
                         "none" -> compression = PostHogCompression.NONE
                     }
+                }
+                posthogConfig.getIfNotNull<String>("captureAiCompression") {
+                    when (it) {
+                        "gzip" -> captureAiCompression = PostHogCompression.GZIP
+                        "none" -> captureAiCompression = PostHogCompression.NONE
+                    }
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiMaxQueueSize") {
+                    captureAiMaxQueueSize = it
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiTimeoutSeconds") {
+                    captureAiTimeout = it
+                }
+                posthogConfig.getIfNotNull<Int>("captureAiMaxEventBytes") {
+                    captureAiMaxEventBytes = it
                 }
                 posthogConfig.getIfNotNull<Boolean>("sessionReplay") {
                     sessionReplay = it
@@ -833,6 +877,8 @@ class PosthogFlutterPlugin :
                     }
                 }
 
+                // Flutter apps translate in Dart, so native resources don't say what's shown
+                detectAppLanguage = false
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
 
@@ -850,12 +896,7 @@ class PosthogFlutterPlugin :
                         )
                     }
                 }
-
-                onFeatureFlags =
-                    PostHogOnFeatureFlags {
-                        Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
-                        invokeFlutterMethod("onFeatureFlagsCallback", emptyMap<String, Any?>())
-                    }
+                nativeBeforeSendSnapshot().forEach { this.addBeforeSend(it) }
             }
 
         lastBuiltConfig = config
@@ -996,6 +1037,8 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopOcclusionDetector()
+        featureFlagsSubscription?.unsubscribe()
+        featureFlagsSubscription = null
         channel.setMethodCallHandler(null)
         pushChannelCandidates.remove(channel)
         if (activeChannel === channel) {
@@ -1714,19 +1757,6 @@ class PosthogFlutterPlugin :
         }
     }
 
-    private fun getFeatureFlagPayload(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val featureFlagKey: String = call.argument("key")!!
-            val flag = PostHog.getFeatureFlagResult(featureFlagKey, sendFeatureFlagEvent = false)?.payload
-            result.success(flag)
-        } catch (e: Throwable) {
-            result.error("PosthogFlutterException", e.localizedMessage, null)
-        }
-    }
-
     private fun getFeatureFlagResult(
         call: MethodCall,
         result: Result,
@@ -1737,7 +1767,7 @@ class PosthogFlutterPlugin :
                 result.error("PosthogFlutterException", "Missing argument: key", null)
                 return
             }
-            val sendEvent: Boolean = call.argument("sendEvent") ?: true
+            val sendEvent: Boolean? = call.argument("sendEvent")
             val flagResult = PostHog.getFeatureFlagResult(featureFlagKey, sendEvent)
 
             if (flagResult != null) {
@@ -1782,7 +1812,8 @@ class PosthogFlutterPlugin :
             val userId: String = call.argument("userId")!!
             val userProperties: Map<String, Any>? = call.argument("userProperties")
             val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
-            PostHog.identify(userId, userProperties, userPropertiesSetOnce)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.identify(userId, userProperties, userPropertiesSetOnce, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1796,7 +1827,8 @@ class PosthogFlutterPlugin :
         try {
             val userPropertiesToSet: Map<String, Any>? = call.argument("userPropertiesToSet")
             val userPropertiesToSetOnce: Map<String, Any>? = call.argument("userPropertiesToSetOnce")
-            PostHog.setPersonProperties(userPropertiesToSet, userPropertiesToSetOnce)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.setPersonProperties(userPropertiesToSet, userPropertiesToSetOnce, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1812,13 +1844,39 @@ class PosthogFlutterPlugin :
             val properties: Map<String, Any>? = call.argument("properties")
             val userProperties: Map<String, Any>? = call.argument("userProperties")
             val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
+            val options: Map<String, Any?>? = call.argument("options")
             PostHog.capture(
                 eventName,
                 properties = properties,
                 userProperties = userProperties,
                 userPropertiesSetOnce = userPropertiesSetOnce,
+                options = options,
             )
             result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureAi(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val eventName: String = call.argument("eventName")!!
+            val properties: Map<String, Any>? = call.argument("properties")
+            val userProperties: Map<String, Any>? = call.argument("userProperties")
+            val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
+            val options: Map<String, Any?>? = call.argument("options")
+            val uuid =
+                PostHog.captureAi(
+                    eventName,
+                    properties = properties,
+                    userProperties = userProperties,
+                    userPropertiesSetOnce = userPropertiesSetOnce,
+                    options = options,
+                )
+            result.success(uuid?.toString())
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -1831,11 +1889,97 @@ class PosthogFlutterPlugin :
         try {
             val screenName: String = call.argument("screenName")!!
             val properties: Map<String, Any>? = call.argument("properties")
-            PostHog.screen(screenName, properties)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.screen(screenName, properties, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
+    }
+
+    /**
+     * Builds the event a capture, screen or captureException call would send, for the
+     * Dart beforeSend callbacks, and returns it to Dart. Returns null when the SDK skips it.
+     */
+    private fun buildEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val timestampMs: Long? = call.argument<Number>("timestamp")?.toLong()
+            val built =
+                PostHog.buildEventForWrapper(
+                    call.argument("eventName")!!,
+                    properties = call.argument("properties"),
+                    userProperties = call.argument("userProperties"),
+                    userPropertiesSetOnce = call.argument("userPropertiesSetOnce"),
+                    options = call.argument("options"),
+                    ai = call.argument("ai") ?: false,
+                    timestamp = timestampMs?.let { Date(it) },
+                )
+            val uuid = built?.uuid?.toString()
+            if (built == null || uuid == null) {
+                result.success(null)
+                return
+            }
+            val now = SystemClock.elapsedRealtime()
+            builtEvents.values.removeAll { (_, builtAt) -> now - builtAt >= BUILT_EVENT_TIMEOUT_MS }
+            builtEvents[uuid] = built to now
+            result.success(
+                mapOf(
+                    "event" to built.event,
+                    "uuid" to uuid,
+                    "distinctId" to built.distinctId,
+                    "timestamp" to built.timestamp.time,
+                    "properties" to built.properties?.let(::toChannelValue),
+                    "options" to built.options?.let(::toChannelValue),
+                ),
+            )
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    /**
+     * Sends an event from [buildEvent] as the Dart beforeSend callbacks left it.
+     * Returns its uuid once queued, or null.
+     */
+    private fun sendBuiltEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val uuid: String = call.argument("uuid")!!
+            val built = builtEvents.remove(uuid)?.first
+            if (built == null) {
+                result.success(null)
+                return
+            }
+            val properties: Map<String, Any>? = call.argument("properties")
+            val options: Map<String, Any?>? = call.argument("options")
+            val timestampMs: Long? = call.argument<Number>("timestamp")?.toLong()
+            val event =
+                built
+                    .copy(
+                        event = call.argument("event")!!,
+                        distinctId = call.argument<String>("distinctId")?.takeIf { it.isNotBlank() } ?: built.distinctId,
+                        properties = properties?.toMutableMap() ?: mutableMapOf(),
+                        timestamp = timestampMs?.let { Date(it) } ?: built.timestamp,
+                    ).also { it.options = options?.toMutableMap() ?: mutableMapOf() }
+            val sent = PostHog.sendBuiltEventForWrapper(event, ai = call.argument("ai") ?: false)
+            result.success(sent?.toString())
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    /** Drops an event from [buildEvent] that a Dart beforeSend callback dropped. */
+    private fun discardBuiltEvent(
+        call: MethodCall,
+        result: Result,
+    ) {
+        call.argument<String>("uuid")?.let { builtEvents.remove(it) }
+        result.success(null)
     }
 
     private fun captureLog(
@@ -1872,7 +2016,8 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val alias: String = call.argument("alias")!!
-            PostHog.alias(alias)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.alias(alias, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1981,9 +2126,9 @@ class PosthogFlutterPlugin :
             // Resolve the Dart Future only once flags have actually finished
             // loading. The native callback fires on a background thread, so the
             // result must be posted back to the main thread for Flutter.
-            PostHog.reloadFeatureFlags {
+            PostHog.reloadFeatureFlags { loaded ->
                 Handler(Looper.getMainLooper()).post {
-                    result.success(null)
+                    result.success(loaded.toFlutterMap())
                 }
             }
         } catch (e: Throwable) {
@@ -2050,7 +2195,8 @@ class PosthogFlutterPlugin :
             val groupType: String = call.argument("groupType")!!
             val groupKey: String = call.argument("groupKey")!!
             val groupProperties: Map<String, Any>? = call.argument("groupProperties")
-            PostHog.group(groupType, groupKey, groupProperties)
+            val options: Map<String, Any?>? = call.argument("options")
+            PostHog.group(groupType, groupKey, groupProperties, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -2126,6 +2272,18 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun setAppLanguage(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            PostHog.setAppLanguage(call.argument("language"))
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
     private fun unregisterPushNotificationToken(result: Result) {
         try {
             PostHog.unregisterPushNotificationToken()
@@ -2182,6 +2340,9 @@ class PosthogFlutterPlugin :
             val properties = arguments["properties"] as? Map<String, Any>
             val timestampMs = arguments["timestamp"] as? Long
 
+            @Suppress("UNCHECKED_CAST")
+            val options = arguments["options"] as? Map<String, Any?>
+
             // Extract timestamp from Flutter
             val timestamp: Date? =
                 timestampMs?.let {
@@ -2189,7 +2350,7 @@ class PosthogFlutterPlugin :
                     Date(timestampMs)
                 }
 
-            PostHog.capture("\$exception", properties = properties, timestamp = timestamp)
+            PostHog.capture("\$exception", properties = properties, timestamp = timestamp, options = options)
             result.success(null)
         } catch (e: Throwable) {
             result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)
@@ -2214,8 +2375,13 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun updateFlagsGeneration(call: MethodCall) {
+        call.argument<Int>("flagsGeneration")?.let { flagsGeneration = it }
+    }
+
     private fun close(result: Result) {
         try {
+            builtEvents.clear()
             PostHog.close()
             result.success(null)
         } catch (e: Throwable) {
@@ -2284,6 +2450,8 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun PostHogFeatureFlagsLoaded.toFlutterMap(): Map<String, Any> = mapOf("variants" to variants, "errorsLoading" to errorsLoading)
+
     private fun invokeFlutterMethod(
         method: String,
         arguments: Any? = null,
@@ -2316,6 +2484,42 @@ class PosthogFlutterPlugin :
     }
 
     companion object {
+        private val nativeBeforeSend = mutableListOf<PostHogBeforeSend>()
+
+        /**
+         * Adds a native `beforeSend` hook that runs on every event the PostHog Android
+         * SDK sends, including the ones Dart never sees.
+         *
+         * Dart `PostHogConfig.beforeSend` callbacks run only on events captured from
+         * Dart. Events the native SDK captures itself, such as crashes, app lifecycle
+         * events, `$feature_flag_called`, `$identify` and session replay, reach only
+         * native hooks. Hooks run in the order they're added, after the Dart callbacks.
+         * Return the event, changed or not, to send it, or `null` to drop it. No hooks
+         * are added by default.
+         *
+         * Add hooks before the SDK is set up: before `Posthog().setup()` runs in Dart,
+         * or in `Application.onCreate` when the SDK is set up from the manifest
+         * (`com.posthog.posthog.AUTO_INIT`). Hooks added later apply from the next setup.
+         *
+         * ```kotlin
+         * // MainApplication.onCreate
+         * PosthogFlutterPlugin.addBeforeSend { event ->
+         *     if (event.event == "Application Backgrounded") null else event
+         * }
+         * ```
+         */
+        @JvmStatic
+        fun addBeforeSend(beforeSend: PostHogBeforeSend) {
+            synchronized(nativeBeforeSend) { nativeBeforeSend.add(beforeSend) }
+        }
+
+        private fun nativeBeforeSendSnapshot(): List<PostHogBeforeSend> = synchronized(nativeBeforeSend) { nativeBeforeSend.toList() }
+
+        @VisibleForTesting
+        internal fun resetNativeBeforeSendForTesting() {
+            synchronized(nativeBeforeSend) { nativeBeforeSend.clear() }
+        }
+
         // Mint route for pushIdentityProvider, anchored to the engine whose setup()
         // installed the provider. A live owner is never displaced; provider-enabled
         // engines stay candidates so detach promotes the most recent survivor instead
@@ -2358,6 +2562,21 @@ class PosthogFlutterPlugin :
         }
     }
 }
+
+/**
+ * Copies [value] into the types the Flutter channel codec can send. Values the
+ * codec can't send, such as a `Date` registered natively, are sent as strings.
+ */
+internal fun toChannelValue(value: Any?): Any? =
+    when (value) {
+        null, is String, is Boolean, is Int, is Long, is Double -> value
+        is ByteArray, is IntArray, is LongArray, is FloatArray, is DoubleArray -> value
+        is Number -> value.toDouble()
+        is Map<*, *> -> value.entries.associate { (k, v) -> k.toString() to toChannelValue(v) }
+        is Iterable<*> -> value.map(::toChannelValue)
+        is Array<*> -> value.map(::toChannelValue)
+        else -> value.toString()
+    }
 
 @Suppress("UNCHECKED_CAST")
 internal fun bootstrapConfigFromMap(bootstrap: Map<String, Any>): PostHogBootstrapConfig =

@@ -7,7 +7,9 @@ import android.os.BadParcelableException
 import android.view.Window
 import android.view.WindowManager
 import com.google.firebase.FirebaseApp
+import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogCompression
+import com.posthog.PostHogConfig
 import com.posthog.PostHogEvent
 import com.posthog.android.replay.PostHogScreenshotColorMode
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -41,6 +43,7 @@ internal class PosthogFlutterPluginTest {
     @BeforeTest
     fun resetSharedRoute() {
         PosthogFlutterPlugin.resetPushIdentityRouteForTesting()
+        PosthogFlutterPlugin.resetNativeBeforeSendForTesting()
     }
 
     @Test
@@ -228,6 +231,48 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
+    fun setup_captureAiSettings_forwardToNativeConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        val call =
+            MethodCall(
+                "setup",
+                mapOf(
+                    "projectToken" to "test-token",
+                    "captureAiCompression" to "none",
+                    "captureAiMaxQueueSize" to 7,
+                    "captureAiTimeoutSeconds" to 90,
+                    "captureAiMaxEventBytes" to 1024,
+                ),
+            )
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        val config = assertNotNull(plugin.lastBuiltConfig)
+        assertEquals(PostHogCompression.NONE, config.captureAiCompression)
+        assertEquals(7, config.captureAiMaxQueueSize)
+        assertEquals(90, config.captureAiTimeout)
+        assertEquals(1024, config.captureAiMaxEventBytes)
+    }
+
+    @Test
+    fun setup_captureAiSettings_unsetKeepNativeDefaults() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token")),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+
+        val config = assertNotNull(plugin.lastBuiltConfig)
+        assertEquals(PostHogCompression.GZIP, config.captureAiCompression)
+        assertEquals(PostHogConfig.DEFAULT_CAPTURE_AI_MAX_QUEUE_SIZE, config.captureAiMaxQueueSize)
+        assertEquals(PostHogConfig.DEFAULT_CAPTURE_AI_TIMEOUT_SECONDS, config.captureAiTimeout)
+        assertEquals(PostHogConfig.DEFAULT_CAPTURE_AI_MAX_EVENT_BYTES, config.captureAiMaxEventBytes)
+    }
+
+    @Test
     fun setup_flutterVersion_addedOnlyToInstallAndUpdateEvents() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
@@ -247,6 +292,30 @@ internal class PosthogFlutterPluginTest {
         assertEquals("3.35.0", propertiesOf("Application Updated")?.get("\$flutter_version"))
         assertNull(propertiesOf("Application Opened")?.get("\$flutter_version"))
         assertNull(propertiesOf("custom")?.get("\$flutter_version"))
+    }
+
+    @Test
+    fun setup_addBeforeSend_runsAfterTheFlutterVersionHook() {
+        val seen = mutableListOf<Any?>()
+        PosthogFlutterPlugin.addBeforeSend { event ->
+            seen.add(event.properties?.get("\$flutter_version"))
+            null
+        }
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "flutterVersion" to "3.35.0")),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+        val beforeSend = assertNotNull(plugin.lastBuiltConfig).beforeSendList
+
+        val result =
+            beforeSend.fold<PostHogBeforeSend, PostHogEvent?>(
+                PostHogEvent("Application Installed", "id", properties = mutableMapOf()),
+            ) { event, hook -> event?.let { hook.run(it) } }
+
+        assertNull(result)
+        assertEquals(listOf<Any?>("3.35.0"), seen)
     }
 
     @Test
@@ -994,5 +1063,12 @@ internal class PosthogFlutterPluginTest {
         Mockito
             .verify(backgroundMessenger, Mockito.never())
             .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
+
+    @Test
+    fun `toChannelValue keeps primitive arrays the codec can send`() {
+        val values = listOf(intArrayOf(1), longArrayOf(2L), floatArrayOf(3f), doubleArrayOf(4.0), byteArrayOf(5))
+
+        values.forEach { assertSame(it, toChannelValue(it)) }
     }
 }

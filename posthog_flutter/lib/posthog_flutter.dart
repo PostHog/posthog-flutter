@@ -3,6 +3,7 @@ library posthog_flutter;
 
 export 'src/error_tracking/posthog_isolate_extension.dart';
 export 'src/feature_flag_result.dart';
+export 'src/feature_flags_loaded.dart';
 export 'src/logs/posthog_log_record.dart';
 export 'src/logs/posthog_log_severity.dart';
 export 'src/logs/posthog_logger.dart' hide CaptureLog;

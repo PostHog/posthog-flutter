@@ -78,7 +78,7 @@ void main() {
     PosthogFlutterDart.registerWith();
     var platform = PosthogFlutterPlatformInterface.instance;
     await platform.setup(configFor(server));
-    await platform.disable();
+    await platform.optOut();
     await platform.close();
 
     PosthogFlutterDart.registerWith();

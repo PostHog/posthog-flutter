@@ -15,9 +15,59 @@
     }
   },
   {
-    "method": "captureException",
+    "method": "buildEvent",
     "arguments": {
+      "eventName": "$exception",
+      "properties": {
+        "$exception_level": "error",
+        "$exception_list": [
+          {
+            "type": "StateError",
+            "mechanism": {
+              "handled": true,
+              "synthetic": false,
+              "type": "generic"
+            },
+            "value": "Bad state: checkout failed",
+            "stacktrace": {
+              "frames": [
+                {
+                  "platform": "dart",
+                  "abs_path": "package:snapshot_app/main.dart",
+                  "in_app": true,
+                  "package": "snapshot_app",
+                  "function": "main",
+                  "filename": "main.dart",
+                  "lineno": 10,
+                  "colno": 3
+                },
+                {
+                  "platform": "dart",
+                  "abs_path": "package:snapshot_app/checkout.dart",
+                  "in_app": true,
+                  "package": "snapshot_app",
+                  "function": "CheckoutService.submit",
+                  "filename": "checkout.dart",
+                  "lineno": 42,
+                  "colno": 7
+                }
+              ],
+              "type": "raw"
+            },
+            "thread_id": "<thread-id>"
+          }
+        ],
+        "order_id": "ord_123",
+        "attempted_at": "2024-03-01 12:30:00.000Z"
+      },
       "timestamp": "<timestamp-ms>",
+      "ai": false
+    }
+  },
+  {
+    "method": "sendBuiltEvent",
+    "arguments": {
+      "event": "$exception",
       "properties": {
         "$exception_level": "error",
         "$exception_list": [
@@ -60,13 +110,67 @@
         "order_id": "ord_123",
         "attempted_at": "2024-03-01 12:30:00.000Z",
         "snapshot_before_send": "event"
-      }
+      },
+      "distinctId": "snapshot-user",
+      "timestamp": 1709296200000,
+      "options": {},
+      "uuid": "snapshot-uuid",
+      "ai": false
     }
   },
   {
-    "method": "captureException",
+    "method": "buildEvent",
     "arguments": {
+      "eventName": "$exception",
+      "properties": {
+        "$exception_level": "error",
+        "$exception_list": [
+          {
+            "type": "ArgumentError",
+            "mechanism": {
+              "handled": false,
+              "synthetic": false,
+              "type": "runZonedGuarded"
+            },
+            "value": "Invalid argument(s): zoned checkout failure",
+            "stacktrace": {
+              "frames": [
+                {
+                  "platform": "dart",
+                  "abs_path": "package:snapshot_app/main.dart",
+                  "in_app": true,
+                  "package": "snapshot_app",
+                  "function": "main",
+                  "filename": "main.dart",
+                  "lineno": 12,
+                  "colno": 3
+                },
+                {
+                  "platform": "dart",
+                  "abs_path": "package:snapshot_app/zone.dart",
+                  "in_app": true,
+                  "package": "snapshot_app",
+                  "function": "CheckoutZone.run",
+                  "filename": "zone.dart",
+                  "lineno": 21,
+                  "colno": 5
+                }
+              ],
+              "type": "raw"
+            },
+            "thread_id": "<thread-id>"
+          }
+        ],
+        "zone": "checkout"
+      },
       "timestamp": "<timestamp-ms>",
+      "ai": false
+    }
+  },
+  {
+    "method": "sendBuiltEvent",
+    "arguments": {
+      "event": "$exception",
       "properties": {
         "$exception_level": "error",
         "$exception_list": [
@@ -108,7 +212,12 @@
         ],
         "zone": "checkout",
         "snapshot_before_send": "event"
-      }
+      },
+      "distinctId": "snapshot-user",
+      "timestamp": 1709296200000,
+      "options": {},
+      "uuid": "snapshot-uuid",
+      "ai": false
     }
   },
   {
