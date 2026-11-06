@@ -594,30 +594,52 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
             true;
   }
 
+  late final JSFunction _appLanguageHook = _addAppLanguage.toJS
+    ..setProperty(_appLanguageHookMarker.toJS, true.toJS);
+
+  bool _isAppLanguageHook(JSAny? fn) =>
+      fn.isA<JSFunction>() && (fn as JSObject).has(_appLanguageHookMarker);
+
+  JSArray<JSAny?> _withAppLanguageHook(JSAny? hooks) => <JSAny?>[
+        _appLanguageHook,
+        if (hooks.isA<JSArray>())
+          ...(hooks as JSArray<JSAny?>)
+              .toDart
+              .where((fn) => !_isAppLanguageHook(fn))
+        else if (!hooks.isUndefinedOrNull && !_isAppLanguageHook(hooks))
+          hooks,
+      ].toJS;
+
   void _installAppLanguageHook() {
     final ph = posthog as JSObject?;
     if (ph == null || !ph.has('push')) return;
-    final hook = _addAppLanguage.toJS
-      ..setProperty(_appLanguageHookMarker.toJS, true.toJS);
-    bool isHook(JSAny? fn) =>
-        fn.isA<JSFunction>() && (fn as JSObject).has(_appLanguageHookMarker);
     // The loader snippet queues a pushed function until posthog.init() and
-    // runs it before the queued captures. A loaded posthog-js runs it now.
+    // runs it before the queued method calls. A loaded posthog-js runs it now.
+    // set_config is wrapped so a later before_send, queued or not, keeps the
+    // hook first.
     final install = (JSObject instance) {
       final config = instance.getProperty<JSAny?>('config'.toJS);
-      if (!config.isA<JSObject>()) return;
-      final existing =
-          (config as JSObject).getProperty<JSAny?>('before_send'.toJS);
-      final hooks = <JSAny?>[
-        hook,
-        if (existing.isA<JSArray>())
-          ...(existing as JSArray<JSAny?>).toDart.where((fn) => !isHook(fn))
-        else if (!existing.isUndefinedOrNull && !isHook(existing))
-          existing,
-      ];
-      instance.callMethod(
-        'set_config'.toJS,
-        JSObject()..setProperty('before_send'.toJS, hooks.toJS),
+      final setConfig = instance.getProperty<JSAny?>('set_config'.toJS);
+      if (!config.isA<JSObject>() || !setConfig.isA<JSFunction>()) return;
+      var wrapped = setConfig as JSFunction;
+      if (!wrapped.has(_appLanguageHookMarker)) {
+        final original = wrapped;
+        wrapped = ((JSAny? update) {
+          if (update.isA<JSObject>() &&
+              (update as JSObject).has('before_send')) {
+            update.setProperty('before_send'.toJS,
+                _withAppLanguageHook(update.getProperty('before_send'.toJS)));
+          }
+          return original.callAsFunction(instance, update);
+        }).toJS
+          ..setProperty(_appLanguageHookMarker.toJS, true.toJS);
+        instance.setProperty('set_config'.toJS, wrapped);
+      }
+      wrapped.callAsFunction(
+        instance,
+        JSObject()
+          ..setProperty('before_send'.toJS,
+              (config as JSObject).getProperty<JSAny?>('before_send'.toJS)),
       );
     }.toJSCaptureThis;
     try {

@@ -150,6 +150,23 @@ void main() {
       expect(flagCalled(false).containsKey(r'$app_language'), isFalse);
       expect(flagCalled(true)[r'$app_language'], 'de');
     });
+
+    test('stays first when the app sets before_send later', () async {
+      Object? seen;
+      final appBeforeSend = ((JSObject event) {
+        seen = (event.dartify()! as Map)['properties'];
+        return event;
+      }).toJS;
+      final instance = createInstance();
+      globalContext.setProperty('posthog'.toJS, instance);
+
+      await PosthogFlutterWeb().setAppLanguage('de');
+      instance.callMethod('set_config'.toJS,
+          JSObject()..setProperty('before_send'.toJS, appBeforeSend));
+
+      expect(send(instance)[r'$app_language'], 'de');
+      expect(seen, {r'$app_language': 'de'});
+    });
   });
 
   group('handleWebMethodCall captureLog', () {
