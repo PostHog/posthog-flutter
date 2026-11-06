@@ -515,14 +515,6 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
 
       posthog?.unregister(stringToJSAny(key));
       break;
-    case 'setAppLanguage':
-      final language = args['language'] as String?;
-      if (language == null) {
-        posthog?.unregister(stringToJSAny(r'$app_language'));
-      } else {
-        posthog?.register(mapToJSAny({r'$app_language': language}));
-      }
-      break;
     case 'getSessionId':
       final sessionId = posthog?.get_session_id()?.dartify() as String?;
       if (sessionId?.isEmpty == true) return null;
