@@ -193,7 +193,8 @@ def main() -> None:
     write(f"posthog-flutter-{major}.md", [front_matter(title, body), *body])
     if declared >= major:
         write("posthog-flutter-reference.md", [front_matter("PostHog Flutter SDK", body), *body])
-    if guides := sorted((ROOT / "docs").glob("migration-*.md"), reverse=True):
+    # The migration guide lives next to the package, as posthog_flutter/MIGRATION.md.
+    if guides := [g for g in [PKG / "MIGRATION.md"] if g.exists()]:
         head = "---\ntitle: PostHog Flutter SDK migration guides\nsidebar: Docs\nshowTitle: true\n---"
         write("posthog-flutter-migration.md", [head, *(g.read_text().strip() for g in guides)])
 
