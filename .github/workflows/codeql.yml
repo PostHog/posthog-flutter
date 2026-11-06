@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+      - chore/v6-posthog-ios-4
 
 jobs:
   analyze:
@@ -70,6 +71,18 @@ jobs:
       - name: Install dependencies (Java/Kotlin)
         if: matrix.language == 'java-kotlin'
         run: flutter pub get
+
+      - name: Publish unreleased posthog-android 4.0 to mavenLocal
+        if: matrix.language == 'java-kotlin'
+        run: |
+          git clone --depth 1 -b chore/v4-remove-deprecated https://github.com/PostHog/posthog-android.git "$RUNNER_TEMP/posthog-android"
+          cd "$RUNNER_TEMP/posthog-android"
+          sed -i 's/^coreVersion=.*/coreVersion=7.0.0/; s/^androidVersion=.*/androidVersion=4.0.0/' gradle.properties
+          # posthog-android requires signing when CI=true, and there is no key here.
+          CI=false ./gradlew :posthog:publishToMavenLocal :posthog-android:publishToMavenLocal
+          cd "$GITHUB_WORKSPACE"
+          python3 -c "p='example/android/build.gradle.kts'; s=open(p).read(); open(p,'w').write(s.replace('repositories {\n        google()', 'repositories {\n        mavenLocal()\n        google()', 1))"
+          grep -n mavenLocal example/android/build.gradle.kts
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
