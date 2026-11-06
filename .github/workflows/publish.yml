@@ -160,6 +160,55 @@ jobs:
           git tag -a "$NEW_VERSION" -m "$NEW_VERSION"
           git push origin "$NEW_VERSION"
 
+      # The reference headings come from the sdk-specs capabilities.
+      - name: Check out sdk-specs
+        # Best-effort: a failure never blocks the release. Run generate-references.yml to retry.
+        continue-on-error: true
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: PostHog/sdk-specs
+          path: .sdk-specs
+          persist-credentials: false
+
+      # The generator runs `flutter pub get` and `dart doc`. Same pinned action as ci.yml.
+      - uses: axi92/flutter-action@36d2c2625bac6ea011cd7808d2a01bd8a7e5c766 # feature/pin-action-sha @ 2026-04-30
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        with:
+          channel: 'stable'
+
+      # Ubuntu's system Python refuses a plain pip install (externally managed).
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        with:
+          python-version: '3.13'
+
+      - name: Generate references
+        id: reference
+        # Best-effort: a failure never blocks the release. Run generate-references.yml to retry.
+        continue-on-error: true
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        run: |
+          python3 -m pip install --quiet -r scripts/requirements.txt
+          python3 scripts/generate_markdown_reference.py --sdk-specs .sdk-specs
+          # Stage the pages, so a new page shows in git status as a file, not as an untracked folder.
+          git add references
+
+      - name: Warn if the SDK reference didn't regenerate
+        if: steps.reference.outcome == 'failure'
+        run: echo "::warning::The SDK reference didn't regenerate. Run generate-references.yml to retry."
+
+      - name: Commit generated references
+        if: steps.commit-version-bump.outputs.commit-hash != ''
+        uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
+        with:
+          commit_message: 'Update generated references'
+          repo: ${{ github.repository }}
+          branch: main
+          file_pattern: references/
+        env:
+          GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
+
       - name: Send failure event to PostHog
         if: ${{ failure() }}
         continue-on-error: true
