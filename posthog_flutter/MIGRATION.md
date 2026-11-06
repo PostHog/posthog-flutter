@@ -45,7 +45,7 @@ Other plugins that only support CocoaPods keep working: Flutter installs them th
 
 If every plugin in your app supports Swift Package Manager, you can remove CocoaPods. This is optional. Follow [Flutter's steps](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers#how-to-remove-cocoapods-integration).
 
-**Add-to-app:** `flutter build swift-package` still installs a Flutter module's plugins with CocoaPods on current stable releases, so it stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'` because posthog_flutter has no podspec. Flutter fixed this in [flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590), which isn't in a stable release yet. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until it is.
+**Add-to-app:** `flutter build swift-package` still installs a Flutter module's plugins with CocoaPods on current stable releases, so it stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'` because posthog_flutter has no podspec. Flutter fixed this in [flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590), which isn't in a stable release yet. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until it is. On Flutter 3.44 or later, you can instead embed Flutter in an iOS app from a Flutter app project (`flutter create`, not `-t module`) by following [Flutter's Swift Package Manager add-to-app steps](https://docs.flutter.dev/add-to-app/ios/project-setup); this works with posthog_flutter 6.
 
 ### Android
 
