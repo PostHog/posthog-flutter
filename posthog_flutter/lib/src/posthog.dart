@@ -625,8 +625,8 @@ class Posthog {
   /// flag that has a value always wins, including `false` and variants, and
   /// `$feature_flag_called` never reports [defaultValue] as the flag's value.
   ///
-  /// Returns `false` when the flag is disabled, and `true` when it is enabled
-  /// or set to a variant.
+  /// Returns `false` when the flag is disabled or set to an empty variant, and
+  /// `true` when it is enabled or set to a non-empty variant.
   ///
   /// **Example:**
   /// ```dart
