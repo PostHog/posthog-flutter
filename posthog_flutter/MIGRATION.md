@@ -261,8 +261,6 @@ For the changes every capture v1 SDK shares, such as event options, limits and p
 
 On every platform except web, an event's properties are now the SDK's, then registered properties, then the ones you pass, so your value wins over the SDK's for that event. In 5.x, the SDK's values won.
 
-<!-- TODO(capture-v1): the iOS `#capture-v1` and Android `#endpoints` / `#hosts-without-capture-v1` anchors exist only on the posthog-ios and posthog-android `chore/v4-remove-deprecated` branches, not on `main` yet. Check these links once both 4.0 guides merge. -->
-
 #### Checklist
 
 You need to change code if your app does any of these:
