@@ -38,7 +38,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// way [PosthogFlutterIO] runs it before the platform channel.
   List<BeforeSendCallback> _beforeSendCallbacks = [];
   JSFunction? _featureFlagsUnsubscribe;
-  String? _appLanguage;
 
   /// Bumped by each setup() and close(), so a posthog-js registration from an
   /// earlier one stops delivering even when it can't be unsubscribed.
@@ -121,9 +120,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     );
     final instance = PosthogFlutterWeb();
     channel.setMethodCallHandler(instance.handleMethodCall);
-
-    // posthog-js persists registered properties, but $app_language lasts one launch.
-    posthog?.unregister(stringToJSAny(r'$app_language'));
 
     // Set the platform instance so that Posthog() can call methods directly
     // on the web implementation instead of going through the method channel.
@@ -499,16 +495,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> reset() async {
-    final language = _appLanguage;
-    // posthog-js clears registered properties on reset. Registering in the
-    // same synchronous step keeps $app_language on a capture() made without
-    // awaiting reset().
-    await Future.wait([
-      handleWebMethodCall(const MethodCall('reset')),
-      if (language != null)
-        handleWebMethodCall(
-            MethodCall('setAppLanguage', {'language': language})),
-    ]);
+    return handleWebMethodCall(const MethodCall('reset'));
   }
 
   @override
@@ -542,13 +529,6 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   @override
   Future<void> unregister(String key) async {
     return handleWebMethodCall(MethodCall('unregister', {'key': key}));
-  }
-
-  @override
-  Future<void> setAppLanguage(String? language) async {
-    _appLanguage = language;
-    return handleWebMethodCall(
-        MethodCall('setAppLanguage', {'language': language}));
   }
 
   @override

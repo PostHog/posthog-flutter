@@ -582,6 +582,9 @@ class Posthog {
   /// The [language] is a BCP 47 tag, such as `de` or `pt-BR`. Pass `null` to go
   /// back to the observer's value.
   ///
+  /// Not sent on web yet, because posthog-js doesn't support `$app_language`.
+  /// To send it there now, use [register].
+  ///
   /// **Example:**
   /// ```dart
   /// await Posthog().setAppLanguage('de');
