@@ -1682,28 +1682,58 @@ void main() {
       }
     });
 
-    test(r'a personless $set does not mark the person properties as sent',
+    // Capture reads these strings and numbers as false too.
+    for (final personless in <Object>[false, 'no', 'false', 'off', 0, 0.0]) {
+      test(
+          'a \$set with process_person_profile $personless '
+          'does not mark the person properties as sent', () async {
+        final server = await LocalPostHogServer.start();
+        final platform = await setUpPlatform(configFor(server));
+        await platform.identify(userId: 'user-1');
+
+        await platform.setPersonProperties(
+          userPropertiesToSet: {'plan': 'pro'},
+          options: {'process_person_profile': personless},
+        );
+        await platform
+            .setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+        await platform
+            .setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+        await platform.capture(eventName: 'done');
+        await server.waitForEvent('done');
+
+        final sets = [
+          for (final event in server.events)
+            if (event['event'] == r'$set') _optionsOf(event),
+        ];
+        expect(
+          [for (final set in sets) set['process_person_profile']],
+          [personless, isNull],
+        );
+      });
+    }
+
+    test(r'a $set with a non-boolean process_person_profile clears the dedup',
         () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
       await platform.identify(userId: 'user-1');
 
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'free'});
       await platform.setPersonProperties(
         userPropertiesToSet: {'plan': 'pro'},
-        options: {'process_person_profile': false},
+        options: {'process_person_profile': 'yes'},
       );
-      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'free'});
       await platform.capture(eventName: 'done');
       await server.waitForEvent('done');
 
-      final sets = [
+      final plans = [
         for (final event in server.events)
-          if (event['event'] == r'$set') _optionsOf(event),
+          if (event['event'] == r'$set')
+            ((event['properties'] as Map)[r'$set'] as Map)['plan'],
       ];
-      expect(
-        [for (final set in sets) set['process_person_profile']],
-        [isFalse, isNull],
-      );
+      expect(plans, ['free', 'pro', 'free']);
     });
   });
 

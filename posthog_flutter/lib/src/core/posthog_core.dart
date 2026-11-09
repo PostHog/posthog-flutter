@@ -405,10 +405,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
           properties: identifyProperties,
           options: identifyOptions,
         );
-        if ((userProperties != null || userPropertiesSetOnce != null) &&
-            !_isPersonless(identifyProperties, identifyOptions)) {
-          _cachedPersonProperties = _personPropertiesHash(
-              distinctId, userProperties, userPropertiesSetOnce);
+        if (userProperties != null || userPropertiesSetOnce != null) {
+          _recordSentPersonProperties(
+            _processPersonProfile(identifyProperties, identifyOptions),
+            _personPropertiesHash(
+                distinctId, userProperties, userPropertiesSetOnce),
+          );
         }
         _reloadFeatureFlags();
       } else if (!isIdentified) {
@@ -595,10 +597,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
     if (event == r'$set' || event == r'$identify') {
       final set = properties[r'$set'];
       final setOnce = properties[r'$set_once'];
-      if ((set is Map || setOnce is Map) &&
-          !_isPersonless(properties, options)) {
-        _cachedPersonProperties =
-            _personPropertiesHash(getDistinctId(), set, setOnce);
+      if (set is Map || setOnce is Map) {
+        _recordSentPersonProperties(
+          _processPersonProfile(properties, options),
+          _personPropertiesHash(getDistinctId(), set, setOnce),
+        );
       }
     }
     return queued;
@@ -1269,8 +1272,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
       // A personless `$set` doesn't update the person, so it is never a
       // duplicate.
+      final processPerson =
+          _processPersonProfile(null, _withRegisteredOptions(options));
       if (_cachedPersonProperties == hash &&
-          !_isPersonless(null, _withRegisteredOptions(options))) {
+          (processPerson == null || processPerson == true)) {
         logger.info(
             'A duplicate setPersonProperties call was made. It has been ignored.');
         return;
@@ -1308,15 +1313,24 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   static bool _isNonEmptyMap(Object? value) => value is Map && value.isNotEmpty;
 
-  /// Whether [options], or else [properties], turn person processing off
-  /// for their event. An option wins over the property.
-  static bool _isPersonless(
+  /// The event's person-processing setting: the option wins over the
+  /// property.
+  static Object? _processPersonProfile(
     Map<String, Object?>? properties,
     Map<String, Object?>? options,
   ) =>
-      (options?['process_person_profile'] ??
-          properties?[r'$process_person_profile']) ==
-      false;
+      options?['process_person_profile'] ??
+      properties?[r'$process_person_profile'];
+
+  void _recordSentPersonProperties(Object? processPerson, String hash) {
+    if (processPerson == null || processPerson == true) {
+      _cachedPersonProperties = hash;
+    } else if (processPerson != false) {
+      // Values are sent as given, and capture reads strings and numbers such
+      // as 'no', 'yes' or 0 either way, so the profile's state is unknown.
+      _cachedPersonProperties = null;
+    }
+  }
 
   static Map<String, Object>? _asPropertyMap(Object? value) {
     if (value is! Map) return null;
