@@ -3,7 +3,8 @@
 ---
 
 - **Breaking:** bump the minimum iOS deployment target from 13.0 to 15.0 and macOS from 10.15 to 11.0 — see the [migration guide](https://github.com/PostHog/posthog-flutter/blob/main/posthog_flutter/MIGRATION.md)
-- **Breaking:** remove CocoaPods support on iOS and macOS — install through Swift Package Manager, which needs Flutter 3.41 or later and doesn't support add-to-app modules yet
+- **Breaking:** require the Flutter SDK 3.41 or later on every platform, including Android-only apps
+- **Breaking:** remove CocoaPods support on iOS and macOS — install through Swift Package Manager, which needs the Flutter SDK 3.41 or later and doesn't support add-to-app modules yet
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x
 - **Breaking:** remove `PostHogConfig.apiKey` and the `com.posthog.posthog.API_KEY` manifest and Info.plist key — use `projectToken` and `com.posthog.posthog.PROJECT_TOKEN`
@@ -27,7 +28,7 @@
 - **Breaking:** rename `getFeatureFlagResult(sendEvent:)` to `getFeatureFlagResult(sendFeatureFlagEvent:)`
 - **Breaking:** change `getFeatureFlagResult()` to follow `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux when `sendFeatureFlagEvent` is omitted — pass `sendFeatureFlagEvent: true` to keep capturing `$feature_flag_called`
 - **Breaking:** return `null` instead of the raw string for a malformed (such as a plain-text `hello`), empty or whitespace-only `getFeatureFlagResult()` payload on iOS, macOS and Android, and for a JSON `null` payload on Android
-- **Breaking:** return `false` from `isFeatureEnabled()` for a flag whose variant is an empty string on iOS and macOS
+- **Breaking:** treat a feature flag whose variant is an empty string as disabled in `isFeatureEnabled()`, with or without `defaultValue`, `getFeatureFlagResult().enabled`, `onFeatureFlags` listeners and `$active_feature_flags` on iOS, macOS, Android, Windows and Linux, as on web
 - **Breaking:** keep string payloads passed to `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, as strings on iOS and macOS instead of decoding them to numbers or booleans
 - **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android — update filters that match it
 - **Breaking:** pause sending on iOS and macOS while cellular data is off for the app, and delete events a `posthog-ios` 2.x SDK left on disk instead of sending them
@@ -37,7 +38,7 @@
 - Add `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`
-- Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself
+- Add the `$app_language` property, reported by `PosthogObserver` from the locale `MaterialApp` resolved, and `setAppLanguage()` to set it yourself (not on web yet)
 - Add a `defaultValue` option to `isFeatureEnabled()`, returned when the flag has no value
 - Declare Android `minSdkVersion` 23 to match `posthog-android`
 - Skip `setup()` with one log line when `projectToken` is a personal API key (`phx_`), so the key is never sent

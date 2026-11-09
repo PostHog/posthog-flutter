@@ -274,6 +274,20 @@ void main() {
       expect(client.isFeatureEnabled('missing'), isNull);
     });
 
+    test('an empty variant reads as disabled', () async {
+      final client = testClient(server);
+      server.respond = (_) => _flagsResponse(
+          {'empty-variant': _flag('empty-variant', variant: '')});
+      await client.reloadFeatureFlagsAsync();
+
+      expect(client.isFeatureEnabled('empty-variant'), isFalse);
+      final result =
+          client.getFeatureFlagResult('empty-variant', sendEvent: false);
+      expect(result?.enabled, isFalse);
+      expect(result?.variant, '');
+      expect(client.featureFlagsLoaded().flags, isEmpty);
+    });
+
     test('payloads accompany only enabled flags', () async {
       final client = testClient(server);
       server.respond = (_) => _flagsResponse({
@@ -588,6 +602,7 @@ void main() {
             'on-flag': _flag('on-flag'),
             'variant-flag': _flag('variant-flag', variant: 'test'),
             'off-flag': _flag('off-flag', enabled: false),
+            'empty-variant-flag': _flag('empty-variant-flag', variant: ''),
           });
       await client.reloadFeatureFlagsAsync();
 
@@ -596,6 +611,7 @@ void main() {
       final props = queuedProps(storage, 0);
       expect(props[r'$active_feature_flags'], ['on-flag', 'variant-flag']);
       expect(props[r'$feature/off-flag'], isFalse);
+      expect(props[r'$feature/empty-variant-flag'], '');
     });
 
     test('is left out when no flag is enabled', () async {

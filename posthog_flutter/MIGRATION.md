@@ -8,9 +8,9 @@
 | macOS deployment target | 10.15 | 11.0 |
 | Android `minSdkVersion` declared by the plugin | 21 | 23 |
 | iOS and macOS dependency manager | CocoaPods or Swift Package Manager | Swift Package Manager only |
-| Flutter for iOS and macOS builds | 3.27 | 3.41 |
+| Flutter SDK | 3.27 | 3.41 |
 
-The Dart minimum (`>=3.6.0`) is unchanged. Android, web, Windows and Linux builds aren't affected by the Swift Package Manager requirement.
+posthog_flutter 6.0 needs the Flutter SDK 3.41 or later on every platform: `flutter pub get` fails on an older Flutter, including in Android-only apps. The Dart minimum (`>=3.6.0`) is unchanged. Only iOS and macOS builds need Swift Package Manager.
 
 ### iOS and macOS
 
@@ -45,7 +45,7 @@ Other plugins that only support CocoaPods keep working: Flutter installs them th
 
 If every plugin in your app supports Swift Package Manager, you can remove CocoaPods. This is optional. Follow [Flutter's steps](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers#how-to-remove-cocoapods-integration).
 
-**Add-to-app:** Flutter doesn't support Swift Package Manager in Flutter modules yet ([flutter/flutter#146957](https://github.com/flutter/flutter/issues/146957)), and its build stops for a plugin without a podspec. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until Flutter adds support.
+**Add-to-app:** `flutter build swift-package` still installs a Flutter module's plugins with CocoaPods on current stable releases, so it stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'` because posthog_flutter has no podspec. Flutter fixed this in [flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590), which isn't in a stable release yet. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until it is. On Flutter 3.44 or later, you can instead embed Flutter in an iOS or macOS app from a Flutter app project (`flutter create`, not `-t module`) by following Flutter's Swift Package Manager add-to-app steps for [iOS](https://docs.flutter.dev/add-to-app/ios/project-setup) or [macOS](https://docs.flutter.dev/add-to-app/macos/project-setup); this works with posthog_flutter 6.
 
 ### Android
 
@@ -261,13 +261,12 @@ For the changes every capture v1 SDK shares, such as event options, limits and p
 
 On every platform except web, an event's properties are now the SDK's, then registered properties, then the ones you pass, so your value wins over the SDK's for that event. In 5.x, the SDK's values won.
 
-<!-- TODO(capture-v1): the iOS `#capture-v1` and Android `#endpoints` / `#hosts-without-capture-v1` anchors exist only on the posthog-ios and posthog-android `chore/v4-remove-deprecated` branches, not on `main` yet. Check these links once both 4.0 guides merge. -->
-
 #### Checklist
 
 You need to change code if your app does any of these:
 
 - sends events to a self-hosted PostHog or a reverse proxy that doesn't serve `/i/v1/analytics/events` and `/i/v1/ai/events`
+- sends events through a reverse proxy set up from PostHog's proxy guides before 29 October 2026, which strips `Authorization`
 - identifies users with a distinct ID over 200 UTF-8 bytes, such as a JWT
 - captures events whose name is over 200 UTF-8 bytes
 - sets `projectToken` to a personal API key (`phx_...`)
@@ -288,7 +287,7 @@ Before you upgrade, make your own proxy:
 - accept request bodies up to 20 MB. AI requests are often larger than 1 MB, the default limit in nginx and ingress-nginx.
 - pass PostHog's response body through unchanged, because a 2xx whose body isn't PostHog's `{"results": {...}}` drops the events instead of retrying them
 
-PostHog's managed reverse proxy already does this. See the [proxy guides](https://posthog.com/docs/advanced/proxy).
+PostHog's managed reverse proxy already does this and needs no change. A proxy set up from PostHog's [proxy guides](https://posthog.com/docs/advanced/proxy) before 29 October 2026 strips `Authorization`, so PostHog answers `401` and the events are dropped. Update it from the current guide.
 
 The SDK doesn't fall back to `/batch/`. On Windows and Linux, a 404 is retried, events stay queued until the route is served, and the SDK prints one warning, also without `debug`. Other statuses that aren't retried, such as 401, 403 or 405, drop the batch. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides for those platforms.
 
@@ -298,7 +297,7 @@ On iOS, macOS and Android, a malformed (such as a plain-text `hello`), empty or 
 
 On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
 
-On iOS and macOS, `isFeatureEnabled()` returns `false` for a flag whose variant is an empty string.
+A flag whose variant is an empty string reads as disabled on iOS, macOS, Android, Windows and Linux, as it already did on web. `isFeatureEnabled()` returns `false`, with or without `defaultValue`, `getFeatureFlagResult()` returns `enabled: false`, `onFeatureFlags` listeners and `reloadFeatureFlags()` leave the flag out, and so does `$active_feature_flags` on captured events. `variant`, `getFeatureFlag()` and the event's `$feature/<key>` property still return `""`.
 
 ### `beforeSend` on iOS, macOS and Android
 
@@ -320,7 +319,7 @@ Events the native SDK captures itself don't go through Dart callbacks. Use `Post
 
 Update cohorts, insights and actions that match `$locale`: a filter on `$locale = de` stops matching `de-CH`. To keep matching a language, use a regex such as `^de(-|$)`, because "contains" also matches `en-DE`. Events already stored keep the old values. Feature flags aren't affected: the SDK doesn't send `$locale` or `$app_language` with flag requests, so flags only see these if you set them as person properties yourself.
 
-The new `$app_language` property is the language your app shows. `PosthogObserver` reports the locale exactly as your `MaterialApp` resolved it every time a route changes. An app that doesn't declare `supportedLocales` reports `en-US`, and one declaring `Locale('en')` reports `en`, so use a regex such as `^en(-|$)` to match English. Native detection is off because Flutter apps translate in Dart. If you translate outside `Localizations`, don't use the observer, or want to send another value, call `Posthog().setAppLanguage('de')`.
+The new `$app_language` property is the language your app shows. `PosthogObserver` reports the locale exactly as your `MaterialApp` resolved it every time a route changes. An app that doesn't declare `supportedLocales` reports `en-US`, and one declaring `Locale('en')` reports `en`, so use a regex such as `^en(-|$)` to match English. Native detection is off because Flutter apps translate in Dart. If you translate outside `Localizations`, don't use the observer, or want to send another value, call `Posthog().setAppLanguage('de')`. Web doesn't send `$app_language` yet, because posthog-js doesn't support it. To send it there now, call `Posthog().register(r'$app_language', 'de')`.
 
 ### Network reachability on iOS and macOS
 
@@ -463,7 +462,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 ## Upgrade checklist
 
-- [ ] Use Flutter 3.41 or later and make sure Swift Package Manager is on.
+- [ ] Use the Flutter SDK 3.41 or later on every platform, and make sure Swift Package Manager is on for iOS and macOS.
 - [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
 - [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.
 - [ ] Rename `com.posthog.posthog.API_KEY` to `com.posthog.posthog.PROJECT_TOKEN` in `AndroidManifest.xml` and `Info.plist`.
