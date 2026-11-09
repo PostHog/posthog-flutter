@@ -211,6 +211,7 @@ These affect only code that calls, extends or fakes `PosthogFlutterPlatformInter
 - `isFeatureEnabled()` takes `defaultValue`.
 - `reloadFeatureFlags()` returns a `Future<PostHogFeatureFlagsLoaded>`.
 - `setAppLanguage(String? language)` is new. The base class does nothing unless you override it.
+- `registerOptions(Map<String, Object?> options)` and `unregisterOptions(String key)` are new. The base class throws `UnimplementedError` unless you override them.
 - `OnFeatureFlagsCallback` now receives a `PostHogFeatureFlagsLoaded`: `void Function(PostHogFeatureFlagsLoaded loaded)` instead of `void Function()`.
 
 ```dart
@@ -466,6 +467,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 ### New features
 
 - An `options` argument on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` in `beforeSend`. `process_person_profile`, `cookieless_mode`, `disable_skew_correction` and `product_tour_id` win over their legacy option properties (`$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`). Other keys are sent unchanged. On web, known keys are sent as those legacy option properties and other keys are dropped. On web, `process_person_profile` has no effect, and the options of `identify`, `setPersonProperties`, `alias` and `group` are dropped.
+- `Posthog().registerOptions()` and `unregisterOptions()`, to send capture options such as `cookieless_mode` with every following event. An event's own options win over registered ones, and `reset()` clears them. On web, known keys are registered as their legacy option properties and other keys are dropped.
 - `isFeatureEnabled(defaultValue:)`, returned when the flag has no value because flags haven't loaded, the request failed or the key doesn't exist. A flag that has a value always wins.
 - `PostHogEvent.uuid`, `distinctId` and `timestamp` in `beforeSend`, set on every platform except web. A callback can change the distinct ID and timestamp.
 - `captureAi` for `$ai_*` events. It returns the event's UUID, or `null` when the event isn't admitted. On web it sends nothing and returns `null`.

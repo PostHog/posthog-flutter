@@ -187,10 +187,18 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('unregister() has not been implemented.');
   }
 
+  /// Registers capture options sent with all following events. See
+  /// [Posthog.registerOptions].
+  ///
+  /// Throws [UnimplementedError] unless overridden.
   Future<void> registerOptions(Map<String, Object?> options) {
     throw UnimplementedError('registerOptions() has not been implemented.');
   }
 
+  /// Removes an option registered with [registerOptions]. See
+  /// [Posthog.unregisterOptions].
+  ///
+  /// Throws [UnimplementedError] unless overridden.
   Future<void> unregisterOptions(String key) {
     throw UnimplementedError('unregisterOptions() has not been implemented.');
   }
