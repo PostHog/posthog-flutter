@@ -6,6 +6,8 @@ Please see the main [PostHog docs](https://posthog.com/docs).
 
 Specifically, the [Flutter docs](https://posthog.com/docs/libraries/flutter) details.
 
+Upgrading from 5.x? See the [migration guide](https://github.com/PostHog/posthog-flutter/blob/main/posthog_flutter/MIGRATION.md).
+
 ## Desktop support
 
 Windows and Linux support is experimental and enabled by default. They support
