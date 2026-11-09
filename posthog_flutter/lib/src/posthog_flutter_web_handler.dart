@@ -171,6 +171,18 @@ void _addAppVersionProperties(Map<String, dynamic> properties) {
   );
 }
 
+/// Page URL and app version attached to web events.
+///
+/// [PosthogFlutterWeb] applies this before `beforeSend`. The handler applies
+/// it only for callers that have not, so a callback can redact the values.
+void stampWebAutomaticProperties(Map<String, dynamic> properties) {
+  properties.addAll(_getLocationProperties());
+  _addAppVersionProperties(properties);
+}
+
+bool _automaticPropertiesApplied(Object? args) =>
+    args is Map && args['automaticPropertiesApplied'] == true;
+
 Map<String, String> _getLocationProperties() {
   try {
     final location = web.window.location;
@@ -241,8 +253,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'capture':
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (!_automaticPropertiesApplied(args)) {
+        stampWebAutomaticProperties(properties);
+      }
       final userProperties = safeMapConversion(args['userProperties']);
       final userPropertiesSetOnce = safeMapConversion(
         args['userPropertiesSetOnce'],
@@ -268,8 +281,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final screenName = args['screenName'] as String;
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (!_automaticPropertiesApplied(args)) {
+        stampWebAutomaticProperties(properties);
+      }
 
       posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
       break;
@@ -477,8 +491,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (!_automaticPropertiesApplied(args)) {
+        stampWebAutomaticProperties(properties);
+      }
 
       // Route through posthog-js's captureException so it attaches required
       // metadata and any buffered $exception_steps. posthog-js spreads the

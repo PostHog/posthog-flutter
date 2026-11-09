@@ -244,6 +244,49 @@ void main() {
     expect(captures, isEmpty);
   });
 
+  test('capture attaches the page url when beforeSend leaves it', () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token'));
+
+    await web.capture(eventName: 'checkout', properties: {'plan': 'pro'});
+
+    final properties = captures.single['properties'] as Map;
+    expect(properties[r'$current_url'], isNotEmpty);
+    expect(properties[r'$host'], isNotEmpty);
+    expect(properties[r'$pathname'], isNotEmpty);
+    expect(properties['plan'], 'pro');
+  });
+
+  test('beforeSend can redact the page url on capture, screen, and exception',
+      () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token', beforeSend: [
+      (event) {
+        event.properties
+          ?..remove(r'$current_url')
+          ..remove(r'$host')
+          ..remove(r'$pathname');
+        return event;
+      },
+    ]));
+
+    await web.capture(eventName: 'checkout', properties: {'plan': 'pro'});
+    await web.screen(screenName: 'Checkout');
+    await web.captureException(error: StateError('boom'));
+
+    expect(captures, hasLength(3));
+    for (final captured in captures) {
+      final properties = captured['properties'] as Map;
+      expect(properties.containsKey(r'$current_url'), isFalse,
+          reason: '${captured['event']}');
+      expect(properties.containsKey(r'$host'), isFalse,
+          reason: '${captured['event']}');
+      expect(properties.containsKey(r'$pathname'), isFalse,
+          reason: '${captured['event']}');
+    }
+    expect((captures.first['properties'] as Map)['plan'], 'pro');
+  });
+
   test('beforeSend can strip a property before web capture', () async {
     final web = PosthogFlutterWeb();
     await web.setup(
