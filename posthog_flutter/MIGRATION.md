@@ -63,7 +63,7 @@ If every plugin in your app supports Swift Package Manager, you can remove Cocoa
 
 Don't add these native SDKs to your app separately at a different major version.
 
-On Android, posthog-android 4.0 brings the `posthog` core 7.0, which isn't binary compatible with artifacts built against posthog-android 3.x. If your app also uses `posthog-server` older than 2.25.0, or another plugin or library built on posthog-android 3.x, it fails at runtime with errors such as `NoSuchMethodError`. Upgrade `posthog-server` to 2.25.0 or later. See [`posthog-server`](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#posthog-server) in the Android guide.
+On Android, posthog-android 4.0 brings the `posthog` core 7.0, which isn't binary compatible with artifacts built against posthog-android 3.x. If your app also uses `posthog-server` older than 2.25.0, or another plugin or library built on posthog-android 3.x, it fails at runtime with errors such as `NoSuchMethodError`. Upgrade `posthog-server` to 2.25.0 or later. See [`posthog-server`](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#posthog-server) in the Android guide.
 
 ### Breaking API changes
 
@@ -262,7 +262,7 @@ await Posthog().setup(config);
 
 Web doesn't move to capture v1 in this release. It keeps posthog-js and its current endpoints. On web, `options` are sent as the legacy option properties, and `captureAi` sends nothing.
 
-For the changes every capture v1 SDK shares, such as event options, limits and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/libraries/capture-v1). On iOS, macOS and Android, capture v1 comes from the native SDKs, so the Capture v1 sections of the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#endpoints) guides apply there too. Windows and Linux are covered [below](#capture-v1-on-windows-and-linux).
+For the changes every capture v1 SDK shares, such as event options, limits and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/libraries/capture-v1). On iOS, macOS and Android, capture v1 comes from the native SDKs, so the Capture v1 sections of the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#endpoints) guides apply there too. Windows and Linux are covered [below](#capture-v1-on-windows-and-linux).
 
 On every platform except web, an event's properties are now the SDK's, then registered properties, then the ones you pass, so your value wins over the SDK's for that event. In 5.x, the SDK's values won.
 
@@ -297,7 +297,7 @@ Before you upgrade, make your own proxy:
 
 PostHog's managed reverse proxy already does this and needs no change. A proxy set up from PostHog's [proxy guides](https://posthog.com/docs/advanced/proxy) before 29 October 2026 strips `Authorization`, so PostHog answers `401` and the events are dropped. Update it from the current guide.
 
-The SDK doesn't fall back to `/batch/`. On iOS, macOS, Android, Windows and Linux, a 404 is retried, events stay queued until the route is served, and the SDK prints one warning, also without `debug`. Other statuses that aren't retried, such as 401, 403 or 405, drop the batch. Web keeps posthog-js, which doesn't send to these routes. For iOS and Android details, see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides.
+The SDK doesn't fall back to `/batch/`. On iOS, macOS, Android, Windows and Linux, a 404 is retried, events stay queued until the route is served, and the SDK prints one warning, also without `debug`. Other statuses that aren't retried, such as 401, 403 or 405, drop the batch. Web keeps posthog-js, which doesn't send to these routes. For iOS and Android details, see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#hosts-without-capture-v1) guides.
 
 #### Feature flag payloads
 
@@ -307,7 +307,7 @@ On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`,
 
 A flag whose variant is an empty string reads as disabled on iOS, macOS, Android, Windows and Linux, as it already did on web. `isFeatureEnabled()` returns `false`, with or without `defaultValue`, `getFeatureFlagResult()` and `getAllFeatureFlags()` return `enabled: false`, `onFeatureFlags` listeners and `reloadFeatureFlags()` leave the flag out, and so does `$active_feature_flags` on captured events. `variant`, `getFeatureFlag()` and the event's `$feature/<key>` property still return `""`. PostHog no longer accepts empty variants for new flags, so only flags created earlier through the API, MCP or Terraform are affected. `/flags` still returns `enabled: true` for them, and other PostHog SDKs can still report them as enabled, so rename the variant before you upgrade.
 
-On Android, `$feature_flag_called` for a missing flag now leaves out `$feature_flag_response`. 5.x sent `""` from `getFeatureFlag()` and `false` from `isFeatureEnabled()`. Insights, cohorts and actions that filter on `$feature_flag_response = ""` or `false` to find missing flags stop matching new Android events without any error, so use an `is not set` filter instead. See [`$feature_flag_response` for a missing flag](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#feature_flag_response-for-a-missing-flag) in the Android guide.
+On Android, `$feature_flag_called` for a missing flag now leaves out `$feature_flag_response`. 5.x sent `""` from `getFeatureFlag()` and `false` from `isFeatureEnabled()`. Insights, cohorts and actions that filter on `$feature_flag_response = ""` or `false` to find missing flags stop matching new Android events without any error, so use an `is not set` filter instead. See [`$feature_flag_response` for a missing flag](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#feature_flag_response-for-a-missing-flag) in the Android guide.
 
 #### `beforeSend` on iOS, macOS and Android
 
