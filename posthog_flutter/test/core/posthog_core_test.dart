@@ -397,8 +397,7 @@ void main() {
       client.capture('plain');
       client.capture('own', options: {'cookieless_mode': true});
 
-      expect(queuedOptions(storage, 0),
-          containsPair('cookieless_mode', false));
+      expect(queuedOptions(storage, 0), containsPair('cookieless_mode', false));
       expect(queuedOptions(storage, 0),
           containsPair('disable_skew_correction', true));
       expect(queuedOptions(storage, 1), containsPair('cookieless_mode', true));
@@ -417,7 +416,8 @@ void main() {
       expect(queuedEvents(storage),
           [r'$identify', r'$create_alias', r'$groupidentify']);
       for (var i = 0; i < 3; i++) {
-        expect(queuedOptions(storage, i), containsPair('cookieless_mode', true));
+        expect(
+            queuedOptions(storage, i), containsPair('cookieless_mode', true));
       }
     });
 
