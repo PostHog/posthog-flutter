@@ -1308,15 +1308,19 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   static bool _isNonEmptyMap(Object? value) => value is Map && value.isNotEmpty;
 
-  /// Whether [options], or else [properties], turn person processing off
+  /// Whether [options], or else [properties], may turn person processing off
   /// for their event. An option wins over the property.
+  ///
+  /// Values are sent as given and capture also reads strings and numbers
+  /// such as `'no'` or `0` as false, so anything but `true` counts here.
   static bool _isPersonless(
     Map<String, Object?>? properties,
     Map<String, Object?>? options,
-  ) =>
-      (options?['process_person_profile'] ??
-          properties?[r'$process_person_profile']) ==
-      false;
+  ) {
+    final value = options?['process_person_profile'] ??
+        properties?[r'$process_person_profile'];
+    return value != null && value != true;
+  }
 
   static Map<String, Object>? _asPropertyMap(Object? value) {
     if (value is! Map) return null;

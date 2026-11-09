@@ -1682,29 +1682,36 @@ void main() {
       }
     });
 
-    test(r'a personless $set does not mark the person properties as sent',
-        () async {
-      final server = await LocalPostHogServer.start();
-      final platform = await setUpPlatform(configFor(server));
-      await platform.identify(userId: 'user-1');
+    // Capture reads these strings and numbers as false too.
+    for (final personless in <Object>[false, 'no', 'false', 'off', 0, 0.0]) {
+      test(
+          'a \$set with process_person_profile $personless '
+          'does not mark the person properties as sent', () async {
+        final server = await LocalPostHogServer.start();
+        final platform = await setUpPlatform(configFor(server));
+        await platform.identify(userId: 'user-1');
 
-      await platform.setPersonProperties(
-        userPropertiesToSet: {'plan': 'pro'},
-        options: {'process_person_profile': false},
-      );
-      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
-      await platform.capture(eventName: 'done');
-      await server.waitForEvent('done');
+        await platform.setPersonProperties(
+          userPropertiesToSet: {'plan': 'pro'},
+          options: {'process_person_profile': personless},
+        );
+        await platform
+            .setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+        await platform
+            .setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+        await platform.capture(eventName: 'done');
+        await server.waitForEvent('done');
 
-      final sets = [
-        for (final event in server.events)
-          if (event['event'] == r'$set') _optionsOf(event),
-      ];
-      expect(
-        [for (final set in sets) set['process_person_profile']],
-        [isFalse, isNull],
-      );
-    });
+        final sets = [
+          for (final event in server.events)
+            if (event['event'] == r'$set') _optionsOf(event),
+        ];
+        expect(
+          [for (final set in sets) set['process_person_profile']],
+          [personless, isNull],
+        );
+      });
+    }
   });
 
   group('captureAi', () {
