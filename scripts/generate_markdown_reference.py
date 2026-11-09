@@ -53,8 +53,8 @@ class Docs:
     def entry(self, symbol: dict, label: str, level: int) -> str:
         page = self.page(symbol)
         sig = page.select_one("section.multi-line-signature")
-        for label in sig.select(".features") if sig else []:  # "final", "getter/setter pair"
-            label.decompose()
+        for feature in sig.select(".features") if sig else []:  # "final", "getter/setter pair"
+            feature.decompose()
         code = tidy(" ".join(sig.get_text().split())) if sig else f"{KEYWORD.get(symbol['kind'], '')} {symbol['name']}".strip()
         parts = [f"{'#' * level} `{label}`", f"```dart\n{code}\n```"]
         parts += [markdown(page.select_one(s)) for s in ("section.desc", "section#values") if page.select_one(s)]
