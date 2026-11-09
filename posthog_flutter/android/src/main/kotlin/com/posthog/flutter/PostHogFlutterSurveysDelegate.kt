@@ -26,6 +26,7 @@ class PostHogFlutterSurveysDelegate(
     // Native setup keeps the first delegate; its engine channel can detach independently.
     @Volatile
     internal var channel: MethodChannel? = channel
+        private set
 
     override val supportsSurveyResume: Boolean = true
 
@@ -35,6 +36,8 @@ class PostHogFlutterSurveysDelegate(
     private var onSurveyShownCallback: OnPostHogSurveyShown? = null
     private var onSurveyResponseCallback: OnPostHogSurveyResponse? = null
     private var onSurveyClosedCallback: OnPostHogSurveyClosed? = null
+    private var hasBeenShown = false
+    private var isSurveyCompleted = false
 
     override fun renderSurvey(
         survey: PostHogDisplaySurvey,
@@ -42,20 +45,31 @@ class PostHogFlutterSurveysDelegate(
         onSurveyResponse: OnPostHogSurveyResponse,
         onSurveyClosed: OnPostHogSurveyClosed,
     ) {
-        val presentation = UUID.randomUUID().toString()
-        presentationId = presentation
         currentSurvey = survey
         onSurveyShownCallback = onSurveyShown
         onSurveyResponseCallback = onSurveyResponse
         onSurveyClosedCallback = onSurveyClosed
+        hasBeenShown = false
+        isSurveyCompleted = false
+        presentSurvey()
+    }
 
-        // Convert survey to map and send to Flutter
+    internal fun attachToEngine(channel: MethodChannel) {
+        this.channel = channel
+        if (hasBeenShown && presentationId == null) {
+            presentSurvey()
+        }
+    }
+
+    private fun presentSurvey() {
+        val survey = currentSurvey ?: return
+        val presentation = UUID.randomUUID().toString()
+        presentationId = presentation
         Handler(Looper.getMainLooper()).post {
             if (presentationId == presentation) {
                 val target = channel
                 if (target == null) {
-                    cleanupSurveys()
-                    onSurveyClosed(survey)
+                    detachFromEngine()
                 } else {
                     target.invokeMethod("showSurvey", survey.toMap() + ("presentationId" to presentation))
                 }
@@ -65,6 +79,12 @@ class PostHogFlutterSurveysDelegate(
 
     internal fun detachFromEngine() {
         channel = null
+        presentationId = null
+        // Closing an unfinished, shown survey deletes native progress and records a dismissal.
+        // Keep its callbacks (not its engine) so reattach can continue the same attempt.
+        if (hasBeenShown && !isSurveyCompleted) {
+            return
+        }
         val survey = currentSurvey
         val onClosed = onSurveyClosedCallback
         cleanupSurveys()
@@ -79,6 +99,8 @@ class PostHogFlutterSurveysDelegate(
         onSurveyShownCallback = null
         onSurveyResponseCallback = null
         onSurveyClosedCallback = null
+        hasBeenShown = false
+        isSurveyCompleted = false
         invokeFlutterMethod("hideSurveys")
     }
 
@@ -95,7 +117,10 @@ class PostHogFlutterSurveysDelegate(
 
         when (action) {
             "shown" -> {
-                onSurveyShownCallback?.invoke(survey)
+                if (!hasBeenShown) {
+                    hasBeenShown = true
+                    onSurveyShownCallback?.invoke(survey)
+                }
             }
 
             "response" -> {
@@ -147,6 +172,8 @@ class PostHogFlutterSurveysDelegate(
 
                     // Call the callback with the constructed response
                     onSurveyResponseCallback?.invoke(survey, index, surveyResponse)?.let { nextQuestion ->
+                        currentSurvey = survey.copy(initialQuestionIndex = nextQuestion.questionIndex)
+                        isSurveyCompleted = nextQuestion.isSurveyCompleted
                         result.success(
                             mapOf(
                                 "nextIndex" to nextQuestion.questionIndex,
@@ -168,6 +195,8 @@ class PostHogFlutterSurveysDelegate(
                 onSurveyShownCallback = null
                 onSurveyResponseCallback = null
                 onSurveyClosedCallback = null
+                hasBeenShown = false
+                isSurveyCompleted = false
             }
         }
 

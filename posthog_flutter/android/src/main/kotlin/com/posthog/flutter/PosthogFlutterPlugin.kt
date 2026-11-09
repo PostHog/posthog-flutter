@@ -169,8 +169,6 @@ class PosthogFlutterPlugin :
             snapshotSendExecutor = Executors.newSingleThreadExecutor()
         }
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "posthog_flutter")
-        // The surveys delegate outlives the channel, so move it to the live engine on a re-attach.
-        flutterSurveysDelegate?.channel = channel
 
         this.applicationContext = flutterPluginBinding.applicationContext
         initPlugin()
@@ -701,6 +699,8 @@ class PosthogFlutterPlugin :
                         // first one. A new instance here would render nothing yet still receive
                         // every Dart survey action, so each action comes back as SurveyInvalidated.
                         val delegate = flutterSurveysDelegate ?: PostHogFlutterSurveysDelegate(channel)
+                        // Dart's setup confirms its handler is ready before resuming a detached survey.
+                        delegate.attachToEngine(channel)
                         surveysConfig.surveysDelegate = delegate
                         flutterSurveysDelegate = delegate
                     }

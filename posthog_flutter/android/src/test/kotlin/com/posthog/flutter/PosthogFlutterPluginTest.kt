@@ -167,6 +167,7 @@ internal class PosthogFlutterPluginTest {
 
         val reattachedMessenger = Mockito.mock(BinaryMessenger::class.java)
         attach(plugin, reattachedMessenger)
+        assertNull((first as PostHogFlutterSurveysDelegate).channel)
         plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
 
         // The reused delegate must reach the engine that is attached now, not the detached one.
