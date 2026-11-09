@@ -1712,6 +1712,29 @@ void main() {
         );
       });
     }
+
+    test(r'a $set with a non-boolean process_person_profile clears the dedup',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final platform = await setUpPlatform(configFor(server));
+      await platform.identify(userId: 'user-1');
+
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'free'});
+      await platform.setPersonProperties(
+        userPropertiesToSet: {'plan': 'pro'},
+        options: {'process_person_profile': 'yes'},
+      );
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'free'});
+      await platform.capture(eventName: 'done');
+      await server.waitForEvent('done');
+
+      final plans = [
+        for (final event in server.events)
+          if (event['event'] == r'$set')
+            ((event['properties'] as Map)[r'$set'] as Map)['plan'],
+      ];
+      expect(plans, ['free', 'pro', 'free']);
+    });
   });
 
   group('captureAi', () {
