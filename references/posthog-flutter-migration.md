@@ -295,7 +295,7 @@ Before you upgrade, make your own proxy:
 
 PostHog's managed reverse proxy already does this and needs no change. A proxy set up from PostHog's [proxy guides](https://posthog.com/docs/advanced/proxy) before 29 October 2026 strips `Authorization`, so PostHog answers `401` and the events are dropped. Update it from the current guide.
 
-The SDK doesn't fall back to `/batch/`. On Windows and Linux, a 404 is retried, events stay queued until the route is served, and the SDK prints one warning, also without `debug`. Other statuses that aren't retried, such as 401, 403 or 405, drop the batch. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides for those platforms.
+The SDK doesn't fall back to `/batch/`. On iOS, macOS, Android, Windows and Linux, a 404 is retried, events stay queued until the route is served, and the SDK prints one warning, also without `debug`. Other statuses that aren't retried, such as 401, 403 or 405, drop the batch. Web keeps posthog-js, which doesn't send to these routes. For iOS and Android details, see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/docs/migration-3.x-to-4.0.md#hosts-without-capture-v1) guides.
 
 ### Feature flag payloads
 

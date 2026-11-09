@@ -735,8 +735,8 @@ have not loaded yet, the flags request failed, or no flag has this key. A
 flag that has a value always wins, including `false` and variants, and
 `$feature_flag_called` never reports `defaultValue` as the flag's value.
 
-Returns `false` when the flag is disabled, and `true` when it is enabled
-or set to a variant.
+Returns `false` when the flag is disabled or set to an empty variant, and
+`true` when it is enabled or set to a non-empty variant.
 
 **Example:**
 
@@ -1340,6 +1340,9 @@ Settings.
 The `language` is a BCP 47 tag, such as `de` or `pt-BR`. Pass `null` to go
 back to the observer's value.
 
+Not sent on web yet, because posthog-js doesn't support `$app_language`.
+To send it there now, use register.
+
 **Example:**
 
 ```dart
@@ -1526,7 +1529,7 @@ const PostHogMaskWidget({Key? key, required Widget child})
 
 Creates a mask around `child` for session replay.
 
-#### `<></>`
+#### `PostHogMaskWidget.child`
 
 ```dart
 Widget child
@@ -1571,7 +1574,7 @@ const PostHogPlatformView({Key? key, required Widget child, PostHogPlatformViewP
 
 Creates a session replay policy marker around `child`.
 
-#### `<></>`
+#### `PostHogPlatformView.child`
 
 ```dart
 Widget child
@@ -1579,7 +1582,7 @@ Widget child
 
 The platform view subtree this policy applies to.
 
-#### `<></>`
+#### `PostHogPlatformView.privacy`
 
 ```dart
 PostHogPlatformViewPrivacy privacy
@@ -1634,7 +1637,7 @@ const PostHogUnmaskWidget({Key? key, required Widget child})
 
 Creates an exception to global text/image masking around `child`.
 
-#### `<></>`
+#### `PostHogUnmaskWidget.child`
 
 ```dart
 Widget child
@@ -1664,7 +1667,7 @@ const PostHogWidget({Key? key, required Widget child})
 
 Creates a session replay root widget around `child`.
 
-#### `<></>`
+#### `PostHogWidget.child`
 
 ```dart
 Widget child
@@ -1772,7 +1775,7 @@ Creates a bootstrap configuration.
 
 Pass only the dimensions you want to seed; leave the rest `null`.
 
-#### `<></>`
+#### `PostHogBootstrapConfig.distinctId`
 
 ```dart
 String? distinctId
@@ -1784,7 +1787,7 @@ When isIdentifiedId is `false` (the default) this becomes the anonymous
 id — the `$distinct_id` on pre-identify events. When `true` it is treated
 as an already-identified user's distinct id.
 
-#### `<></>`
+#### `PostHogBootstrapConfig.featureFlagPayloads`
 
 ```dart
 Map<String, Object?>? featureFlagPayloads
@@ -1793,7 +1796,7 @@ Map<String, Object?>? featureFlagPayloads
 JSON payloads paired with featureFlags, keyed by flag key. Each value is
 the already-decoded payload (map, list, string, number, `null`, ...).
 
-#### `<></>`
+#### `PostHogBootstrapConfig.featureFlags`
 
 ```dart
 Map<String, Object>? featureFlags
@@ -1804,7 +1807,7 @@ keyed by flag key. Each value is a `bool` for boolean flags or a `String`
 for multivariate flags. Only enabled values are served: `false` or an
 empty string is dropped.
 
-#### `<></>`
+#### `PostHogBootstrapConfig.isIdentifiedId`
 
 ```dart
 bool isIdentifiedId
@@ -1853,7 +1856,7 @@ The `projectToken` is trimmed before it is stored.
 The optional `beforeSend` callbacks are copied into `beforeSend` and run in
 order before Dart-captured events are sent.
 
-#### `<></>`
+#### `PostHogConfig.beforeSend`
 
 ```dart
 List<BeforeSendCallback> beforeSend
@@ -1916,8 +1919,7 @@ config.beforeSend = [
 - On iOS, macOS, Android, Windows and Linux, the callbacks see the
   system properties (like `$device_type` and `$session_id`), the
   registered properties and the options the SDK adds, and can change
-  them for that event, except `$lib` and `$lib_version`, which PostHog
-  sets from the SDK. On iOS, macOS and Android, registering callbacks
+  them for that event. On iOS, macOS and Android, registering callbacks
   adds one more call to the native SDK per event. The native SDK keeps
   each built event until Dart sends it back, and discards one still
   waiting after a minute (for example, after a hot restart). On web,
@@ -1941,7 +1943,7 @@ config.beforeSend = [
 - If any callback returns `null`, the event is dropped and subsequent
   callbacks are not called.
 
-#### `<></>`
+#### `PostHogConfig.bootstrap`
 
 ```dart
 PostHogBootstrapConfig? bootstrap
@@ -1964,7 +1966,7 @@ drop the bootstrap on `reset()`). Defaults to `null` (no bootstrap).
 posthog-js instance, so configure `bootstrap` in your `posthog.init({...})`
 call instead.
 
-#### `<></>`
+#### `PostHogConfig.captureAiCompression`
 
 ```dart
 PostHogCompression? captureAiCompression
@@ -1977,7 +1979,7 @@ Not applied on web, where Posthog.captureAi sends nothing.
 
 Defaults to `null`, which keeps the SDK default (gzip).
 
-#### `<></>`
+#### `PostHogConfig.captureAiMaxEventBytes`
 
 ```dart
 int? captureAiMaxEventBytes
@@ -1996,7 +1998,7 @@ Not applied on web, where Posthog.captureAi sends nothing.
 
 Defaults to `null`, which keeps the SDK default.
 
-#### `<></>`
+#### `PostHogConfig.captureAiMaxQueueSize`
 
 ```dart
 int? captureAiMaxQueueSize
@@ -2015,7 +2017,7 @@ Not applied on web, where Posthog.captureAi sends nothing.
 
 Defaults to `null`, which keeps the SDK default.
 
-#### `<></>`
+#### `PostHogConfig.captureAiTimeout`
 
 ```dart
 Duration? captureAiTimeout
@@ -2034,7 +2036,7 @@ Not applied on web, where Posthog.captureAi sends nothing.
 
 Defaults to `null`, which keeps the SDK default.
 
-#### `<></>`
+#### `PostHogConfig.captureApplicationLifecycleEvents`
 
 ```dart
 bool captureApplicationLifecycleEvents
@@ -2045,7 +2047,7 @@ Whether the SDK captures application lifecycle events automatically.
 Captured events include app opened, backgrounded, installed, and updated
 events where supported by the platform. Defaults to `true`.
 
-#### `<></>`
+#### `PostHogConfig.capturePushNotificationOpened`
 
 ```dart
 bool capturePushNotificationOpened
@@ -2070,7 +2072,7 @@ Setting this to `false` does not prevent the iOS cold-start prewarm, which runs 
 Dart does — opt that out with the `com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED`
 key in `Info.plist`.
 
-#### `<></>`
+#### `PostHogConfig.capturePushNotificationSubscriptions`
 
 ```dart
 bool capturePushNotificationSubscriptions
@@ -2092,7 +2094,7 @@ Posthog.registerPushNotificationToken yourself.
 
 **Flutter web, Windows and Linux:** not supported. Defaults to `true`.
 
-#### `<></>`
+#### `PostHogConfig.compression`
 
 ```dart
 PostHogCompression compression
@@ -2109,7 +2111,7 @@ posthog-js instance, so set `disable_compression: true` in your
 
 Defaults to PostHogCompression.gzip.
 
-#### `<></>`
+#### `PostHogConfig.dataMode`
 
 ```dart
 PostHogDataMode dataMode
@@ -2119,7 +2121,7 @@ Network connection types that can be used to send data on Apple platforms.
 
 Defaults to PostHogDataMode.any.
 
-#### `<></>`
+#### `PostHogConfig.debug`
 
 ```dart
 bool debug
@@ -2129,7 +2131,7 @@ Whether the SDK emits verbose debug logs.
 
 Defaults to `false`.
 
-#### `<></>`
+#### `PostHogConfig.enableWindowsAndLinux`
 
 ```dart
 @experimental bool enableWindowsAndLinux
@@ -2142,7 +2144,7 @@ Set to `false` before Posthog.setup to disable the SDK on these
 platforms. Other platforms are unaffected. Close the SDK before
 changing this setting and calling setup again.
 
-#### `<></>`
+#### `PostHogConfig.errorTrackingConfig`
 
 ```dart
 PostHogErrorTrackingConfig errorTrackingConfig
@@ -2150,7 +2152,7 @@ PostHogErrorTrackingConfig errorTrackingConfig
 
 Configuration for error tracking and exception capture.
 
-#### `<></>`
+#### `PostHogConfig.evaluationContexts`
 
 ```dart
 List<String>? evaluationContexts
@@ -2174,7 +2176,34 @@ final config = PostHogConfig('<YOUR_PROJECT_TOKEN>')
 await Posthog().setup(config);
 ```
 
-#### `<></>`
+#### `PostHogConfig.featureFlagRequestMaxRetries`
+
+```dart
+int featureFlagRequestMaxRetries
+```
+
+Maximum number of retries for a `/flags` request after a network error
+or a gateway error (HTTP 502 or 504).
+
+The SDK waits 300ms before the first retry and doubles the wait for each
+later one. A refused connection is not retried.
+
+Defaults to `1`. Set to `0` to disable retries; negative values are
+treated as `0`.
+
+**Flutter web:** not applied. posthog-js is initialized by your app, so
+set `feature_flag_request_max_retries` in your `posthog.init({...})` call
+instead.
+
+**Example:**
+
+```dart
+final config = PostHogConfig('<YOUR_PROJECT_TOKEN>')
+  ..featureFlagRequestMaxRetries = 3;
+await Posthog().setup(config);
+```
+
+#### `PostHogConfig.flushAt`
 
 ```dart
 int flushAt
@@ -2184,7 +2213,7 @@ Number of queued events that triggers an automatic flush.
 
 Defaults to `20`.
 
-#### `<></>`
+#### `PostHogConfig.flushInterval`
 
 ```dart
 Duration flushInterval
@@ -2205,7 +2234,7 @@ The PostHog ingestion host.
 Defaults to `https://us.i.posthog.com`. The setter trims surrounding
 whitespace and falls back to the default host when assigned a blank value.
 
-#### `<></>`
+#### `PostHogConfig.logsConfig`
 
 ```dart
 PostHogLogsConfig logsConfig
@@ -2214,7 +2243,7 @@ PostHogLogsConfig logsConfig
 Configuration for the logs subsystem (`Posthog().captureLog()` and the
 `Posthog().logger` facade).
 
-#### `<></>`
+#### `PostHogConfig.maxBatchSize`
 
 ```dart
 int maxBatchSize
@@ -2224,7 +2253,7 @@ Maximum number of events sent in a single batch.
 
 Defaults to `50`.
 
-#### `<></>`
+#### `PostHogConfig.maxQueueSize`
 
 ```dart
 int maxQueueSize
@@ -2235,7 +2264,7 @@ Maximum number of events stored in the local queue.
 When the queue is full, the oldest events may be dropped by the native SDK.
 Defaults to `1000`.
 
-#### `<></>`
+#### `PostHogConfig.optOut`
 
 ```dart
 bool optOut
@@ -2246,7 +2275,7 @@ Whether the SDK starts with data collection disabled.
 Defaults to `false`. Use `Posthog().optOut()` and `Posthog().optIn()` to
 change this setting at runtime.
 
-#### `<></>`
+#### `PostHogConfig.personProfiles`
 
 ```dart
 PostHogPersonProfiles personProfiles
@@ -2256,7 +2285,7 @@ Controls whether captured events create or update person profiles.
 
 Defaults to PostHogPersonProfiles.identifiedOnly.
 
-#### `<></>`
+#### `PostHogConfig.preloadFeatureFlags`
 
 ```dart
 bool preloadFeatureFlags
@@ -2277,7 +2306,7 @@ posthog-js instance, so set
 `advanced_disable_feature_flags_on_first_load`
 in your `posthog.init({...})` call instead.
 
-#### `<></>`
+#### `PostHogConfig.projectToken`
 
 ```dart
 String projectToken
@@ -2288,7 +2317,7 @@ Your PostHog project token.
 You can find it at:
 https://us.posthog.com/settings/project-details#variables
 
-#### `<></>`
+#### `PostHogConfig.pushIdentityProvider`
 
 ```dart
 PushIdentityProvider? pushIdentityProvider
@@ -2317,7 +2346,7 @@ Posthog.setup.
 
 **Flutter web, Windows and Linux:** not supported. Defaults to `null`.
 
-#### `<></>`
+#### `PostHogConfig.rageClickConfig`
 
 ```dart
 PostHogRageClickConfig rageClickConfig
@@ -2327,7 +2356,7 @@ Configuration for rage-click autocapture on iOS and Mac Catalyst.
 
 Rage-click autocapture is not currently supported on other platforms.
 
-#### `<></>`
+#### `PostHogConfig.sendFeatureFlagEvent`
 
 ```dart
 bool sendFeatureFlagEvent
@@ -2337,7 +2366,7 @@ Whether calls that evaluate feature flags capture `$feature_flag_called`.
 
 Defaults to `true`.
 
-#### `<></>`
+#### `PostHogConfig.sessionReplay`
 
 ```dart
 bool sessionReplay
@@ -2348,7 +2377,7 @@ Whether mobile session replay is enabled for Android and iOS.
 Requires Record user sessions to be enabled in PostHog project settings.
 Defaults to `false`.
 
-#### `<></>`
+#### `PostHogConfig.sessionReplayConfig`
 
 ```dart
 PostHogSessionReplayConfig sessionReplayConfig
@@ -2358,7 +2387,7 @@ Configuration for mobile session replay.
 
 sessionReplay must be enabled for these options to take effect.
 
-#### `<></>`
+#### `PostHogConfig.surveys`
 
 ```dart
 bool surveys
@@ -2411,7 +2440,7 @@ PostHogErrorTrackingConfig()
 
 Creates an error tracking configuration with all autocapture disabled.
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.captureFlutterErrors`
 
 ```dart
 bool captureFlutterErrors
@@ -2423,7 +2452,7 @@ Controls whether `FlutterError.onError` errors are captured.
 
 Default: false
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.captureIsolateErrors`
 
 ```dart
 bool captureIsolateErrors
@@ -2443,7 +2472,7 @@ an isolate spawned paused.
 
 Default: false
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.captureNativeCrashes`
 
 ```dart
 bool captureNativeCrashes
@@ -2473,7 +2502,7 @@ Because the event is sent from the next launch, properties like
 
 Default: false
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.captureNativeExceptions`
 
 ```dart
 bool captureNativeExceptions
@@ -2511,7 +2540,7 @@ See: https://posthog.com/docs/error-tracking/upload-mappings/android
 
 Default: false
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.capturePlatformDispatcherErrors`
 
 ```dart
 bool capturePlatformDispatcherErrors
@@ -2527,7 +2556,7 @@ Controls whether `PlatformDispatcher.onError` errors are captured.
 
 Default: false
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.captureSilentFlutterErrors`
 
 ```dart
 bool captureSilentFlutterErrors
@@ -2540,7 +2569,7 @@ Controls whether Flutter errors marked as silent
 
 Default: false
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.exceptionSteps`
 
 ```dart
 PostHogExceptionStepsConfig exceptionSteps
@@ -2551,7 +2580,7 @@ attached to every captured `$exception` as `$exception_steps`).
 
 Record steps with `Posthog().addExceptionStep()`.
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.inAppByDefault`
 
 ```dart
 bool inAppByDefault
@@ -2575,7 +2604,7 @@ Default behavior when true:
 - Flutter web: Not supported
 - Android: Not supported
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.inAppExcludes`
 
 ```dart
 List<String> inAppExcludes
@@ -2609,7 +2638,7 @@ Common packages to exclude:
 - Flutter web: Not supported
 - Android: Not supported
 
-#### `<></>`
+#### `PostHogErrorTrackingConfig.inAppIncludes`
 
 ```dart
 List<String> inAppIncludes
@@ -2688,7 +2717,7 @@ The optional `options` are the event's per-event options.
 The optional `uuid`, `distinctId` and `timestamp` are set by the SDK on
 every platform but web.
 
-#### `<></>`
+#### `PostHogEvent.distinctId`
 
 ```dart
 String? distinctId
@@ -2699,7 +2728,7 @@ The id of the person the event is captured for.
 Set on iOS, macOS, Android, Windows and Linux, where a callback can
 change it. `null` on web.
 
-#### `<></>`
+#### `PostHogEvent.event`
 
 ```dart
 String event
@@ -2707,7 +2736,7 @@ String event
 
 The name of the event (e.g., 'button\_clicked', '$screen', '$exception')
 
-#### `<></>`
+#### `PostHogEvent.options`
 
 ```dart
 Map<String, Object?>? options
@@ -2719,7 +2748,7 @@ its properties. See `Posthog.capture` for the known keys.
 A callback can read, add, change or remove them. A null value means
 unset.
 
-#### `<></>`
+#### `PostHogEvent.properties`
 
 ```dart
 Map<String, Object>? properties
@@ -2736,7 +2765,7 @@ and userPropertiesSetOnce instead.
 On web, only the event's own properties are here; posthog-js adds the
 rest later.
 
-#### `<></>`
+#### `PostHogEvent.timestamp`
 
 ```dart
 DateTime? timestamp
@@ -2747,7 +2776,7 @@ When the event happened.
 Set on iOS, macOS, Android, Windows and Linux, where a callback can
 change it. `null` on web.
 
-#### `<></>`
+#### `PostHogEvent.userProperties`
 
 ```dart
 Map<String, Object>? userProperties
@@ -2757,7 +2786,7 @@ User properties to set on the user profile ($set).
 
 These properties will be merged with any existing user properties.
 
-#### `<></>`
+#### `PostHogEvent.userPropertiesSetOnce`
 
 ```dart
 Map<String, Object>? userPropertiesSetOnce
@@ -2767,7 +2796,7 @@ User properties to set only once on the user profile ($set\_once).
 
 These properties will only be set if they don't already exist on the user profile.
 
-#### `<></>`
+#### `PostHogEvent.uuid`
 
 ```dart
 String? uuid
@@ -2813,7 +2842,7 @@ PostHogExceptionStepsConfig()
 
 Creates an exception-steps configuration with native defaults.
 
-#### `<></>`
+#### `PostHogExceptionStepsConfig.enabled`
 
 ```dart
 bool enabled
@@ -2824,7 +2853,7 @@ Whether recording and attaching exception steps is enabled.
 When disabled, `Posthog().addExceptionStep()` is a no-op and nothing is
 attached. Defaults to `true`.
 
-#### `<></>`
+#### `PostHogExceptionStepsConfig.maxBytes`
 
 ```dart
 int maxBytes
@@ -2866,7 +2895,7 @@ The optional `variant` is the variant key for multivariate flags.
 The optional `payload` is the JSON payload configured for the matched flag
 or variant.
 
-#### `<></>`
+#### `PostHogFeatureFlagResult.enabled`
 
 ```dart
 bool enabled
@@ -2877,7 +2906,7 @@ Whether the flag is enabled.
 For boolean flags, this is the flag value.
 For multivariate flags, this is true when the flag evaluates to any variant.
 
-#### `<></>`
+#### `PostHogFeatureFlagResult.key`
 
 ```dart
 String key
@@ -2885,7 +2914,7 @@ String key
 
 The feature flag key.
 
-#### `<></>`
+#### `PostHogFeatureFlagResult.payload`
 
 ```dart
 Object? payload
@@ -2893,7 +2922,7 @@ Object? payload
 
 The JSON payload associated with the flag, if any.
 
-#### `<></>`
+#### `PostHogFeatureFlagResult.variant`
 
 ```dart
 String? variant
@@ -2936,7 +2965,7 @@ PostHogFeatureFlagsLoaded({required Map<String, Object?> variants, required bool
 Creates the loaded feature flags from `variants`, keeping only enabled
 flags: `true`, or a non-empty variant string.
 
-#### `<></>`
+#### `PostHogFeatureFlagsLoaded.errorsLoading`
 
 ```dart
 bool errorsLoading
@@ -2957,7 +2986,7 @@ List<String> get flags
 
 The keys of the enabled feature flags.
 
-#### `<></>`
+#### `PostHogFeatureFlagsLoaded.variants`
 
 ```dart
 Map<String, Object> variants
@@ -3014,7 +3043,7 @@ The `level` is the severity, defaulting to PostHogLogSeverity.info.
 The optional `attributes` are per-record attributes that can be amended
 before capture.
 
-#### `<></>`
+#### `PostHogLogRecord.attributes`
 
 ```dart
 Map<String, Object>? attributes
@@ -3026,7 +3055,7 @@ Note: Auto-captured context (distinct id, session id, screen name, app
 state, active feature flags) is added by the native SDK at a later stage
 and is not available in this map.
 
-#### `<></>`
+#### `PostHogLogRecord.body`
 
 ```dart
 String body
@@ -3034,7 +3063,7 @@ String body
 
 The log message body.
 
-#### `<></>`
+#### `PostHogLogRecord.level`
 
 ```dart
 PostHogLogSeverity level
@@ -3097,7 +3126,7 @@ PostHogLogsConfig()
 
 Creates a logs configuration with native defaults.
 
-#### `<></>`
+#### `PostHogLogsConfig.beforeSend`
 
 ```dart
 List<BeforeSendLogCallback> beforeSend
@@ -3138,7 +3167,7 @@ config.logsConfig.beforeSend = [
   record. Keep anything sensitive out of those fields; put it in `body` or
   PostHogLogRecord.attributes, which a callback can scrub or drop.
 
-#### `<></>`
+#### `PostHogLogsConfig.environment`
 
 ```dart
 String? environment
@@ -3148,7 +3177,7 @@ Sets the OTLP `deployment.environment` resource attribute (e.g.
 `production`, `staging`). When `null`, the native SDK's default is used
 (no environment).
 
-#### `<></>`
+#### `PostHogLogsConfig.flushAt`
 
 ```dart
 int? flushAt
@@ -3157,7 +3186,7 @@ int? flushAt
 Queue depth that triggers an immediate flush. When `null`, the native
 default is used (20 on iOS/Android).
 
-#### `<></>`
+#### `PostHogLogsConfig.flushInterval`
 
 ```dart
 Duration? flushInterval
@@ -3166,7 +3195,7 @@ Duration? flushInterval
 Periodic auto-flush interval. When `null`, the native default is used
 (30s on iOS/Android).
 
-#### `<></>`
+#### `PostHogLogsConfig.maxBatchSize`
 
 ```dart
 int? maxBatchSize
@@ -3175,7 +3204,7 @@ int? maxBatchSize
 Maximum number of records sent per POST. When `null`, the native default
 is used (50 on iOS/Android).
 
-#### `<></>`
+#### `PostHogLogsConfig.maxBufferSize`
 
 ```dart
 int? maxBufferSize
@@ -3184,7 +3213,7 @@ int? maxBufferSize
 Maximum number of buffered records before the oldest are dropped (FIFO).
 When `null`, the native default is used (1000 on iOS/Android).
 
-#### `<></>`
+#### `PostHogLogsConfig.rateCapMaxLogs`
 
 ```dart
 int? rateCapMaxLogs
@@ -3194,7 +3223,7 @@ Maximum number of logs accepted per rate-cap window before excess logs are
 dropped. When `null`, the native default is used (500 on iOS/Android). A
 non-positive value disables the cap natively.
 
-#### `<></>`
+#### `PostHogLogsConfig.rateCapWindow`
 
 ```dart
 Duration? rateCapWindow
@@ -3203,7 +3232,7 @@ Duration? rateCapWindow
 Length of the rate-cap window. When `null`, the native default is used
 (10s on iOS/Android).
 
-#### `<></>`
+#### `PostHogLogsConfig.resourceAttributes`
 
 ```dart
 Map<String, Object> resourceAttributes
@@ -3214,7 +3243,7 @@ Extra OTLP resource attributes merged into every payload.
 SDK-managed identity keys (`service.*`, `telemetry.sdk.*`) take precedence
 and cannot be overridden.
 
-#### `<></>`
+#### `PostHogLogsConfig.serviceName`
 
 ```dart
 String? serviceName
@@ -3225,7 +3254,7 @@ Sets the OTLP `service.name` resource attribute.
 When `null`, the native SDK's default is used (the app bundle id on Apple
 platforms, the app namespace on Android).
 
-#### `<></>`
+#### `PostHogLogsConfig.serviceVersion`
 
 ```dart
 String? serviceVersion
@@ -3282,7 +3311,7 @@ PostHogRageClickConfig()
 
 Creates a rage-click configuration using the native defaults.
 
-#### `<></>`
+#### `PostHogRageClickConfig.enabled`
 
 ```dart
 bool enabled
@@ -3292,7 +3321,7 @@ Whether rapid repeated taps are captured as `$rageclick` events.
 
 Defaults to `true`.
 
-#### `<></>`
+#### `PostHogRageClickConfig.minimumTapCount`
 
 ```dart
 int minimumTapCount
@@ -3302,7 +3331,7 @@ Number of consecutive taps required to capture a rage click.
 
 Defaults to `3`.
 
-#### `<></>`
+#### `PostHogRageClickConfig.thresholdPoints`
 
 ```dart
 double thresholdPoints
@@ -3312,7 +3341,7 @@ Maximum Manhattan distance, in logical points, between consecutive taps.
 
 Defaults to `30`.
 
-#### `<></>`
+#### `PostHogRageClickConfig.timeoutInterval`
 
 ```dart
 Duration timeoutInterval
@@ -3399,7 +3428,7 @@ a sensitive native screen guarantees that screen is not captured.
 
 Default: false. Requires native SDK support for on-demand capture.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.captureTouches`
 
 ```dart
 bool captureTouches
@@ -3413,7 +3442,7 @@ Disabling touches does not stop screenshot capture.
 
 Default: true. Not supported on web or desktop.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.maskAllImages`
 
 ```dart
 bool maskAllImages
@@ -3427,7 +3456,7 @@ requires canvas masking to be enabled as described in maskAllTexts.
 Does not mask images drawn by CustomPainter. Enable maskCustomPaint or
 wrap sensitive custom-painted widgets in PostHogMaskWidget to mask them.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.maskAllPlatformViews`
 
 ```dart
 bool maskAllPlatformViews
@@ -3452,7 +3481,7 @@ See PostHogPlatformViewPrivacy.capture.
 Applies only to native views embedded in the Flutter layout. For native
 screens presented over the whole app, see captureNativeScreens.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.maskAllTexts`
 
 ```dart
 bool maskAllTexts
@@ -3483,7 +3512,7 @@ With captureNativeScreens enabled, setting this false also unmasks text
 on captured native screens, including native input fields (passwords,
 card numbers) you may not have built.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.maskCustomPaint`
 
 ```dart
 bool maskCustomPaint
@@ -3504,7 +3533,7 @@ its full-window CustomPaint otherwise masks the entire screen.
 Frames containing a painter whose bounds cannot be determined, such as a
 zero-sized CustomPaint, are skipped rather than sent with a missing mask.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.sampleRate`
 
 ```dart
 double? sampleRate
@@ -3514,7 +3543,7 @@ Session replay sample rate between 0 and 1.
 Local config has precedence over remote config when both are set.
 If null, sampling is controlled by remote config (when available).
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.screenshotColorMode`
 
 ```dart
 @experimental PostHogScreenshotColorMode screenshotColorMode
@@ -3560,7 +3589,7 @@ replay viewport. Masks round outward to cover output pixels; frames with
 mask bounds that cannot be mapped safely are skipped.
 Set before `Posthog().setup(config)`.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.textMaskPolicy`
 
 ```dart
 PostHogTextMaskPolicy? textMaskPolicy
@@ -3631,7 +3660,7 @@ instead:
 
 Default: null.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.throttleDelay`
 
 ```dart
 Duration throttleDelay
@@ -3644,7 +3673,7 @@ This is used for capturing the view as a screenshot. The lower the number,
 the more snapshots will be captured but higher the performance impact.
 Defaults to 1s.
 
-#### `<></>`
+#### `PostHogSessionReplayConfig.verifyScreenshotMaskAlignment`
 
 ```dart
 bool verifyScreenshotMaskAlignment
@@ -3744,7 +3773,7 @@ const PostHogTextMaskExcept(Iterable<TextRange> ranges)
 
 Creates a decision that masks everything except `ranges`.
 
-#### `<></>`
+#### `PostHogTextMaskExcept.ranges`
 
 ```dart
 Iterable<TextRange> ranges
@@ -3784,7 +3813,7 @@ const PostHogTextMaskOnly(Iterable<TextRange> ranges)
 
 Creates a decision that masks only `ranges`.
 
-#### `<></>`
+#### `PostHogTextMaskOnly.ranges`
 
 ```dart
 Iterable<TextRange> ranges
