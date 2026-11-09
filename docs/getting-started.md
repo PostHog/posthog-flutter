@@ -1,5 +1,11 @@
 # Getting started
 
+The Flutter SDK runs in iOS, Android, macOS, and web apps.
+
+To send your first event, add `posthog_flutter`, then call `setup` once before `runApp` with your project token and host from your [project settings](https://app.posthog.com/project/settings).
+
+Use `capture` for your own events, and call `flush` and `close` before the app exits.
+
 Install the package:
 
 ```bash
