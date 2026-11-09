@@ -273,7 +273,7 @@ You need to change code if your app does any of these:
 - reads `$session_id` or `$window_id` from the raw request body, for example in a proxy
 - relies on a `Retry-After` longer than 30 seconds
 - registers or passes a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expects the SDK's value to win
-- on Windows or Linux, returns a `PostHogEvent` from `beforeSend` without the event's `options`
+- on any platform except web, drops the event's `options` in `beforeSend` by returning a new `PostHogEvent` or replacing `event.options`
 - on Windows or Linux, alerts on the SDK's debug log lines
 - on Windows or Linux, calls `exit()` without awaiting the calls before it or `Posthog().close()`
 
@@ -306,6 +306,8 @@ A flag whose variant is an empty string reads as disabled on iOS, macOS, Android
 **Person processing is decided before the callbacks run.** In 5.x, a callback that removed `$set` prevented a person profile. Now the event is still person-processed, and so are later events. Return `null` to drop an event that must not create a profile. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 
 Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Map<String, dynamic>>`. Any other list is `List<dynamic>`, even a `List<String>` you passed to `capture`, so cast its items instead of the list.
+
+The `PostHogEvent` the callbacks return replaces the event's options. A callback that returns a new `PostHogEvent`, or replaces `event.options`, without the options it got drops them, including `process_person_profile: false`, which turns person processing on for that event. Copy `event.options` to the event you return.
 
 Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin for those.
 
@@ -454,6 +456,8 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 ## New features
 
 - An `options` argument on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` in `beforeSend`. `process_person_profile`, `cookieless_mode`, `disable_skew_correction` and `product_tour_id` win over their legacy option properties (`$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`). Other keys are sent unchanged. On web, known keys are sent as those legacy option properties and other keys are dropped. On web, `process_person_profile` has no effect, and the options of `identify`, `setPersonProperties`, `alias` and `group` are dropped.
+- `isFeatureEnabled(defaultValue:)`, returned when the flag has no value because flags haven't loaded, the request failed or the key doesn't exist. A flag that has a value always wins.
+- `PostHogEvent.uuid`, `distinctId` and `timestamp` in `beforeSend`, set on every platform except web. A callback can change the distinct ID and timestamp.
 - `captureAi` for `$ai_*` events. It returns the event's UUID, or `null` when the event isn't admitted. On web it sends nothing and returns `null`.
 - `Posthog().onFeatureFlags()` to get notified after every feature flags load. It returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`. You can register it before `WidgetsFlutterBinding.ensureInitialized()`, but other SDK calls, including `setup()`, are skipped with a warning until the binding is initialized.
 - `$app_language` and `Posthog().setAppLanguage()`. See [`$locale` and `$app_language`](#locale-and-app_language).
