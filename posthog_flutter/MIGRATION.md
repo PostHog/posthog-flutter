@@ -8,9 +8,9 @@
 | macOS deployment target | 10.15 | 11.0 |
 | Android `minSdkVersion` declared by the plugin | 21 | 23 |
 | iOS and macOS dependency manager | CocoaPods or Swift Package Manager | Swift Package Manager only |
-| Flutter for iOS and macOS builds | 3.27 | 3.41 |
+| Flutter SDK | 3.27 | 3.41 |
 
-The Dart minimum (`>=3.6.0`) is unchanged. Android, web, Windows and Linux builds aren't affected by the Swift Package Manager requirement.
+posthog_flutter 6.0 needs the Flutter SDK 3.41 or later on every platform: `flutter pub get` fails on an older Flutter, including in Android-only apps. The Dart minimum (`>=3.6.0`) is unchanged. Only iOS and macOS builds need Swift Package Manager.
 
 ### iOS and macOS
 
@@ -462,7 +462,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 ## Upgrade checklist
 
-- [ ] Use Flutter 3.41 or later and make sure Swift Package Manager is on.
+- [ ] Use the Flutter SDK 3.41 or later on every platform, and make sure Swift Package Manager is on for iOS and macOS.
 - [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
 - [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.
 - [ ] Rename `com.posthog.posthog.API_KEY` to `com.posthog.posthog.PROJECT_TOKEN` in `AndroidManifest.xml` and `Info.plist`.
