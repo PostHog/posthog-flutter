@@ -96,6 +96,15 @@ jobs:
         working-directory: ./example
         run: flutter build apk
 
+      # The posthog-android publish and the apk build leave Gradle and Kotlin daemons running.
+      # With CodeQL's query run on top of them, the runner runs out of memory and is shut down.
+      - name: Stop Gradle daemons (Java/Kotlin)
+        if: matrix.language == 'java-kotlin'
+        run: |
+          (cd "$RUNNER_TEMP/posthog-android" && ./gradlew --stop) || true
+          (cd example/android && ./gradlew --stop) || true
+          pkill -f KotlinCompileDaemon || true
+
       - name: Build iOS (Swift)
         if: matrix.language == 'swift'
         working-directory: ./example
