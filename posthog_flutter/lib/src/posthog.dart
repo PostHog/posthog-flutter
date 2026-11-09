@@ -570,9 +570,10 @@ class Posthog {
   /// `cookieless_mode` or `disable_skew_correction`. See [capture] for the
   /// known keys.
   ///
-  /// An event's own `options` win over registered ones key by key, and
-  /// [PostHogConfig.beforeSend] callbacks see and can change the result. New
-  /// values overwrite registered ones for the same keys. They persist across
+  /// An event's own `options` win over registered ones key by key. On iOS,
+  /// macOS, Android, Windows and Linux, [PostHogConfig.beforeSend] callbacks
+  /// see and can change the result. New values overwrite registered ones for
+  /// the same keys. They persist across
   /// app restarts until [unregisterOptions] removes them or [reset] clears
   /// them. A `null` value is ignored.
   ///
@@ -581,7 +582,9 @@ class Posthog {
   ///
   /// On web, posthog-js has no options: known keys are registered as their
   /// legacy properties, with the limits described on [capture], and other
-  /// keys are dropped.
+  /// keys are dropped. posthog-js adds them to every event it sends, including
+  /// the ones it captures itself, after [PostHogConfig.beforeSend] runs, so
+  /// the callbacks don't see them, as for properties added with [register].
   ///
   /// Returns a [Future] that completes when the options have been registered.
   Future<void> registerOptions(Map<String, Object?> options) =>
