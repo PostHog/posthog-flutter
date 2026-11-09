@@ -998,6 +998,7 @@ class PosthogFlutterPlugin :
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopOcclusionDetector()
+        flutterSurveysDelegate?.detachFromEngine()
         channel.setMethodCallHandler(null)
         pushChannelCandidates.remove(channel)
         if (activeChannel === channel) {
@@ -2219,6 +2220,8 @@ class PosthogFlutterPlugin :
     private fun close(result: Result) {
         try {
             PostHog.close()
+            flutterSurveysDelegate?.detachFromEngine()
+            flutterSurveysDelegate = null
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

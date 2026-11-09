@@ -25,6 +25,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -161,6 +162,7 @@ internal class PosthogFlutterPluginTest {
         val binding = attach(plugin, messenger)
         val call = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
         plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        val first = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
         plugin.onDetachedFromEngine(binding)
 
         val reattachedMessenger = Mockito.mock(BinaryMessenger::class.java)
@@ -169,7 +171,8 @@ internal class PosthogFlutterPluginTest {
 
         // The reused delegate must reach the engine that is attached now, not the detached one.
         val delegate = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
-        (delegate as PostHogFlutterSurveysDelegate).channel.invokeMethod("hideSurveys", null)
+        assertSame(first, delegate)
+        assertNotNull((delegate as PostHogFlutterSurveysDelegate).channel).invokeMethod("hideSurveys", null)
 
         Mockito
             .verify(reattachedMessenger)
@@ -177,6 +180,45 @@ internal class PosthogFlutterPluginTest {
         Mockito
             .verify(messenger, Mockito.never())
             .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
+
+    @Test
+    fun detach_releasesSurveysChannel() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true)),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+        val delegate = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+
+        plugin.onDetachedFromEngine(binding)
+
+        assertNull(delegate.channel)
+    }
+
+    @Test
+    fun close_releasesSurveysDelegateAndAllowsFreshSetupOnTheSameEngine() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        val setup = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        val first = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+
+        val closed = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("close", null), closed)
+        Mockito.verify(closed).success(null)
+        assertNull(first.channel)
+
+        val action = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("surveyAction", mapOf("type" to "shown")), action)
+        Mockito.verify(action).error("InvalidArguments", "Survey delegate not available", null)
+
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        val second = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+        assertNotSame(first, second)
+        assertNotNull(second.channel)
+        plugin.onDetachedFromEngine(binding)
     }
 
     @Test

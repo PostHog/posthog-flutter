@@ -23,11 +23,9 @@ import java.util.UUID
 class PostHogFlutterSurveysDelegate(
     channel: MethodChannel,
 ) : PostHogSurveysResumeAwareDelegate {
-    // The native SDK holds the first delegate it gets, so the plugin keeps this instance across
-    // repeated setup() calls. An engine re-attach builds a new method channel, and the plugin
-    // re-points this field to it, because a survey sent on the detached channel never appears.
+    // Native setup keeps the first delegate; its engine channel can detach independently.
     @Volatile
-    internal var channel: MethodChannel = channel
+    internal var channel: MethodChannel? = channel
 
     override val supportsSurveyResume: Boolean = true
 
@@ -54,8 +52,24 @@ class PostHogFlutterSurveysDelegate(
         // Convert survey to map and send to Flutter
         Handler(Looper.getMainLooper()).post {
             if (presentationId == presentation) {
-                channel.invokeMethod("showSurvey", survey.toMap() + ("presentationId" to presentation))
+                val target = channel
+                if (target == null) {
+                    cleanupSurveys()
+                    onSurveyClosed(survey)
+                } else {
+                    target.invokeMethod("showSurvey", survey.toMap() + ("presentationId" to presentation))
+                }
             }
+        }
+    }
+
+    internal fun detachFromEngine() {
+        channel = null
+        val survey = currentSurvey
+        val onClosed = onSurveyClosedCallback
+        cleanupSurveys()
+        if (survey != null) {
+            onClosed?.invoke(survey)
         }
     }
 
@@ -167,8 +181,13 @@ class PostHogFlutterSurveysDelegate(
         method: String,
         arguments: Any? = null,
     ) {
-        Handler(Looper.getMainLooper()).post {
-            channel.invokeMethod(method, arguments)
+        // close() releases the channel after native cleanup, so hide before returning on main.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            channel?.invokeMethod(method, arguments)
+        } else {
+            Handler(Looper.getMainLooper()).post {
+                channel?.invokeMethod(method, arguments)
+            }
         }
     }
 }

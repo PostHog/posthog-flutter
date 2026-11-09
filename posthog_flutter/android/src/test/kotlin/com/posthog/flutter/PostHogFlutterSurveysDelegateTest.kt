@@ -8,6 +8,7 @@ import com.posthog.android.PostHogAndroidConfig
 import com.posthog.android.surveys.PostHogSurveysIntegration
 import com.posthog.internal.PostHogPreferences
 import com.posthog.internal.PostHogSerializer
+import com.posthog.surveys.PostHogDisplaySurvey
 import com.posthog.surveys.Survey
 import io.flutter.plugin.common.MethodChannel
 import org.junit.Test
@@ -21,6 +22,7 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -100,6 +102,82 @@ class PostHogFlutterSurveysDelegateTest {
             result,
         )
         return result
+    }
+
+    @Test
+    fun detachCancelsQueuedPresentationBeforeReattach() {
+        val channel = Mockito.mock(MethodChannel::class.java)
+        val delegate = PostHogFlutterSurveysDelegate(channel)
+        val survey = PostHogDisplaySurvey("test-survey", "Feedback", emptyList())
+        var closed = 0
+        delegate.renderSurvey(survey, {}, { _, _, _ -> null }, { closed++ })
+
+        delegate.detachFromEngine()
+        assertNull(delegate.channel)
+        val reattached = Mockito.mock(MethodChannel::class.java)
+        delegate.channel = reattached
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(1, closed)
+        Mockito.verifyNoInteractions(channel, reattached)
+    }
+
+    @Test
+    fun renderWithoutEngineReportsClosedInsteadOfKeepingPresentationPending() {
+        val channel = Mockito.mock(MethodChannel::class.java)
+        val delegate = PostHogFlutterSurveysDelegate(channel)
+        delegate.detachFromEngine()
+        val survey = PostHogDisplaySurvey("test-survey", "Feedback", emptyList())
+        var closed = 0
+
+        delegate.renderSurvey(survey, {}, { _, _, _ -> null }, { closed++ })
+        shadowOf(Looper.getMainLooper()).idle()
+        delegate.detachFromEngine()
+
+        assertEquals(1, closed)
+        Mockito.verifyNoInteractions(channel)
+    }
+
+    @Test
+    fun detachInvalidatesActionsFromTheOldEngine() {
+        val (sdk, delegate) = start(true)
+        try {
+            val presentation = shown()
+            delegate.action("shown", presentation)
+            val messageCount = messages.size
+
+            delegate.detachFromEngine()
+
+            val eventCount = events.size
+            val stale = delegate.action("response", presentation, response = "Stale")
+            Mockito.verify(stale).error(Mockito.eq("SurveyInvalidated"), Mockito.anyString(), Mockito.isNull())
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(eventCount, events.size)
+            assertEquals(messageCount, messages.size)
+        } finally {
+            sdk.close()
+            preferences.clear()
+        }
+    }
+
+    @Test
+    fun closeHidesSurveyBeforeChannelIsReleasedAndRejectsOldActions() {
+        val (sdk, delegate) = start(true)
+        val presentation = shown()
+        delegate.action("shown", presentation)
+
+        sdk.close()
+        delegate.detachFromEngine()
+
+        assertNull(delegate.channel)
+        assertEquals("hideSurveys", messages.last().first)
+        val count = events.size
+        val stale = delegate.action("response", presentation, response = "Stale")
+        Mockito.verify(stale).error(Mockito.eq("SurveyInvalidated"), Mockito.anyString(), Mockito.isNull())
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(count, events.size)
+        assertEquals(1, messages.count { it.first == "hideSurveys" })
+        preferences.clear()
     }
 
     @Test
