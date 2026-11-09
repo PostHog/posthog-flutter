@@ -37,6 +37,7 @@ import com.posthog.android.replay.PostHogReplayIntegration
 import com.posthog.android.replay.PostHogScreenshotColorMode
 import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -161,6 +162,16 @@ class PosthogFlutterPlugin :
 
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
+    private val engineLifecycleListener =
+        object : FlutterEngine.EngineLifecycleListener {
+            override fun onPreEngineRestart() {
+                // Hot restart replaces Dart without detaching the native plugin.
+                flutterSurveysDelegate?.detachFromEngine()
+            }
+
+            override fun onEngineWillDestroy() {}
+        }
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         if (bitmapExportExecutor.isShutdown) {
             bitmapExportExecutor = Executors.newSingleThreadExecutor()
@@ -174,6 +185,9 @@ class PosthogFlutterPlugin :
         initPlugin()
 
         channel.setMethodCallHandler(this)
+        @Suppress("DEPRECATION")
+        val engine = flutterPluginBinding.flutterEngine
+        engine.addEngineLifecycleListener(engineLifecycleListener)
     }
 
     private fun initPlugin() {
@@ -698,7 +712,12 @@ class PosthogFlutterPlugin :
                 posthogConfig.getIfNotNull<Boolean>("surveys") {
                     surveys = it
                     if (surveys) {
-                        val delegate = PostHogFlutterSurveysDelegate(channel)
+                        // The native SDK ignores a repeated setup() and keeps the delegate from the
+                        // first one. A new instance here would render nothing yet still receive
+                        // every Dart survey action, so each action comes back as SurveyInvalidated.
+                        val delegate = flutterSurveysDelegate ?: PostHogFlutterSurveysDelegate(channel)
+                        // Dart's setup confirms its handler is ready before resuming a detached survey.
+                        delegate.attachToEngine(channel)
                         surveysConfig.surveysDelegate = delegate
                         flutterSurveysDelegate = delegate
                     }
@@ -995,7 +1014,11 @@ class PosthogFlutterPlugin :
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        @Suppress("DEPRECATION")
+        val engine = binding.flutterEngine
+        engine.removeEngineLifecycleListener(engineLifecycleListener)
         stopOcclusionDetector()
+        flutterSurveysDelegate?.detachFromEngine()
         channel.setMethodCallHandler(null)
         pushChannelCandidates.remove(channel)
         if (activeChannel === channel) {
@@ -2217,6 +2240,8 @@ class PosthogFlutterPlugin :
     private fun close(result: Result) {
         try {
             PostHog.close()
+            flutterSurveysDelegate?.detachFromEngine()
+            flutterSurveysDelegate = null
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
