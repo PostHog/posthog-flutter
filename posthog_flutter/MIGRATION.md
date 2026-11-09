@@ -380,8 +380,8 @@ When the event is sent, the SDK removes each one from `properties` and uses it f
 - An option you pass or set in `beforeSend` wins over its legacy option property. A `null` option counts as unset, so the legacy option property fills it.
 - Option values are sent as given. PostHog drops an event whose option value it can't read.
 - Other option keys are sent unchanged.
-- There are no global options. To set one for every event, register its legacy option property, for example `Posthog().register(r'$cookieless_mode', true)`.
-- A registered legacy option property also reaches `$identify`, `$create_alias` and `$groupidentify`. If it turns person processing off, PostHog accepts those events and then drops them with an ingestion warning, and the SDK doesn't report it.
+- To set an option for every event, register it with `Posthog().registerOptions({'cookieless_mode': true})` and remove it with `unregisterOptions`. An event's own options win over registered ones, and `reset()` clears them. Registering its legacy option property, such as `Posthog().register(r'$cookieless_mode', true)`, still works.
+- A registered option or legacy option property also reaches `$identify`, `$create_alias` and `$groupidentify`. If it turns person processing off, PostHog accepts those events and then drops them with an ingestion warning, and the SDK doesn't report it.
 - Person processing is sent as the `process_person_profile: false` option only while it's off, instead of a `$process_person_profile` property on every event.
 - Person processing is decided before `beforeSend` runs, as on iOS, macOS and Android. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 - Events still queued on disk by 5.x are sent to capture v1 after the update, with their legacy option properties moved to options.

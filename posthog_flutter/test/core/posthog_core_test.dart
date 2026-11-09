@@ -381,6 +381,81 @@ void main() {
     });
   });
 
+  group('Registered options', () {
+    late FileStorage storage;
+    late DesktopPostHog client;
+
+    setUp(() {
+      storage = tempStorage();
+      client = testClient(server, storage: storage);
+    });
+
+    test("go on every event, under the event's own options", () {
+      client.registerOptions(
+          {'cookieless_mode': false, 'disable_skew_correction': true});
+
+      client.capture('plain');
+      client.capture('own', options: {'cookieless_mode': true});
+
+      expect(queuedOptions(storage, 0),
+          containsPair('cookieless_mode', false));
+      expect(queuedOptions(storage, 0),
+          containsPair('disable_skew_correction', true));
+      expect(queuedOptions(storage, 1), containsPair('cookieless_mode', true));
+      expect(queuedOptions(storage, 1),
+          containsPair('disable_skew_correction', true));
+      expect(queuedProps(storage, 0), isNot(contains('cookieless_mode')));
+    });
+
+    test(r'go on $identify, $create_alias and $groupidentify', () {
+      client.registerOptions({'cookieless_mode': true});
+
+      client.identify('user-1');
+      client.alias('alias-1');
+      client.group('company', 'acme');
+
+      expect(queuedEvents(storage),
+          [r'$identify', r'$create_alias', r'$groupidentify']);
+      for (var i = 0; i < 3; i++) {
+        expect(queuedOptions(storage, i), containsPair('cookieless_mode', true));
+      }
+    });
+
+    test("a registered process_person_profile replaces the SDK's default", () {
+      client.registerOptions({'process_person_profile': true});
+
+      client.capture('anonymous');
+
+      expect(queuedOptions(storage, 0),
+          containsPair('process_person_profile', true));
+    });
+
+    test('unregisterOptions and reset remove them', () {
+      client.registerOptions(
+          {'cookieless_mode': true, 'disable_skew_correction': true});
+
+      client.unregisterOptions('cookieless_mode');
+      client.capture('after_unregister');
+      client.reset();
+      client.capture('after_reset');
+
+      expect(queuedOptions(storage, 0), isNot(contains('cookieless_mode')));
+      expect(queuedOptions(storage, 0),
+          containsPair('disable_skew_correction', true));
+      expect(queuedOptions(storage, 1),
+          isNot(contains('disable_skew_correction')));
+    });
+
+    test('persist across clients', () {
+      client.registerOptions({'cookieless_mode': true});
+
+      final next = testClient(server, storage: storage);
+      next.capture('next');
+
+      expect(queuedOptions(storage, 0), containsPair('cookieless_mode', true));
+    });
+  });
+
   group('PostHogCore.registerForSession', () {
     late FileStorage storage;
     late DesktopPostHog client;

@@ -177,7 +177,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// registered ones, then the event's own [properties], each winning over
   /// the ones before. A value set for an event changes that event only.
   ///
-  /// Person processing is not a property: see [_personProcessingOptions].
+  /// Person processing is not a property: see [_eventOptions].
   Map<String, Object?> _enrichProperties(Map<String, Object?>? properties) {
     final now = DateTime.now().millisecondsSinceEpoch;
     // Resolved first: it may start a new session, which the debug
@@ -204,15 +204,22 @@ abstract class PostHogCore extends PostHogCoreStateless {
     return enriched;
   }
 
-  /// The [options] of an event with [properties], with
-  /// `process_person_profile: false` added when person processing is off,
-  /// the event is not [requested] to update the person, and neither an
+  /// The [options] of an event over the registered ones.
+  Map<String, Object?>? _withRegisteredOptions(Map<String, Object?>? options) {
+    final registered = registeredOptions;
+    return registered.isEmpty ? options : {...registered, ...?options};
+  }
+
+  /// The [options] of an event with [properties] over the registered ones,
+  /// with `process_person_profile: false` added when person processing is
+  /// off, the event is not [requested] to update the person, and neither an
   /// option nor a `$process_person_profile` property says otherwise.
-  Map<String, Object?>? _personProcessingOptions(
-    Map<String, Object?>? options,
+  Map<String, Object?>? _eventOptions(
+    Map<String, Object?>? eventOptions,
     Map<String, Object?> properties, {
     required bool requested,
   }) {
+    final options = _withRegisteredOptions(eventOptions);
     if (requested ||
         _hasPersonProcessing() ||
         properties[r'$process_person_profile'] != null ||
@@ -392,13 +399,14 @@ abstract class PostHogCore extends PostHogCoreStateless {
           ...maybeAdd(r'$set', userProperties),
           ...maybeAdd(r'$set_once', userPropertiesSetOnce),
         });
+        final identifyOptions = _withRegisteredOptions(options);
         identifyStateless(
           distinctId,
           properties: identifyProperties,
-          options: options,
+          options: identifyOptions,
         );
         if ((userProperties != null || userPropertiesSetOnce != null) &&
-            !_isPersonless(identifyProperties, options)) {
+            !_isPersonless(identifyProperties, identifyOptions)) {
           _cachedPersonProperties = _personPropertiesHash(
               distinctId, userProperties, userPropertiesSetOnce);
         }
@@ -549,7 +557,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     }
     return (
       properties: allProperties,
-      options: _personProcessingOptions(
+      options: _eventOptions(
         options,
         allProperties,
         requested: requestsPersonProcessing,
@@ -637,7 +645,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (!_requirePersonProcessing('posthog.alias')) return;
 
       aliasStateless(alias, getDistinctId(),
-          properties: _enrichProperties(null), options: options);
+          properties: _enrichProperties(null),
+          options: _withRegisteredOptions(options));
     });
   }
 
@@ -695,7 +704,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         distinctId: getDistinctId(),
         eventProperties: _enrichProperties(null),
         groupProperties: groupProperties,
-        options: options,
+        options: _withRegisteredOptions(options),
       );
     });
   }
@@ -1260,7 +1269,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
       // A personless `$set` doesn't update the person, so it is never a
       // duplicate.
-      if (_cachedPersonProperties == hash && !_isPersonless(null, options)) {
+      if (_cachedPersonProperties == hash &&
+          !_isPersonless(null, _withRegisteredOptions(options))) {
         logger.info(
             'A duplicate setPersonProperties call was made. It has been ignored.');
         return;

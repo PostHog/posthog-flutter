@@ -1060,6 +1060,34 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
   }
 
   @override
+  Future<void> registerOptions(Map<String, Object?> options) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+    final cleaned = cleanEventOptions(options);
+    if (cleaned == null) return;
+
+    try {
+      return await _invoke('registerOptions', {'options': cleaned});
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on registerOptions: $exception');
+    }
+  }
+
+  @override
+  Future<void> unregisterOptions(String key) async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      return await _invoke('unregisterOptions', {'key': key});
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on unregisterOptions: $exception');
+    }
+  }
+
+  @override
   Future<void> setAppLanguage(String? language) async {
     if (!isSupportedPlatform()) {
       return;
