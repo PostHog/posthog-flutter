@@ -586,11 +586,20 @@ class Posthog {
   /// the ones it captures itself, after [PostHogConfig.beforeSend] runs, so
   /// the callbacks don't see them, as for properties added with [register].
   ///
+  /// ```dart
+  /// await Posthog().registerOptions({'cookieless_mode': true});
+  /// ```
+  ///
   /// Returns a [Future] that completes when the options have been registered.
   Future<void> registerOptions(Map<String, Object?> options) =>
       _posthog.registerOptions(options);
 
-  /// Removes an option registered with [registerOptions].
+  /// Removes an option registered with [registerOptions]. Events captured
+  /// afterwards no longer get it, unless they pass it in their own `options`.
+  ///
+  /// ```dart
+  /// await Posthog().unregisterOptions('cookieless_mode');
+  /// ```
   ///
   /// Returns a [Future] that completes when the option has been removed.
   Future<void> unregisterOptions(String key) => _posthog.unregisterOptions(key);

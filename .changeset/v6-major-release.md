@@ -9,7 +9,7 @@
 - **Breaking:** adopt `posthog-android` 4.x
 - **Breaking:** remove `PostHogConfig.apiKey` and the `com.posthog.posthog.API_KEY` manifest and Info.plist key — use `projectToken` and `com.posthog.posthog.PROJECT_TOKEN`
 - **Breaking:** remove `Posthog().enable()` and `Posthog().disable()`, and rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb` — use `optIn()` and `optOut()`
-- **Breaking:** add `options` to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `defaultValue` to `isFeatureEnabled()`, add `captureAi()` and `setAppLanguage()`, and remove `getFeatureFlagPayload()` on `PosthogFlutterPlatformInterface` — update subclasses and test fakes
+- **Breaking:** add `options` to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `defaultValue` to `isFeatureEnabled()`, add `captureAi()`, `setAppLanguage()`, `registerOptions()` and `unregisterOptions()`, and remove `getFeatureFlagPayload()` on `PosthogFlutterPlatformInterface` — update subclasses and test fakes
 - **Breaking:** remove `PostHogConfig.sendFeatureFlagEvents` — use `sendFeatureFlagEvent`
 - **Breaking:** remove `Posthog().getFeatureFlagPayload()` — use `getFeatureFlagResult(key, sendFeatureFlagEvent: false)` and read `payload`
 - **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter — use `throttleDelay`
