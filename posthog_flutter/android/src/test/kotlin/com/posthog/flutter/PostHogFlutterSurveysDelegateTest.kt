@@ -234,6 +234,29 @@ class PostHogFlutterSurveysDelegateTest {
     }
 
     @Test
+    fun repeatedSetupDoesNotRedisplayAnActiveSurvey() {
+        val (sdk, delegate) = start(true)
+        try {
+            val presentation = shown()
+            delegate.action("shown", presentation)
+            delegate.action("response", presentation, response = "Saved answer")
+            val messageCount = messages.size
+            val eventCount = events.size
+
+            delegate.attachToEngine(assertNotNull(delegate.channel))
+            shadowOf(Looper.getMainLooper()).idle()
+
+            assertEquals(messageCount, messages.size)
+            assertEquals(eventCount, events.size)
+            val reply = delegate.action("response", presentation, 1, "Final answer")
+            Mockito.verify(reply).success(mapOf("nextIndex" to 1, "isSurveyCompleted" to true))
+        } finally {
+            sdk.close()
+            preferences.clear()
+        }
+    }
+
+    @Test
     fun reattachContinuesTheSameUnfinishedAttemptAtTheNextQuestion() {
         for (partial in listOf(true, false)) {
             events.clear()

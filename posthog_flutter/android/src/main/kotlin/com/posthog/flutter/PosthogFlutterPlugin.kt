@@ -37,6 +37,7 @@ import com.posthog.android.replay.PostHogReplayIntegration
 import com.posthog.android.replay.PostHogScreenshotColorMode
 import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -161,6 +162,16 @@ class PosthogFlutterPlugin :
 
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
+    private val engineLifecycleListener =
+        object : FlutterEngine.EngineLifecycleListener {
+            override fun onPreEngineRestart() {
+                // Hot restart replaces Dart without detaching the native plugin.
+                flutterSurveysDelegate?.detachFromEngine()
+            }
+
+            override fun onEngineWillDestroy() {}
+        }
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         if (bitmapExportExecutor.isShutdown) {
             bitmapExportExecutor = Executors.newSingleThreadExecutor()
@@ -174,6 +185,9 @@ class PosthogFlutterPlugin :
         initPlugin()
 
         channel.setMethodCallHandler(this)
+        @Suppress("DEPRECATION")
+        val engine = flutterPluginBinding.flutterEngine
+        engine.addEngineLifecycleListener(engineLifecycleListener)
     }
 
     private fun initPlugin() {
@@ -997,6 +1011,9 @@ class PosthogFlutterPlugin :
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        @Suppress("DEPRECATION")
+        val engine = binding.flutterEngine
+        engine.removeEngineLifecycleListener(engineLifecycleListener)
         stopOcclusionDetector()
         flutterSurveysDelegate?.detachFromEngine()
         channel.setMethodCallHandler(null)

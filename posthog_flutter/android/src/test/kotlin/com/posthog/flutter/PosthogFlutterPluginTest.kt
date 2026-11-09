@@ -10,6 +10,7 @@ import com.google.firebase.FirebaseApp
 import com.posthog.PostHogCompression
 import com.posthog.PostHogEvent
 import com.posthog.android.replay.PostHogScreenshotColorMode
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
@@ -181,6 +182,27 @@ internal class PosthogFlutterPluginTest {
         Mockito
             .verify(messenger, Mockito.never())
             .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun hotRestart_invalidatesTheSurveysChannelUntilSetupAndUnregistersOnDetach() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        val setup = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        val delegate = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+        val listener = ArgumentCaptor.forClass(FlutterEngine.EngineLifecycleListener::class.java)
+        Mockito.verify(binding.flutterEngine).addEngineLifecycleListener(listener.capture())
+
+        listener.value.onPreEngineRestart()
+
+        assertNull(delegate.channel)
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        assertSame(delegate, assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate)
+        assertNotNull(delegate.channel)
+        plugin.onDetachedFromEngine(binding)
+        Mockito.verify(binding.flutterEngine).removeEngineLifecycleListener(listener.value)
     }
 
     @Test
@@ -855,6 +877,7 @@ internal class PosthogFlutterPluginTest {
     // The stubbed test Looper makes runOnMainThread run inline (myLooper and
     // getMainLooper both default to null), so mint round trips are synchronous here.
 
+    @Suppress("DEPRECATION")
     private fun attach(
         plugin: PosthogFlutterPlugin,
         messenger: BinaryMessenger,
@@ -862,6 +885,7 @@ internal class PosthogFlutterPluginTest {
         val binding = Mockito.mock(FlutterPlugin.FlutterPluginBinding::class.java)
         Mockito.`when`(binding.applicationContext).thenReturn(Mockito.mock(Context::class.java))
         Mockito.`when`(binding.binaryMessenger).thenReturn(messenger)
+        Mockito.`when`(binding.flutterEngine).thenReturn(Mockito.mock(FlutterEngine::class.java))
         plugin.onAttachedToEngine(binding)
         return binding
     }
