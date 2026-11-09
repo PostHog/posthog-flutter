@@ -543,6 +543,27 @@ abstract class PostHogCoreStateless {
     });
   }
 
+  @protected
+  Map<String, Object?> get registeredOptions {
+    return getPersistedProperty<Map<String, Object?>>(
+            PostHogPersistedProperty.registeredOptions) ??
+        {};
+  }
+
+  void registerOptions(Map<String, Object?> options) {
+    wrap(() {
+      setPersistedProperty(PostHogPersistedProperty.registeredOptions,
+          {...registeredOptions, ...toJsonMap(options, logger)});
+    });
+  }
+
+  void unregisterOptions(String key) {
+    wrap(() {
+      final updated = {...registeredOptions}..remove(key);
+      setPersistedProperty(PostHogPersistedProperty.registeredOptions, updated);
+    });
+  }
+
   /// Queues [message] on [lane], with [uuid] or a new one, and returns its
   /// uuid, with whether the queue keeps it: the AI queue drops an event over
   /// its size limit. Its capture v1 [options] are queued with it; the legacy

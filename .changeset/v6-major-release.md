@@ -34,6 +34,7 @@
 - **Breaking:** pause sending on iOS and macOS while cellular data is off for the app, and delete events a `posthog-ios` 2.x SDK left on disk instead of sending them
 - **Breaking:** stop sending the legacy `version` and `build` properties on `Application Installed`, `Application Updated` and `Application Opened` on iOS and macOS — use `$app_version` and `$app_build`
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
+- Add `registerOptions()` and `unregisterOptions()` to send capture options with every event, under each event's own options; on web, known options are registered as their legacy properties
 - Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set before `beforeSend` runs on every platform except web — a callback can change the distinct ID and timestamp, and the event keeps its uuid
 - Add `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web

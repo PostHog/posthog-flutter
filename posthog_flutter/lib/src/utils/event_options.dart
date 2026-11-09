@@ -19,6 +19,10 @@ Map<String, Object>? cleanEventOptions(Map<String, Object?>? options) {
   return Map<String, Object>.from(cleaned);
 }
 
+/// The legacy event property that [option] replaces, or null when it has none.
+String? legacyPropertyForOption(String option) =>
+    _legacyPropertyForOption[option];
+
 /// Converts [options] to the legacy event properties for posthog-js, which
 /// has no options field.
 ///

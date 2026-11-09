@@ -384,6 +384,14 @@ class PosthogFlutterPlugin :
                 unregister(call, result)
             }
 
+            "registerOptions" -> {
+                registerOptions(call, result)
+            }
+
+            "unregisterOptions" -> {
+                unregisterOptions(call, result)
+            }
+
             "setAppLanguage" -> {
                 setAppLanguage(call, result)
             }
@@ -2224,6 +2232,32 @@ class PosthogFlutterPlugin :
         try {
             val key: String = call.argument("key")!!
             PostHog.unregister(key)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun registerOptions(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val options: Map<String, Any> = call.argument("options")!!
+            PostHog.registerOptionsForWrapper(options)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun unregisterOptions(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val key: String = call.argument("key")!!
+            PostHog.unregisterOptionsForWrapper(key)
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

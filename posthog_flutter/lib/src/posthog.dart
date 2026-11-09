@@ -566,6 +566,35 @@ class Posthog {
   /// Returns a [Future] that completes when the property has been removed.
   Future<void> unregister(String key) => _posthog.unregister(key);
 
+  /// Registers capture options sent with all following events, such as
+  /// `cookieless_mode` or `disable_skew_correction`. See [capture] for the
+  /// known keys.
+  ///
+  /// An event's own `options` win over registered ones key by key. On iOS,
+  /// macOS, Android, Windows and Linux, [PostHogConfig.beforeSend] callbacks
+  /// see and can change the result. New values overwrite registered ones for
+  /// the same keys. They persist across
+  /// app restarts until [unregisterOptions] removes them or [reset] clears
+  /// them. A `null` value is ignored.
+  ///
+  /// Use this instead of registering a legacy option property such as
+  /// `$cookieless_mode`.
+  ///
+  /// On web, posthog-js has no options: known keys are registered as their
+  /// legacy properties, with the limits described on [capture], and other
+  /// keys are dropped. posthog-js adds them to every event it sends, including
+  /// the ones it captures itself, after [PostHogConfig.beforeSend] runs, so
+  /// the callbacks don't see them, as for properties added with [register].
+  ///
+  /// Returns a [Future] that completes when the options have been registered.
+  Future<void> registerOptions(Map<String, Object?> options) =>
+      _posthog.registerOptions(options);
+
+  /// Removes an option registered with [registerOptions].
+  ///
+  /// Returns a [Future] that completes when the option has been removed.
+  Future<void> unregisterOptions(String key) => _posthog.unregisterOptions(key);
+
   /// Sets the `$app_language` property: the language your app displays, sent
   /// with every event.
   ///

@@ -621,6 +621,10 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
             register(call, result: result)
         case "unregister":
             unregister(call, result: result)
+        case "registerOptions":
+            registerOptions(call, result: result)
+        case "unregisterOptions":
+            unregisterOptions(call, result: result)
         case "setAppLanguage":
             PostHogSDK.shared.setAppLanguage((call.arguments as? [String: Any])?["language"] as? String)
             result(nil)
@@ -1953,6 +1957,34 @@ extension PosthogFlutterPlugin {
            let key = args["key"] as? String
         {
             PostHogSDK.shared.unregister(key)
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func registerOptions(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let options = args["options"] as? [String: Any]
+        {
+            PostHogSDK.shared.registerOptionsForWrapper(options)
+            result(nil)
+        } else {
+            _badArgumentError(result)
+        }
+    }
+
+    private func unregisterOptions(
+        _ call: FlutterMethodCall,
+        result: @escaping FlutterResult
+    ) {
+        if let args = call.arguments as? [String: Any],
+           let key = args["key"] as? String
+        {
+            PostHogSDK.shared.unregisterOptionsForWrapper(key)
             result(nil)
         } else {
             _badArgumentError(result)

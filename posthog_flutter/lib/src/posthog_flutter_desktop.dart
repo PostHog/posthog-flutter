@@ -507,6 +507,17 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       _guard('unregister', (client) => client.unregister(key));
 
   @override
+  Future<void> registerOptions(Map<String, Object?> options) =>
+      _guard('registerOptions', (client) {
+        final cleaned = cleanEventOptions(options);
+        if (cleaned != null) client.registerOptions(cleaned);
+      });
+
+  @override
+  Future<void> unregisterOptions(String key) =>
+      _guard('unregisterOptions', (client) => client.unregisterOptions(key));
+
+  @override
   Future<void> setAppLanguage(String? language) =>
       _guard('setAppLanguage', (client) => client.appLanguage = language);
 
