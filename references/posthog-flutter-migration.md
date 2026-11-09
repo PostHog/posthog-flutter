@@ -14,9 +14,9 @@ showTitle: true
 | macOS deployment target | 10.15 | 11.0 |
 | Android `minSdkVersion` declared by the plugin | 21 | 23 |
 | iOS and macOS dependency manager | CocoaPods or Swift Package Manager | Swift Package Manager only |
-| Flutter for iOS and macOS builds | 3.27 | 3.41 |
+| Flutter SDK | 3.27 | 3.41 |
 
-The Dart minimum (`>=3.6.0`) is unchanged. Android, web, Windows and Linux builds aren't affected by the Swift Package Manager requirement.
+posthog_flutter 6.0 needs the Flutter SDK 3.41 or later on every platform: `flutter pub get` fails on an older Flutter, including in Android-only apps. The Dart minimum (`>=3.6.0`) is unchanged. Only iOS and macOS builds need Swift Package Manager.
 
 ### iOS and macOS
 
@@ -267,8 +267,6 @@ For the changes every capture v1 SDK shares, such as event options, limits and p
 
 On every platform except web, an event's properties are now the SDK's, then registered properties, then the ones you pass, so your value wins over the SDK's for that event. In 5.x, the SDK's values won.
 
-<!-- TODO(capture-v1): the iOS `#capture-v1` and Android `#endpoints` / `#hosts-without-capture-v1` anchors exist only on the posthog-ios and posthog-android `chore/v4-remove-deprecated` branches, not on `main` yet. Check these links once both 4.0 guides merge. -->
-
 #### Checklist
 
 You need to change code if your app does any of these:
@@ -281,7 +279,7 @@ You need to change code if your app does any of these:
 - reads `$session_id` or `$window_id` from the raw request body, for example in a proxy
 - relies on a `Retry-After` longer than 30 seconds
 - registers or passes a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expects the SDK's value to win
-- on Windows or Linux, returns a `PostHogEvent` from `beforeSend` without the event's `options`
+- on any platform except web, drops the event's `options` in `beforeSend` by returning a new `PostHogEvent` or replacing `event.options`
 - on Windows or Linux, alerts on the SDK's debug log lines
 - on Windows or Linux, calls `exit()` without awaiting the calls before it or `Posthog().close()`
 
@@ -305,7 +303,7 @@ On iOS, macOS and Android, a malformed (such as a plain-text `hello`), empty or 
 
 On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, stay strings instead of being decoded to numbers or booleans.
 
-On iOS and macOS, `isFeatureEnabled()` without `defaultValue` returns `false` for a flag whose variant is an empty string. With `defaultValue`, and in `getFeatureFlagResult()`, the flag is still enabled.
+A flag whose variant is an empty string reads as disabled on iOS, macOS, Android, Windows and Linux, as it already did on web. `isFeatureEnabled()` returns `false`, with or without `defaultValue`, `getFeatureFlagResult()` returns `enabled: false`, `onFeatureFlags` listeners and `reloadFeatureFlags()` leave the flag out, and so does `$active_feature_flags` on captured events. `variant`, `getFeatureFlag()` and the event's `$feature/<key>` property still return `""`.
 
 ### `beforeSend` on iOS, macOS and Android
 
@@ -314,6 +312,8 @@ On iOS and macOS, `isFeatureEnabled()` without `defaultValue` returns `false` fo
 **Person processing is decided before the callbacks run.** In 5.x, a callback that removed `$set` prevented a person profile. Now the event is still person-processed, and so are later events. Return `null` to drop an event that must not create a profile. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 
 Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Map<String, dynamic>>`. Any other list is `List<dynamic>`, even a `List<String>` you passed to `capture`, so cast its items instead of the list.
+
+The `PostHogEvent` the callbacks return replaces the event's options. A callback that returns a new `PostHogEvent`, or replaces `event.options`, without the options it got drops them, including `process_person_profile: false`, which turns person processing on for that event. Copy `event.options` to the event you return.
 
 Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin for those.
 
@@ -327,7 +327,7 @@ Events the native SDK captures itself don't go through Dart callbacks. Use `Post
 
 Update cohorts, insights and actions that match `$locale`: a filter on `$locale = de` stops matching `de-CH`. To keep matching a language, use a regex such as `^de(-|$)`, because "contains" also matches `en-DE`. Events already stored keep the old values. Feature flags aren't affected: the SDK doesn't send `$locale` or `$app_language` with flag requests, so flags only see these if you set them as person properties yourself.
 
-The new `$app_language` property is the language your app shows. `PosthogObserver` reports the locale exactly as your `MaterialApp` resolved it every time a route changes. An app that doesn't declare `supportedLocales` reports `en-US`, and one declaring `Locale('en')` reports `en`, so use a regex such as `^en(-|$)` to match English. Native detection is off because Flutter apps translate in Dart. If you translate outside `Localizations`, don't use the observer, or want to send another value, call `Posthog().setAppLanguage('de')`.
+The new `$app_language` property is the language your app shows. `PosthogObserver` reports the locale exactly as your `MaterialApp` resolved it every time a route changes. An app that doesn't declare `supportedLocales` reports `en-US`, and one declaring `Locale('en')` reports `en`, so use a regex such as `^en(-|$)` to match English. Native detection is off because Flutter apps translate in Dart. If you translate outside `Localizations`, don't use the observer, or want to send another value, call `Posthog().setAppLanguage('de')`. Web doesn't send `$app_language` yet, because posthog-js doesn't support it. To send it there now, call `Posthog().register(r'$app_language', 'de')`.
 
 ### Network reachability on iOS and macOS
 
@@ -462,6 +462,8 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 ## New features
 
 - An `options` argument on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` in `beforeSend`. `process_person_profile`, `cookieless_mode`, `disable_skew_correction` and `product_tour_id` win over their legacy option properties (`$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`). Other keys are sent unchanged. On web, known keys are sent as those legacy option properties and other keys are dropped. On web, `process_person_profile` has no effect, and the options of `identify`, `setPersonProperties`, `alias` and `group` are dropped.
+- `isFeatureEnabled(defaultValue:)`, returned when the flag has no value because flags haven't loaded, the request failed or the key doesn't exist. A flag that has a value always wins.
+- `PostHogEvent.uuid`, `distinctId` and `timestamp` in `beforeSend`, set on every platform except web. A callback can change the distinct ID and timestamp.
 - `captureAi` for `$ai_*` events. It returns the event's UUID, or `null` when the event isn't admitted. On web it sends nothing and returns `null`.
 - `Posthog().onFeatureFlags()` to get notified after every feature flags load. It returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`. You can register it before `WidgetsFlutterBinding.ensureInitialized()`, but other SDK calls, including `setup()`, are skipped with a warning until the binding is initialized.
 - `$app_language` and `Posthog().setAppLanguage()`. See [`$locale` and `$app_language`](#locale-and-app_language).
@@ -470,7 +472,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 ## Upgrade checklist
 
-- [ ] Use Flutter 3.41 or later and make sure Swift Package Manager is on.
+- [ ] Use the Flutter SDK 3.41 or later on every platform, and make sure Swift Package Manager is on for iOS and macOS.
 - [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
 - [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.
 - [ ] Rename `com.posthog.posthog.API_KEY` to `com.posthog.posthog.PROJECT_TOKEN` in `AndroidManifest.xml` and `Info.plist`.
