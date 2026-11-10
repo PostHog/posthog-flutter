@@ -159,7 +159,6 @@ jobs:
 
       - name: Notify Slack - Released
         if: needs.publish.result == 'success'
-        continue-on-error: true
         uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
         with:
           slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
