@@ -187,6 +187,22 @@ abstract class PosthogFlutterPlatformInterface extends PlatformInterface {
     throw UnimplementedError('unregister() has not been implemented.');
   }
 
+  /// Registers capture options sent with all following events. See
+  /// [Posthog.registerOptions].
+  ///
+  /// Throws [UnimplementedError] unless overridden.
+  Future<void> registerOptions(Map<String, Object?> options) {
+    throw UnimplementedError('registerOptions() has not been implemented.');
+  }
+
+  /// Removes an option registered with [registerOptions]. See
+  /// [Posthog.unregisterOptions].
+  ///
+  /// Throws [UnimplementedError] unless overridden.
+  Future<void> unregisterOptions(String key) {
+    throw UnimplementedError('unregisterOptions() has not been implemented.');
+  }
+
   /// Sets or, with `null`, clears the `$app_language` event property. Does
   /// nothing by default, because [PosthogObserver] calls it during navigation.
   Future<void> setAppLanguage(String? language) async {}

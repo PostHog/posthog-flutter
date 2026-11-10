@@ -255,12 +255,7 @@ abstract class PostHogCoreStateless {
 
   /// Gets common event properties.
   @protected
-  Map<String, Object?> getCommonEventProperties() {
-    return {
-      r'$lib': postHogFlutterSdkName,
-      r'$lib_version': postHogFlutterVersion,
-    };
-  }
+  Map<String, Object?> getCommonEventProperties() => const {};
 
   @protected
   T? getPersistedProperty<T>(PostHogPersistedProperty key) {
@@ -540,6 +535,27 @@ abstract class PostHogCoreStateless {
     wrap(() {
       final updated = {...props}..remove(property);
       setPersistedProperty(PostHogPersistedProperty.props, updated);
+    });
+  }
+
+  @protected
+  Map<String, Object?> get registeredOptions {
+    return getPersistedProperty<Map<String, Object?>>(
+            PostHogPersistedProperty.registeredOptions) ??
+        {};
+  }
+
+  void registerOptions(Map<String, Object?> options) {
+    wrap(() {
+      setPersistedProperty(PostHogPersistedProperty.registeredOptions,
+          {...registeredOptions, ...toJsonMap(options, logger)});
+    });
+  }
+
+  void unregisterOptions(String key) {
+    wrap(() {
+      final updated = {...registeredOptions}..remove(key);
+      setPersistedProperty(PostHogPersistedProperty.registeredOptions, updated);
     });
   }
 

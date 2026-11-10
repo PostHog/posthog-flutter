@@ -531,6 +531,23 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     return handleWebMethodCall(MethodCall('unregister', {'key': key}));
   }
 
+  // posthog-js has no options, so they are registered as their legacy
+  // properties, which it sends under each event's own properties.
+  @override
+  Future<void> registerOptions(Map<String, Object?> options) async {
+    final properties =
+        eventOptionsToLegacyProperties(options, method: 'registerOptions');
+    for (final MapEntry(:key, :value) in properties.entries) {
+      await register(key, value);
+    }
+  }
+
+  @override
+  Future<void> unregisterOptions(String key) async {
+    final legacyKey = legacyPropertyForOption(key);
+    if (legacyKey != null) await unregister(legacyKey);
+  }
+
   @override
   Future<bool> isFeatureEnabled(
     String key, {

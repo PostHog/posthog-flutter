@@ -311,6 +311,51 @@ void main() {
     });
   });
 
+  group('PosthogFlutterWeb registerOptions', () {
+    late List<Object?> registered;
+    late List<String> unregistered;
+
+    setUp(() {
+      registered = [];
+      unregistered = [];
+      final fake = JSObject();
+      fake.setProperty(
+        'register'.toJS,
+        ((JSAny properties) {
+          registered.add(properties.dartify());
+        }).toJS,
+      );
+      fake.setProperty(
+        'unregister'.toJS,
+        ((JSString key) {
+          unregistered.add(key.toDart);
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('registers known options as their legacy properties', () async {
+      await PosthogFlutterWeb().registerOptions({
+        'cookieless_mode': true,
+        'disable_skew_correction': true,
+        'unknown_option': 1,
+        'unset': null,
+      });
+
+      expect(registered, [
+        {r'$cookieless_mode': true},
+        {r'$ignore_sent_at': true},
+      ]);
+    });
+
+    test('unregisters the legacy property of a known option only', () async {
+      await PosthogFlutterWeb().unregisterOptions('disable_skew_correction');
+      await PosthogFlutterWeb().unregisterOptions('unknown_option');
+
+      expect(unregistered, [r'$ignore_sent_at']);
+    });
+  });
+
   test('PosthogFlutterWeb captureFeatureView captures the native event shape',
       () async {
     final calls = <List<Object?>>[];

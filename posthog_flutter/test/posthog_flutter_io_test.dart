@@ -633,6 +633,21 @@ isolate_dso_base: 7000000000
       });
     }
 
+    test('registerOptions sends the options without unset keys', () async {
+      await posthogFlutterIO.registerOptions(options);
+      expect(argsOf('registerOptions'), {'options': sent});
+    });
+
+    test('registerOptions with only unset keys calls nothing', () async {
+      await posthogFlutterIO.registerOptions({'k': null});
+      expect(log.map((c) => c.method), isNot(contains('registerOptions')));
+    });
+
+    test('unregisterOptions sends the key', () async {
+      await posthogFlutterIO.unregisterOptions('cookieless_mode');
+      expect(argsOf('unregisterOptions'), {'key': 'cookieless_mode'});
+    });
+
     test('calls without options send no options argument', () async {
       await posthogFlutterIO.capture(eventName: 'clicked');
       await posthogFlutterIO.alias(alias: 'alias-1', options: {'k': null});

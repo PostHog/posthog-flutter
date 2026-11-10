@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 import '../feature_flag_result.dart';
 import '../feature_flags_loaded.dart';
 import '../posthog_config.dart';
+import '../posthog_flutter_version.dart';
 import 'feature_flag_utils.dart';
 import 'feature_flags.dart';
 import 'persistence.dart';
@@ -176,8 +177,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// The properties of an event: the ones the SDK sets, then the
   /// registered ones, then the event's own [properties], each winning over
   /// the ones before. A value set for an event changes that event only.
+  /// `$lib` and `$lib_version` are the exception, see [_fillLibraryIdentity].
   ///
-  /// Person processing is not a property: see [_personProcessingOptions].
+  /// Person processing is not a property: see [_eventOptions].
   Map<String, Object?> _enrichProperties(Map<String, Object?>? properties) {
     final now = DateTime.now().millisecondsSinceEpoch;
     // Resolved first: it may start a new session, which the debug
@@ -201,18 +203,42 @@ abstract class PostHogCore extends PostHogCoreStateless {
     if (sessionId is! String || sessionId.isEmpty) {
       enriched[r'$session_id'] = managedSessionId;
     }
+    _fillLibraryIdentity(enriched);
     return enriched;
   }
 
-  /// The [options] of an event with [properties], with
-  /// `process_person_profile: false` added when person processing is off,
-  /// the event is not [requested] to update the person, and neither an
+  /// Fills the SDK's `$lib` and `$lib_version` as a pair, after every other
+  /// layer, so another library's `$lib` never gets this SDK's version and a
+  /// `$lib_version` without a `$lib` is replaced.
+  static void _fillLibraryIdentity(Map<String, Object?> properties) {
+    final lib = properties[r'$lib'];
+    if (lib is! String || lib.isEmpty) {
+      properties[r'$lib'] = postHogFlutterSdkName;
+      properties[r'$lib_version'] = postHogFlutterVersion;
+    } else if (lib == postHogFlutterSdkName) {
+      final version = properties[r'$lib_version'];
+      if (version is! String || version.isEmpty) {
+        properties[r'$lib_version'] = postHogFlutterVersion;
+      }
+    }
+  }
+
+  /// The [options] of an event over the registered ones.
+  Map<String, Object?>? _withRegisteredOptions(Map<String, Object?>? options) {
+    final registered = registeredOptions;
+    return registered.isEmpty ? options : {...registered, ...?options};
+  }
+
+  /// The [options] of an event with [properties] over the registered ones,
+  /// with `process_person_profile: false` added when person processing is
+  /// off, the event is not [requested] to update the person, and neither an
   /// option nor a `$process_person_profile` property says otherwise.
-  Map<String, Object?>? _personProcessingOptions(
-    Map<String, Object?>? options,
+  Map<String, Object?>? _eventOptions(
+    Map<String, Object?>? eventOptions,
     Map<String, Object?> properties, {
     required bool requested,
   }) {
+    final options = _withRegisteredOptions(eventOptions);
     if (requested ||
         _hasPersonProcessing() ||
         properties[r'$process_person_profile'] != null ||
@@ -392,15 +418,18 @@ abstract class PostHogCore extends PostHogCoreStateless {
           ...maybeAdd(r'$set', userProperties),
           ...maybeAdd(r'$set_once', userPropertiesSetOnce),
         });
+        final identifyOptions = _withRegisteredOptions(options);
         identifyStateless(
           distinctId,
           properties: identifyProperties,
-          options: options,
+          options: identifyOptions,
         );
-        if ((userProperties != null || userPropertiesSetOnce != null) &&
-            !_isPersonless(identifyProperties, options)) {
-          _cachedPersonProperties = _personPropertiesHash(
-              distinctId, userProperties, userPropertiesSetOnce);
+        if (userProperties != null || userPropertiesSetOnce != null) {
+          _recordSentPersonProperties(
+            _processPersonProfile(identifyProperties, identifyOptions),
+            _personPropertiesHash(
+                distinctId, userProperties, userPropertiesSetOnce),
+          );
         }
         _reloadFeatureFlags();
       } else if (!isIdentified) {
@@ -549,7 +578,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     }
     return (
       properties: allProperties,
-      options: _personProcessingOptions(
+      options: _eventOptions(
         options,
         allProperties,
         requested: requestsPersonProcessing,
@@ -587,10 +616,11 @@ abstract class PostHogCore extends PostHogCoreStateless {
     if (event == r'$set' || event == r'$identify') {
       final set = properties[r'$set'];
       final setOnce = properties[r'$set_once'];
-      if ((set is Map || setOnce is Map) &&
-          !_isPersonless(properties, options)) {
-        _cachedPersonProperties =
-            _personPropertiesHash(getDistinctId(), set, setOnce);
+      if (set is Map || setOnce is Map) {
+        _recordSentPersonProperties(
+          _processPersonProfile(properties, options),
+          _personPropertiesHash(getDistinctId(), set, setOnce),
+        );
       }
     }
     return queued;
@@ -637,7 +667,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (!_requirePersonProcessing('posthog.alias')) return;
 
       aliasStateless(alias, getDistinctId(),
-          properties: _enrichProperties(null), options: options);
+          properties: _enrichProperties(null),
+          options: _withRegisteredOptions(options));
     });
   }
 
@@ -695,7 +726,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         distinctId: getDistinctId(),
         eventProperties: _enrichProperties(null),
         groupProperties: groupProperties,
-        options: options,
+        options: _withRegisteredOptions(options),
       );
     });
   }
@@ -1260,7 +1291,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
       // A personless `$set` doesn't update the person, so it is never a
       // duplicate.
-      if (_cachedPersonProperties == hash && !_isPersonless(null, options)) {
+      final processPerson =
+          _processPersonProfile(null, _withRegisteredOptions(options));
+      if (_cachedPersonProperties == hash &&
+          (processPerson == null || processPerson == true)) {
         logger.info(
             'A duplicate setPersonProperties call was made. It has been ignored.');
         return;
@@ -1298,15 +1332,24 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   static bool _isNonEmptyMap(Object? value) => value is Map && value.isNotEmpty;
 
-  /// Whether [options], or else [properties], turn person processing off
-  /// for their event. An option wins over the property.
-  static bool _isPersonless(
+  /// The event's person-processing setting: the option wins over the
+  /// property.
+  static Object? _processPersonProfile(
     Map<String, Object?>? properties,
     Map<String, Object?>? options,
   ) =>
-      (options?['process_person_profile'] ??
-          properties?[r'$process_person_profile']) ==
-      false;
+      options?['process_person_profile'] ??
+      properties?[r'$process_person_profile'];
+
+  void _recordSentPersonProperties(Object? processPerson, String hash) {
+    if (processPerson == null || processPerson == true) {
+      _cachedPersonProperties = hash;
+    } else if (processPerson != false) {
+      // Values are sent as given, and capture reads strings and numbers such
+      // as 'no', 'yes' or 0 either way, so the profile's state is unknown.
+      _cachedPersonProperties = null;
+    }
+  }
 
   static Map<String, Object>? _asPropertyMap(Object? value) {
     if (value is! Map) return null;

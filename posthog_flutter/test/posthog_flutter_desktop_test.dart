@@ -1187,6 +1187,36 @@ void main() {
       expect(event['session_id'], isA<String>());
     });
 
+    test('callbacks see registered options and can remove them', () async {
+      final server = await LocalPostHogServer.start();
+      Map<String, Object?>? seen;
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen = {...?event.options};
+            event.options = {...?event.options}..remove('cookieless_mode');
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      await platform.registerOptions(
+          {'cookieless_mode': true, 'disable_skew_correction': true});
+
+      await platform.capture(
+        eventName: 'registered options event',
+        options: {'disable_skew_correction': false},
+      );
+
+      final event = await server.waitForEvent('registered options event');
+      expect(seen, containsPair('cookieless_mode', true));
+      expect(seen, containsPair('disable_skew_correction', false),
+          reason: "the event's own option wins over a registered one");
+      final sentOptions = event['options'] as Map;
+      expect(sentOptions, isNot(contains('cookieless_mode')),
+          reason: 'the SDK adds nothing back after the hook ran');
+      expect(sentOptions, containsPair('disable_skew_correction', false));
+    });
+
     test('properties the callbacks remove stay removed', () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
@@ -1652,28 +1682,58 @@ void main() {
       }
     });
 
-    test(r'a personless $set does not mark the person properties as sent',
+    // Capture reads these strings and numbers as false too.
+    for (final personless in <Object>[false, 'no', 'false', 'off', 0, 0.0]) {
+      test(
+          'a \$set with process_person_profile $personless '
+          'does not mark the person properties as sent', () async {
+        final server = await LocalPostHogServer.start();
+        final platform = await setUpPlatform(configFor(server));
+        await platform.identify(userId: 'user-1');
+
+        await platform.setPersonProperties(
+          userPropertiesToSet: {'plan': 'pro'},
+          options: {'process_person_profile': personless},
+        );
+        await platform
+            .setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+        await platform
+            .setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+        await platform.capture(eventName: 'done');
+        await server.waitForEvent('done');
+
+        final sets = [
+          for (final event in server.events)
+            if (event['event'] == r'$set') _optionsOf(event),
+        ];
+        expect(
+          [for (final set in sets) set['process_person_profile']],
+          [personless, isNull],
+        );
+      });
+    }
+
+    test(r'a $set with a non-boolean process_person_profile clears the dedup',
         () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
       await platform.identify(userId: 'user-1');
 
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'free'});
       await platform.setPersonProperties(
         userPropertiesToSet: {'plan': 'pro'},
-        options: {'process_person_profile': false},
+        options: {'process_person_profile': 'yes'},
       );
-      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+      await platform.setPersonProperties(userPropertiesToSet: {'plan': 'free'});
       await platform.capture(eventName: 'done');
       await server.waitForEvent('done');
 
-      final sets = [
+      final plans = [
         for (final event in server.events)
-          if (event['event'] == r'$set') _optionsOf(event),
+          if (event['event'] == r'$set')
+            ((event['properties'] as Map)[r'$set'] as Map)['plan'],
       ];
-      expect(
-        [for (final set in sets) set['process_person_profile']],
-        [isFalse, isNull],
-      );
+      expect(plans, ['free', 'pro', 'free']);
     });
   });
 
