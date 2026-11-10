@@ -19,7 +19,7 @@
 - **Breaking:** drop the batch on a redirect on Windows and Linux, following only same-origin 307 and 308 redirects, and cap a `Retry-After` wait at 30 seconds
 - **Breaking:** write events to disk only when the returned future completes on Windows and Linux, so an unawaited call can be lost on a crash or `exit()` — await the call or `Posthog().close()` before `exit()`
 - **Breaking:** apply SDK properties, then registered properties, then event properties on iOS, macOS, Android, Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
-- **Breaking:** fill `$lib` and `$lib_version` as a pair after your properties on Windows and Linux, so a `$lib` you pass without `$lib_version` is sent without one and a `$lib_version` without `$lib` is replaced
+- **Breaking:** fill `$lib` and `$lib_version` as a pair after your properties on iOS, macOS, Android, Windows and Linux, so a `$lib` you pass without `$lib_version` is sent without one and a `$lib_version` without `$lib` is replaced
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
 - **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
@@ -33,6 +33,8 @@
 - **Breaking:** keep string payloads passed to `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, as strings on iOS and macOS instead of decoding them to numbers or booleans
 - **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android — update filters that match it
 - **Breaking:** pause sending on iOS and macOS while cellular data is off for the app, and delete events a `posthog-ios` 2.x SDK left on disk instead of sending them
+- **Breaking:** leave out `$feature_flag_response` on `$feature_flag_called` for a missing flag on iOS, macOS and Android, instead of `null`, `""` or `false` — filter on `is not set`
+- **Breaking:** leave out `null` values inside nested maps on iOS and macOS instead of sending `null`, and keep `null` list elements in place on Android instead of removing them
 - **Breaking:** stop sending the legacy `version` and `build` properties on `Application Installed`, `Application Updated` and `Application Opened` on iOS and macOS — use `$app_version` and `$app_build`
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
 - Add `registerOptions()` and `unregisterOptions()` to send capture options with every event, under each event's own options; on web, known options are registered as their legacy properties

@@ -267,6 +267,8 @@ For the changes every capture v1 SDK shares, such as event options, limits and p
 
 On every platform except web, an event's properties are now the SDK's, then registered properties, then the ones you pass, so your value wins over the SDK's for that event. In 5.x, the SDK's values won.
 
+`$lib` and `$lib_version` are the exception on every platform except web: the SDK fills them as a pair after all of the above. If `$lib` is missing or empty, the SDK sets both, replacing a `$lib_version` you passed on its own. If `$lib` names another library, the SDK leaves both as you set them and doesn't add its own version.
+
 ##### Checklist
 
 You need to change code if your app does any of these:
@@ -280,8 +282,11 @@ You need to change code if your app does any of these:
 - reads `$session_id` or `$window_id` from the raw request body, for example in a proxy
 - relies on a `Retry-After` longer than 30 seconds
 - sets `$cookieless_mode`, `$ignore_sent_at` or `$product_tour_id` to a value PostHog can't read, such as `"maybe"`
-- on Android, filters insights, cohorts or actions on the `$feature_flag_response` of `$feature_flag_called`, such as `""` or `false` for a missing flag (see [Feature flag payloads](#feature-flag-payloads))
+- on iOS, macOS or Android, filters insights, cohorts or actions on the `$feature_flag_response` of `$feature_flag_called` for a missing flag, such as `null`, `""` or `false` (see [Feature flag payloads](#feature-flag-payloads))
 - registers or passes a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expects the SDK's value to win
+- passes `$lib` without `$lib_version`, or `$lib_version` without `$lib`
+- on iOS and macOS, sends `null` inside a nested map and expects it to arrive as `null`
+- on Android, sends lists with `null` elements and expects them removed
 - on any platform except web, drops the event's `options` in `beforeSend` by returning a new `PostHogEvent` or replacing `event.options`
 - alerts on the SDK's debug log lines, whose text changed on every platform except web
 - on Windows or Linux, calls `exit()` without awaiting the calls before it or `Posthog().close()`
@@ -308,7 +313,7 @@ On iOS and macOS, string values in `PostHogBootstrapConfig.featureFlagPayloads`,
 
 A flag whose variant is an empty string reads as disabled on iOS, macOS, Android, Windows and Linux, as it already did on web. `isFeatureEnabled()` returns `false`, with or without `defaultValue`, `getFeatureFlagResult()` and `getAllFeatureFlags()` return `enabled: false`, `onFeatureFlags` listeners and `reloadFeatureFlags()` leave the flag out, and so does `$active_feature_flags` on captured events. `variant`, `getFeatureFlag()` and the event's `$feature/<key>` property still return `""`. PostHog no longer accepts empty variants for new flags, so only flags created earlier through the API, MCP or Terraform are affected. `/flags` still returns `enabled: true` for them, and other PostHog SDKs can still report them as enabled, so rename the variant before you upgrade.
 
-On Android, `$feature_flag_called` for a missing flag now leaves out `$feature_flag_response`. 5.x sent `""` from `getFeatureFlag()` and `false` from `isFeatureEnabled()`. Insights, cohorts and actions that filter on `$feature_flag_response = ""` or `false` to find missing flags stop matching new Android events without any error, so use an `is not set` filter instead. See [`$feature_flag_response` for a missing flag](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#feature_flag_response-for-a-missing-flag) in the Android guide.
+On iOS, macOS and Android, `$feature_flag_called` for a missing flag now leaves out `$feature_flag_response`. 5.x sent `null` on iOS and macOS, and on Android `""` from `getFeatureFlag()` and `false` from `isFeatureEnabled()`. Insights, cohorts and actions that filter on `$feature_flag_response` being `null`, `""` or `false` to find missing flags stop matching new events without any error, so use an `is not set` filter instead. See [`$feature_flag_response` for a missing flag](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#feature_flag_response-for-a-missing-flag) in the Android guide.
 
 #### `beforeSend` on iOS, macOS and Android
 
@@ -320,7 +325,15 @@ Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Ma
 
 The `PostHogEvent` the callbacks return replaces the event's options. A callback that returns a new `PostHogEvent`, or replaces `event.options`, without the options it got drops them, including `process_person_profile: false`, which turns person processing on for that event. Copy `event.options` to the event you return.
 
-Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin for those.
+A Dart callback that sets the distinct ID to an empty or whitespace-only string keeps the SDK's distinct ID for that event.
+
+Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin for those. A native hook that sets the distinct ID to an empty or whitespace-only string drops the event.
+
+#### Null values on iOS, macOS and Android
+
+On iOS and macOS, a `null` value inside a nested map, including one a `beforeSend` callback returns, is now left out of the event instead of being sent as `null`. A list keeps a `null` element at its position, and a map left empty is sent as `{}`. `$set`, `$set_once` and `$group_set` still send `null` values, so you can still clear a person or group property. See [Null event properties](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#null-event-properties) in the iOS guide.
+
+On Android, a `null` element in a list is now sent as `null` at its position instead of being removed, which moved later elements to lower indexes in 5.x. A map entry whose value is `null` is still left out.
 
 #### Lifecycle events on iOS and macOS
 
@@ -491,7 +504,15 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 - [ ] Replace `PostHogConfig.onFeatureFlags` with `Posthog().onFeatureFlags()` before `setup()`.
 - [ ] Update cohorts, insights and actions that match `$locale`, which now includes the region. Use `$app_language` for the language your app shows.
 - [ ] Move anything that reads `version` or `build` on iOS and macOS lifecycle events to `$app_version` and `$app_build`.
-- [ ] Change filters on `$feature_flag_response = ""` or `false` for missing flags to `is not set`.
+- [ ] Change filters on `$feature_flag_response` being `null`, `""` or `false` for missing flags to `is not set`.
 - [ ] If you set `sendFeatureFlagEvent = false`, check whether anything relies on `$feature_flag_called` from `getFeatureFlagResult()`.
 - [ ] Add `sendFeatureFlagEvent: false` wherever you replace `getFeatureFlagPayload()`.
 - [ ] Fix the remaining compile errors using the sections above, including any test fakes of the platform classes.
+
+### Rolling back to 5.x
+
+If you ship 6.0 and then go back to 5.x, events still queued on the device are sent by 5.x to `/batch/`, which doesn't read capture options. This applies on iOS, macOS, Windows and Linux:
+
+- Events that 6.0 marked as personless (`process_person_profile: false`) are processed as person events.
+- Options such as `cookieless_mode` passed through `options` or `registerOptions()` are lost.
+- AI events queued by 6.0 in their own queue are never sent.
