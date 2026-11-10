@@ -75,7 +75,7 @@ module.exports = async function releaseFailureNotification({ github, context, ch
     }
 
     if (published && (!releasedStep || ['skipped', 'failure'].includes(releasedStep.conclusion))) {
-        problems.push('• The released Slack notification did not run.');
+        problems.push('• The released Slack notification was skipped or failed.');
     }
 
     if (problems.length === 0 && run.conclusion === 'success') {
