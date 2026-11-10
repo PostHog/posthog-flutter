@@ -12,6 +12,7 @@ import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
 import com.posthog.PostHogEvent
 import com.posthog.android.replay.PostHogScreenshotColorMode
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
@@ -27,6 +28,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -138,6 +140,111 @@ internal class PosthogFlutterPluginTest {
         val config = assertNotNull(plugin.lastBuiltConfig)
         assertFalse(config.sessionReplayConfig.captureTouches)
         assertTrue(config.sessionReplay)
+    }
+
+    @Test
+    fun setup_surveysDelegate_staysTheSameInstanceAcrossRepeatedSetup() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        val call = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        val first = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
+
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        val second = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
+
+        // The native SDK keeps the delegate from the first setup, so a second instance here would
+        // render nothing yet still receive every Dart survey action and reject it.
+        assertSame(first, second)
+    }
+
+    @Test
+    fun setup_surveysDelegate_reSetupAfterDetachRepointsTheChannel() {
+        val plugin = PosthogFlutterPlugin()
+        val messenger = Mockito.mock(BinaryMessenger::class.java)
+        val binding = attach(plugin, messenger)
+        val call = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+        val first = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
+        plugin.onDetachedFromEngine(binding)
+
+        val reattachedMessenger = Mockito.mock(BinaryMessenger::class.java)
+        attach(plugin, reattachedMessenger)
+        assertNull((first as PostHogFlutterSurveysDelegate).channel)
+        plugin.onMethodCall(call, Mockito.mock(MethodChannel.Result::class.java))
+
+        // The reused delegate must reach the engine that is attached now, not the detached one.
+        val delegate = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate
+        assertSame(first, delegate)
+        assertNotNull((delegate as PostHogFlutterSurveysDelegate).channel).invokeMethod("hideSurveys", null)
+
+        Mockito
+            .verify(reattachedMessenger)
+            .send(Mockito.eq("posthog_flutter"), Mockito.any(), Mockito.any())
+        Mockito
+            .verify(messenger, Mockito.never())
+            .send(Mockito.any(), Mockito.any(), Mockito.any())
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun hotRestart_invalidatesTheSurveysChannelUntilSetupAndUnregistersOnDetach() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        val setup = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        val delegate = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+        val listener = ArgumentCaptor.forClass(FlutterEngine.EngineLifecycleListener::class.java)
+        Mockito.verify(binding.flutterEngine).addEngineLifecycleListener(listener.capture())
+
+        listener.value.onPreEngineRestart()
+
+        assertNull(delegate.channel)
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        assertSame(delegate, assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate)
+        assertNotNull(delegate.channel)
+        plugin.onDetachedFromEngine(binding)
+        Mockito.verify(binding.flutterEngine).removeEngineLifecycleListener(listener.value)
+    }
+
+    @Test
+    fun detach_releasesSurveysChannel() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true)),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+        val delegate = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+
+        plugin.onDetachedFromEngine(binding)
+
+        assertNull(delegate.channel)
+    }
+
+    @Test
+    fun close_releasesSurveysDelegateAndAllowsFreshSetupOnTheSameEngine() {
+        val plugin = PosthogFlutterPlugin()
+        val binding = attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        val setup = MethodCall("setup", mapOf("projectToken" to "test-token", "surveys" to true))
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        val first = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+
+        val closed = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("close", null), closed)
+        Mockito.verify(closed).success(null)
+        assertNull(first.channel)
+
+        val action = Mockito.mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("surveyAction", mapOf("type" to "shown")), action)
+        Mockito.verify(action).error("InvalidArguments", "Survey delegate not available", null)
+
+        plugin.onMethodCall(setup, Mockito.mock(MethodChannel.Result::class.java))
+        val second = assertNotNull(plugin.lastBuiltConfig).surveysConfig.surveysDelegate as PostHogFlutterSurveysDelegate
+        assertNotSame(first, second)
+        assertNotNull(second.channel)
+        plugin.onDetachedFromEngine(binding)
     }
 
     @Test
@@ -839,6 +946,7 @@ internal class PosthogFlutterPluginTest {
     // The stubbed test Looper makes runOnMainThread run inline (myLooper and
     // getMainLooper both default to null), so mint round trips are synchronous here.
 
+    @Suppress("DEPRECATION")
     private fun attach(
         plugin: PosthogFlutterPlugin,
         messenger: BinaryMessenger,
@@ -846,6 +954,7 @@ internal class PosthogFlutterPluginTest {
         val binding = Mockito.mock(FlutterPlugin.FlutterPluginBinding::class.java)
         Mockito.`when`(binding.applicationContext).thenReturn(Mockito.mock(Context::class.java))
         Mockito.`when`(binding.binaryMessenger).thenReturn(messenger)
+        Mockito.`when`(binding.flutterEngine).thenReturn(Mockito.mock(FlutterEngine::class.java))
         plugin.onAttachedToEngine(binding)
         return binding
     }
