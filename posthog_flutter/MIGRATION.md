@@ -269,7 +269,7 @@ On every platform except web, an event's properties are now the SDK's, then regi
 
 `$lib` and `$lib_version` are the exception on every platform except web: the SDK fills them as a pair after all of the above. If `$lib` is missing or empty, the SDK sets both, replacing a `$lib_version` you passed on its own. If `$lib` names another library, the SDK leaves both as you set them and doesn't add its own version.
 
-On every platform except web, a registered `process_person_profile: false`, set with `registerOptions()` or as the `$process_person_profile` property with `register()`, also reaches `identify`, `alias`, `group` and `setPersonProperties`. PostHog accepts the `$identify`, `$create_alias` and `$groupidentify` events and then drops them with an ingestion warning, and the SDK doesn't report it. A `$set` event is kept, but the person isn't updated. In 5.x, the SDK replaced a registered `$process_person_profile` with its own value, so it had no effect. In 6.0 it also applies to other events after `identify` or with `PostHogPersonProfiles.always`, which then don't change the person profile. To keep identifying, pass the option on the call. A `$process_person_profile` property you pass loses to a registered option, so use the option:
+On every platform except web, a registered `process_person_profile: false`, set with `registerOptions()` or as the `$process_person_profile` property with `register()`, also reaches `identify`, `alias`, `group` and `setPersonProperties`. PostHog accepts the `$identify`, `$create_alias` and `$groupidentify` events and then drops them with an ingestion warning, and the SDK doesn't report it. A `$set` event is kept, but the person isn't updated. In 5.x, the SDK replaced a registered `$process_person_profile` with its own value, so it had no effect. In 6.0 it also applies to other events after `identify` or with `PostHogPersonProfiles.always`, which then don't change the person profile. They are still linked to the person and billed as identified events. To keep identifying, pass the option on the call. A `$process_person_profile` property you pass loses to a registered option, so use the option:
 
 ```dart
 await Posthog().registerOptions({'process_person_profile': false});
@@ -281,7 +281,9 @@ await Posthog().identify(
 );
 ```
 
-To create no person profiles at all, set `personProfiles` to `PostHogPersonProfiles.never` instead. The SDK then skips these calls on the device.
+If you registered `false` to skip person profiles for anonymous users, remove it: `PostHogPersonProfiles.identifiedOnly`, the default, already does that and still lets `identify` create the person. To create no person profiles at all, set `personProfiles` to `PostHogPersonProfiles.never` instead. The SDK then skips these calls on the device.
+
+On web, posthog-js replaces a registered `$process_person_profile` with its own value, so a registered `false` has no effect there.
 
 ##### Checklist
 
