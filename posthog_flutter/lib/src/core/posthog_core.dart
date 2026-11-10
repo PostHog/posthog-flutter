@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 import '../feature_flag_result.dart';
 import '../feature_flags_loaded.dart';
 import '../posthog_config.dart';
+import '../posthog_flutter_version.dart';
 import 'feature_flag_utils.dart';
 import 'feature_flags.dart';
 import 'persistence.dart';
@@ -176,6 +177,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// The properties of an event: the ones the SDK sets, then the
   /// registered ones, then the event's own [properties], each winning over
   /// the ones before. A value set for an event changes that event only.
+  /// `$lib` and `$lib_version` are the exception, see [_fillLibraryIdentity].
   ///
   /// Person processing is not a property: see [_eventOptions].
   Map<String, Object?> _enrichProperties(Map<String, Object?>? properties) {
@@ -201,7 +203,24 @@ abstract class PostHogCore extends PostHogCoreStateless {
     if (sessionId is! String || sessionId.isEmpty) {
       enriched[r'$session_id'] = managedSessionId;
     }
+    _fillLibraryIdentity(enriched);
     return enriched;
+  }
+
+  /// Fills the SDK's `$lib` and `$lib_version` as a pair, after every other
+  /// layer, so another library's `$lib` never gets this SDK's version and a
+  /// `$lib_version` without a `$lib` is replaced.
+  static void _fillLibraryIdentity(Map<String, Object?> properties) {
+    final lib = properties[r'$lib'];
+    if (lib is! String || lib.isEmpty) {
+      properties[r'$lib'] = postHogFlutterSdkName;
+      properties[r'$lib_version'] = postHogFlutterVersion;
+    } else if (lib == postHogFlutterSdkName) {
+      final version = properties[r'$lib_version'];
+      if (version is! String || version.isEmpty) {
+        properties[r'$lib_version'] = postHogFlutterVersion;
+      }
+    }
   }
 
   /// The [options] of an event over the registered ones.

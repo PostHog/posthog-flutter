@@ -379,6 +379,45 @@ void main() {
 
       expect(queuedProps(storage, 0)['plan'], 'pro');
     });
+
+    for (final (name, given, expected) in [
+      (
+        'another library keeps its own version, or none',
+        {r'$lib': 'posthog-unity'},
+        {r'$lib': 'posthog-unity', r'$lib_version': null},
+      ),
+      (
+        r'a $lib_version without $lib is replaced',
+        {r'$lib_version': '9.9.9'},
+        {
+          r'$lib': postHogFlutterSdkName,
+          r'$lib_version': postHogFlutterVersion
+        },
+      ),
+      (
+        r'an empty $lib is replaced with the pair',
+        {r'$lib': '', r'$lib_version': '9.9.9'},
+        {
+          r'$lib': postHogFlutterSdkName,
+          r'$lib_version': postHogFlutterVersion
+        },
+      ),
+      (
+        r'the SDK $lib with a set version keeps it',
+        {r'$lib': postHogFlutterSdkName, r'$lib_version': '9.9.9'},
+        {r'$lib': postHogFlutterSdkName, r'$lib_version': '9.9.9'},
+      ),
+    ]) {
+      test(r'$lib and $lib_version fill as a pair: ' + name, () {
+        client.register(given);
+
+        client.capture('test_event');
+
+        final props = queuedProps(storage, 0);
+        expect(props[r'$lib'], expected[r'$lib']);
+        expect(props[r'$lib_version'], expected[r'$lib_version']);
+      });
+    }
   });
 
   group('Registered options', () {

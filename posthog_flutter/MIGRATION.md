@@ -361,6 +361,7 @@ Capture v1 checks each event on its own and drops only the invalid ones, so the 
 ##### Property precedence
 
 An event's properties are the SDK's, then registered properties, then the event's own, so your value now wins for that event. In 5.x, the SDK's values won.
+`$lib` and `$lib_version` are the exception: the SDK fills them as a pair after all of the above. If `$lib` is missing or empty, the SDK sets both, replacing a `$lib_version` you passed on its own. If `$lib` names another library, the SDK leaves both as you set them and doesn't add its own version.
 `beforeSend` runs after that merge and sees the result.
 
 A registered or passed `$session_id` that is a non-empty string replaces the SDK's session ID, which can detach events from their session.

@@ -255,12 +255,7 @@ abstract class PostHogCoreStateless {
 
   /// Gets common event properties.
   @protected
-  Map<String, Object?> getCommonEventProperties() {
-    return {
-      r'$lib': postHogFlutterSdkName,
-      r'$lib_version': postHogFlutterVersion,
-    };
-  }
+  Map<String, Object?> getCommonEventProperties() => const {};
 
   @protected
   T? getPersistedProperty<T>(PostHogPersistedProperty key) {

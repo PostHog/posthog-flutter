@@ -19,6 +19,7 @@
 - **Breaking:** drop the batch on a redirect on Windows and Linux, following only same-origin 307 and 308 redirects, and cap a `Retry-After` wait at 30 seconds
 - **Breaking:** write events to disk only when the returned future completes on Windows and Linux, so an unawaited call can be lost on a crash or `exit()` — await the call or `Posthog().close()` before `exit()`
 - **Breaking:** apply SDK properties, then registered properties, then event properties on iOS, macOS, Android, Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
+- **Breaking:** fill `$lib` and `$lib_version` as a pair after your properties on Windows and Linux, so a `$lib` you pass without `$lib_version` is sent without one and a `$lib_version` without `$lib` is replaced
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
 - **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
