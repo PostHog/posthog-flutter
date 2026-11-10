@@ -52,6 +52,26 @@ jobs:
       slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
       posthog_project_api_key: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
 
+  preserve-slack-thread:
+    name: Preserve Slack thread
+    needs: notify-approval-needed
+    if: needs.notify-approval-needed.outputs.slack_ts != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - name: Save approval thread timestamp
+        env:
+          THREAD_TS: ${{ needs.notify-approval-needed.outputs.slack_ts }}
+        run: printf '%s' "$THREAD_TS" > thread-ts.txt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-slack-thread-${{ github.run_attempt }}
+          path: thread-ts.txt
+          retention-days: 30
+          if-no-files-found: error
+
   version-bump:
     name: Bump version, commit, and tag
     needs: [check-changesets, notify-approval-needed]
@@ -181,17 +201,6 @@ jobs:
               "alertText": ":rotating_light: Failed to prepare release posthog_flutter@${{ steps.apply-changesets.outputs.new-version }} :rotating_light:",
               "alertContext": "The version bump/changelog step failed before packages were published."
             }
-
-      - name: Notify Slack - Failed
-        continue-on-error: true
-        if: ${{ failure() && needs.notify-approval-needed.outputs.slack_ts != '' }}
-        uses: PostHog/.github/.github/actions/slack-thread-reply@cb0979b67dcd585828b61ac45927eef4da8f6287 # main
-        with:
-          slack_bot_token: ${{ secrets.SLACK_CLIENT_LIBRARIES_BOT_TOKEN }}
-          slack_channel_id: ${{ vars.SLACK_APPROVALS_CLIENT_LIBRARIES_CHANNEL_ID }}
-          thread_ts: ${{ needs.notify-approval-needed.outputs.slack_ts }}
-          message: '❌ Failed to bump version for `posthog_flutter@${{ steps.apply-changesets.outputs.new-version }}`! <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>'
-          emoji_reaction: 'x'
 
   notify-rejected:
     name: Notify Slack - Rejected
