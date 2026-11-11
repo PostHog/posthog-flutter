@@ -334,26 +334,47 @@ internal class PosthogFlutterPluginTest {
         assertEquals(PostHogCompression.NONE, assertNotNull(plugin.lastBuiltConfig).compression)
     }
 
-    @Test
-    fun setup_flutterVersion_addedOnlyToInstallAndUpdateEvents() {
+    /** Runs setup with [setupArgs] and returns a lookup from event name to its properties after the native beforeSend hooks. */
+    private fun nativeBeforeSendAfterSetup(setupArgs: Map<String, Any>): (eventName: String) -> Map<String, Any>? {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
-        plugin.onMethodCall(
-            MethodCall("setup", mapOf("projectToken" to "test-token", "flutterVersion" to "3.35.0")),
-            Mockito.mock(MethodChannel.Result::class.java),
-        )
+        plugin.onMethodCall(MethodCall("setup", setupArgs), Mockito.mock(MethodChannel.Result::class.java))
         val beforeSend = assertNotNull(plugin.lastBuiltConfig).beforeSendList
-
-        fun propertiesOf(name: String): Map<String, Any>? =
+        return { eventName ->
             beforeSend
-                .fold(PostHogEvent(name, "id", properties = mutableMapOf())) { event, hook ->
+                .fold(PostHogEvent(eventName, "id", properties = mutableMapOf())) { event, hook ->
                     assertNotNull(hook.run(event))
                 }.properties
+        }
+    }
+
+    @Test
+    fun setup_flutterVersion_addedOnlyToInstallAndUpdateEvents() {
+        val propertiesOf = nativeBeforeSendAfterSetup(mapOf("projectToken" to "test-token", "flutterVersion" to "3.35.0"))
 
         assertEquals("3.35.0", propertiesOf("Application Installed")?.get("\$flutter_version"))
         assertEquals("3.35.0", propertiesOf("Application Updated")?.get("\$flutter_version"))
         assertNull(propertiesOf("Application Opened")?.get("\$flutter_version"))
         assertNull(propertiesOf("custom")?.get("\$flutter_version"))
+    }
+
+    @Test
+    fun setup_disableGeoip_marksEventsButNotSnapshots() {
+        val propertiesOf = nativeBeforeSendAfterSetup(mapOf("projectToken" to "test-token", "disableGeoip" to true))
+
+        assertEquals(true, propertiesOf("custom")?.get("\$geoip_disable"))
+        assertEquals(true, propertiesOf("Application Opened")?.get("\$geoip_disable"))
+        assertNull(propertiesOf("\$snapshot")?.get("\$geoip_disable"))
+    }
+
+    @Test
+    fun setup_disableGeoipFalse_leavesEventsUnmarked() {
+        for (args in listOf(
+            mapOf("projectToken" to "test-token", "disableGeoip" to false),
+            mapOf("projectToken" to "test-token"),
+        )) {
+            assertNull(nativeBeforeSendAfterSetup(args)("custom")?.get("\$geoip_disable"))
+        }
     }
 
     @Test

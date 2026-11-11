@@ -232,6 +232,9 @@ public class PosthogFlutterPlugin: NSObject, FlutterPlugin {
         if let optOut = posthogConfig["optOut"] as? Bool {
             config.optOut = optOut
         }
+        if let disableGeoip = posthogConfig["disableGeoip"] as? Bool {
+            config.disableGeoIp = disableGeoip
+        }
 
         if let personProfiles = posthogConfig["personProfiles"] as? String {
             switch personProfiles {

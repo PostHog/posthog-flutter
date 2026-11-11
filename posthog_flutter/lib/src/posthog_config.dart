@@ -236,6 +236,22 @@ class PostHogConfig {
   /// Defaults to [PostHogPersonProfiles.identifiedOnly].
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
 
+  /// Whether PostHog skips GeoIP enrichment, so the server doesn't infer the
+  /// user's location from their IP address.
+  ///
+  /// When `true`, events carry `$geoip_disable: true` and feature flag
+  /// requests send `geoip_disable: true`. The SDK adds the property after
+  /// [beforeSend] runs, so a callback can't see or remove it.
+  ///
+  /// Defaults to `false`.
+  ///
+  /// **Android:** events only. Feature flag requests still use GeoIP until
+  /// posthog-android supports this option.
+  ///
+  /// **Flutter web:** not applied. posthog-js is initialized by your app, so
+  /// set `$geoip_disable: true` on events in its `before_send` instead.
+  var disableGeoip = false;
+
   /// Controls how request bodies are compressed before being sent to PostHog.
   ///
   /// Set this to [PostHogCompression.none] when something between the app and
@@ -509,6 +525,7 @@ class PostHogConfig {
       'optOut': optOut,
       'surveys': surveys,
       'personProfiles': personProfiles.name,
+      'disableGeoip': disableGeoip,
       'compression': compression.name,
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,

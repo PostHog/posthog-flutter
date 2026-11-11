@@ -23,6 +23,7 @@
       "optOut": false,
       "surveys": true,
       "personProfiles": "always",
+      "disableGeoip": false,
       "compression": "gzip",
       "sessionReplay": true,
       "dataMode": "any",
