@@ -16,6 +16,26 @@ void main() {
   late bool optedOut;
   late String userState;
 
+  // posthog-js merges window.location under the caller's properties, and only
+  // skips a key that is already present. Null stays null.
+  Map<String, Object?> recordedProperties(JSAny? properties) {
+    final received = properties?.dartify();
+    final map = received is Map
+        ? Map<String, Object?>.from(
+            received.map((key, value) => MapEntry(key.toString(), value)),
+          )
+        : <String, Object?>{};
+    const location = {
+      r'$current_url': 'https://example.test/checkout',
+      r'$host': 'example.test',
+      r'$pathname': '/checkout',
+    };
+    for (final entry in location.entries) {
+      map.putIfAbsent(entry.key, () => entry.value);
+    }
+    return map;
+  }
+
   setUp(() {
     captures.clear();
     final fake = JSObject();
@@ -24,7 +44,7 @@ void main() {
       ((JSString event, JSAny? properties, [JSAny? options]) {
         captures.add({
           'event': event.toDart,
-          'properties': properties?.dartify(),
+          'properties': recordedProperties(properties),
           'options': options?.dartify(),
         });
       }).toJS,
@@ -45,7 +65,7 @@ void main() {
       ((JSAny? error, JSAny? properties) {
         captures.add({
           'event': r'$exception',
-          'properties': properties?.dartify(),
+          'properties': recordedProperties(properties),
         });
       }).toJS,
     );
@@ -448,6 +468,47 @@ void main() {
     );
 
     expect(captures, isEmpty);
+  });
+
+  test('capture attaches the page url when beforeSend leaves it', () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token'));
+
+    await web.capture(eventName: 'checkout', properties: {'plan': 'pro'});
+
+    final properties = captures.single['properties'] as Map;
+    expect(properties[r'$current_url'], isNotEmpty);
+    expect(properties[r'$host'], isNotEmpty);
+    expect(properties[r'$pathname'], isNotEmpty);
+    expect(properties['plan'], 'pro');
+  });
+
+  test('beforeSend can redact the page url on capture, screen, and exception',
+      () async {
+    final web = PosthogFlutterWeb();
+    await web.setup(PostHogConfig('test_token', beforeSend: [
+      (event) {
+        event.properties
+          ?..remove(r'$current_url')
+          ..remove(r'$host')
+          ..remove(r'$pathname');
+        return event;
+      },
+    ]));
+
+    await web.capture(eventName: 'checkout', properties: {'plan': 'pro'});
+    await web.screen(screenName: 'Checkout');
+    await web.captureException(error: StateError('boom'));
+
+    expect(captures, hasLength(3));
+    for (final captured in captures) {
+      final properties = captured['properties'] as Map;
+      expect(properties[r'$current_url'], isNull,
+          reason: '${captured['event']}');
+      expect(properties[r'$host'], isNull, reason: '${captured['event']}');
+      expect(properties[r'$pathname'], isNull, reason: '${captured['event']}');
+    }
+    expect((captures.first['properties'] as Map)['plan'], 'pro');
   });
 
   test('beforeSend can strip a property before web capture', () async {

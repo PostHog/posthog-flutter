@@ -1,5 +1,11 @@
 ## Next
 
+## 5.60.2
+
+### Patch Changes
+
+- 7796ebf: Let web `beforeSend` redact `$current_url`, `$host`, and `$pathname`. Those properties are attached before the callback. A removed key is sent as null, because posthog-js fills an omitted one back in from `window.location`.
+
 ## 5.60.1
 
 ### Patch Changes

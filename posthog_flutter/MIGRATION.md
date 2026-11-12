@@ -269,6 +269,22 @@ On every platform except web, an event's properties are now the SDK's, then regi
 
 `$lib` and `$lib_version` are the exception on every platform except web: the SDK fills them as a pair after all of the above. If `$lib` is missing or empty, the SDK sets both, replacing a `$lib_version` you passed on its own. If `$lib` names another library, the SDK leaves both as you set them and doesn't add its own version.
 
+On every platform except web, a registered `process_person_profile: false`, set with `registerOptions()` or as the `$process_person_profile` property with `register()`, also reaches `identify`, `alias`, `group` and `setPersonProperties`. PostHog accepts the `$identify`, `$create_alias` and `$groupidentify` events and then drops them with an ingestion warning, and the SDK doesn't report it. A `$set` event is kept, but the person isn't updated. In 5.x, the SDK replaced a registered `$process_person_profile` with its own value, so it had no effect. In 6.0 it also applies to other events after `identify` or with `PostHogPersonProfiles.always`, which then don't change the person profile. They are still linked to the person and billed as identified events. To keep identifying, pass the option on the call. A `$process_person_profile` property you pass loses to a registered option, so use the option:
+
+```dart
+await Posthog().registerOptions({'process_person_profile': false});
+
+await Posthog().identify(
+  userId: 'user-123',
+  userProperties: {'plan': 'pro'},
+  options: {'process_person_profile': true},
+);
+```
+
+If you registered `false` to skip person profiles for anonymous users, remove it: `PostHogPersonProfiles.identifiedOnly`, the default, already does that and still lets `identify` create the person. To create no person profiles at all, set `personProfiles` to `PostHogPersonProfiles.never` instead. The SDK then skips these calls on the device.
+
+On web, posthog-js replaces a registered `$process_person_profile` with its own value, so a registered `false` has no effect there.
+
 ##### Checklist
 
 You need to change code if your app does any of these:
@@ -290,6 +306,7 @@ You need to change code if your app does any of these:
 - on any platform except web, drops the event's `options` in `beforeSend` by returning a new `PostHogEvent` or replacing `event.options`
 - alerts on the SDK's debug log lines, whose text changed on every platform except web
 - on Windows or Linux, calls `exit()` without awaiting the calls before it or `Posthog().close()`
+- on any platform except web, registers `process_person_profile: false` and still calls `identify`, `alias`, `group` or `setPersonProperties`
 
 ##### Reverse proxies and self-hosting
 
@@ -406,7 +423,7 @@ When the event is sent, the SDK removes each one from `properties` and uses it f
 - Option values are sent as given. PostHog drops an event whose option value it can't read.
 - Other option keys are sent unchanged.
 - To set an option for every event, register it with `Posthog().registerOptions({'cookieless_mode': true})` and remove it with `unregisterOptions`. An event's own options win over registered ones, and `reset()` clears them. Registering its legacy option property, such as `Posthog().register(r'$cookieless_mode', true)`, still works.
-- A registered option or legacy option property also reaches `$identify`, `$create_alias` and `$groupidentify`. If it turns person processing off, PostHog accepts those events and then drops them with an ingestion warning, and the SDK doesn't report it.
+- A registered `process_person_profile: false` also reaches identity calls; see [Events go to capture v1](#events-go-to-capture-v1).
 - Person processing is sent as the `process_person_profile: false` option only while it's off, instead of a `$process_person_profile` property on every event.
 - Person processing is decided before `beforeSend` runs, as on iOS, macOS and Android. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 - Events still queued on disk by 5.x are sent to capture v1 after the update, with their legacy option properties moved to options.
