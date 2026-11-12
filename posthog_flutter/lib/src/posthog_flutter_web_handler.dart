@@ -183,6 +183,17 @@ void stampWebAutomaticProperties(Map<String, dynamic> properties) {
 bool _automaticPropertiesApplied(Object? args) =>
     args is Map && args['automaticPropertiesApplied'] == true;
 
+const _pageLocationKeys = [r'$current_url', r'$host', r'$pathname'];
+
+/// posthog-js copies `window.location` onto a property it did not receive.
+/// It leaves an explicit null in place, so a key `beforeSend` removed has to
+/// be sent as null or the page URL comes back.
+void _preserveRedactedPageLocation(Map<String, dynamic> properties) {
+  for (final key in _pageLocationKeys) {
+    properties.putIfAbsent(key, () => null);
+  }
+}
+
 Map<String, String> _getLocationProperties() {
   try {
     final location = web.window.location;
@@ -253,7 +264,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'capture':
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
-      if (!_automaticPropertiesApplied(args)) {
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
         stampWebAutomaticProperties(properties);
       }
       final userProperties = safeMapConversion(args['userProperties']);
@@ -281,7 +294,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final screenName = args['screenName'] as String;
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
-      if (!_automaticPropertiesApplied(args)) {
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
         stampWebAutomaticProperties(properties);
       }
 
@@ -491,7 +506,9 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
-      if (!_automaticPropertiesApplied(args)) {
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
         stampWebAutomaticProperties(properties);
       }
 

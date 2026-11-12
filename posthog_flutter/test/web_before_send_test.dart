@@ -13,6 +13,26 @@ void main() {
 
   final captures = <Map<String, Object?>>[];
 
+  // posthog-js merges window.location under the caller's properties, and only
+  // skips a key that is already present. Null stays null.
+  Map<String, Object?> recordedProperties(JSAny? properties) {
+    final received = properties?.dartify();
+    final map = received is Map
+        ? Map<String, Object?>.from(
+            received.map((key, value) => MapEntry(key.toString(), value)),
+          )
+        : <String, Object?>{};
+    const location = {
+      r'$current_url': 'https://example.test/checkout',
+      r'$host': 'example.test',
+      r'$pathname': '/checkout',
+    };
+    for (final entry in location.entries) {
+      map.putIfAbsent(entry.key, () => entry.value);
+    }
+    return map;
+  }
+
   setUp(() {
     captures.clear();
     final fake = JSObject();
@@ -21,7 +41,7 @@ void main() {
       ((JSString event, JSAny? properties, [JSAny? options]) {
         captures.add({
           'event': event.toDart,
-          'properties': properties?.dartify(),
+          'properties': recordedProperties(properties),
         });
       }).toJS,
     );
@@ -30,7 +50,7 @@ void main() {
       ((JSAny? error, JSAny? properties) {
         captures.add({
           'event': r'$exception',
-          'properties': properties?.dartify(),
+          'properties': recordedProperties(properties),
         });
       }).toJS,
     );
@@ -277,12 +297,10 @@ void main() {
     expect(captures, hasLength(3));
     for (final captured in captures) {
       final properties = captured['properties'] as Map;
-      expect(properties.containsKey(r'$current_url'), isFalse,
+      expect(properties[r'$current_url'], isNull,
           reason: '${captured['event']}');
-      expect(properties.containsKey(r'$host'), isFalse,
-          reason: '${captured['event']}');
-      expect(properties.containsKey(r'$pathname'), isFalse,
-          reason: '${captured['event']}');
+      expect(properties[r'$host'], isNull, reason: '${captured['event']}');
+      expect(properties[r'$pathname'], isNull, reason: '${captured['event']}');
     }
     expect((captures.first['properties'] as Map)['plan'], 'pro');
   });
