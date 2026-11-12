@@ -195,6 +195,29 @@ void _addAppVersionProperties(Map<String, dynamic> properties) {
   );
 }
 
+/// Page URL and app version attached to web events.
+///
+/// [PosthogFlutterWeb] applies this before `beforeSend`. The handler applies
+/// it only for callers that have not, so a callback can redact the values.
+void stampWebAutomaticProperties(Map<String, dynamic> properties) {
+  properties.addAll(_getLocationProperties());
+  _addAppVersionProperties(properties);
+}
+
+bool _automaticPropertiesApplied(Object? args) =>
+    args is Map && args['automaticPropertiesApplied'] == true;
+
+const _pageLocationKeys = [r'$current_url', r'$host', r'$pathname'];
+
+/// posthog-js copies `window.location` onto a property it did not receive.
+/// It leaves an explicit null in place, so a key `beforeSend` removed has to
+/// be sent as null or the page URL comes back.
+void _preserveRedactedPageLocation(Map<String, dynamic> properties) {
+  for (final key in _pageLocationKeys) {
+    properties.putIfAbsent(key, () => null);
+  }
+}
+
 Map<String, String> _getLocationProperties() {
   try {
     final location = web.window.location;
@@ -360,8 +383,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'capture':
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
+        stampWebAutomaticProperties(properties);
+      }
       final options = _personCaptureOptions(args);
 
       posthog?.capture(
@@ -374,8 +400,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final screenName = args['screenName'] as String;
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
+        stampWebAutomaticProperties(properties);
+      }
 
       final options = _personCaptureOptions(args);
       posthog?.capture(
@@ -579,8 +608,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
+        stampWebAutomaticProperties(properties);
+      }
 
       // Route through posthog-js's captureException so it attaches required
       // metadata and any buffered $exception_steps. posthog-js spreads the

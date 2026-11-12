@@ -258,6 +258,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     );
   }
 
+  Map<String, Object> _withWebContext(Map<String, Object>? properties) {
+    final stamped = <String, dynamic>{...?properties};
+    stampWebAutomaticProperties(stamped);
+    return stamped.cast<String, Object>();
+  }
+
   @override
   Future<void> capture({
     required String eventName,
@@ -268,7 +274,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }) async {
     final processedEvent = _runBeforeSend(
       eventName,
-      properties,
+      _withWebContext(properties),
       userProperties: userProperties,
       userPropertiesSetOnce: userPropertiesSetOnce,
       options: options,
@@ -310,6 +316,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     return handleWebMethodCall(
       MethodCall('capture', {
         'eventName': processedEvent.event,
+        'automaticPropertiesApplied': true,
         if (normalizedProperties != null) 'properties': normalizedProperties,
         if (normalizedUserProperties != null)
           'userProperties': normalizedUserProperties,
@@ -383,10 +390,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }) async {
     // The screen name argument wins over a properties `$screen_name`.
     // beforeSend still runs after this and can change the name.
-    final propsWithScreenName = <String, Object>{
+    final propsWithScreenName = _withWebContext({
       ...?properties,
       PostHogPropertyName.screenName: screenName,
-    };
+    });
 
     final processedEvent = _runBeforeSend(
       PostHogEventName.screen,
@@ -424,6 +431,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     return handleWebMethodCall(
       MethodCall('screen', {
         'screenName': finalScreenName,
+        'automaticPropertiesApplied': true,
         if (remaining != null && remaining.isNotEmpty) 'properties': remaining,
         if (userProperties != null)
           'userProperties': PropertyNormalizer.normalize(userProperties),
@@ -742,7 +750,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
       final processedEvent = _runBeforeSend(
         PostHogEventName.exception,
-        exceptionData.cast<String, Object>(),
+        _withWebContext(Map<String, Object>.from(exceptionData)),
         options: options,
       );
       if (processedEvent == null) {
@@ -777,7 +785,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       });
 
       return await handleWebMethodCall(
-        MethodCall('captureException', {'properties': normalizedData}),
+        MethodCall('captureException', {
+          'automaticPropertiesApplied': true,
+          'properties': normalizedData,
+        }),
       );
     } catch (error) {
       printIfDebug('Exception in captureException: $error');
