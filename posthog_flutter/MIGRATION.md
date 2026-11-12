@@ -1,6 +1,6 @@
 # Migrate the Flutter SDK from 5.x.x to 6.0.0
 
-The Flutter SDK 6.x.x sends every event to the [capture v1](https://posthog.com/docs/api/capture-v1) endpoints, `/i/v1/analytics/events` and `/i/v1/ai/events`.
+The Flutter SDK 6.x.x sends every event on iOS, macOS, Android, Windows, and Linux to the [capture v1](https://posthog.com/docs/api/capture-v1) endpoints, `/i/v1/analytics/events` and `/i/v1/ai/events`. On the web, it uses the JavaScript Web SDK, which stays on legacy capture.
 
 Use the top right copy page button to work through this with your agents.
 
