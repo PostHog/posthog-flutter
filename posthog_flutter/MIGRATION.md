@@ -263,7 +263,7 @@ await Posthog().setup(config);
 
 Web doesn't move to capture v1 in this release. It keeps posthog-js and its current endpoints. On web, `options` are sent as the legacy option properties, and `captureAi` sends nothing.
 
-For the changes every capture v1 SDK shares, such as event options, limits and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/libraries/capture-v1). On iOS, macOS and Android, capture v1 comes from the native SDKs, so the Capture v1 sections of the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#endpoints) guides apply there too. Windows and Linux are covered [below](#capture-v1-on-windows-and-linux).
+For the changes every capture v1 SDK shares, such as event options, limits and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/api/capture-v1). On iOS, macOS and Android, capture v1 comes from the native SDKs, so the Capture v1 sections of the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#endpoints) guides apply there too. Windows and Linux are covered [below](#capture-v1-on-windows-and-linux).
 
 On every platform except web, an event's properties are now the SDK's, then registered properties, then the ones you pass, so your value wins over the SDK's for that event. In 5.x, the SDK's values won.
 
