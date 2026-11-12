@@ -67,7 +67,11 @@ android {
         testImplementation 'org.robolectric:robolectric:4.14.1'
         testImplementation 'junit:junit:4.13.2'
         testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:5.10.1'
-        implementation 'com.posthog:posthog-android:[4.0.0,5.0.0)'
+        // strictly: Gradle otherwise raises a plain range when the app or another library asks for a
+        // newer posthog-android, and this plugin, compiled against 4.x, then crashes at runtime.
+        implementation('com.posthog:posthog-android') {
+            version { strictly '[4.0.0,5.0.0)' }
+        }
     }
 
     testOptions {

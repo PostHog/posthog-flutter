@@ -7,6 +7,7 @@
 - **Breaking:** remove CocoaPods support on iOS and macOS — install through Swift Package Manager, which needs the Flutter SDK 3.41 or later and doesn't support add-to-app modules yet
 - **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x
+- Fail the Android build instead of crashing at runtime when another dependency would raise `posthog-android` past 4.x
 - **Breaking:** remove `PostHogConfig.apiKey` and the `com.posthog.posthog.API_KEY` manifest and Info.plist key — use `projectToken` and `com.posthog.posthog.PROJECT_TOKEN`
 - **Breaking:** remove `Posthog().enable()` and `Posthog().disable()`, and rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb` — use `optIn()` and `optOut()`
 - **Breaking:** add `options` to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `defaultValue` to `isFeatureEnabled()`, add `captureAi()`, `setAppLanguage()`, `registerOptions()` and `unregisterOptions()`, and remove `getFeatureFlagPayload()` on `PosthogFlutterPlatformInterface` — update subclasses and test fakes
