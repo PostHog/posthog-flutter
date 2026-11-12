@@ -1344,9 +1344,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
   void _recordSentPersonProperties(Object? processPerson, String hash) {
     if (processPerson == null || processPerson == true) {
       _cachedPersonProperties = hash;
-    } else if (processPerson != false) {
-      // Values are sent as given, and capture reads strings and numbers such
-      // as 'no', 'yes' or 0 either way, so the profile's state is unknown.
+    } else {
+      // Any other value may be personless, so the stored hash no longer
+      // matches the person (PostHog/sdk-specs#208).
       _cachedPersonProperties = null;
     }
   }
