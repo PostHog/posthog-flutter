@@ -366,7 +366,11 @@ The new `$app_language` property is the language your app shows. `PosthogObserve
 
 #### Network reachability on iOS and macOS
 
-A path that needs user action, such as a VPN waiting for a password, counts as reachable, and queues pause while cellular data is off for the app. Events captured in the first 100 ms after setup may leave out `$network_wifi` and `$network_cellular`. Events still on disk from a `posthog-ios` 2.x SDK are deleted instead of sent.
+A path that needs user action, such as a VPN waiting for a password, counts as reachable, and queues pause while cellular data is off for the app. Events captured in the first 100 ms after setup may leave out `$network_wifi` and `$network_cellular`.
+
+#### Events queued by posthog-ios 2.x
+
+If an app updates straight from a `posthog-ios` 2.x SDK, events that 2.x left on disk are deleted instead of sent. Distinct ID, anonymous ID, groups and cached feature flags carry over. Events queued by 5.x aren't affected.
 
 #### Personal API keys
 
@@ -391,15 +395,16 @@ Capture v1 checks each event on its own and drops only the invalid ones, so the 
 ##### Property precedence
 
 An event's properties are the SDK's, then registered properties, then the event's own, so your value now wins for that event. In 5.x, the SDK's values won.
+
 `$lib` and `$lib_version` are the exception: the SDK fills them as a pair after all of the above. If `$lib` is missing or empty, the SDK sets both, replacing a `$lib_version` you passed on its own. If `$lib` names another library, the SDK leaves both as you set them and doesn't add its own version.
+
 `beforeSend` runs after that merge and sees the result.
 
 A registered or passed `$session_id` that is a non-empty string replaces the SDK's session ID, which can detach events from their session.
 
 ##### Session and window IDs
 
-Capture v1 sends `$session_id` and `$window_id` as top-level `session_id` and `window_id` fields, not as properties.
-The SDK moves them out of `properties` for you.
+Capture v1 sends `$session_id` and `$window_id` as top-level `session_id` and `window_id` fields, not as properties. The SDK moves them out of `properties` for you.
 
 - A string value, including an empty string, is sent unchanged.
 - Any other value is removed and not sent. With `debug` on, the SDK logs a warning that names the key and the value's JSON type, never the value.
@@ -409,8 +414,7 @@ In PostHog, the events still have `$session_id` and `$window_id`.
 
 ##### Event options
 
-The legacy option properties, the `$`-prefixed properties legacy capture reads as settings, still work.
-When the event is sent, the SDK removes each one from `properties` and uses it for its option:
+The legacy option properties, the `$`-prefixed properties legacy capture reads as settings, still work. When the event is sent, the SDK removes each one from `properties` and uses it for its option:
 
 | Legacy option property | Option |
 | --- | --- |
@@ -443,10 +447,7 @@ When the event is sent, the SDK removes each one from `properties` and uses it f
 
 ##### Redirects
 
-The SDK follows a 307 or 308 redirect only to the origin of `host` (same scheme, host and port), at most 5 times, and resends the same body and headers.
-Any other redirect drops the batch.
-In 5.x, no redirect was followed and the batch stayed queued.
-If a proxy redirects capture requests to another host, point `host` at the final host.
+The SDK follows a 307 or 308 redirect only to the origin of `host` (same scheme, host and port), at most 5 times, and resends the same body and headers. Any other redirect drops the batch. In 5.x, no redirect was followed and the batch stayed queued. If a proxy redirects capture requests to another host, point `host` at the final host.
 
 ##### Batches and size limits
 
@@ -516,6 +517,10 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 - [ ] Use Xcode 26 or later.
 - [ ] If you run your own reverse proxy or self-host, serve `/i/v1/analytics/events` and `/i/v1/ai/events` first.
 - [ ] Shorten or hash distinct IDs over 200 UTF-8 bytes.
+- [ ] On Android, upgrade `posthog-server` to 2.25.0 or later if you use it.
+- [ ] Rename empty-string flag variants.
+- [ ] If you register `process_person_profile: false`, pass `process_person_profile: true` on the `identify`, `alias`, `group` and `setPersonProperties` calls that should still update the person.
+- [ ] On Windows and Linux, await calls or `Posthog().close()` before `exit()`.
 - [ ] Make `beforeSend` callbacks, including `PostHogLogsConfig.beforeSend`, synchronous.
 - [ ] Review your `beforeSend` callbacks for the new event shape, which includes the SDK's properties and options on every platform except web, and for person processing decided before they run.
 - [ ] Replace `PostHogConfig.onFeatureFlags` with `Posthog().onFeatureFlags()` before `setup()`.
@@ -528,7 +533,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 
 ### Rolling back to 5.x
 
-If you ship 6.0 and then go back to 5.x, events still queued on the device are sent by 5.x to `/batch/`, which doesn't read capture options. This applies on iOS, macOS, Windows and Linux:
+If you ship 6.0 and then go back to 5.x, events still queued on the device are sent by 5.x to `/batch/`, which doesn't read capture options. This applies on every platform except web:
 
 - Events that 6.0 marked as personless (`process_person_profile: false`) are processed as person events.
 - Options such as `cookieless_mode` passed through `options` or `registerOptions()` are lost.
