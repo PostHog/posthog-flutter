@@ -120,8 +120,8 @@ const minimalFeatureFlagCalledProperties = <String>{
 /// Get the value from a [PostHogFeatureFlagDetail].
 ///
 /// Returns the variant string if present, the enabled bool otherwise.
-/// Returns null if the detail is null.
+/// Returns null if the detail is absent or its evaluation failed.
 PostHogFeatureFlagValue? getFeatureFlagValue(PostHogFeatureFlagDetail? detail) {
-  if (detail == null) return null;
+  if (detail == null || detail.failed == true) return null;
   return detail.variant ?? detail.enabled;
 }
