@@ -217,15 +217,25 @@ PostHog no longer accepts empty variants for new flags, so only flags created ea
 
 | Removed | Use instead |
 | --- | --- |
-| The `sendEvent:` parameter of `getFeatureFlagResult()` | `sendFeatureFlagEvent:`. The parameter is also now `bool?` (see [Check flag events](#check-flag-events)). |
-| `PostHogConfig.apiKey` | `projectToken`. The constructor already takes the token as its first argument. |
+| The `sendEvent:` parameter of `getFeatureFlagResult()` | `sendFeatureFlagEvent:` |
+| `PostHogConfig.apiKey` | `projectToken` |
 | `Posthog().enable()` and `disable()` | `Posthog().optIn()` and `optOut()` |
 | `PostHogConfig.sendFeatureFlagEvents` | `sendFeatureFlagEvent` |
 | `Posthog().getFeatureFlagPayload()` | `getFeatureFlagResult()` and its `payload` |
 | `PostHogSessionReplayConfig.debouncerDelay` | `throttleDelay` |
-| `PostHogDataMode.cellular` | `PostHogDataMode.any`. `cellular` always behaved like `any`, so sending doesn't change. |
-| `toMap()` and `PostHogFeatureFlagResult.fromMap()` | Nothing. They serialized the internal platform-channel format. |
-| `PostHogConfig.onFeatureFlags` | `Posthog().onFeatureFlags()` (see [Replace onFeatureFlags](#replace-onfeatureflags)) |
+| `PostHogDataMode.cellular` | `PostHogDataMode.any` |
+| `toMap()` and `PostHogFeatureFlagResult.fromMap()` | Nothing |
+| `PostHogConfig.onFeatureFlags` | `Posthog().onFeatureFlags()` |
+
+The `sendFeatureFlagEvent:` parameter is also now `bool?` (see [Check flag events](#check-flag-events)).
+
+The `PostHogConfig` constructor already takes the token as its first argument.
+
+`PostHogDataMode.cellular` always behaved like `any`, so sending doesn't change.
+
+`toMap()` and `PostHogFeatureFlagResult.fromMap()` serialized the internal platform-channel format.
+
+To move to `Posthog().onFeatureFlags()`, see [Replace onFeatureFlags](#replace-onfeatureflags).
 
 Rename the `sendEvent:` parameter:
 
@@ -396,14 +406,24 @@ These changes affect only code that calls, extends, or fakes `PosthogFlutterPlat
 | --- | --- |
 | `enable()` and `disable()` | Now `optIn()` and `optOut()` |
 | `getFeatureFlagPayload()` | Removed |
-| `getFeatureFlagResult({required String key, bool sendEvent = true})` | Now `getFeatureFlagResult({required String key, bool? sendFeatureFlagEvent})` |
+| `getFeatureFlagResult()` | New parameters |
 | `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group`, and `captureException` | Take an `options` map |
-| `captureAi()` | New. The base class throws `UnimplementedError` unless you override it. |
+| `captureAi()` | New |
 | `isFeatureEnabled()` | Takes `defaultValue` |
-| `reloadFeatureFlags()` | Returns a `Future<PostHogFeatureFlagsLoaded>` |
-| `setAppLanguage(String? language)` | New. The base class does nothing unless you override it. |
-| `registerOptions(Map<String, Object?> options)` and `unregisterOptions(String key)` | New. The base class throws `UnimplementedError` unless you override them. |
-| `OnFeatureFlagsCallback` | Now receives a `PostHogFeatureFlagsLoaded`: `void Function(PostHogFeatureFlagsLoaded loaded)` instead of `void Function()` |
+| `reloadFeatureFlags()` | New return type |
+| `setAppLanguage()` | New |
+| `registerOptions()` and `unregisterOptions()` | New |
+| `OnFeatureFlagsCallback` | New parameter |
+
+`getFeatureFlagResult({required String key, bool sendEvent = true})` is now `getFeatureFlagResult({required String key, bool? sendFeatureFlagEvent})`.
+
+The base class `captureAi()` throws `UnimplementedError` unless you override it. So do `registerOptions(Map<String, Object?> options)` and `unregisterOptions(String key)`.
+
+The base class `setAppLanguage(String? language)` does nothing unless you override it.
+
+`reloadFeatureFlags()` returns a `Future<PostHogFeatureFlagsLoaded>`.
+
+`OnFeatureFlagsCallback` now receives a `PostHogFeatureFlagsLoaded`. It's `void Function(PostHogFeatureFlagsLoaded loaded)` instead of `void Function()`.
 
 Rename the overrides in your fakes:
 
@@ -457,8 +477,10 @@ On every platform except web, an event's properties are the SDK's, then register
 
 | You set | The SDK sends |
 | --- | --- |
-| No `$lib`, or an empty one | Its own `$lib` and `$lib_version`. It replaces a `$lib_version` you passed on its own. |
-| A `$lib` that names another library | Both as you set them. It doesn't add its own version. |
+| No `$lib`, or an empty one | Its own `$lib` and `$lib_version` |
+| A `$lib` that names another library | Both as you set them |
+
+With no `$lib`, or an empty one, the SDK replaces a `$lib_version` you passed on its own. With a `$lib` that names another library, it doesn't add its own version.
 
 On Windows and Linux, `beforeSend` runs after that merge and sees the result.
 
@@ -544,12 +566,10 @@ On iOS and macOS, `Application Installed`, `Application Updated`, and `Applicati
 
 `$locale` now means the device's language, with its region, on iOS, Android, macOS, Windows, and Linux.
 
-| Platform | Change |
-| --- | --- |
-| iOS, macOS, Windows, and Linux | `de-CH` instead of `de` |
-| Android | `$locale` no longer follows a per-app language or `Locale.setDefault()`. |
-| Older Android versions | Hebrew, Indonesian, and Yiddish values also change from legacy codes, such as `in-ID` to `id-ID`. |
-| iOS and macOS | If a user picks a language for your app in iOS or macOS Settings, the system reports that language as the first preferred language, so `$locale` follows it. |
+- **iOS, macOS, Windows, and Linux.** `$locale` is `de-CH` instead of `de`.
+- **Android.** `$locale` no longer follows a per-app language or `Locale.setDefault()`.
+- **Older Android versions.** Hebrew, Indonesian, and Yiddish values also change from legacy codes, such as `in-ID` to `id-ID`.
+- **App languages on iOS and macOS.** If a user picks a language for your app in iOS or macOS Settings, the system reports that language as the first preferred language, so `$locale` follows it.
 
 Update cohorts, insights, and actions that match `$locale`. A filter on `$locale = de` stops matching `de-CH`.
 
@@ -600,11 +620,19 @@ On Windows and Linux, retries change:
 
 | Behavior | 5.x.x | 6.x.x |
 | --- | --- | --- |
-| Statuses retried | 408, 429, every 5xx, and 3xx responses, but not 404 | Network errors and 404, 408, 429, 500, 502, 503, and 504 responses. Other statuses drop the batch, such as a 402 when you're over your billing limit. |
-| Wait between sends | 3 seconds | Doubles after each failed send, from 1 second up to 30 seconds, with up to 25% random jitter |
-| Retry limit | A failed batch was retried up to 3 times, within the same flush | None. Queued events stay until they're delivered or a full queue drops the oldest. |
-| `Retry-After` | No cap | A floor under the wait, capped at 30 seconds |
-| Timeout | 10 seconds in total | 10 seconds without progress, and 60 seconds without progress for an AI request |
+| Statuses retried | 408, 429, every 5xx, and 3xx responses, but not 404 | Network errors and 404, 408, 429, 500, 502, 503, and 504 responses |
+| Wait between sends | 3 seconds | 1 to 30 seconds |
+| Retry limit | 3 times | None |
+| `Retry-After` | No cap | Capped at 30 seconds |
+| Timeout | 10 seconds in total | 10 seconds without progress |
+
+In 6.x.x, other statuses drop the batch, such as a 402 when you're over your billing limit.
+
+In 6.x.x, the wait doubles after each failed send, from 1 second up to 30 seconds, with up to 25% random jitter. `Retry-After` is a floor under the wait, capped at 30 seconds.
+
+In 5.x.x, a failed batch was retried up to 3 times, within the same flush. In 6.x.x, queued events stay until they're delivered or a full queue drops the oldest.
+
+In 6.x.x, an AI request times out after 60 seconds without progress.
 
 The response decides what the SDK keeps:
 
