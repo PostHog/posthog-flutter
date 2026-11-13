@@ -1,6 +1,6 @@
 # Migrate the Flutter SDK from 5.x.x to 6.0.0
 
-The Flutter SDK 6.x.x sends every event on iOS, macOS, Android, Windows, and Linux to the [capture v1](https://posthog.com/docs/api/capture-v1) endpoints, `/i/v1/analytics/events` and `/i/v1/ai/events`. On the web, it uses the JavaScript Web SDK, which stays on legacy capture.
+On iOS, macOS, Android, Windows, and Linux, the Flutter SDK 6.x.x sends analytics and AI events to the [capture v1](https://posthog.com/docs/api/capture-v1) endpoints, `/i/v1/analytics/events` and `/i/v1/ai/events`. Session replay, logs, and feature flags keep their endpoints. On the web, it uses the JavaScript Web SDK, which keeps its current endpoints.
 
 Use the top right copy page button to work through this with your agents.
 
@@ -8,7 +8,7 @@ You don't need to make every change on the day you upgrade your SDK. Required ch
 
 - **Before you upgrade**: you should make these changes before you upgrade your SDK to 6.x.x.
 - **During your upgrade**: These are changes that you need to make in the same PR that upgrades your SDK version.
-- **Follow ups**: These are changes that can come in follow up PRs because 6.x.x has limited backward compatibility for methods that are to be deprecated.
+- **Follow ups**: These are changes that can come in follow up PRs, because 6.x.x still accepts the old names and options.
 
 ## Checklist
 
@@ -43,6 +43,7 @@ Read the checklist first, then the sections that apply to you.
 - [ ] You register or pass a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expect the SDK's value to win → [Check property precedence](#check-property-precedence)
 - [ ] You pass `$lib` without `$lib_version`, or `$lib_version` without `$lib` → [Check property precedence](#check-property-precedence)
 - [ ] You register `process_person_profile: false` on any platform except web and expect it to keep every event personless → [Check registered person processing](#check-registered-person-processing)
+- [ ] You read flag payloads and expect a malformed or JSON `null` payload as a string, or bootstrap string payloads such as `"123"` as numbers → [Check flag values](#check-flag-values)
 - [ ] You filter insights, cohorts, or actions on the `$feature_flag_response` of `$feature_flag_called` for a missing flag, such as `null`, `""`, or `false`, on iOS, macOS, or Android → [Update flag filters](#update-flag-filters)
 - [ ] You set `sendFeatureFlagEvent = false` and rely on `$feature_flag_called` from `getFeatureFlagResult()` → [Check flag events](#check-flag-events)
 - [ ] You send `null` inside a nested map on iOS or macOS and expect it to arrive as `null` → [Check null values](#check-null-values)
@@ -52,8 +53,13 @@ Read the checklist first, then the sections that apply to you.
 - [ ] You read `$session_id` or `$window_id` from the raw request body, for example in a proxy → [Check dropped events](#check-dropped-events)
 - [ ] You set `$cookieless_mode`, `$ignore_sent_at`, or `$product_tour_id` to a value PostHog can't read, such as `"maybe"` → [Check dropped events](#check-dropped-events)
 - [ ] You rely on a `Retry-After` longer than 30 seconds → [Check retries](#check-retries)
+- [ ] On Windows or Linux, you tune `flushAt` or `maxBatchSize`, or capture events large enough to fill a 5 MiB request → [Check batch sizes](#check-batch-sizes)
+- [ ] On Windows or Linux, you set event timestamps or rely on the format of event uuids or anonymous distinct IDs → [Check timestamps and IDs](#check-timestamps-and-ids)
 - [ ] You alert on the SDK's debug log lines, whose text changed on every platform except web → [Update log alerts](#update-log-alerts)
 - [ ] You call `exit()` on Windows or Linux without awaiting the calls before it or `Posthog().close()` → [Await before exit](#await-before-exit)
+- [ ] Your app may update from a `posthog-ios` 2.x.x SDK, or has events queued by 5.x.x on Windows or Linux → [Check queued events](#check-queued-events)
+- [ ] On iOS or macOS, users can turn off cellular data for your app, or you read `$network_wifi` or `$network_cellular` → [Check network reachability](#check-network-reachability)
+- [ ] You might go back to 5.x.x after shipping 6.0.0 → [Plan a rollback](#plan-a-rollback)
 
 **Follow ups**
 
@@ -171,11 +177,11 @@ The SDK doesn't fall back to `/batch/`. On iOS, macOS, Android, Windows, and Lin
 - **A 404.** The SDK retries it, and events stay queued until the route is served. The SDK prints one warning, also without `debug`.
 - **Other statuses that aren't retried.** A status such as 401, 403, or 405 drops the batch.
 
-On Windows and Linux, the SDK follows a 307 or 308 redirect only to the origin of `host`, at most 5 times. The origin is the same scheme, host, and port. The SDK resends the same body and headers.
+On iOS, macOS, Android, Windows, and Linux, the SDK follows a 307 or 308 redirect only to the origin of `host`, at most 5 times. The origin is the same scheme, host, and port. The SDK resends the same body and headers.
 
-Any other redirect drops the batch. In 5.x.x, no redirect was followed and the batch stayed queued. If a proxy redirects capture requests to another host, point `host` at the final host.
+Any other redirect drops the batch. In 5.x.x, iOS, macOS, and Android followed redirects to any host, and Windows and Linux followed none and kept the batch queued. If a proxy redirects capture requests to another host, point `host` at the final host.
 
-On iOS, macOS, and Android, capture v1 comes from the native SDKs. The capture v1 changes in the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#during-your-upgrade) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#during-your-upgrade) guides apply there too.
+On iOS, macOS, and Android, capture v1 comes from the native SDKs. The capture v1 changes in the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#prepare-your-proxy) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#prepare-your-proxy) guides apply there too.
 
 For the changes every capture v1 SDK shares, such as event options, limits, and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/api/capture-v1).
 
@@ -191,7 +197,7 @@ If you identify users with a long ID, such as a JWT or a long email address, sho
 
 On Windows and Linux, PostHog also drops an event whose name is over 200 UTF-8 bytes. Legacy capture had no limit on event name length.
 
-On iOS, macOS, and Android, the native SDKs send the events (see [Prepare your proxy](#prepare-your-proxy)).
+On iOS, macOS, and Android, the native SDKs send the events and apply the same limits (see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#shorten-distinct-ids) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#shorten-long-ids) guides).
 
 ### Rename empty variants
 
@@ -738,6 +744,8 @@ Web keeps the legacy option properties:
 ### Send AI events
 
 `captureAi` sends `$ai_*` events to `/i/v1/ai/events`. It returns the event's UUID, or `null` when the event isn't admitted.
+
+`$ai_*` events you keep sending with `capture` still reach PostHog through the analytics endpoint, as in 5.x.x. Moving them to `captureAi` gets you the AI endpoint's much larger event size limit, and a queue of their own, so large AI events don't hold up your other events.
 
 On web, `captureAi` sends nothing and returns `null`.
 
