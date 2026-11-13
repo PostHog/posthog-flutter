@@ -707,7 +707,8 @@ If you ship 6.0.0 and then go back to 5.x.x, events still queued on the device a
 
 - **Personless events.** Events that 6.0.0 marked as personless (`process_person_profile: false`) are processed as person events.
 - **Options.** Options such as `cookieless_mode` passed through `options` or `registerOptions()` are lost.
-- **AI events.** AI events queued by 6.0.0 in their own queue are never sent.
+- **AI events.** 5.x.x doesn't send AI events queued by 6.x.x in their own queue. They stay on the device, and 6.x.x sends them after you update again.
+- **Registered options.** Options registered with `registerOptions()` don't apply to events 5.x.x captures. They're kept, and apply again after you update to 6.x.x.
 
 ## Follow ups
 
