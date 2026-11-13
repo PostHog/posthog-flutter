@@ -47,7 +47,7 @@ Other plugins that only support CocoaPods keep working: Flutter installs them th
 
 If every plugin in your app supports Swift Package Manager, you can remove CocoaPods. This is optional. Follow [Flutter's steps](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers#how-to-remove-cocoapods-integration).
 
-**Add-to-app:** `flutter build swift-package` still installs a Flutter module's plugins with CocoaPods on current stable releases, so it stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'` because posthog_flutter has no podspec. Flutter fixed this in [flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590), which isn't in a stable release yet. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x until it is. On Flutter 3.44 or later, you can instead embed Flutter in an iOS or macOS app from a Flutter app project (`flutter create`, not `-t module`) by following Flutter's Swift Package Manager add-to-app steps for [iOS](https://docs.flutter.dev/add-to-app/ios/project-setup) or [macOS](https://docs.flutter.dev/add-to-app/macos/project-setup); this works with posthog_flutter 6.
+**Add-to-app:** to embed Flutter as a module (`flutter create -t module`) in an iOS app, use Flutter 3.50 or later and build it with `flutter build swift-package`. Earlier Flutter versions install a module's plugins with CocoaPods, so the build stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'` because posthog_flutter has no podspec ([flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590)). If you can't move to Flutter 3.50, stay on posthog_flutter 5.x, or on Flutter 3.44 or later embed Flutter from a Flutter app project (`flutter create`, not `-t module`) by following Flutter's Swift Package Manager add-to-app steps for [iOS](https://docs.flutter.dev/add-to-app/ios/project-setup) or [macOS](https://docs.flutter.dev/add-to-app/macos/project-setup).
 
 #### Android
 
@@ -503,7 +503,7 @@ On web, `PostHogConfig.sendFeatureFlagEvent` is not applied to posthog-js, so an
 ### Upgrade checklist
 
 - [ ] Use the Flutter SDK 3.41 or later on every platform, and make sure Swift Package Manager is on for iOS and macOS.
-- [ ] Don't upgrade yet if you embed Flutter as an iOS or macOS add-to-app module.
+- [ ] If you embed Flutter in an iOS app as an add-to-app module, use Flutter 3.50 or later.
 - [ ] Raise iOS to 15.0 and macOS to 11.0 in your Xcode projects, and in any `Podfile` you keep.
 - [ ] Rename `com.posthog.posthog.API_KEY` to `com.posthog.posthog.PROJECT_TOKEN` in `AndroidManifest.xml` and `Info.plist`.
 - [ ] Use Xcode 26 or later.
