@@ -935,16 +935,14 @@ abstract class PostHogCore extends PostHogCoreStateless {
         logger.info(
             'Cached feature flags: ', jsonEncode(currentDetails?.flags));
 
-        final filteredFlags = <String, PostHogFeatureFlagDetail>{};
-        for (final entry in res.flags.entries) {
-          if (entry.value.failed != true) {
-            filteredFlags[entry.key] = entry.value;
-          }
-        }
-
         resolvedFlags = {
           ...(currentDetails?.flags ?? {}),
-          ...filteredFlags,
+          for (final entry in res.flags.entries)
+            // Keep failed details for diagnostics, but never replace a
+            // successful cached value with a failed evaluation.
+            if (entry.value.failed != true ||
+                getFeatureFlagValue(currentDetails?.flags[entry.key]) == null)
+              entry.key: entry.value,
         };
       }
 
@@ -1118,6 +1116,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
         }
       }
 
+      if (featureFlag?.failed == true) {
+        errors.add(FeatureFlagErrorType.evaluationFailed.value);
+      }
       final featureFlagError = errors.isNotEmpty ? errors.join(',') : null;
 
       (_flagCallReported[key] ??= {}).add(flagValue);
