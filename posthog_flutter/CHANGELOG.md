@@ -1,5 +1,11 @@
 ## Next
 
+## 5.60.3
+
+### Patch Changes
+
+- b7c9e50: Fix failed feature flag values and payloads on Windows and Linux, preserve successful cached values on errored refreshes, and report failed reads as evaluation failures.
+
 ## 5.60.2
 
 ### Patch Changes

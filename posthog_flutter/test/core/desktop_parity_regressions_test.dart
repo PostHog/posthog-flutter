@@ -124,9 +124,9 @@ void main() {
   test('a personless identify does not update the marker', () {
     final storage = tempStorage();
     final client = testClient(server, storage: storage);
-    client.register({r'$process_person_profile': false});
-    client.identify('user', userProperties: {'plan': 'A'});
-    client.unregister(r'$process_person_profile');
+    client.identify('user',
+        userProperties: {'plan': 'A'},
+        options: {'process_person_profile': false});
     client.setPersonProperties(userPropertiesToSet: {'plan': 'A'});
     expect(queuedEvents(storage), [r'$identify', r'$set']);
   });

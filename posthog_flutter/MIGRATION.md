@@ -20,7 +20,7 @@ Read the checklist first, then the sections that apply to you.
 - [ ] You build for iOS or macOS with an Xcode older than 26 → [Update Flutter and Xcode](#update-flutter-and-xcode)
 - [ ] Your iOS deployment target is below 15.0 or your macOS deployment target is below 11.0, in your Xcode projects or in a `Podfile` you keep → [Raise deployment targets](#raise-deployment-targets)
 - [ ] You build for iOS or macOS with Swift Package Manager off → [Use Swift Package Manager](#use-swift-package-manager)
-- [ ] You embed Flutter as an iOS or macOS add-to-app module → [Use Swift Package Manager](#use-swift-package-manager)
+- [ ] You embed Flutter in an iOS app as an add-to-app module → use Flutter 3.50.0 or later, see [Use Swift Package Manager](#use-swift-package-manager)
 - [ ] You use `posthog-server` older than 2.25.0 in your Android app → [Check native SDKs](#check-native-sdks)
 - [ ] You send events through a reverse proxy that doesn't serve `/i/v1/analytics/events` and `/i/v1/ai/events` → [Prepare your proxy](#prepare-your-proxy)
 - [ ] You send events through a reverse proxy set up from PostHog's proxy guides before 29 October 2026, which strips `Authorization` → [Prepare your proxy](#prepare-your-proxy)
@@ -42,7 +42,7 @@ Read the checklist first, then the sections that apply to you.
 - [ ] You drop the event's `options` in `beforeSend` on any platform except web, by returning a new `PostHogEvent` or replacing `event.options` → [Review beforeSend callbacks](#review-beforesend-callbacks)
 - [ ] You register or pass a property with the same key as one the SDK sets, such as `$os` or `$is_identified`, and expect the SDK's value to win → [Check property precedence](#check-property-precedence)
 - [ ] You pass `$lib` without `$lib_version`, or `$lib_version` without `$lib` → [Check property precedence](#check-property-precedence)
-- [ ] You register `process_person_profile: false` on any platform except web and still call `identify`, `alias`, `group`, or `setPersonProperties` → [Fix identity calls](#fix-identity-calls)
+- [ ] You register `process_person_profile: false` on any platform except web and expect it to keep every event personless → [Check registered person processing](#check-registered-person-processing)
 - [ ] You filter insights, cohorts, or actions on the `$feature_flag_response` of `$feature_flag_called` for a missing flag, such as `null`, `""`, or `false`, on iOS, macOS, or Android → [Update flag filters](#update-flag-filters)
 - [ ] You set `sendFeatureFlagEvent = false` and rely on `$feature_flag_called` from `getFeatureFlagResult()` → [Check flag events](#check-flag-events)
 - [ ] You send `null` inside a nested map on iOS or macOS and expect it to arrive as `null` → [Check null values](#check-null-values)
@@ -122,10 +122,10 @@ Other plugins that only support CocoaPods keep working. Flutter installs them th
 
 If every plugin in your app supports Swift Package Manager, you can remove CocoaPods. This is optional. Follow [Flutter's steps](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers#how-to-remove-cocoapods-integration).
 
-Add-to-app modules on iOS and macOS can't upgrade yet:
+Add-to-app modules (`flutter create -t module`) on iOS need Flutter 3.50.0 or later:
 
-- **The failure.** `flutter build swift-package` still installs a Flutter module's plugins with CocoaPods on current stable releases. It stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'`, since posthog_flutter has no podspec.
-- **The fix in Flutter.** Flutter fixed this in [flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590), which isn't in a stable release yet. If you embed Flutter as a module in an iOS or macOS app, stay on posthog_flutter 5.x.x until it is.
+- **On Flutter 3.50.0 or later.** Build the module with `flutter build swift-package`.
+- **On earlier Flutter versions.** `flutter build swift-package` installs a module's plugins with CocoaPods and stops with `Unable to find a specification for 'posthog_flutter' depended upon by 'FlutterPluginRegistrant'`, since posthog_flutter has no podspec ([flutter/flutter#184590](https://github.com/flutter/flutter/issues/184590)). Stay on posthog_flutter 5.x.x, or use the other route.
 - **The other route.** On Flutter 3.44.0 or later, you can embed Flutter in an iOS or macOS app from a Flutter app project (`flutter create`, not `-t module`). Follow Flutter's Swift Package Manager add-to-app steps for [iOS](https://docs.flutter.dev/add-to-app/ios/project-setup) or [macOS](https://docs.flutter.dev/add-to-app/macos/project-setup). This works with posthog_flutter 6.x.x.
 
 ### Check native SDKs
@@ -177,7 +177,7 @@ Any other redirect drops the batch. In 5.x.x, no redirect was followed and the b
 
 On iOS, macOS, and Android, capture v1 comes from the native SDKs. The capture v1 changes in the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#during-your-upgrade) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#during-your-upgrade) guides apply there too.
 
-For the changes every capture v1 SDK shares, such as event options, limits, and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/libraries/capture-v1).
+For the changes every capture v1 SDK shares, such as event options, limits, and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/api/capture-v1).
 
 ### Use a project token
 
@@ -486,27 +486,14 @@ On Windows and Linux, `beforeSend` runs after that merge and sees the result.
 
 On Windows and Linux, a registered or passed `$session_id` that is a non-empty string replaces the SDK's session ID. This can detach events from their session.
 
-### Fix identity calls
+### Check registered person processing
 
-On every platform except web, a registered `process_person_profile: false` also reaches `identify`, `alias`, `group`, and `setPersonProperties`. You register it with `registerOptions()`, or as the `$process_person_profile` property with `register()`.
+On every platform except web, a registered `process_person_profile: false` now applies to your events. You register it with `registerOptions()`, or as the `$process_person_profile` property with `register()`.
 
-- **Identity events.** PostHog accepts the `$identify`, `$create_alias`, and `$groupidentify` events and then drops them with an ingestion warning. The SDK doesn't report it.
-- **`$set` events.** PostHog keeps a `$set` event, but the person isn't updated.
-- **Other events.** The registered value also applies to other events after `identify` or with `PostHogPersonProfiles.always`. Those events then don't change the person profile. They are still linked to the person and billed as identified events.
+- **Other events.** The registered value also applies to events after `identify` or with `PostHogPersonProfiles.always`. Those events then don't change the person profile. They are still linked to the person and billed as identified events.
+- **Identity events.** The registered value doesn't apply to `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set`, and `$set_once`. With person processing off, PostHog drops the first four and ignores the person update of `$set` and `$set_once`, so a registered `false` would stop `identify`, `alias`, `group`, and `setPersonProperties` from working. A value you pass on the call still applies.
 - **5.x.x.** The SDK replaced a registered `$process_person_profile` with its own value, so it had no effect.
 - **Web.** posthog-js replaces a registered `$process_person_profile` with its own value, so a registered `false` has no effect there.
-
-To keep identifying, pass the option on the call. A `$process_person_profile` property you pass loses to a registered option, so use the option:
-
-```dart
-await Posthog().registerOptions({'process_person_profile': false});
-
-await Posthog().identify(
-  userId: 'user-123',
-  userProperties: {'plan': 'pro'},
-  options: {'process_person_profile': true},
-);
-```
 
 If you registered `false` to skip person profiles for anonymous users, remove it. `PostHogPersonProfiles.identifiedOnly`, the default, already does that and still lets `identify` create the person.
 
@@ -729,7 +716,7 @@ Other option keys are sent unchanged.
 
 To send an option with every following event, register it with `Posthog().registerOptions({'cookieless_mode': true})`. Remove it with `unregisterOptions()`. An event's own options win over registered ones, and `reset()` clears them.
 
-A registered `process_person_profile: false` also reaches identity calls (see [Fix identity calls](#fix-identity-calls)).
+A registered `process_person_profile` doesn't apply to identity calls (see [Check registered person processing](#check-registered-person-processing)).
 
 On Windows and Linux, the SDK's own Dart client handles the legacy option properties:
 

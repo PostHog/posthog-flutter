@@ -4,9 +4,10 @@
 
 - **Breaking:** bump the minimum iOS deployment target from 13.0 to 15.0 and macOS from 10.15 to 11.0. See the [migration guide](https://github.com/PostHog/posthog-flutter/blob/main/posthog_flutter/MIGRATION.md)
 - **Breaking:** require the Flutter SDK 3.41 or later on every platform, including Android-only apps
-- **Breaking:** remove CocoaPods support on iOS and macOS. Install through Swift Package Manager, which needs the Flutter SDK 3.41 or later and doesn't support add-to-app modules yet
+- **Breaking:** remove CocoaPods support on iOS and macOS. Install through Swift Package Manager, which needs the Flutter SDK 3.41 or later, or 3.50 or later for add-to-app modules
 - **Breaking:** adopt `posthog-ios` 4.x.x, which requires Xcode 26
 - **Breaking:** adopt `posthog-android` 4.x.x
+- Fail the Android build instead of crashing at runtime when another dependency would raise `posthog-android` past 4.x.x
 - **Breaking:** remove `PostHogConfig.apiKey` and the `com.posthog.posthog.API_KEY` manifest and Info.plist key. Use `projectToken` and `com.posthog.posthog.PROJECT_TOKEN`
 - **Breaking:** remove `Posthog().enable()` and `Posthog().disable()`, and rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`. Use `optIn()` and `optOut()`
 - **Breaking:** add `options` to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `defaultValue` to `isFeatureEnabled()`, add `captureAi()`, `setAppLanguage()`, `registerOptions()` and `unregisterOptions()`, and remove `getFeatureFlagPayload()` on `PosthogFlutterPlatformInterface`. Update subclasses and test fakes
@@ -21,6 +22,7 @@
 - **Breaking:** apply SDK properties, then registered properties, then event properties on iOS, macOS, Android, Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** fill `$lib` and `$lib_version` as a pair after your properties on iOS, macOS, Android, Windows and Linux, so a `$lib` you pass without `$lib_version` is sent without one and a `$lib_version` without `$lib` is replaced
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
+- Ignore a registered `$process_person_profile` or `process_person_profile` option on `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once` on Windows and Linux, as the native SDKs do, so a registered `false` doesn't stop identifying users
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous. Load what they need ahead of time instead of using `await`
 - **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
 - **Breaking:** decide person processing before `beforeSend` runs on iOS, macOS, Android, Windows and Linux. A callback that removes `$set` no longer prevents a person profile, and a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option

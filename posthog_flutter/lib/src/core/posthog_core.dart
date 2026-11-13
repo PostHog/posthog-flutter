@@ -180,7 +180,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// `$lib` and `$lib_version` are the exception, see [_fillLibraryIdentity].
   ///
   /// Person processing is not a property: see [_eventOptions].
-  Map<String, Object?> _enrichProperties(Map<String, Object?>? properties) {
+  Map<String, Object?> _enrichProperties(
+    Map<String, Object?>? properties, {
+    String? event,
+  }) {
     final now = DateTime.now().millisecondsSinceEpoch;
     // Resolved first: it may start a new session, which the debug
     // properties below then describe.
@@ -194,7 +197,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       r'$is_identified': _isIdentified(),
       ..._sessionDebugProperties(now),
       ..._sessionProps,
-      ...props,
+      ..._registeredProperties(event),
       ...?properties,
     };
     // An empty or non-string session id would leave the event out of its
@@ -223,9 +226,35 @@ abstract class PostHogCore extends PostHogCoreStateless {
     }
   }
 
-  /// The [options] of an event over the registered ones.
-  Map<String, Object?>? _withRegisteredOptions(Map<String, Object?>? options) {
-    final registered = registeredOptions;
+  /// Events that change a person or group. PostHog drops or ignores them
+  /// when person processing is off, so a registered
+  /// `$process_person_profile` property or `process_person_profile` option
+  /// doesn't apply to them. A value set on the call still does.
+  static const _identityEvents = {
+    r'$identify',
+    r'$create_alias',
+    r'$merge_dangerously',
+    r'$groupidentify',
+    r'$set',
+    r'$set_once',
+  };
+
+  /// The registered properties sent with [event].
+  Map<String, Object?> _registeredProperties(String? event) {
+    final registered = props;
+    if (!_identityEvents.contains(event)) return registered;
+    return {...registered}..remove(r'$process_person_profile');
+  }
+
+  /// The [options] of [event] over the registered ones.
+  Map<String, Object?>? _withRegisteredOptions(
+    Map<String, Object?>? options, {
+    required String event,
+  }) {
+    var registered = registeredOptions;
+    if (_identityEvents.contains(event)) {
+      registered = {...registered}..remove('process_person_profile');
+    }
     return registered.isEmpty ? options : {...registered, ...?options};
   }
 
@@ -234,11 +263,12 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// off, the event is not [requested] to update the person, and neither an
   /// option nor a `$process_person_profile` property says otherwise.
   Map<String, Object?>? _eventOptions(
+    String event,
     Map<String, Object?>? eventOptions,
     Map<String, Object?> properties, {
     required bool requested,
   }) {
-    final options = _withRegisteredOptions(eventOptions);
+    final options = _withRegisteredOptions(eventOptions, event: event);
     if (requested ||
         _hasPersonProcessing() ||
         properties[r'$process_person_profile'] != null ||
@@ -417,8 +447,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
           r'$anon_distinct_id': previousDistinctId,
           ...maybeAdd(r'$set', userProperties),
           ...maybeAdd(r'$set_once', userPropertiesSetOnce),
-        });
-        final identifyOptions = _withRegisteredOptions(options);
+        }, event: r'$identify');
+        final identifyOptions =
+            _withRegisteredOptions(options, event: r'$identify');
         identifyStateless(
           distinctId,
           properties: identifyProperties,
@@ -569,7 +600,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }) {
     if (_ignoredWhileOptedOut('posthog.capture')) return null;
 
-    final allProperties = _enrichProperties(properties);
+    final allProperties = _enrichProperties(properties, event: event);
     final requestsPersonProcessing = _requestsPersonProcessing(properties);
     // Once an event is person-processed, all later ones are too. A value
     // passed for this event alone doesn't count.
@@ -579,6 +610,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     return (
       properties: allProperties,
       options: _eventOptions(
+        event,
         options,
         allProperties,
         requested: requestsPersonProcessing,
@@ -667,8 +699,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       if (!_requirePersonProcessing('posthog.alias')) return;
 
       aliasStateless(alias, getDistinctId(),
-          properties: _enrichProperties(null),
-          options: _withRegisteredOptions(options));
+          properties: _enrichProperties(null, event: r'$create_alias'),
+          options: _withRegisteredOptions(options, event: r'$create_alias'));
     });
   }
 
@@ -724,9 +756,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
         groupType,
         groupKey,
         distinctId: getDistinctId(),
-        eventProperties: _enrichProperties(null),
+        eventProperties: _enrichProperties(null, event: r'$groupidentify'),
         groupProperties: groupProperties,
-        options: _withRegisteredOptions(options),
+        options: _withRegisteredOptions(options, event: r'$groupidentify'),
       );
     });
   }
@@ -903,16 +935,14 @@ abstract class PostHogCore extends PostHogCoreStateless {
         logger.info(
             'Cached feature flags: ', jsonEncode(currentDetails?.flags));
 
-        final filteredFlags = <String, PostHogFeatureFlagDetail>{};
-        for (final entry in res.flags.entries) {
-          if (entry.value.failed != true) {
-            filteredFlags[entry.key] = entry.value;
-          }
-        }
-
         resolvedFlags = {
           ...(currentDetails?.flags ?? {}),
-          ...filteredFlags,
+          for (final entry in res.flags.entries)
+            // Keep failed details for diagnostics, but never replace a
+            // successful cached value with a failed evaluation.
+            if (entry.value.failed != true ||
+                getFeatureFlagValue(currentDetails?.flags[entry.key]) == null)
+              entry.key: entry.value,
         };
       }
 
@@ -1086,6 +1116,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
         }
       }
 
+      if (featureFlag?.failed == true) {
+        errors.add(FeatureFlagErrorType.evaluationFailed.value);
+      }
       final featureFlagError = errors.isNotEmpty ? errors.join(',') : null;
 
       (_flagCallReported[key] ??= {}).add(flagValue);
@@ -1291,8 +1324,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
       // A personless `$set` doesn't update the person, so it is never a
       // duplicate.
-      final processPerson =
-          _processPersonProfile(null, _withRegisteredOptions(options));
+      final processPerson = _processPersonProfile(
+          null, _withRegisteredOptions(options, event: r'$set'));
       if (_cachedPersonProperties == hash &&
           (processPerson == null || processPerson == true)) {
         logger.info(
