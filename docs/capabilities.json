@@ -22,6 +22,7 @@
   "Posthog.logger": "logs",
   "Posthog.optIn": "opt-in",
   "Posthog.register": "register",
+  "Posthog.registerOptions": "register",
   "Posthog.reloadFeatureFlags": "reload-feature-flags",
   "Posthog.reset": "reset",
   "Posthog.resetGroupPropertiesForFlags": "reset-group-properties-for-flags",
@@ -34,6 +35,7 @@
   "Posthog.startSessionRecording": "start-session-recording",
   "Posthog.stopSessionRecording": "stop-session-recording",
   "Posthog.unregister": "unregister",
+  "Posthog.unregisterOptions": "unregister",
   "next": {
     "Posthog.captureAi": "capture-ai",
     "Posthog.onFeatureFlags": "on-feature-flags"

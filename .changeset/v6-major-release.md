@@ -2,45 +2,45 @@
 "posthog_flutter": major
 ---
 
-- **Breaking:** bump the minimum iOS deployment target from 13.0 to 15.0 and macOS from 10.15 to 11.0 — see the [migration guide](https://github.com/PostHog/posthog-flutter/blob/main/posthog_flutter/MIGRATION.md)
+- **Breaking:** bump the minimum iOS deployment target from 13.0 to 15.0 and macOS from 10.15 to 11.0. See the [migration guide](https://github.com/PostHog/posthog-flutter/blob/main/posthog_flutter/MIGRATION.md)
 - **Breaking:** require the Flutter SDK 3.41 or later on every platform, including Android-only apps
-- **Breaking:** remove CocoaPods support on iOS and macOS — install through Swift Package Manager, which needs the Flutter SDK 3.41 or later, or 3.50 or later for add-to-app modules
-- **Breaking:** adopt `posthog-ios` 4.x, which requires Xcode 26
-- **Breaking:** adopt `posthog-android` 4.x
-- Fail the Android build instead of crashing at runtime when another dependency would raise `posthog-android` past 4.x
-- **Breaking:** remove `PostHogConfig.apiKey` and the `com.posthog.posthog.API_KEY` manifest and Info.plist key — use `projectToken` and `com.posthog.posthog.PROJECT_TOKEN`
-- **Breaking:** remove `Posthog().enable()` and `Posthog().disable()`, and rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb` — use `optIn()` and `optOut()`
-- **Breaking:** add `options` to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `defaultValue` to `isFeatureEnabled()`, add `captureAi()`, `setAppLanguage()`, `registerOptions()` and `unregisterOptions()`, and remove `getFeatureFlagPayload()` on `PosthogFlutterPlatformInterface` — update subclasses and test fakes
-- **Breaking:** remove `PostHogConfig.sendFeatureFlagEvents` — use `sendFeatureFlagEvent`
-- **Breaking:** remove `Posthog().getFeatureFlagPayload()` — use `getFeatureFlagResult(key, sendFeatureFlagEvent: false)` and read `payload`
-- **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter — use `throttleDelay`
-- **Breaking:** remove `PostHogDataMode.cellular` — use `PostHogDataMode.any`
+- **Breaking:** remove CocoaPods support on iOS and macOS. Install through Swift Package Manager, which needs the Flutter SDK 3.41 or later, or 3.50 or later for add-to-app modules
+- **Breaking:** adopt `posthog-ios` 4.x.x, which requires Xcode 26
+- **Breaking:** adopt `posthog-android` 4.x.x
+- Fail the Android build instead of crashing at runtime when another dependency would raise `posthog-android` past 4.x.x
+- **Breaking:** remove `PostHogConfig.apiKey` and the `com.posthog.posthog.API_KEY` manifest and Info.plist key. Use `projectToken` and `com.posthog.posthog.PROJECT_TOKEN`
+- **Breaking:** remove `Posthog().enable()` and `Posthog().disable()`, and rename `enable()` and `disable()` to `optIn()` and `optOut()` on `PosthogFlutterPlatformInterface`, `PosthogFlutterIO` and `PosthogFlutterWeb`. Use `optIn()` and `optOut()`
+- **Breaking:** add `options` to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `defaultValue` to `isFeatureEnabled()`, add `captureAi()`, `setAppLanguage()`, `registerOptions()` and `unregisterOptions()`, and remove `getFeatureFlagPayload()` on `PosthogFlutterPlatformInterface`. Update subclasses and test fakes
+- **Breaking:** remove `PostHogConfig.sendFeatureFlagEvents`. Use `sendFeatureFlagEvent`
+- **Breaking:** remove `Posthog().getFeatureFlagPayload()`. Use `getFeatureFlagResult(key, sendFeatureFlagEvent: false)` and read `payload`
+- **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter. Use `throttleDelay`
+- **Breaking:** remove `PostHogDataMode.cellular`. Use `PostHogDataMode.any`
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
-- **Breaking:** send events to capture v1 (`/i/v1/analytics/events`) instead of `/batch/` on iOS, macOS, Android, Windows and Linux — update your reverse proxy first, see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#hosts-without-capture-v1) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#hosts-without-capture-v1) migration guides
+- **Breaking:** send events to capture v1 (`/i/v1/analytics/events`) instead of `/batch/` on iOS, macOS, Android, Windows and Linux. Update your reverse proxy first. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#prepare-your-proxy) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#prepare-your-proxy) migration guides
 - **Breaking:** drop the batch on a redirect on Windows and Linux, following only same-origin 307 and 308 redirects, and cap a `Retry-After` wait at 30 seconds
-- **Breaking:** write events to disk only when the returned future completes on Windows and Linux, so an unawaited call can be lost on a crash or `exit()` — await the call or `Posthog().close()` before `exit()`
+- **Breaking:** write events to disk only when the returned future completes on Windows and Linux, so an unawaited call can be lost on a crash or `exit()`. Await the call or `Posthog().close()` before `exit()`
 - **Breaking:** apply SDK properties, then registered properties, then event properties on iOS, macOS, Android, Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** fill `$lib` and `$lib_version` as a pair after your properties on iOS, macOS, Android, Windows and Linux, so a `$lib` you pass without `$lib_version` is sent without one and a `$lib_version` without `$lib` is replaced
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
 - Ignore a registered `$process_person_profile` or `process_person_profile` option on `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once` on Windows and Linux, as the native SDKs do, so a registered `false` doesn't stop identifying users
-- **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
+- **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous. Load what they need ahead of time instead of using `await`
 - **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
-- **Breaking:** decide person processing before `beforeSend` runs on iOS, macOS, Android, Windows and Linux — a callback that removes `$set` no longer prevents a person profile, and a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
-- **Breaking:** remove `PostHogConfig.onFeatureFlags` — call `Posthog().onFeatureFlags((loaded) { ... })` before `setup()` instead, which also covers the first load and returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`
+- **Breaking:** decide person processing before `beforeSend` runs on iOS, macOS, Android, Windows and Linux. A callback that removes `$set` no longer prevents a person profile, and a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
+- **Breaking:** remove `PostHogConfig.onFeatureFlags`. Call `Posthog().onFeatureFlags((loaded) { ... })` before `setup()` instead, which also covers the first load and returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`
 - **Breaking:** return the reloaded flags from `reloadFeatureFlags()` as a `Future<PostHogFeatureFlagsLoaded>`
 - **Breaking:** rename `getFeatureFlagResult(sendEvent:)` to `getFeatureFlagResult(sendFeatureFlagEvent:)`
-- **Breaking:** change `getFeatureFlagResult()` to follow `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux when `sendFeatureFlagEvent` is omitted — pass `sendFeatureFlagEvent: true` to keep capturing `$feature_flag_called`
+- **Breaking:** change `getFeatureFlagResult()` to follow `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux when `sendFeatureFlagEvent` is omitted. Pass `sendFeatureFlagEvent: true` to keep capturing `$feature_flag_called`
 - **Breaking:** return `null` instead of the raw string for a malformed (such as a plain-text `hello`), empty or whitespace-only `getFeatureFlagResult()` payload on iOS, macOS and Android, and for a JSON `null` payload on Android
 - **Breaking:** treat a feature flag whose variant is an empty string as disabled in `isFeatureEnabled()`, with or without `defaultValue`, `getFeatureFlagResult().enabled`, `onFeatureFlags` listeners and `$active_feature_flags` on iOS, macOS, Android, Windows and Linux, as on web
 - **Breaking:** keep string payloads passed to `PostHogBootstrapConfig.featureFlagPayloads`, such as `"123"`, as strings on iOS and macOS instead of decoding them to numbers or booleans
-- **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android — update filters that match it
-- **Breaking:** pause sending on iOS and macOS while cellular data is off for the app, and delete events a `posthog-ios` 2.x SDK left on disk instead of sending them
-- **Breaking:** leave out `$feature_flag_response` on `$feature_flag_called` for a missing flag on iOS, macOS and Android, instead of `null`, `""` or `false` — filter on `is not set`
+- **Breaking:** change `$locale` to the device's language with its region, such as `de-CH` instead of `de`, on iOS, macOS, Windows and Linux, follow a language picked for the app in Settings on iOS and macOS, and stop it following a per-app language on Android. Update filters that match it
+- **Breaking:** pause sending on iOS and macOS while cellular data is off for the app, and delete events a `posthog-ios` 2.x.x SDK left on disk instead of sending them
+- **Breaking:** leave out `$feature_flag_response` on `$feature_flag_called` for a missing flag on iOS, macOS and Android, instead of `null`, `""` or `false`. Filter on `is not set`
 - **Breaking:** leave out `null` values inside nested maps on iOS and macOS instead of sending `null`, and keep `null` list elements in place on Android instead of removing them
-- **Breaking:** stop sending the legacy `version` and `build` properties on `Application Installed`, `Application Updated` and `Application Opened` on iOS and macOS — use `$app_version` and `$app_build`
+- **Breaking:** stop sending the legacy `version` and `build` properties on `Application Installed`, `Application Updated` and `Application Opened` on iOS and macOS. Use `$app_version` and `$app_build`
 - Add an `options` parameter to `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and `captureException`, and `PostHogEvent.options` for `beforeSend` callbacks
-- Add `registerOptions()` and `unregisterOptions()` to send capture options with every event, under each event's own options; on web, known options are registered as their legacy properties
-- Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set before `beforeSend` runs on every platform except web — a callback can change the distinct ID and timestamp, and the event keeps its uuid
+- Add `registerOptions()` and `unregisterOptions()` to send capture options with every event, under each event's own options. On web, known options are registered as their legacy properties
+- Add `PostHogEvent.uuid`, `distinctId` and `timestamp`, set before `beforeSend` runs on every platform except web. A callback can change the distinct ID and timestamp, and the event keeps its uuid
 - Add `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin to filter or edit events the native SDK captures itself, such as crashes, app lifecycle and `$feature_flag_called` events
 - Add `captureAi` for AI observability events, a no-op that returns `null` on web
 - Add `PostHogConfig.captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes`
@@ -53,8 +53,8 @@
 - Run a `beforeSend` callback that renames a screen or exception event once, and keep its `userProperties`
 - Keep `userProperties` and `userPropertiesSetOnce` that a `beforeSend` callback sets on a screen or exception event on web
 - Send an event as its original user when a `beforeSend` callback calls `reset()` or `identify()` on Windows and Linux, instead of dropping it, and on web, instead of sending it as the new user
-- Attach `$exception_steps` before `beforeSend` runs on Windows and Linux so callbacks can read or remove them — steps recorded while a callback runs, or an event a callback renames to `$exception`, no longer get them
-- Retry a 404 on Windows and Linux so events stay queued, printing one warning, also without `debug`, until a reverse proxy or self-hosted instance serves the new path
+- Attach `$exception_steps` before `beforeSend` runs on Windows and Linux so callbacks can read or remove them. Steps recorded while a callback runs, or an event a callback renames to `$exception`, no longer get them
+- Retry a 404 on Windows and Linux so events stay queued, printing one warning, also without `debug`, until your reverse proxy serves the new path
 - Apply a `$process_person_profile` property or `process_person_profile` option passed with an event to that event on Windows and Linux
 - Replace lone UTF-16 surrogates with U+FFFD on Windows and Linux, in event names, ids, properties and options, and in the person and group properties sent for feature flags, so one such event no longer loses its whole batch
 - Back off failed sends on Windows and Linux from 1 second up to 30 seconds with ±25% jitter, instead of resending within the flush, treating `Retry-After` as a floor
