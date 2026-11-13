@@ -460,6 +460,56 @@ void main() {
       }
     });
 
+    test("a registered personless setting doesn't reach identity events", () {
+      client.registerOptions({'process_person_profile': false});
+      client.register({r'$process_person_profile': false});
+
+      client.identify('user-1');
+      client.alias('alias-1');
+      client.group('company', 'acme');
+      client.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+      client.capture(r'$set_once', properties: {
+        r'$set_once': {'first': 'web'},
+      });
+      client.capture(r'$merge_dangerously', properties: {'alias': 'anon'});
+      client.capture('plain');
+
+      const identityEvents = [
+        r'$identify',
+        r'$create_alias',
+        r'$groupidentify',
+        r'$set',
+        r'$set_once',
+        r'$merge_dangerously',
+      ];
+      expect(queuedEvents(storage), [...identityEvents, 'plain']);
+      for (var i = 0; i < identityEvents.length; i++) {
+        expect(queuedOptions(storage, i),
+            isNot(contains('process_person_profile')),
+            reason: identityEvents[i]);
+        expect(queuedProps(storage, i),
+            isNot(contains(r'$process_person_profile')),
+            reason: identityEvents[i]);
+      }
+      expect(queuedOptions(storage, 6),
+          containsPair('process_person_profile', false));
+    });
+
+    test("a call's personless setting still applies to an identity event", () {
+      client.registerOptions({'process_person_profile': true});
+
+      client.alias('alias-1', options: {'process_person_profile': false});
+      client.capture(r'$set', properties: {
+        r'$process_person_profile': false,
+        r'$set': {'plan': 'pro'},
+      });
+
+      expect(queuedOptions(storage, 0),
+          containsPair('process_person_profile', false));
+      expect(queuedProps(storage, 1),
+          containsPair(r'$process_person_profile', false));
+    });
+
     test("a registered process_person_profile replaces the SDK's default", () {
       client.registerOptions({'process_person_profile': true});
 

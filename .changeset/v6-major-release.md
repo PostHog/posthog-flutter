@@ -22,6 +22,7 @@
 - **Breaking:** apply SDK properties, then registered properties, then event properties on iOS, macOS, Android, Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge
 - **Breaking:** fill `$lib` and `$lib_version` as a pair after your properties on iOS, macOS, Android, Windows and Linux, so a `$lib` you pass without `$lib_version` is sent without one and a `$lib_version` without `$lib` is replaced
 - **Breaking:** send person processing as the `process_person_profile: false` option on Windows and Linux, only while it's off, instead of a `$process_person_profile` property on every event
+- Ignore a registered `$process_person_profile` or `process_person_profile` option on `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once` on Windows and Linux, as the native SDKs do, so a registered `false` doesn't stop identifying users
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous — load what they need ahead of time instead of using `await`
 - **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
 - **Breaking:** decide person processing before `beforeSend` runs on iOS, macOS, Android, Windows and Linux — a callback that removes `$set` no longer prevents a person profile, and a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
