@@ -251,6 +251,12 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when the event has been queued.
   ///
+  /// On Android and Apple platforms, events captured offline are queued in
+  /// device file storage and sent when the device is online. Queued events
+  /// survive app restarts and are sent after restart when the device is online.
+  /// [PostHogConfig.maxQueueSize] limits the queue. When full, it drops the
+  /// oldest event first.
+  ///
   /// **Example**
   /// ```dart
   ///   await Posthog().capture(
