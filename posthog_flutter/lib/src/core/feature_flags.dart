@@ -165,7 +165,9 @@ class PostHogFlagsResponse {
   Map<String, PostHogFeatureFlagValue> get featureFlags {
     final result = <String, PostHogFeatureFlagValue>{};
     for (final entry in flags.entries) {
-      result[entry.key] = entry.value.variant ?? entry.value.enabled;
+      if (entry.value.failed != true) {
+        result[entry.key] = entry.value.variant ?? entry.value.enabled;
+      }
     }
     return result;
   }
@@ -181,6 +183,7 @@ abstract final class QuotaLimitedFeature {
 enum FeatureFlagErrorType {
   errorsWhileComputing('errors_while_computing_flags'),
   flagMissing('flag_missing'),
+  evaluationFailed('evaluation_failed'),
   quotaLimited('quota_limited'),
   timeout('timeout'),
   connectionError('connection_error'),
