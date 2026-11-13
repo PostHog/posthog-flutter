@@ -871,19 +871,7 @@ class PosthogFlutterPlugin :
                 }
 
                 posthogConfig.getIfNotNull<Boolean>("disableGeoip") { disableGeoip ->
-                    if (disableGeoip) {
-                        // shortcut: marks events only, not /flags requests; use the native config
-                        // option once posthog-android supports it (PostHog/posthog-android#562).
-                        addBeforeSend(
-                            PostHogBeforeSend { event ->
-                                // Native SDKs leave shared properties off replay snapshots.
-                                if (event.event != "\$snapshot") {
-                                    event.properties?.put("\$geoip_disable", true)
-                                }
-                                event
-                            },
-                        )
-                    }
+                    disableGeoIp = disableGeoip
                 }
 
                 onFeatureFlags =

@@ -245,9 +245,6 @@ class PostHogConfig {
   ///
   /// Defaults to `false`.
   ///
-  /// **Android:** events only. Feature flag requests still use GeoIP until
-  /// posthog-android supports this option.
-  ///
   /// **Flutter web:** not applied. posthog-js is initialized by your app, so
   /// set `$geoip_disable: true` on events in its `before_send` instead.
   var disableGeoip = false;

@@ -359,22 +359,39 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun setup_disableGeoip_marksEventsButNotSnapshots() {
-        val propertiesOf = nativeBeforeSendAfterSetup(mapOf("projectToken" to "test-token", "disableGeoip" to true))
+    fun setup_disableGeoip_forwardsTrueToNativeConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoip" to true)),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
 
-        assertEquals(true, propertiesOf("custom")?.get("\$geoip_disable"))
-        assertEquals(true, propertiesOf("Application Opened")?.get("\$geoip_disable"))
-        assertNull(propertiesOf("\$snapshot")?.get("\$geoip_disable"))
+        assertTrue(assertNotNull(plugin.lastBuiltConfig).disableGeoIp)
     }
 
     @Test
-    fun setup_disableGeoipFalse_leavesEventsUnmarked() {
-        for (args in listOf(
-            mapOf("projectToken" to "test-token", "disableGeoip" to false),
-            mapOf("projectToken" to "test-token"),
-        )) {
-            assertNull(nativeBeforeSendAfterSetup(args)("custom")?.get("\$geoip_disable"))
-        }
+    fun setup_disableGeoip_forwardsFalseToNativeConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoip" to false)),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+
+        assertFalse(assertNotNull(plugin.lastBuiltConfig).disableGeoIp)
+    }
+
+    @Test
+    fun setup_disableGeoip_defaultsToFalse() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token")),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+
+        assertFalse(assertNotNull(plugin.lastBuiltConfig).disableGeoIp)
     }
 
     @Test
