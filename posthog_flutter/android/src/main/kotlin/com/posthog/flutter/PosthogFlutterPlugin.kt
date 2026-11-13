@@ -870,8 +870,8 @@ class PosthogFlutterPlugin :
                     }
                 }
 
-                posthogConfig.getIfNotNull<Boolean>("disableGeoip") { disableGeoip ->
-                    disableGeoIp = disableGeoip
+                posthogConfig.getIfNotNull<Boolean>("disableGeoIp") {
+                    disableGeoIp = it
                 }
 
                 onFeatureFlags =

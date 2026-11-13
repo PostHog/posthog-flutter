@@ -48,15 +48,15 @@ void main() {
       });
     }
 
-    for (final disableGeoip in [false, true]) {
-      test('disableGeoip $disableGeoip sends geoip_disable $disableGeoip',
+    for (final disableGeoIp in [false, true]) {
+      test('disableGeoIp $disableGeoIp sends geoip_disable $disableGeoIp',
           () async {
         final client = testClient(server,
-            config: testConfig()..disableGeoip = disableGeoip);
+            config: testConfig()..disableGeoIp = disableGeoIp);
 
         await client.reloadFeatureFlagsAsync();
 
-        expect(_flagsRequestBody(server)['geoip_disable'], disableGeoip);
+        expect(_flagsRequestBody(server)['geoip_disable'], disableGeoIp);
       });
     }
 

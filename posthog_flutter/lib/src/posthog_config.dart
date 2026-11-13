@@ -247,7 +247,7 @@ class PostHogConfig {
   ///
   /// **Flutter web:** not applied. posthog-js is initialized by your app, so
   /// set `$geoip_disable: true` on events in its `before_send` instead.
-  var disableGeoip = false;
+  var disableGeoIp = false;
 
   /// Controls how request bodies are compressed before being sent to PostHog.
   ///
@@ -522,7 +522,7 @@ class PostHogConfig {
       'optOut': optOut,
       'surveys': surveys,
       'personProfiles': personProfiles.name,
-      'disableGeoip': disableGeoip,
+      'disableGeoIp': disableGeoIp,
       'compression': compression.name,
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,

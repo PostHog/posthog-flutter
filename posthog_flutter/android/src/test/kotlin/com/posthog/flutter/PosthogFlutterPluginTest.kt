@@ -359,11 +359,11 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun setup_disableGeoip_forwardsTrueToNativeConfig() {
+    fun setup_disableGeoIp_forwardsTrueToNativeConfig() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
         plugin.onMethodCall(
-            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoip" to true)),
+            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoIp" to true)),
             Mockito.mock(MethodChannel.Result::class.java),
         )
 
@@ -371,11 +371,11 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun setup_disableGeoip_forwardsFalseToNativeConfig() {
+    fun setup_disableGeoIp_forwardsFalseToNativeConfig() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
         plugin.onMethodCall(
-            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoip" to false)),
+            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoIp" to false)),
             Mockito.mock(MethodChannel.Result::class.java),
         )
 
@@ -383,7 +383,7 @@ internal class PosthogFlutterPluginTest {
     }
 
     @Test
-    fun setup_disableGeoip_defaultsToFalse() {
+    fun setup_disableGeoIp_defaultsToFalse() {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
         plugin.onMethodCall(

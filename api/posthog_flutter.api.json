@@ -2570,7 +2570,7 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
-                        "name": "disableGeoip",
+                        "name": "disableGeoIp",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "bool"
                     },

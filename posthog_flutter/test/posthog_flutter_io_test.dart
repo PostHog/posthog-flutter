@@ -226,12 +226,12 @@ isolate_dso_base: 7000000000
       expect(args['apiKey'], equals('test_project_token'));
     });
 
-    test('setup sends disableGeoip to native', () async {
+    test('setup sends disableGeoIp to native', () async {
       await posthogFlutterIO
-          .setup(PostHogConfig('test_project_token')..disableGeoip = true);
+          .setup(PostHogConfig('test_project_token')..disableGeoIp = true);
 
       final call = log.firstWhere((c) => c.method == 'setup');
-      expect((call.arguments as Map)['disableGeoip'], isTrue);
+      expect((call.arguments as Map)['disableGeoIp'], isTrue);
     });
 
     test(
