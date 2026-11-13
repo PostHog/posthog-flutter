@@ -7,7 +7,6 @@ import 'posthog.dart';
 import 'posthog_event.dart';
 import 'posthog_flutter_platform_interface.dart';
 import 'replay/mask/posthog_text_mask.dart';
-import 'util/logging.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
 ///
@@ -15,9 +14,9 @@ import 'util/logging.dart';
 /// that are about to be captured. Return a possibly modified event to send it,
 /// or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogEvent?>`).
-typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
+/// Callbacks are synchronous, as in the native SDKs, so the event is sent
+/// with the user and properties it was captured under.
+typedef BeforeSendCallback = PostHogEvent? Function(
   PostHogEvent event,
 );
 
@@ -28,9 +27,8 @@ typedef BeforeSendCallback = FutureOr<PostHogEvent?> Function(
 /// attributes that are about to be captured. Return a possibly modified record
 /// to send it, or return `null` to drop it.
 ///
-/// Callbacks can be synchronous or asynchronous (returning
-/// `FutureOr<PostHogLogRecord?>`).
-typedef BeforeSendLogCallback = FutureOr<PostHogLogRecord?> Function(
+/// Callbacks are synchronous, as in the native SDKs.
+typedef BeforeSendLogCallback = PostHogLogRecord? Function(
   PostHogLogRecord record,
 );
 
@@ -72,17 +70,6 @@ enum PostHogDataMode {
   /// Send data only on Wi-Fi connections.
   wifi,
 
-  /// Send data on any available connection, same as [any].
-  ///
-  /// Despite its name, this never restricted sending to cellular connections.
-  /// It will be removed in the next major version.
-  ///
-  /// ```dart
-  /// config.dataMode = PostHogDataMode.any;
-  /// ```
-  @Deprecated('Behaves like `any`. Use `PostHogDataMode.any` instead.')
-  cellular,
-
   /// Send data on any available connection.
   any,
 }
@@ -98,15 +85,7 @@ class PostHogConfig {
   ///
   /// You can find it at:
   /// https://us.posthog.com/settings/project-details#variables
-  ///
-  /// This field was formerly named [apiKey].
   final String projectToken;
-
-  /// Deprecated alias for [projectToken].
-  @Deprecated(
-    'Deprecated in favor of [projectToken]. This will be removed in the next major version.',
-  )
-  String get apiKey => projectToken;
 
   String _host = _defaultHost;
 
@@ -142,17 +121,6 @@ class PostHogConfig {
   ///
   /// Defaults to `true`.
   var sendFeatureFlagEvent = true;
-
-  /// Deprecated alias for [sendFeatureFlagEvent].
-  @Deprecated(
-    'Use sendFeatureFlagEvent instead. This will be removed in the next major version.',
-  )
-  bool get sendFeatureFlagEvents => sendFeatureFlagEvent;
-
-  @Deprecated(
-    'Use sendFeatureFlagEvent instead. This will be removed in the next major version.',
-  )
-  set sendFeatureFlagEvents(bool value) => sendFeatureFlagEvent = value;
 
   /// Whether feature flags are loaded when the SDK starts.
   ///
@@ -248,6 +216,56 @@ class PostHogConfig {
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
 
+  /// How [Posthog.captureAi] request bodies are compressed, separately from
+  /// [compression].
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default (gzip).
+  PostHogCompression? captureAiCompression;
+
+  /// Maximum number of [Posthog.captureAi] events kept in their on-disk queue
+  /// before the oldest are dropped.
+  ///
+  /// AI events can be megabytes, so the default (100) is lower than
+  /// [maxQueueSize]. The queue also keeps at most 50 MiB of AI events,
+  /// whatever this is set to. A value of `0` or less uses the default.
+  ///
+  /// When it is full, the oldest events are dropped.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  int? captureAiMaxQueueSize;
+
+  /// Timeout of a [Posthog.captureAi] request: how long it may go without
+  /// network activity. On iOS, macOS and Android it is sent to the native SDK
+  /// in whole seconds (a positive value under one second is sent as one
+  /// second).
+  ///
+  /// AI requests can carry several MB, so the default (60 seconds) is
+  /// longer than for other requests. [Duration.zero] or less uses the
+  /// default.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  Duration? captureAiTimeout;
+
+  /// Maximum size, in bytes, of a [Posthog.captureAi] event. The SDK drops a
+  /// larger event and [Posthog.captureAi] returns `null`.
+  ///
+  /// Use it to lower the limit. PostHog drops AI events whose properties are
+  /// over 8 MiB, so a larger value, or a value of `0` or less, uses the
+  /// default. By default the SDK drops a serialized event over 8 MiB plus
+  /// 64 KiB for the rest of the event, measured before compression. A set
+  /// value limits the whole serialized event.
+  ///
+  /// Not applied on web, where [Posthog.captureAi] sends nothing.
+  ///
+  /// Defaults to `null`, which keeps the SDK default.
+  int? captureAiMaxEventBytes;
+
   /// Whether the SDK is enabled on Windows and Linux.
   ///
   /// Windows and Linux support is experimental. Defaults to `true`.
@@ -313,12 +331,6 @@ class PostHogConfig {
   /// posthog-js instance, so configure `bootstrap` in your `posthog.init({...})`
   /// call instead.
   PostHogBootstrapConfig? bootstrap;
-
-  /// Callback to be invoked when feature flags are loaded.
-  ///
-  /// Use [Posthog.getFeatureFlag] or [Posthog.isFeatureEnabled] within this
-  /// callback to access the loaded flag values.
-  OnFeatureFlagsCallback? onFeatureFlags;
 
   /// Whether to automatically register this device's push token or Firebase
   /// Installation ID (FID) with PostHog.
@@ -416,23 +428,6 @@ class PostHogConfig {
   /// ];
   /// ```
   ///
-  /// **Example (async callback):**
-  /// ```dart
-  /// config.beforeSend = [
-  ///   (event) async {
-  ///     // Perform async operations
-  ///     final shouldSend = await checkIfEventAllowed(event.event);
-  ///     if (!shouldSend) {
-  ///       return null; // Drop the event
-  ///     }
-  ///     // Enrich event with async data
-  ///     final extraData = await fetchExtraContext();
-  ///     event.properties = {...?event.properties, ...extraData};
-  ///     return event;
-  ///   },
-  /// ];
-  /// ```
-  ///
   /// **Limitations:**
   /// - These callbacks do NOT intercept native-initiated events such as:
   ///   - Session replay events (`$snapshot`) when `config.sessionReplay` is
@@ -441,27 +436,38 @@ class PostHogConfig {
   ///     `config.captureApplicationLifecycleEvents` is enabled
   ///   - Feature flag events (`$feature_flag_called`) when
   ///     `config.sendFeatureFlagEvent` is enabled
-  ///   - Identity events (`$set`) when `identify` is called
+  ///   - Identity events (`$identify`, `$set`, `$create_alias`,
+  ///     `$groupidentify`) from `identify`, `setPersonProperties`, `alias`
+  ///     and `group`
   ///   - Survey events (`survey shown`, etc.) when `config.surveys` is enabled
-  /// - Only user-provided properties are available; system properties (like
-  ///   `$device_type`, `$session_id`) are added by the native SDK at a later
-  ///   stage.
+  ///   On iOS, macOS and Android, add a native hook with
+  ///   `PosthogFlutterPlugin.addBeforeSend` (Swift or Kotlin) to filter or
+  ///   edit those events.
+  /// - On iOS, macOS, Android, Windows and Linux, the callbacks see the
+  ///   system properties (like `$device_type` and `$session_id`), the
+  ///   registered properties and the options the SDK adds, and can change
+  ///   them for that event. On iOS, macOS and Android, registering callbacks
+  ///   adds one more call to the native SDK per event. The native SDK keeps
+  ///   each built event until Dart sends it back, and discards one still
+  ///   waiting after a minute (for example, after a hot restart). On web,
+  ///   only the event's own properties are available; posthog-js adds the
+  ///   rest later.
   ///
   /// **Note:**
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogEvent?>`)
+  /// - Callbacks are synchronous and run on the calling isolate, so a slow one
+  ///   blocks the UI. Load anything they need (such as remote config or feature
+  ///   flags) ahead of time; a change made after the callback returns is not
+  ///   sent.
+  /// - A callback that captures an event must not do so for that event too, or
+  ///   it never finishes.
+  /// - On web, an event whose callback calls `reset()` stays on its user but
+  ///   joins the next user's session and person processing, and its user
+  ///   properties are dropped, because posthog-js builds the event after the
+  ///   callbacks.
   /// - If a callback throws, the event is dropped and later callbacks are not
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
-  /// - On every platform except Windows and Linux, PostHog calls made after a
-  ///   capture (including `reset()`, `identify()` and getters) wait until its
-  ///   callbacks finish, so the event keeps the user and consent it was
-  ///   captured under. A callback that runs longer than 10 seconds stops
-  ///   holding them back; its event is still sent when it finishes, with the
-  ///   user, super properties, groups and consent current by then. Calls made
-  ///   from inside a callback do not wait, but a callback that waits on a
-  ///   PostHog call made elsewhere stalls until that limit.
   List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, captureDeepLinks integrations
@@ -470,14 +476,10 @@ class PostHogConfig {
   ///
   /// The [projectToken] is trimmed before it is stored.
   ///
-  /// The optional [onFeatureFlags] callback is invoked when feature flags finish
-  /// loading.
-  ///
   /// The optional [beforeSend] callbacks are copied into [beforeSend] and run in
   /// order before Dart-captured events are sent.
   PostHogConfig(
     String projectToken, {
-    this.onFeatureFlags,
     List<BeforeSendCallback>? beforeSend,
   })  : projectToken = projectToken.trim(),
         beforeSend = beforeSend ?? [];
@@ -485,45 +487,6 @@ class PostHogConfig {
   static String _normalizeHost(String host) {
     final trimmedHost = host.trim();
     return trimmedHost.isEmpty ? _defaultHost : trimmedHost;
-  }
-
-  /// Converts this configuration to a platform-channel map.
-  ///
-  /// Returns the values consumed by the Android, Apple, and web implementations.
-  Map<String, dynamic> toMap() {
-    return {
-      'projectToken': projectToken,
-      'apiKey': projectToken,
-      'host': host,
-      'flushAt': flushAt,
-      'maxQueueSize': maxQueueSize,
-      'maxBatchSize': maxBatchSize,
-      'flushInterval': flushInterval.inSeconds,
-      'sendFeatureFlagEvents': sendFeatureFlagEvent,
-      'preloadFeatureFlags': preloadFeatureFlags,
-      if (evaluationContexts != null) 'evaluationContexts': evaluationContexts,
-      'featureFlagRequestMaxRetries': featureFlagRequestMaxRetries,
-      'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
-      'rageClickConfig': rageClickConfig.toMap(),
-      'debug': debug,
-      'optOut': optOut,
-      'surveys': surveys,
-      'personProfiles': personProfiles.name,
-      'compression': compression.name,
-      'sessionReplay': sessionReplay,
-      'dataMode': dataMode.name,
-      'sessionReplayConfig': sessionReplayConfig.toMap(),
-      'errorTrackingConfig': errorTrackingConfig.toMap(),
-      'logs': logsConfig.toMap(),
-      'capturePushNotificationSubscriptions':
-          capturePushNotificationSubscriptions,
-      'capturePushNotificationOpened': capturePushNotificationOpened,
-      // A closure can't cross the channel. This tells native whether to install
-      // a bridging provider at all — installing one the host didn't ask for
-      // would change how the native SDK handles a 401 on the subscription call.
-      'pushIdentityProviderEnabled': pushIdentityProvider != null,
-      if (bootstrap != null) 'bootstrap': bootstrap!.toMap(),
-    };
   }
 }
 
@@ -581,34 +544,6 @@ class PostHogBootstrapConfig {
   /// JSON payloads paired with [featureFlags], keyed by flag key. Each value is
   /// the already-decoded payload (map, list, string, number, `null`, ...).
   final Map<String, Object?>? featureFlagPayloads;
-
-  /// Converts this configuration to a platform-channel map.
-  ///
-  /// Only the dimensions that were set are included; [isIdentifiedId] is always
-  /// sent so the native SDK doesn't have to infer it.
-  Map<String, Object?> toMap() {
-    final flags = featureFlags;
-    if (flags != null) {
-      for (final entry in flags.entries) {
-        // Only bool/String are served (see [featureFlags]); the native SDKs drop
-        // anything else silently, so warn instead of leaving no trace.
-        if (entry.value is! bool && entry.value is! String) {
-          printIfDebug(
-            '[PostHog] bootstrap featureFlags["${entry.key}"] is '
-            '${entry.value.runtimeType}; only bool and String values are served, '
-            'so this entry will be ignored.',
-          );
-        }
-      }
-    }
-    return {
-      if (distinctId != null) 'distinctId': distinctId,
-      'isIdentifiedId': isIdentifiedId,
-      if (featureFlags != null) 'featureFlags': featureFlags,
-      if (featureFlagPayloads != null)
-        'featureFlagPayloads': featureFlagPayloads,
-    };
-  }
 }
 
 /// Configuration for the logs subsystem.
@@ -704,8 +639,7 @@ class PostHogLogsConfig {
   ///   native SDKs' own `beforeSend`. Dart callbacks cannot cross the platform
   ///   channel, and running it here gives identical behavior everywhere
   ///   (including web). This mirrors the event [PostHogConfig.beforeSend].
-  /// - Callbacks can be synchronous or asynchronous (via
-  ///   `FutureOr<PostHogLogRecord?>`).
+  /// - Callbacks are synchronous.
   /// - A callback that throws is logged, and the record is dropped.
   /// - The W3C trace fields (`traceId`, `spanId`, `traceFlags`) are **not**
   ///   part of [PostHogLogRecord] and are not visible here. They pass straight
@@ -713,36 +647,6 @@ class PostHogLogsConfig {
   ///   record. Keep anything sensitive out of those fields; put it in [body] or
   ///   [PostHogLogRecord.attributes], which a callback can scrub or drop.
   List<BeforeSendLogCallback> beforeSend = [];
-
-  /// Converts the identity and tuning options to a platform-channel map.
-  ///
-  /// Only fields the user set are included, so unset fields keep the native
-  /// default. [beforeSend] is intentionally omitted: it runs in Dart and never
-  /// crosses the platform channel.
-  Map<String, dynamic> toMap() {
-    return {
-      if (serviceName != null) 'serviceName': serviceName,
-      if (serviceVersion != null) 'serviceVersion': serviceVersion,
-      if (environment != null) 'environment': environment,
-      if (resourceAttributes.isNotEmpty)
-        'resourceAttributes': resourceAttributes,
-      if (flushInterval != null)
-        'flushIntervalSeconds': _wholeSeconds(flushInterval!),
-      if (flushAt != null) 'flushAt': flushAt,
-      if (maxBatchSize != null) 'maxBatchSize': maxBatchSize,
-      if (maxBufferSize != null) 'maxBufferSize': maxBufferSize,
-      if (rateCapMaxLogs != null) 'rateCapMaxLogs': rateCapMaxLogs,
-      if (rateCapWindow != null)
-        'rateCapWindowSeconds': _wholeSeconds(rateCapWindow!),
-    };
-  }
-
-  /// The native flush interval and rate-cap window are whole seconds. A
-  /// sub-second [Duration] truncates to `0`, which the native SDK treats as
-  /// "disabled" (rate cap) or continuous flushing — surprising for a caller who
-  /// set, say, 500ms. Floor at 1s, the smallest value the native API can honor.
-  static int _wholeSeconds(Duration duration) =>
-      duration.inSeconds < 1 ? 1 : duration.inSeconds;
 }
 
 /// Configuration for rage-click autocapture on iOS and Mac Catalyst.
@@ -772,17 +676,6 @@ class PostHogRageClickConfig {
   ///
   /// Defaults to `3`.
   var minimumTapCount = 3;
-
-  /// Converts this rage-click configuration to a platform-channel map.
-  Map<String, Object> toMap() {
-    return {
-      'enabled': enabled,
-      'thresholdPoints': thresholdPoints,
-      'timeoutInterval':
-          timeoutInterval.inMicroseconds / Duration.microsecondsPerSecond,
-      'minimumTapCount': minimumTapCount,
-    };
-  }
 }
 
 /// Pixel format for Android native-screen captures in session replay.
@@ -932,17 +825,6 @@ class PostHogSessionReplayConfig {
   /// Default: null.
   PostHogTextMaskPolicy? textMaskPolicy;
 
-  /// Deprecated setter that forwards assigned values to [throttleDelay].
-  ///
-  /// Debouncer delay used to reduce the number of snapshots captured and reduce
-  /// performance impact. This is used for capturing the view as a screenshot.
-  /// The lower the number, the more snapshots will be captured but higher the
-  /// performance impact. Defaults to 1s.
-  @Deprecated('Deprecated in favor of [throttleDelay] from v4.8.0.')
-  set debouncerDelay(Duration debouncerDelay) {
-    throttleDelay = debouncerDelay;
-  }
-
   /// Throttling delay used to reduce the number of snapshots captured and reduce
   /// performance impact.
   ///
@@ -1079,26 +961,6 @@ class PostHogSessionReplayConfig {
   ///
   /// Default: false.
   var verifyScreenshotMaskAlignment = false;
-
-  /// Converts this session replay configuration to a platform-channel map.
-  ///
-  /// Returns values consumed by the Android and Apple session replay
-  /// implementations.
-  Map<String, dynamic> toMap() {
-    return {
-      'captureTouches': captureTouches,
-      'maskAllImages': maskAllImages,
-      'maskAllTexts': maskAllTexts,
-      'throttleDelayMs': throttleDelay.inMilliseconds,
-      'maskAllPlatformViews': maskAllPlatformViews,
-      'captureNativeScreens': captureNativeScreens,
-      'verifyScreenshotMaskAlignment': verifyScreenshotMaskAlignment,
-      if (screenshotScale != null) 'screenshotScale': screenshotScale,
-      'screenshotCompressionQuality': screenshotCompressionQuality,
-      'screenshotColorMode': screenshotColorMode.name,
-      if (sampleRate != null) 'sampleRate': sampleRate,
-    };
-  }
 }
 
 /// Configuration for PostHog error tracking and exception capture.
@@ -1277,25 +1139,6 @@ class PostHogErrorTrackingConfig {
   ///
   /// Record steps with `Posthog().addExceptionStep()`.
   final exceptionSteps = PostHogExceptionStepsConfig();
-
-  /// Converts this error tracking configuration to a platform-channel map.
-  ///
-  /// Returns values consumed by the Android, Apple, and Dart exception capture
-  /// implementations.
-  Map<String, dynamic> toMap() {
-    return {
-      'inAppIncludes': inAppIncludes,
-      'inAppExcludes': inAppExcludes,
-      'inAppByDefault': inAppByDefault,
-      'captureFlutterErrors': captureFlutterErrors,
-      'captureSilentFlutterErrors': captureSilentFlutterErrors,
-      'capturePlatformDispatcherErrors': capturePlatformDispatcherErrors,
-      'captureNativeExceptions': captureNativeExceptions,
-      'captureNativeCrashes': captureNativeCrashes,
-      'captureIsolateErrors': captureIsolateErrors,
-      'exceptionSteps': exceptionSteps.toMap(),
-    };
-  }
 }
 
 /// Configuration for exception steps.
@@ -1333,12 +1176,4 @@ class PostHogExceptionStepsConfig {
   /// until the total fits. A single step larger than the budget is rejected
   /// outright. Defaults to `32768` (32 KiB).
   var maxBytes = 32768;
-
-  /// Converts this configuration to a platform-channel map.
-  Map<String, Object> toMap() {
-    return {
-      'enabled': enabled,
-      'maxBytes': maxBytes,
-    };
-  }
 }

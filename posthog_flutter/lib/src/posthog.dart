@@ -5,6 +5,8 @@ import 'package:meta/meta.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_error_tracking_autocapture_integration.dart';
 import 'package:posthog_flutter/src/error_tracking/posthog_exception.dart';
 import 'feature_flag_result.dart';
+import 'feature_flags_listeners.dart';
+import 'feature_flags_loaded.dart';
 import 'logs/posthog_log_record.dart';
 import 'logs/posthog_log_severity.dart';
 import 'logs/posthog_logger.dart';
@@ -13,7 +15,7 @@ import 'posthog_flutter_platform_interface.dart';
 import 'posthog_internal_events.dart';
 import 'posthog_observer.dart';
 import 'replay/mask/posthog_mask_controller.dart';
-import 'utils/before_send.dart';
+import 'utils/project_token.dart';
 
 /// Entry point for the PostHog Flutter SDK.
 ///
@@ -39,14 +41,18 @@ class Posthog {
 
   String? _currentScreen;
 
+  String? _appLanguageFromApp;
+  String? _resolvedAppLanguage;
+  String? _sentAppLanguage;
+
   /// Initializes the PostHog SDK.
   ///
   /// This method sets up the connection to your PostHog instance and prepares
   /// the SDK for tracking events and feature flags.
   ///
   /// The [config] object contains your project token, host, and other settings.
-  /// To listen for feature flag load events, provide an `onFeatureFlags`
-  /// callback in the [PostHogConfig].
+  /// To listen for feature flag load events, call [onFeatureFlags] before this
+  /// method.
   ///
   /// Repeated setup reapplies Dart-side settings such as the error-tracking
   /// hooks. Most native settings still require [close] before setup because
@@ -58,20 +64,17 @@ class Posthog {
   /// ```dart
   /// final config = PostHogConfig('YOUR_PROJECT_TOKEN');
   /// config.host = 'YOUR_POSTHOG_HOST';
-  /// config.onFeatureFlags = () {
+  /// Posthog().onFeatureFlags((loaded) {
   ///   // Feature flags are now loaded, you can read flag values here
-  /// };
+  /// });
   /// await Posthog().setup(config);
   /// ```
   ///
   /// For Android and iOS, if you are performing a manual setup,
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
-  Future<void> setup(PostHogConfig config) {
-    if (config.projectToken.isEmpty) {
-      debugPrint(
-        '[PostHog] projectToken must not be blank. Setup skipped.',
-      );
+  Future<void> setup(PostHogConfig config) async {
+    if (!isUsableProjectToken(config.projectToken)) {
       return Future<void>.value();
     }
 
@@ -96,7 +99,11 @@ class Posthog {
 
     _installFlutterIntegrations(config);
 
-    return _posthog.setup(config);
+    await _posthog.setup(config);
+    // A new desktop client starts without it.
+    if (_sentAppLanguage != null) {
+      await _posthog.setAppLanguage(_sentAppLanguage);
+    }
   }
 
   void _installFlutterIntegrations(PostHogConfig config) {
@@ -139,6 +146,9 @@ class Posthog {
   /// The optional [userPropertiesSetOnce] are person properties set with
   /// `$set_once`.
   ///
+  /// The optional [options] tell PostHog how to process the `$identify` or
+  /// `$set` event this call sends, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the identify call has been queued.
   ///
   /// Note that identifying a user reloads feature flags, which issues a
@@ -156,11 +166,13 @@ class Posthog {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) =>
       _posthog.identify(
         userId: userId,
         userProperties: userProperties,
         userPropertiesSetOnce: userPropertiesSetOnce,
+        options: options,
       );
 
   /// Sets person properties for the current user without requiring identify.
@@ -173,6 +185,9 @@ class Posthog {
   ///
   /// The optional [userPropertiesToSetOnce] values are set with `$set_once` and
   /// do not overwrite existing values.
+  ///
+  /// The optional [options] tell PostHog how to process the `$set` event this
+  /// call sends, as described on [capture].
   ///
   /// Returns a [Future] that completes when the update has been queued.
   /// If both property maps are null or empty, no event is queued.
@@ -187,10 +202,12 @@ class Posthog {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) =>
       _posthog.setPersonProperties(
         userPropertiesToSet: userPropertiesToSet,
         userPropertiesToSetOnce: userPropertiesToSetOnce,
+        options: options,
       );
 
   /// Captures a custom event.
@@ -209,7 +226,36 @@ class Posthog {
   /// The optional [userPropertiesSetOnce] are person properties set with
   /// `$set_once`.
   ///
+  /// The optional [options] tell PostHog how to process this event and are
+  /// sent apart from its properties. Known keys:
+  /// - `process_person_profile` (`bool`): whether PostHog creates or updates a
+  ///   person profile for this event.
+  /// - `cookieless_mode` (`bool`): whether PostHog processes this event in
+  ///   cookieless mode.
+  /// - `disable_skew_correction` (`bool`): whether PostHog keeps the event
+  ///   timestamp as sent instead of correcting it for device clock skew.
+  /// - `product_tour_id` (`String`): the product tour the event belongs to.
+  ///
+  /// These replace the `$process_person_profile`, `$cookieless_mode`,
+  /// `$ignore_sent_at` and `$product_tour_id` properties, and an option wins
+  /// over its property. A null value means unset. [PostHogConfig.beforeSend]
+  /// can change them through [PostHogEvent.options].
+  ///
+  /// On iOS, macOS, Android, Windows and Linux, other keys are sent
+  /// unchanged. On web, the known keys are sent as their legacy properties
+  /// and other keys are dropped. On web, posthog-js sets
+  /// `$process_person_profile` itself, so `process_person_profile` has no
+  /// effect there, and the options of [identify], [setPersonProperties],
+  /// [alias] and [group] are dropped because posthog-js sends those events
+  /// without event properties.
+  ///
   /// Returns a [Future] that completes when the event has been queued.
+  ///
+  /// On Android and Apple platforms, events captured offline are queued in
+  /// device file storage and sent when the device is online. Queued events
+  /// survive app restarts and are sent after restart when the device is online.
+  /// [PostHogConfig.maxQueueSize] limits the queue. When full, it drops the
+  /// oldest event first.
   ///
   /// **Example**
   /// ```dart
@@ -226,7 +272,67 @@ class Posthog {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
+    return _posthog.capture(
+      eventName: eventName,
+      properties: _withCurrentScreen(properties),
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
+    );
+  }
+
+  /// Captures an AI observability event, such as `$ai_generation`,
+  /// `$ai_span`, `$ai_trace` or `$ai_embedding`, and sends it to PostHog's AI
+  /// endpoint, which accepts much larger events than [capture].
+  ///
+  /// Takes the same arguments as [capture] and goes through the same
+  /// [PostHogConfig.beforeSend] callbacks. The event is queued separately from
+  /// other events and sent unchanged: the SDK doesn't redact or truncate
+  /// prompts, outputs or media. PostHog drops an event sent here whose name
+  /// doesn't start with `$ai_`. [capture] never sends events here, even ones
+  /// named `$ai_*`.
+  ///
+  /// Returns the event's UUID once the SDK has admitted it to the AI queue.
+  /// `null` means the event was not admitted and will not be sent:
+  /// - a [PostHogConfig.beforeSend] callback dropped it,
+  /// - it is over [PostHogConfig.captureAiMaxEventBytes],
+  /// - the SDK is disabled, not set up or opted out, or
+  /// - the platform is web (see below).
+  ///
+  /// **Platforms:** supported on iOS, macOS, Android, Windows and Linux. On
+  /// web, `captureAi` is a no-op: it sends nothing, logs a debug message and
+  /// returns `null`.
+  ///
+  /// **Example**
+  /// ```dart
+  ///   await Posthog().captureAi(
+  ///     eventName: r'$ai_generation',
+  ///     properties: {
+  ///       r'$ai_trace_id': traceId,
+  ///       r'$ai_model': 'gpt-4o',
+  ///       r'$ai_provider': 'openai',
+  ///     },
+  ///   );
+  /// ```
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) {
+    return _posthog.captureAi(
+      eventName: eventName,
+      properties: _withCurrentScreen(properties),
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
+    );
+  }
+
+  Map<String, Object>? _withCurrentScreen(Map<String, Object>? properties) {
     final propertiesCopy = properties == null ? null : {...properties};
 
     final currentScreen = _currentScreen;
@@ -235,12 +341,7 @@ class Posthog {
         currentScreen != null) {
       propertiesCopy['\$screen_name'] = currentScreen;
     }
-    return _posthog.capture(
-      eventName: eventName,
-      properties: propertiesCopy,
-      userProperties: userProperties,
-      userPropertiesSetOnce: userPropertiesSetOnce,
-    );
+    return propertiesCopy;
   }
 
   /// Captures a screen view event.
@@ -249,13 +350,20 @@ class Posthog {
   ///
   /// The optional [properties] are additional screen event properties.
   ///
+  /// The optional [options] tell PostHog how to process the `$screen` event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the screen event has been queued.
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) {
     _currentScreen = screenName;
-    return _posthog.screen(screenName: screenName, properties: properties);
+    return _posthog.screen(
+      screenName: screenName,
+      properties: properties,
+      options: options,
+    );
   }
 
   /// Captures a structured log record.
@@ -320,7 +428,7 @@ class Posthog {
         _config?.logsConfig.beforeSend ?? const <BeforeSendLogCallback>[];
     for (final callback in callbacks) {
       try {
-        final result = await runBeforeSend<PostHogLogRecord>(callback, record);
+        final result = callback(record);
         if (result == null) {
           debugPrint('[PostHog] Log dropped by beforeSend');
           return;
@@ -371,8 +479,12 @@ class Posthog {
   ///
   /// The [alias] is the additional distinct ID to associate with the user.
   ///
+  /// The optional [options] tell PostHog how to process the `$create_alias`
+  /// event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the alias call has been queued.
-  Future<void> alias({required String alias}) => _posthog.alias(alias: alias);
+  Future<void> alias({required String alias, Map<String, Object?>? options}) =>
+      _posthog.alias(alias: alias, options: options);
 
   /// Returns the registered `distinctId` property.
   ///
@@ -388,6 +500,7 @@ class Posthog {
     // Bumped before the platform call because native rotates inside that round
     // trip.
     PostHogInternalEvents.requestReplaySessionReset();
+    FeatureFlagsListeners.instance.clear();
     await _posthog.reset();
   }
 
@@ -409,7 +522,7 @@ class Posthog {
     // Native opt-out stops replay itself. A native stopSessionRecording() here
     // would record that the app stopped replay, so native opt-in would not
     // restart it.
-    await _posthog.disable();
+    await _posthog.optOut();
   }
 
   /// Opts the current user back in to data collection.
@@ -424,7 +537,7 @@ class Posthog {
       _installFlutterIntegrations(config);
     }
 
-    await _posthog.enable();
+    await _posthog.optIn();
     final restartReplay = _restartSessionReplayOnEnable;
     _restartSessionReplayOnEnable = false;
     if (restartReplay) {
@@ -432,18 +545,6 @@ class Posthog {
       PostHogInternalEvents.sessionRecordingActive.value = true;
     }
   }
-
-  /// Opts the current user out of data collection.
-  @Deprecated(
-    'Use optOut() instead. This will be removed in the next major version.',
-  )
-  Future<void> disable() => optOut();
-
-  /// Opts the current user back in to data collection.
-  @Deprecated(
-    'Use optIn() instead. This will be removed in the next major version.',
-  )
-  Future<void> enable() => optIn();
 
   /// Returns whether the current user has opted out of data collection.
   Future<bool> isOptOut() => _posthog.isOptOut();
@@ -471,6 +572,88 @@ class Posthog {
   /// Returns a [Future] that completes when the property has been removed.
   Future<void> unregister(String key) => _posthog.unregister(key);
 
+  /// Registers capture options sent with all following events, such as
+  /// `cookieless_mode` or `disable_skew_correction`. See [capture] for the
+  /// known keys.
+  ///
+  /// An event's own `options` win over registered ones key by key. On iOS,
+  /// macOS, Android, Windows and Linux, [PostHogConfig.beforeSend] callbacks
+  /// see and can change the result. New values overwrite registered ones for
+  /// the same keys. They persist across
+  /// app restarts until [unregisterOptions] removes them or [reset] clears
+  /// them. A `null` value is ignored.
+  ///
+  /// Use this instead of registering a legacy option property such as
+  /// `$cookieless_mode`.
+  ///
+  /// On web, posthog-js has no options: known keys are registered as their
+  /// legacy properties, with the limits described on [capture], and other
+  /// keys are dropped. posthog-js adds them to every event it sends, including
+  /// the ones it captures itself, after [PostHogConfig.beforeSend] runs, so
+  /// the callbacks don't see them, as for properties added with [register].
+  ///
+  /// ```dart
+  /// await Posthog().registerOptions({'cookieless_mode': true});
+  /// ```
+  ///
+  /// Returns a [Future] that completes when the options have been registered.
+  Future<void> registerOptions(Map<String, Object?> options) =>
+      _posthog.registerOptions(options);
+
+  /// Removes an option registered with [registerOptions]. Events captured
+  /// afterwards no longer get it, unless they pass it in their own `options`.
+  ///
+  /// ```dart
+  /// await Posthog().unregisterOptions('cookieless_mode');
+  /// ```
+  ///
+  /// Returns a [Future] that completes when the option has been removed.
+  Future<void> unregisterOptions(String key) => _posthog.unregisterOptions(key);
+
+  /// Sets the `$app_language` property: the language your app displays, sent
+  /// with every event.
+  ///
+  /// Default: [PosthogObserver] reports the locale your `MaterialApp` resolved
+  /// each time a route changes, which is `en-US` if you declare no
+  /// `supportedLocales`. Call this if you don't use the observer, translate
+  /// outside `Localizations`, or want to report a different value.
+  ///
+  /// Your value wins over the observer's and survives [reset]. It's kept in
+  /// memory, so call it again on the next launch. Compare `$locale`, which is
+  /// the device language, or on iOS and macOS a language picked for the app in
+  /// Settings.
+  ///
+  /// The [language] is a BCP 47 tag, such as `de` or `pt-BR`. Pass `null` to go
+  /// back to the observer's value.
+  ///
+  /// Not sent on web yet, because posthog-js doesn't support `$app_language`.
+  /// To send it there now, use [register].
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().setAppLanguage('de');
+  /// ```
+  Future<void> setAppLanguage(String? language) async {
+    final normalized = language?.trim().replaceAll('_', '-');
+    _appLanguageFromApp = normalized?.isEmpty == true ? null : normalized;
+    await _syncAppLanguage();
+  }
+
+  /// For internal use only. Called by [PosthogObserver] as routes change.
+  @internal
+  Future<void> reportResolvedAppLanguage(String? language) async {
+    _resolvedAppLanguage = language;
+    await _syncAppLanguage();
+  }
+
+  Future<void> _syncAppLanguage() async {
+    final language = _appLanguageFromApp ?? _resolvedAppLanguage;
+    if (language != _sentAppLanguage) {
+      _sentAppLanguage = language;
+      await _posthog.setAppLanguage(language);
+    }
+  }
+
   /// Returns whether a boolean feature flag is enabled.
   ///
   /// Docs: https://posthog.com/docs/feature-flags and
@@ -483,7 +666,14 @@ class Posthog {
   /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
   /// this call, or `true` to capture it even when the config turns it off.
   ///
-  /// Returns `false` when the flag is disabled, missing, or not a boolean flag.
+  /// [defaultValue] is what this call returns when the flag has no value.
+  /// Defaults to `null`, which returns `false`. A flag has no value when flags
+  /// have not loaded yet, the flags request failed, or no flag has this key. A
+  /// flag that has a value always wins, including `false` and variants, and
+  /// `$feature_flag_called` never reports [defaultValue] as the flag's value.
+  ///
+  /// Returns `false` when the flag is disabled or set to an empty variant, and
+  /// `true` when it is enabled or set to a non-empty variant.
   ///
   /// **Example:**
   /// ```dart
@@ -491,15 +681,80 @@ class Posthog {
   ///     sendFeatureFlagEvent: false)) {
   ///   // show the new checkout without recording a flag exposure
   /// }
+  ///
+  /// // Keep the feature on until the flag says otherwise.
+  /// final showCheckout =
+  ///     await Posthog().isFeatureEnabled('new-checkout', defaultValue: true);
   /// ```
-  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
+  Future<bool> isFeatureEnabled(String key,
+          {bool? sendFeatureFlagEvent, bool? defaultValue}) =>
       _posthog.isFeatureEnabled(key,
-          sendFeatureFlagEvent: sendFeatureFlagEvent);
+          sendFeatureFlagEvent: sendFeatureFlagEvent,
+          defaultValue: defaultValue);
 
   /// Reloads feature flags for the current user.
   ///
-  /// Returns a [Future] that completes when the reload request has been queued.
-  Future<void> reloadFeatureFlags() => _posthog.reloadFeatureFlags();
+  /// Returns a [Future] that completes when the reload finishes, with the
+  /// enabled flags and whether loading failed. When it failed,
+  /// [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the flags are the
+  /// last known values.
+  ///
+  /// **Flutter web:** with posthog-js 1.438.2 or later, completes once this
+  /// reload's request settles; if posthog-js skips it (flags disabled,
+  /// reloading paused, or after repeated network failures), it completes right
+  /// away with the current flags and `errorsLoading: true`. Older posthog-js
+  /// completes with the next flags it reports, and when it skips the request,
+  /// with `errorsLoading: true` once every request attempt posthog-js may
+  /// make could have timed out: `feature_flag_request_max_retries + 2` times
+  /// its `feature_flag_request_timeout_ms`, plus 500 ms per retry (9.5 s with
+  /// the defaults; right away when flags are disabled).
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final loaded = await Posthog().reloadFeatureFlags();
+  /// if (!loaded.errorsLoading && loaded.flags.contains('new-checkout')) {
+  ///   // The flag is enabled.
+  /// }
+  /// ```
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() =>
+      _posthog.reloadFeatureFlags();
+
+  /// Registers a [callback] that's invoked whenever feature flags are loaded
+  /// or updated.
+  ///
+  /// It's invoked after the SDK loads flags at startup (including from
+  /// bootstrap values), after [reloadFeatureFlags], and after calls that
+  /// reload flags such as [identify], [group] or [reset]. If a load fails,
+  /// [PostHogFeatureFlagsLoaded.errorsLoading] is `true` and the values are
+  /// the last known flags. If flags have already loaded when you register,
+  /// it's also invoked with the current values shortly afterwards.
+  ///
+  /// You can register before [setup], even before
+  /// `WidgetsFlutterBinding.ensureInitialized()`, and the callback stays
+  /// registered across [close] and [setup]. Treat each invocation as "flags may have
+  /// changed", not as an exactly-once event.
+  ///
+  /// Returns a subscription; call
+  /// [PostHogFeatureFlagsSubscription.unsubscribe] to stop receiving updates.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final subscription = Posthog().onFeatureFlags((loaded) {
+  ///   if (loaded.variants['new-checkout'] == 'test') {
+  ///     // Show the test variant.
+  ///   }
+  /// });
+  ///
+  /// // Later, stop listening.
+  /// subscription.unsubscribe();
+  /// ```
+  PostHogFeatureFlagsSubscription onFeatureFlags(
+      OnFeatureFlagsCallback callback) {
+    // Creating the platform installs the channel handler native loads arrive
+    // on. With native auto-init this can be the app's only Dart SDK call.
+    _posthog;
+    return FeatureFlagsListeners.instance.add(callback);
+  }
 
   /// Sets person properties that are used only for feature flag evaluation.
   ///
@@ -515,9 +770,9 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing; on iOS and Android this means flags
-  /// have finished loading, so the next [getFeatureFlag] / [getFeatureFlagResult]
-  /// reflects the updated properties. On web the reload is best-effort.
+  /// awaits the reload before completing, so the next [getFeatureFlag] /
+  /// [getFeatureFlagResult] reflects the updated properties. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   ///
   /// **Example:**
   /// ```dart
@@ -545,8 +800,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   Future<void> resetPersonPropertiesForFlags({
     bool reloadFeatureFlags = true,
   }) async {
@@ -569,8 +824,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after updating
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   ///
   /// **Example:**
   /// ```dart
@@ -601,8 +856,8 @@ class Posthog {
   ///
   /// Set [reloadFeatureFlags] to `false` to skip reloading flags after clearing
   /// the properties (defaults to `true`). When `true`, the returned [Future]
-  /// awaits the reload before completing (on iOS/Android, after flags finish
-  /// loading; on web, best-effort).
+  /// awaits the reload before completing. On web, see
+  /// [Posthog.reloadFeatureFlags] for which posthog-js versions wait for it.
   Future<void> resetGroupPropertiesForFlags({
     String? groupType,
     bool reloadFeatureFlags = true,
@@ -623,6 +878,9 @@ class Posthog {
   ///
   /// The optional [groupProperties] are group properties set with `$group_set`.
   ///
+  /// The optional [options] tell PostHog how to process the `$groupidentify`
+  /// event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the group call has been queued.
   ///
   /// Note that setting a group reloads feature flags, which issues a `/flags`
@@ -641,11 +899,13 @@ class Posthog {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
   }) =>
       _posthog.group(
         groupType: groupType,
         groupKey: groupKey,
         groupProperties: groupProperties,
+        options: options,
       );
 
   /// Registers this device's push token or Firebase Installation ID (FID) so
@@ -809,9 +1069,10 @@ class Posthog {
   /// This is the canonical method for getting feature flag data.
   /// Returns `null` if the flag does not exist or cannot be loaded.
   ///
-  /// Set [sendEvent] to `false` to suppress the `$feature_flag_called` event.
-  /// This is useful when you only need the payload and do not want to emit the
-  /// event.
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` when you only need the
+  /// payload, or `true` to capture the event even when the config turns it off.
   ///
   /// **Example:**
   /// ```dart
@@ -823,9 +1084,10 @@ class Posthog {
   /// ```
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult(
     String key, {
-    bool sendEvent = true,
+    bool? sendFeatureFlagEvent,
   }) =>
-      _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
+      _posthog.getFeatureFlagResult(
+          key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Returns the results of all currently loaded feature flags.
   ///
@@ -849,16 +1111,6 @@ class Posthog {
   /// ```
   Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() =>
       _posthog.getAllFeatureFlags();
-
-  /// Returns the payload for the feature flag [key].
-  ///
-  /// Returns `null` when the flag does not exist, has no payload, or the payload
-  /// cannot be loaded.
-  @Deprecated(
-    'Use getFeatureFlagResult instead, which returns both value and payload.',
-  )
-  Future<Object?> getFeatureFlagPayload(String key) =>
-      _posthog.getFeatureFlagPayload(key: key);
 
   /// Captures a `$feature_view` event when the user sees the feature behind
   /// the feature flag [flag].
@@ -916,16 +1168,20 @@ class Posthog {
   ///
   /// The optional [properties] are added to the `$exception` event.
   ///
+  /// The optional [options] tell PostHog how to process the `$exception` event, as described on [capture].
+  ///
   /// Returns a [Future] that completes when the exception event has been queued.
   Future<void> captureException({
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) =>
       _posthog.captureException(
         error: error,
         stackTrace: stackTrace,
         properties: properties,
+        options: options,
       );
 
   /// Captures a `runZonedGuarded` error with optional custom properties.
@@ -1022,9 +1278,10 @@ class Posthog {
   /// Returns a [Future] that completes when platform resources have been closed.
   ///
   /// **Windows/Linux:** first makes one attempt to send the queued events and
-  /// waits for it for up to two seconds. Events left unsent go out with the
-  /// next [setup], or are lost when the application support directory is
-  /// unavailable and state is kept in memory.
+  /// waits for it for up to two seconds, and for the queue's files for up to
+  /// two more. Events left unsent go out with the next [setup], or are lost
+  /// when the application support directory is unavailable and state is kept
+  /// in memory.
   ///
   /// **Note:** After calling `close()`, surveys will not be rendered until the
   /// SDK is re-initialized and the next navigation event occurs.
@@ -1038,6 +1295,7 @@ class Posthog {
     // recording that follows must start clean either way.
     PostHogInternalEvents.requestReplaySessionReset();
     PosthogObserver.clearCurrentContext();
+    FeatureFlagsListeners.instance.clear();
 
     // Uninstall Flutter integrations
     _uninstallFlutterIntegrations();

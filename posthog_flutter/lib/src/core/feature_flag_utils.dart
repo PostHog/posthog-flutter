@@ -79,6 +79,10 @@ const minimalFeatureFlagCalledProperties = <String>{
   r'$feature_flag_error',
   r'$groups',
   r'$process_person_profile',
+  // Converted to capture v1 options when the request is built.
+  r'$cookieless_mode',
+  r'$ignore_sent_at',
+  r'$product_tour_id',
   r'$geoip_disable',
   r'$session_id',
   r'$window_id',

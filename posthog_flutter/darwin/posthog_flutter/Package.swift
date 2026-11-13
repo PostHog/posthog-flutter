@@ -6,15 +6,15 @@ import PackageDescription
 let package = Package(
     name: "posthog_flutter",
     platforms: [
-        .iOS("13.0"),
-        .macOS("10.15"),
+        .iOS("15.0"),
+        .macOS("11.0"),
     ],
     products: [
         .library(name: "posthog-flutter", targets: ["posthog_flutter"]),
     ],
     dependencies: [
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
-        .package(url: "https://github.com/PostHog/posthog-ios", "3.92.3" ..< "4.0.0"),
+        .package(url: "https://github.com/PostHog/posthog-ios", "4.0.0" ..< "5.0.0"),
     ],
     targets: [
         .target(

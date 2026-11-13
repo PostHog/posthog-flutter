@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
 import 'package:posthog_flutter/src/core/persistence.dart';
@@ -40,7 +41,7 @@ void main() {
     test('keeps an anonymous user personless', () {
       client.capture('test_event');
 
-      expect(queuedProps(storage, 0)[r'$process_person_profile'], isFalse);
+      expect(queuedOptions(storage, 0)['process_person_profile'], isFalse);
       expect(queuedProps(storage, 0)[r'$is_identified'], isFalse);
     });
 
@@ -52,9 +53,9 @@ void main() {
         });
         client.capture('next_event');
 
-        expect(queuedProps(storage, 0)[r'$process_person_profile'], isTrue,
+        expect(queuedOptions(storage, 0)['process_person_profile'], isNull,
             reason: 'sending person properties asks for a person profile');
-        expect(queuedProps(storage, 1)[r'$process_person_profile'], isTrue);
+        expect(queuedOptions(storage, 1)['process_person_profile'], isNull);
       });
     }
 
@@ -68,7 +69,7 @@ void main() {
         r'$set': {'plan': 'pro'},
       });
 
-      expect(queuedProps(storage, 0)[r'$process_person_profile'], isFalse);
+      expect(queuedOptions(storage, 0)['process_person_profile'], isFalse);
     });
 
     test(r'$groups apply to that event only', () async {
@@ -81,7 +82,7 @@ void main() {
 
       expect(queuedProps(storage, 0)[r'$groups'], {'company': 'acme'});
       expect(queuedProps(storage, 1).containsKey(r'$groups'), isFalse);
-      expect(queuedProps(storage, 1)[r'$process_person_profile'], isFalse);
+      expect(queuedOptions(storage, 1)['process_person_profile'], isFalse);
       expect(reloads, 0, reason: 'an event-level group is not a group change');
     });
 
@@ -103,8 +104,9 @@ void main() {
       expect(first[r'$sdk_debug_current_session_duration'],
           greaterThanOrEqualTo(10));
       expect(first[r'$sdk_debug_pending_queue_size'], 0);
-      expect(queuedProps(storage, 1)[r'$sdk_debug_pending_queue_size'], 1,
-          reason: 'SDK debug values win over a registered super property');
+      expect(queuedProps(storage, 1)[r'$sdk_debug_pending_queue_size'],
+          'registered',
+          reason: 'a registered super property wins over SDK values');
     });
   });
 
@@ -187,7 +189,7 @@ void main() {
       expect(queuedEvents(storage), [r'$set'],
           reason: r'there is no anonymous history to link, so no $identify');
       expect(queuedProps(storage, 0)[r'$is_identified'], isTrue);
-      expect(queuedProps(storage, 0)[r'$process_person_profile'], isTrue);
+      expect(queuedOptions(storage, 0)['process_person_profile'], isNull);
       expect(reloads, 0,
           reason: 'the identified state alone does not affect flags');
     });
@@ -253,7 +255,10 @@ void main() {
 
       for (final event in [r'$identify', r'$create_alias', r'$groupidentify']) {
         final props = queuedPropsOf(storage, event);
-        expect(props[r'$process_person_profile'], isTrue, reason: event);
+        final message = getQueue(storage)
+            .singleWhere((message) => message['event'] == event);
+        expect(message, isNot(contains('options')),
+            reason: '$event: person-processed events omit the option');
         expect(props[r'$is_identified'], isTrue, reason: event);
         expect(props, contains(r'$sdk_debug_session_start'), reason: event);
       }
@@ -319,6 +324,24 @@ void main() {
       expect(lines, contains(allOf(contains('capture'), contains('sign_in'))));
       expect(printedLines(() => client.capture('sign_out')), isEmpty);
     });
+
+    test('logs events without their properties', () async {
+      final client = testClient(server);
+
+      client.debug(true);
+      final lines = <String>[];
+      final previous = debugPrint;
+      debugPrint = (message, {wrapWidth}) => lines.add(message ?? '');
+      try {
+        client.capture('sign_in', properties: {'prompt': 'secret'});
+        await client.flush();
+      } finally {
+        debugPrint = previous;
+      }
+
+      expect(lines, contains(allOf(contains('flush'), contains('sign_in'))));
+      expect(lines.join(), isNot(contains('secret')));
+    });
   });
 
   group('Super properties', () {
@@ -356,6 +379,170 @@ void main() {
 
       expect(queuedProps(storage, 0)['plan'], 'pro');
     });
+
+    for (final (name, given, expected) in [
+      (
+        'another library keeps its own version, or none',
+        {r'$lib': 'posthog-unity'},
+        {r'$lib': 'posthog-unity', r'$lib_version': null},
+      ),
+      (
+        r'a $lib_version without $lib is replaced',
+        {r'$lib_version': '9.9.9'},
+        {
+          r'$lib': postHogFlutterSdkName,
+          r'$lib_version': postHogFlutterVersion
+        },
+      ),
+      (
+        r'an empty $lib is replaced with the pair',
+        {r'$lib': '', r'$lib_version': '9.9.9'},
+        {
+          r'$lib': postHogFlutterSdkName,
+          r'$lib_version': postHogFlutterVersion
+        },
+      ),
+      (
+        r'the SDK $lib with a set version keeps it',
+        {r'$lib': postHogFlutterSdkName, r'$lib_version': '9.9.9'},
+        {r'$lib': postHogFlutterSdkName, r'$lib_version': '9.9.9'},
+      ),
+    ]) {
+      test(r'$lib and $lib_version fill as a pair: ' + name, () {
+        client.register(given);
+
+        client.capture('test_event');
+
+        final props = queuedProps(storage, 0);
+        expect(props[r'$lib'], expected[r'$lib']);
+        expect(props[r'$lib_version'], expected[r'$lib_version']);
+      });
+    }
+  });
+
+  group('Registered options', () {
+    late FileStorage storage;
+    late DesktopPostHog client;
+
+    setUp(() {
+      storage = tempStorage();
+      client = testClient(server, storage: storage);
+    });
+
+    test("go on every event, under the event's own options", () {
+      client.registerOptions(
+          {'cookieless_mode': false, 'disable_skew_correction': true});
+
+      client.capture('plain');
+      client.capture('own', options: {'cookieless_mode': true});
+
+      expect(queuedOptions(storage, 0), containsPair('cookieless_mode', false));
+      expect(queuedOptions(storage, 0),
+          containsPair('disable_skew_correction', true));
+      expect(queuedOptions(storage, 1), containsPair('cookieless_mode', true));
+      expect(queuedOptions(storage, 1),
+          containsPair('disable_skew_correction', true));
+      expect(queuedProps(storage, 0), isNot(contains('cookieless_mode')));
+    });
+
+    test(r'go on $identify, $create_alias and $groupidentify', () {
+      client.registerOptions({'cookieless_mode': true});
+
+      client.identify('user-1');
+      client.alias('alias-1');
+      client.group('company', 'acme');
+
+      expect(queuedEvents(storage),
+          [r'$identify', r'$create_alias', r'$groupidentify']);
+      for (var i = 0; i < 3; i++) {
+        expect(
+            queuedOptions(storage, i), containsPair('cookieless_mode', true));
+      }
+    });
+
+    test("a registered personless setting doesn't reach identity events", () {
+      client.registerOptions({'process_person_profile': false});
+      client.register({r'$process_person_profile': false});
+
+      client.identify('user-1');
+      client.alias('alias-1');
+      client.group('company', 'acme');
+      client.setPersonProperties(userPropertiesToSet: {'plan': 'pro'});
+      client.capture(r'$set_once', properties: {
+        r'$set_once': {'first': 'web'},
+      });
+      client.capture(r'$merge_dangerously', properties: {'alias': 'anon'});
+      client.capture('plain');
+
+      const identityEvents = [
+        r'$identify',
+        r'$create_alias',
+        r'$groupidentify',
+        r'$set',
+        r'$set_once',
+        r'$merge_dangerously',
+      ];
+      expect(queuedEvents(storage), [...identityEvents, 'plain']);
+      for (var i = 0; i < identityEvents.length; i++) {
+        expect(queuedOptions(storage, i),
+            isNot(contains('process_person_profile')),
+            reason: identityEvents[i]);
+        expect(queuedProps(storage, i),
+            isNot(contains(r'$process_person_profile')),
+            reason: identityEvents[i]);
+      }
+      expect(queuedOptions(storage, 6),
+          containsPair('process_person_profile', false));
+    });
+
+    test("a call's personless setting still applies to an identity event", () {
+      client.registerOptions({'process_person_profile': true});
+
+      client.alias('alias-1', options: {'process_person_profile': false});
+      client.capture(r'$set', properties: {
+        r'$process_person_profile': false,
+        r'$set': {'plan': 'pro'},
+      });
+
+      expect(queuedOptions(storage, 0),
+          containsPair('process_person_profile', false));
+      expect(queuedProps(storage, 1),
+          containsPair(r'$process_person_profile', false));
+    });
+
+    test("a registered process_person_profile replaces the SDK's default", () {
+      client.registerOptions({'process_person_profile': true});
+
+      client.capture('anonymous');
+
+      expect(queuedOptions(storage, 0),
+          containsPair('process_person_profile', true));
+    });
+
+    test('unregisterOptions and reset remove them', () {
+      client.registerOptions(
+          {'cookieless_mode': true, 'disable_skew_correction': true});
+
+      client.unregisterOptions('cookieless_mode');
+      client.capture('after_unregister');
+      client.reset();
+      client.capture('after_reset');
+
+      expect(queuedOptions(storage, 0), isNot(contains('cookieless_mode')));
+      expect(queuedOptions(storage, 0),
+          containsPair('disable_skew_correction', true));
+      expect(queuedOptions(storage, 1),
+          isNot(contains('disable_skew_correction')));
+    });
+
+    test('persist across clients', () {
+      client.registerOptions({'cookieless_mode': true});
+
+      final next = testClient(server, storage: storage);
+      next.capture('next');
+
+      expect(queuedOptions(storage, 0), containsPair('cookieless_mode', true));
+    });
   });
 
   group('PostHogCore.registerForSession', () {
@@ -367,14 +554,14 @@ void main() {
       client = testClient(server, storage: storage);
     });
 
-    test("win over registered properties, not over the event's own", () {
-      client.register({'screen': 'registered', 'plan': 'free'});
+    test("lose to registered properties and to the event's own", () {
+      client.register({'screen': 'registered'});
       client.registerForSession({'screen': 'Checkout', 'plan': 'trial'});
 
       client.capture('first');
       client.capture('second', properties: {'plan': 'pro'});
 
-      expect(queuedProps(storage, 0)['screen'], 'Checkout');
+      expect(queuedProps(storage, 0)['screen'], 'registered');
       expect(queuedProps(storage, 0)['plan'], 'trial');
       expect(queuedProps(storage, 1)['plan'], 'pro');
     });
@@ -425,7 +612,7 @@ void main() {
         client.capture('next_event');
 
         expect(queuedEvents(storage), ['next_event']);
-        expect(queuedProps(storage, 0)[r'$process_person_profile'], isFalse,
+        expect(queuedOptions(storage, 0)['process_person_profile'], isFalse,
             reason: 'an ignored alias does not turn on person processing');
         expect(lines, contains(contains('empty alias')));
       });

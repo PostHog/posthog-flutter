@@ -1,4 +1,5 @@
 import 'package:posthog_flutter/src/feature_flag_result.dart';
+import 'package:posthog_flutter/src/feature_flags_loaded.dart';
 import 'package:posthog_flutter/src/logs/posthog_log_severity.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
@@ -8,11 +9,13 @@ class CapturedExceptionCall {
   final Object error;
   final StackTrace? stackTrace;
   final Map<String, Object>? properties;
+  final Map<String, Object?>? options;
 
   CapturedExceptionCall({
     required this.error,
     this.stackTrace,
     this.properties,
+    this.options,
   });
 }
 
@@ -79,7 +82,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   }
 
   String? screenName;
-  OnFeatureFlagsCallback? registeredOnFeatureFlagsCallback;
   final List<CapturedExceptionCall> capturedExceptions = [];
   PostHogConfig? receivedConfig;
 
@@ -95,7 +97,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
   // Feature flag test data
   final Map<String, Object?> featureFlagValues = {};
-  final Map<String, Object?> featureFlagPayloads = {};
 
   final List<Map<String, Object?>> flagReadCalls = [];
 
@@ -114,6 +115,13 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   /// the session id, which happens while the call is still in flight.
   Future<void> Function()? onSessionBoundaryCall;
 
+  final List<String?> appLanguageCalls = [];
+
+  @override
+  Future<void> setAppLanguage(String? language) async {
+    appLanguageCalls.add(language);
+  }
+
   // Overridden because the base implementations throw UnimplementedError.
   @override
   Future<void> reset() async {
@@ -129,8 +137,9 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> stopSessionRecording() async {}
 
   @override
-  Future<void> reloadFeatureFlags() async {
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
     reloadFeatureFlagsCount++;
+    return PostHogFeatureFlagsLoaded(variants: const {}, errorsLoading: false);
   }
 
   @override
@@ -164,12 +173,71 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   // Tracking for captureLog calls (after Dart-side beforeSend has run)
   final List<CapturedLogCall> capturedLogs = [];
 
+  /// The options each event call received, as (method, options).
+  final List<(String, Map<String, Object?>?)> optionsCalls = [];
+
+  /// Returned by [captureAi].
+  String? captureAiResult;
+
+  @override
+  Future<void> capture({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('capture', options));
+  }
+
+  @override
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('captureAi', options));
+    return captureAiResult;
+  }
+
+  @override
+  Future<void> identify({
+    required String userId,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('identify', options));
+  }
+
+  @override
+  Future<void> alias({
+    required String alias,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('alias', options));
+  }
+
+  @override
+  Future<void> group({
+    required String groupType,
+    required String groupKey,
+    Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
+  }) async {
+    optionsCalls.add(('group', options));
+  }
+
   @override
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     this.screenName = screenName;
+    optionsCalls.add(('screen', options));
   }
 
   @override
@@ -196,7 +264,6 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   @override
   Future<void> setup(PostHogConfig config) async {
     receivedConfig = config;
-    registeredOnFeatureFlagsCallback = config.onFeatureFlags;
     // Simulate async operation if needed, but for fake, direct assignment is often enough.
     return Future.value();
   }
@@ -206,12 +273,14 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     capturedExceptions.add(
       CapturedExceptionCall(
         error: error,
         stackTrace: stackTrace,
         properties: properties,
+        options: options,
       ),
     );
   }
@@ -231,10 +300,10 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   }
 
   @override
-  Future<void> disable() async {}
+  Future<void> optOut() async {}
 
   @override
-  Future<void> enable() async {}
+  Future<void> optIn() async {}
 
   @override
   Future<void> close() async {
@@ -245,10 +314,12 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) async {
     setPersonPropertiesCalls.add({
       'userPropertiesToSet': userPropertiesToSet,
       'userPropertiesToSetOnce': userPropertiesToSetOnce,
+      if (options != null) 'options': options,
     });
   }
 
@@ -285,18 +356,14 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
   @override
   Future<bool> isFeatureEnabled(String key,
-      {bool? sendFeatureFlagEvent}) async {
+      {bool? sendFeatureFlagEvent, bool? defaultValue}) async {
     flagReadCalls.add({
       'method': 'isFeatureEnabled',
       'key': key,
       'sendFeatureFlagEvent': sendFeatureFlagEvent,
+      if (defaultValue != null) 'defaultValue': defaultValue,
     });
     return featureFlagValues[key] == true;
-  }
-
-  @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    return featureFlagPayloads[key];
   }
 
   PostHogFeatureFlagResult? featureFlagResult;
@@ -304,9 +371,10 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool? sendFeatureFlagEvent,
   }) async {
-    getFeatureFlagResultCalls.add({'key': key, 'sendEvent': sendEvent});
+    getFeatureFlagResultCalls
+        .add({'key': key, 'sendFeatureFlagEvent': sendFeatureFlagEvent});
 
     return featureFlagResult;
   }

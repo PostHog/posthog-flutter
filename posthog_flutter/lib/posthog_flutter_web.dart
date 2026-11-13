@@ -1,16 +1,19 @@
 // In order to *not* need this ignore, consider extracting the "web" version
 // of your plugin as a separate package, instead of inlining it in the same
 // package as the core of your plugin.
-import 'dart:async';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:posthog_flutter/src/error_tracking/dart_exception_processor.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
+import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 import 'package:posthog_flutter/src/utils/property_normalizer.dart';
 
 import 'src/feature_flag_result.dart';
+import 'src/feature_flags_listeners.dart';
+import 'src/feature_flags_loaded.dart';
 import 'src/logs/posthog_log_severity.dart';
 import 'src/posthog_config.dart';
 import 'src/posthog_constants.dart';
@@ -18,9 +21,9 @@ import 'src/posthog_event.dart';
 import 'src/posthog_flutter_platform_interface.dart';
 import 'src/posthog_flutter_web_handler.dart';
 import 'src/utils/before_send.dart';
-import 'src/utils/call_order.dart';
 import 'src/replay/web/web_canvas_mask_provider.dart';
 import 'src/utils/capture_utils.dart';
+import 'src/utils/event_options.dart';
 import 'src/utils/feature_event.dart';
 
 /// A web implementation of the PosthogFlutterPlatform of the PosthogFlutter plugin.
@@ -34,35 +37,80 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   /// Copied at setup. Event beforeSend runs here, before posthog-js, the same
   /// way [PosthogFlutterIO] runs it before the platform channel.
   List<BeforeSendCallback> _beforeSendCallbacks = [];
+  JSFunction? _featureFlagsUnsubscribe;
+
+  /// Bumped by each setup() and close(), so a posthog-js registration from an
+  /// earlier one stops delivering even when it can't be unsubscribed.
+  int _featureFlagsGeneration = 0;
 
   // posthog-js has no current screen, so the feature events get it from here
   // the way native SDKs stamp it: the last screen beforeSend accepted, under
   // its final name, until close().
   String? _currentScreen;
 
-  final _order = CallOrder();
-
-  /// Without callbacks the event comes back synchronously, so it is handed
-  /// over in the same call and nothing has to wait for it.
-  FutureOr<PostHogEvent?> _runBeforeSend(
+  PostHogEvent? _runBeforeSend(
     String eventName,
     Map<String, Object>? properties, {
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) {
-    final event = PostHogEvent(
-      event: eventName,
-      properties: properties,
-      userProperties: userProperties,
-      userPropertiesSetOnce: userPropertiesSetOnce,
+    final distinctId =
+        _beforeSendCallbacks.isEmpty ? null : currentWebDistinctId();
+    final wasIdentified = distinctId != null && currentWebUserIdentified();
+    final processed = applyBeforeSend(
+      _beforeSendCallbacks,
+      PostHogEvent(
+        event: eventName,
+        properties: properties,
+        userProperties: userProperties,
+        userPropertiesSetOnce: userPropertiesSetOnce,
+        options: options == null ? null : {...options},
+      ),
     );
-    return _beforeSendCallbacks.isEmpty
-        ? event
-        : applyBeforeSend(_beforeSendCallbacks, event);
+    if (processed == null ||
+        distinctId == null ||
+        distinctId == currentWebDistinctId()) {
+      return processed;
+    }
+    // posthog-js stores an event's `$set` as the current user's person
+    // properties for flags, so after a reset() they would reach the next user.
+    // identify() of an anonymous user links the two, so they stay.
+    if (wasIdentified || !currentWebUserIdentified()) {
+      processed
+        ..userProperties = null
+        ..userPropertiesSetOnce = null
+        ..properties = {...?processed.properties}
+        ..properties!.remove(r'$set')
+        ..properties!.remove(r'$set_once');
+    }
+    // posthog-js builds the event only after the callbacks, so one calling
+    // reset() or identify() would otherwise move the event to the new user.
+    // Event properties win over the stored distinct id. A callback changing
+    // consent under cookieless_mode swaps the id on purpose: neither the user
+    // who opted out nor the shared cookieless id may come back.
+    if (distinctId != r'$posthog_cookieless' &&
+        !(posthog?.has_opted_out_capturing() ?? true)) {
+      processed.properties = {
+        'distinct_id': distinctId,
+        ...?processed.properties,
+      };
+    }
+    return processed;
   }
 
-  Future<dynamic> _call(MethodCall call) =>
-      _order.run(() => handleWebMethodCall(call));
+  /// posthog-js sends these calls' events without event properties, so
+  /// options can't be attached.
+  static void _logUnsupportedOptions(
+    String method,
+    Map<String, Object?>? options,
+  ) {
+    if (cleanEventOptions(options) == null) return;
+    printIfDebug(
+      '[PostHog] $method options are not supported on web and '
+      'were dropped.',
+    );
+  }
 
   static void registerWith(Registrar registrar) {
     final channel = MethodChannel(
@@ -89,7 +137,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       // For now, let's assume direct call to overridden setup handles it.
       return null;
     }
-    return _call(call);
+    return handleWebMethodCall(call);
   }
 
   @override
@@ -139,17 +187,34 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
     WebCanvasMaskProvider(config).register();
 
-    if (config.onFeatureFlags != null && ph != null) {
-      final dartCallback = config.onFeatureFlags!;
+    // Skipped for a posthog-js stub without onFeatureFlags.
+    if (ph != null && (ph as JSObject).has('onFeatureFlags')) {
+      // Repeated setup would otherwise deliver each load twice.
+      _featureFlagsUnsubscribe?.callAsFunction();
+      _featureFlagsUnsubscribe = null;
+      final generation = ++_featureFlagsGeneration;
 
       // JS SDK calls with: (flags: string[], variants: Record, context?: {errorsLoading})
-      // We ignore the JS parameters and just invoke the void callback
       final jsCallback =
           (JSArray jsFlags, JSObject jsFlagVariants, [JSObject? jsContext]) {
-        dartCallback();
+        // The posthog-js loader snippet queues the registration and returns
+        // no unsubscribe, so a later setup() or close() can't remove it.
+        if (generation != _featureFlagsGeneration) return;
+        final loaded = featureFlagsLoadedFromMap({
+          'variants': jsFlagVariants.dartify(),
+          'errorsLoading': (jsContext?.dartify() as Map?)?['errorsLoading'],
+        });
+        FeatureFlagsListeners.instance.deliver(loaded);
       }.toJS;
 
-      ph.onFeatureFlags(jsCallback);
+      // posthog-js replays loaded flags synchronously, and a callback may call
+      // close() or setup() before this returns the unsubscribe.
+      final unsubscribe = ph.onFeatureFlags(jsCallback);
+      if (generation == _featureFlagsGeneration) {
+        _featureFlagsUnsubscribe = unsubscribe;
+      } else {
+        unsubscribe?.callAsFunction();
+      }
     }
   }
 
@@ -158,8 +223,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String userId,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
   }) async {
-    return _call(
+    _logUnsupportedOptions('identify', options);
+    return handleWebMethodCall(
       MethodCall('identify', {
         'userId': userId,
         if (userProperties != null) 'userProperties': userProperties,
@@ -173,13 +240,15 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> setPersonProperties({
     Map<String, Object>? userPropertiesToSet,
     Map<String, Object>? userPropertiesToSetOnce,
+    Map<String, Object?>? options,
   }) async {
+    _logUnsupportedOptions('setPersonProperties', options);
     if ((userPropertiesToSet?.isEmpty ?? true) &&
         (userPropertiesToSetOnce?.isEmpty ?? true)) {
       return;
     }
 
-    return _call(
+    return handleWebMethodCall(
       MethodCall('setPersonProperties', {
         if (userPropertiesToSet != null)
           'userPropertiesToSet': userPropertiesToSet,
@@ -201,33 +270,35 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
     Map<String, Object>? userPropertiesSetOnce,
-  }) =>
-      _order.event(
-        () => _runBeforeSend(
-          eventName,
-          _withWebContext(properties),
-          userProperties: userProperties,
-          userPropertiesSetOnce: userPropertiesSetOnce,
-        ),
-        (processedEvent) => _sendCapture(eventName, processedEvent),
-      );
-
-  Future<void> _sendCapture(
-    String eventName,
-    PostHogEvent? processedEvent,
-  ) async {
+    Map<String, Object?>? options,
+  }) async {
+    final processedEvent = _runBeforeSend(
+      eventName,
+      _withWebContext(properties),
+      userProperties: userProperties,
+      userPropertiesSetOnce: userPropertiesSetOnce,
+      options: options,
+    );
     if (processedEvent == null) {
       printIfDebug('[PostHog] Event dropped by beforeSend: $eventName');
       return;
     }
 
+    return _sendCapture(processedEvent);
+  }
+
+  Future<void> _sendCapture(PostHogEvent processedEvent) {
     final extracted = CaptureUtils.extractUserProperties(
       properties: processedEvent.properties,
       userProperties: processedEvent.userProperties,
       userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
     );
 
-    final extractedProperties = extracted.properties;
+    final extractedProperties = _withOptionProperties(
+      extracted.properties,
+      processedEvent.options,
+      processedEvent.event,
+    );
     final extractedUserProperties = extracted.userProperties;
     final extractedUserPropertiesSetOnce = extracted.userPropertiesSetOnce;
 
@@ -242,7 +313,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
             ? PropertyNormalizer.normalize(extractedUserPropertiesSetOnce)
             : null;
 
-    return _call(
+    return handleWebMethodCall(
       MethodCall('capture', {
         'eventName': processedEvent.event,
         'automaticPropertiesApplied': true,
@@ -253,6 +324,37 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
           'userPropertiesSetOnce': normalizedUserPropertiesSetOnce,
       }),
     );
+  }
+
+  /// posthog-js has no AI capture, so AI events are not sent on web.
+  @override
+  Future<String?> captureAi({
+    required String eventName,
+    Map<String, Object>? properties,
+    Map<String, Object>? userProperties,
+    Map<String, Object>? userPropertiesSetOnce,
+    Map<String, Object?>? options,
+  }) async {
+    printIfDebug(
+      '[PostHog] captureAi is not supported on web. '
+      'The event "$eventName" was not sent.',
+    );
+    return null;
+  }
+
+  /// posthog-js has no options for these keys, so they are sent as their
+  /// legacy properties, winning over a legacy property set on the event.
+  static Map<String, Object>? _withOptionProperties(
+    Map<String, Object>? properties,
+    Map<String, Object?>? options,
+    String eventName,
+  ) {
+    final optionProperties = eventOptionsToLegacyProperties(
+      options,
+      method: eventName,
+    );
+    if (optionProperties.isEmpty) return properties;
+    return {...?properties, ...optionProperties};
   }
 
   @override
@@ -267,7 +369,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final normalizedAttributes =
         attributes != null ? PropertyNormalizer.normalize(attributes) : null;
 
-    return _call(
+    return handleWebMethodCall(
       MethodCall('captureLog', {
         'body': body,
         'level': level.name,
@@ -284,6 +386,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   Future<void> screen({
     required String screenName,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     // The screen name argument wins over a properties `$screen_name`.
     // beforeSend still runs after this and can change the name.
@@ -292,26 +395,18 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
       PostHogPropertyName.screenName: screenName,
     });
 
-    return _order.event(
-      () => _runBeforeSend(PostHogEventName.screen, propsWithScreenName),
-      (processedEvent) => _sendScreen(screenName, processedEvent),
+    final processedEvent = _runBeforeSend(
+      PostHogEventName.screen,
+      propsWithScreenName,
+      options: options,
     );
-  }
-
-  Future<void> _sendScreen(
-    String screenName,
-    PostHogEvent? processedEvent,
-  ) async {
     if (processedEvent == null) {
       printIfDebug('[PostHog] Screen event dropped by beforeSend: $screenName');
       return;
     }
 
     if (processedEvent.event != PostHogEventName.screen) {
-      await capture(
-        eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
-      );
+      await _sendCapture(processedEvent);
       return;
     }
 
@@ -320,25 +415,45 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
             screenName;
     _currentScreen = finalScreenName;
     processedEvent.properties?.remove(PostHogPropertyName.screenName);
-    final remaining = processedEvent.properties;
+    final extracted = CaptureUtils.extractUserProperties(
+      properties: processedEvent.properties,
+      userProperties: processedEvent.userProperties,
+      userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
+    );
+    final remaining = _withOptionProperties(
+      extracted.properties,
+      processedEvent.options,
+      PostHogEventName.screen,
+    );
+    final userProperties = extracted.userProperties;
+    final userPropertiesSetOnce = extracted.userPropertiesSetOnce;
 
-    return _call(
+    return handleWebMethodCall(
       MethodCall('screen', {
         'screenName': finalScreenName,
         'automaticPropertiesApplied': true,
         if (remaining != null && remaining.isNotEmpty) 'properties': remaining,
+        if (userProperties != null)
+          'userProperties': PropertyNormalizer.normalize(userProperties),
+        if (userPropertiesSetOnce != null)
+          'userPropertiesSetOnce':
+              PropertyNormalizer.normalize(userPropertiesSetOnce),
       }),
     );
   }
 
   @override
-  Future<void> alias({required String alias}) async {
-    return _call(MethodCall('alias', {'alias': alias}));
+  Future<void> alias({
+    required String alias,
+    Map<String, Object?>? options,
+  }) async {
+    _logUnsupportedOptions('alias', options);
+    return handleWebMethodCall(MethodCall('alias', {'alias': alias}));
   }
 
   @override
   Future<String> getDistinctId() async {
-    final result = await _call(const MethodCall('distinctId'));
+    final result = await handleWebMethodCall(const MethodCall('distinctId'));
     return result as String? ?? '';
   }
 
@@ -356,95 +471,119 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
   }) =>
       _captureFeatureEvent(r'$feature_interaction', flag, flagVariant);
 
+  // Looks up the flag and starts the capture without an await in between, so
+  // a reset() right after the call cannot move the event to the next user.
   Future<void> _captureFeatureEvent(
     String event,
     String flag,
     String? flagVariant,
-  ) =>
-      // The flag lookup belongs to the send step so it reads the flags of the
-      // user at hand-over time; an async hook keeps later calls waiting for it.
-      _order.event<void>(
-        () => Future<void>.value(),
-        (_) async {
-          final result = flagVariant == null
-              ? await getFeatureFlagResult(key: flag, sendEvent: false)
-              : null;
-          final captured = featureEvent(
-              event, flag, flagVariant ?? result?.variant ?? result?.enabled);
-          if (captured == null) return;
-          final screenName = _currentScreen;
-          await capture(
-            eventName: event,
-            properties: {
-              ...captured.properties,
-              if (screenName != null)
-                PostHogPropertyName.screenName: screenName,
-            },
-            userProperties: captured.userProperties,
-          );
-        },
-      );
+  ) async {
+    final screenName = _currentScreen;
+    final result = flagVariant == null
+        ? featureFlagResultFromMap(
+            readFeatureFlagResult(flag, sendEvent: false),
+            flag,
+          )
+        : null;
+    final captured = featureEvent(
+      event,
+      flag,
+      flagVariant ?? result?.variant ?? result?.enabled,
+    );
+    if (captured == null) return;
+    await capture(
+      eventName: event,
+      properties: {
+        ...captured.properties,
+        if (screenName != null) PostHogPropertyName.screenName: screenName,
+      },
+      userProperties: captured.userProperties,
+    );
+  }
 
   @override
   Future<void> reset() async {
-    return _call(const MethodCall('reset'));
+    return handleWebMethodCall(const MethodCall('reset'));
   }
 
   @override
-  Future<void> disable() async {
-    return _call(const MethodCall('disable'));
+  Future<void> optOut() async {
+    return handleWebMethodCall(const MethodCall('disable'));
   }
 
   @override
-  Future<void> enable() async {
-    return _call(const MethodCall('enable'));
+  Future<void> optIn() async {
+    return handleWebMethodCall(const MethodCall('enable'));
   }
 
   @override
   Future<bool> isOptOut() async {
-    final result = await _call(const MethodCall('isOptOut'));
+    final result = await handleWebMethodCall(const MethodCall('isOptOut'));
     return result as bool? ?? true;
   }
 
   @override
   Future<void> debug(bool enabled) async {
-    return _call(MethodCall('debug', {'debug': enabled}));
+    return handleWebMethodCall(MethodCall('debug', {'debug': enabled}));
   }
 
   @override
   Future<void> register(String key, Object value) async {
-    return _call(
+    return handleWebMethodCall(
       MethodCall('register', {'key': key, 'value': value}),
     );
   }
 
   @override
   Future<void> unregister(String key) async {
-    return _call(MethodCall('unregister', {'key': key}));
+    return handleWebMethodCall(MethodCall('unregister', {'key': key}));
+  }
+
+  // posthog-js has no options, so they are registered as their legacy
+  // properties, which it sends under each event's own properties.
+  @override
+  Future<void> registerOptions(Map<String, Object?> options) async {
+    final properties =
+        eventOptionsToLegacyProperties(options, method: 'registerOptions');
+    for (final MapEntry(:key, :value) in properties.entries) {
+      await register(key, value);
+    }
   }
 
   @override
-  Future<bool> isFeatureEnabled(String key,
-      {bool? sendFeatureFlagEvent}) async {
-    final result = await _call(
+  Future<void> unregisterOptions(String key) async {
+    final legacyKey = legacyPropertyForOption(key);
+    if (legacyKey != null) await unregister(legacyKey);
+  }
+
+  @override
+  Future<bool> isFeatureEnabled(
+    String key, {
+    bool? sendFeatureFlagEvent,
+    bool? defaultValue,
+  }) async {
+    final result = await handleWebMethodCall(
       MethodCall('isFeatureEnabled', {
         'key': key,
         if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+        if (defaultValue != null) 'defaultValue': defaultValue,
       }),
     );
     return result as bool? ?? false;
   }
 
   @override
-  Future<void> reloadFeatureFlags() async {
-    return _call(const MethodCall('reloadFeatureFlags'));
+  Future<PostHogFeatureFlagsLoaded> reloadFeatureFlags() async {
+    return featureFlagsLoadedFromMap(
+      await handleWebMethodCall(const MethodCall('reloadFeatureFlags')),
+    );
   }
 
   @override
   Future<void> setPersonPropertiesForFlags(
     Map<String, Object> userProperties,
   ) async {
-    return _call(
+    return handleWebMethodCall(
       MethodCall('setPersonPropertiesForFlags', {
         'userProperties': userProperties,
       }),
@@ -453,7 +592,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> resetPersonPropertiesForFlags() async {
-    return _call(
+    return handleWebMethodCall(
       const MethodCall('resetPersonPropertiesForFlags'),
     );
   }
@@ -463,7 +602,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     String groupType,
     Map<String, Object> groupProperties,
   ) async {
-    return _call(
+    return handleWebMethodCall(
       MethodCall('setGroupPropertiesForFlags', {
         'groupType': groupType,
         'groupProperties': groupProperties,
@@ -473,7 +612,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
 
   @override
   Future<void> resetGroupPropertiesForFlags({String? groupType}) async {
-    return _call(
+    return handleWebMethodCall(
       MethodCall('resetGroupPropertiesForFlags', {
         if (groupType != null) 'groupType': groupType,
       }),
@@ -485,8 +624,10 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String groupType,
     required String groupKey,
     Map<String, Object>? groupProperties,
+    Map<String, Object?>? options,
   }) async {
-    return _call(
+    _logUnsupportedOptions('group', options);
+    return handleWebMethodCall(
       MethodCall('group', {
         'groupType': groupType,
         'groupKey': groupKey,
@@ -500,56 +641,59 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required String key,
     bool? sendFeatureFlagEvent,
   }) async {
-    return _call(MethodCall('getFeatureFlag', {
-      'key': key,
-      if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
-    }));
-  }
-
-  @override
-  Future<Object?> getFeatureFlagPayload({required String key}) async {
-    return _call(
-      MethodCall('getFeatureFlagPayload', {'key': key}),
+    return handleWebMethodCall(
+      MethodCall('getFeatureFlag', {
+        'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      }),
     );
   }
 
   @override
   Future<PostHogFeatureFlagResult?> getFeatureFlagResult({
     required String key,
-    bool sendEvent = true,
+    bool? sendFeatureFlagEvent,
   }) async {
-    final result = await _call(
-      MethodCall('getFeatureFlagResult', {'key': key, 'sendEvent': sendEvent}),
+    final result = await handleWebMethodCall(
+      MethodCall('getFeatureFlagResult', {
+        'key': key,
+        if (sendFeatureFlagEvent != null) 'sendEvent': sendFeatureFlagEvent,
+      }),
     );
 
     // Web SDK returns: { key, enabled, variant, payload }
-    return PostHogFeatureFlagResult.fromMap(result, key);
+    return featureFlagResultFromMap(result, key);
   }
 
   @override
   Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() async {
-    final results = await _call(const MethodCall('getAllFeatureFlags'));
+    final results = await handleWebMethodCall(
+      const MethodCall('getAllFeatureFlags'),
+    );
     if (results is! List) return null;
     return results
-        .map((result) => PostHogFeatureFlagResult.fromMap(result, ''))
+        .map((result) => featureFlagResultFromMap(result, ''))
         .nonNulls
         .toList();
   }
 
   @override
   Future<void> flush() async {
-    return _call(const MethodCall('flush'));
+    return handleWebMethodCall(const MethodCall('flush'));
   }
 
   @override
   Future<void> close() async {
     _currentScreen = null;
-    return _call(const MethodCall('close'));
+    _featureFlagsUnsubscribe?.callAsFunction();
+    _featureFlagsUnsubscribe = null;
+    _featureFlagsGeneration++;
+    return handleWebMethodCall(const MethodCall('close'));
   }
 
   @override
   Future<String?> getSessionId() async {
-    final result = await _call(const MethodCall('getSessionId'));
+    final result = await handleWebMethodCall(const MethodCall('getSessionId'));
     return result as String?;
   }
 
@@ -592,6 +736,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     try {
       final exceptionData = DartExceptionProcessor.processException(
@@ -603,68 +748,68 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         inAppByDefault: _config?.errorTrackingConfig.inAppByDefault ?? true,
       );
 
-      final exceptionProperties = _withWebContext(
-        Map<String, Object>.from(exceptionData),
+      final processedEvent = _runBeforeSend(
+        PostHogEventName.exception,
+        _withWebContext(Map<String, Object>.from(exceptionData)),
+        options: options,
       );
+      if (processedEvent == null) {
+        printIfDebug(
+          '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
+        );
+        return;
+      }
 
-      return await _order.event(
-        () => _runBeforeSend(
+      if (processedEvent.event != PostHogEventName.exception) {
+        await _sendCapture(processedEvent);
+        return;
+      }
+
+      final extracted = CaptureUtils.extractUserProperties(
+        properties: processedEvent.properties?.cast<String, Object>(),
+        userProperties: processedEvent.userProperties,
+        userPropertiesSetOnce: processedEvent.userPropertiesSetOnce,
+      );
+      final userProperties = extracted.userProperties;
+      final userPropertiesSetOnce = extracted.userPropertiesSetOnce;
+      // posthog-js's captureException takes no capture options, but capture
+      // merges `$set` and `$set_once` from the event's properties.
+      final normalizedData = PropertyNormalizer.normalize({
+        ...?_withOptionProperties(
+          extracted.properties,
+          processedEvent.options,
           PostHogEventName.exception,
-          exceptionProperties,
         ),
-        (processedEvent) => _sendException(error, processedEvent),
+        if (userProperties != null) r'$set': userProperties,
+        if (userPropertiesSetOnce != null) r'$set_once': userPropertiesSetOnce,
+      });
+
+      return await handleWebMethodCall(
+        MethodCall('captureException', {
+          'automaticPropertiesApplied': true,
+          'properties': normalizedData,
+        }),
       );
     } catch (error) {
       printIfDebug('Exception in captureException: $error');
     }
   }
 
-  Future<void> _sendException(
-    Object error,
-    PostHogEvent? processedEvent,
-  ) async {
-    if (processedEvent == null) {
-      printIfDebug(
-        '[PostHog] Exception event dropped by beforeSend: ${error.runtimeType}',
-      );
-      return;
-    }
-
-    if (processedEvent.event != PostHogEventName.exception) {
-      await capture(
-        eventName: processedEvent.event,
-        properties: processedEvent.properties?.cast<String, Object>(),
-      );
-      return;
-    }
-
-    final normalizedData = PropertyNormalizer.normalize(
-      processedEvent.properties?.cast<String, Object>() ?? <String, Object>{},
-    );
-
-    return _call(
-      MethodCall('captureException', {
-        'automaticPropertiesApplied': true,
-        'properties': normalizedData,
-      }),
-    );
-  }
-
   @override
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
-    return _call(
+    return handleWebMethodCall(
       MethodCall('startSessionRecording', {'resumeCurrent': resumeCurrent}),
     );
   }
 
   @override
   Future<void> stopSessionRecording() async {
-    return _call(const MethodCall('stopSessionRecording'));
+    return handleWebMethodCall(const MethodCall('stopSessionRecording'));
   }
 
   @override
   Future<bool> isSessionReplayActive() async {
-    final result = await _call(
+    final result = await handleWebMethodCall(
       const MethodCall('isSessionReplayActive'),
     );
     return result as bool? ?? false;
@@ -678,7 +823,7 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
     final normalizedProperties =
         properties != null ? PropertyNormalizer.normalize(properties) : null;
 
-    return _call(
+    return handleWebMethodCall(
       MethodCall('addExceptionStep', {
         'message': message,
         if (normalizedProperties != null) 'properties': normalizedProperties,
