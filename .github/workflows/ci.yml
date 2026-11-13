@@ -389,6 +389,18 @@ jobs:
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: flutter pub get
 
+      - name: Publish unreleased posthog-android 4.0 to mavenLocal
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        run: |
+          git clone --depth 1 -b chore/v4-remove-deprecated https://github.com/PostHog/posthog-android.git "$RUNNER_TEMP/posthog-android"
+          cd "$RUNNER_TEMP/posthog-android"
+          sed -i 's/^coreVersion=.*/coreVersion=7.0.0/; s/^androidVersion=.*/androidVersion=4.0.0/' gradle.properties
+          # posthog-android requires signing when CI=true, and there is no key here.
+          CI=false ./gradlew :posthog:publishToMavenLocal :posthog-android:publishToMavenLocal
+          cd "$GITHUB_WORKSPACE"
+          python3 -c "p='example/android/build.gradle.kts'; s=open(p).read(); open(p,'w').write(s.replace('repositories {\n        google()', 'repositories {\n        mavenLocal()\n        google()', 1))"
+          grep -n mavenLocal example/android/build.gradle.kts
+
       - name: Build Android
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         working-directory: ./example
