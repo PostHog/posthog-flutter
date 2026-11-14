@@ -21,6 +21,7 @@ import 'uuid.dart';
 abstract class PostHogCore extends PostHogCoreStateless {
   final bool _sendFeatureFlagEvent;
   final PostHogPersonProfiles _personProfiles;
+  final bool _disableGeoIp;
   final List<String>? _evaluationContexts;
 
   /// The `$feature_flag_called` values already reported, per flag key.
@@ -58,6 +59,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   PostHogCore(PostHogConfig config, {required super.storage})
       : _sendFeatureFlagEvent = config.sendFeatureFlagEvent,
         _personProfiles = config.personProfiles,
+        _disableGeoIp = config.disableGeoIp,
         _evaluationContexts = config.evaluationContexts == null
             ? null
             : List.unmodifiable(config.evaluationContexts!),
@@ -162,6 +164,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
       r'$session_id': sessionId,
       r'$process_person_profile': _hasPersonProcessing(),
       r'$is_identified': _isIdentified(),
+      if (_disableGeoIp) r'$geoip_disable': true,
       ..._sessionDebugProperties(now),
     };
   }
@@ -581,6 +584,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
         r'$anon_distinct_id': _getAnonymousId(),
         r'$device_id': _getDeviceId(),
         if (timezone != null) 'timezone': timezone,
+        'geoip_disable': _disableGeoIp,
         if (_evaluationContexts?.isNotEmpty ?? false)
           'evaluation_contexts': _evaluationContexts,
       };

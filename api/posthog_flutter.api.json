@@ -2570,6 +2570,17 @@
                         "isReadable": true,
                         "isStatic": false,
                         "isWriteable": true,
+                        "name": "disableGeoIp",
+                        "relativePath": "lib/src/posthog_config.dart",
+                        "typeName": "bool"
+                    },
+                    {
+                        "entryPoints": [],
+                        "isDeprecated": false,
+                        "isExperimental": false,
+                        "isReadable": true,
+                        "isStatic": false,
+                        "isWriteable": true,
                         "name": "compression",
                         "relativePath": "lib/src/posthog_config.dart",
                         "typeName": "PostHogCompression"

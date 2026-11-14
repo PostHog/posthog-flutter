@@ -44,6 +44,29 @@ void main() {
       expect(queuedProps(storage, 0)[r'$is_identified'], isFalse);
     });
 
+    test(r'disableGeoIp marks every event with $geoip_disable', () {
+      final storage = tempStorage();
+      final client = testClient(server,
+          config: testConfig()..disableGeoIp = true, storage: storage);
+
+      client.capture('test_event');
+
+      expect(queuedProps(storage, 0)[r'$geoip_disable'], isTrue);
+    });
+
+    test(r'omits $geoip_disable by default', () {
+      client.capture('test_event');
+
+      expect(queuedProps(storage, 0).containsKey(r'$geoip_disable'), isFalse);
+    });
+
+    test(r'keeps a caller-supplied $geoip_disable when disableGeoIp is off',
+        () {
+      client.capture('test_event', properties: {r'$geoip_disable': true});
+
+      expect(queuedProps(storage, 0)[r'$geoip_disable'], isTrue);
+    });
+
     for (final key in [r'$set', r'$set_once']) {
       test('person properties in $key make an anonymous user person-processed',
           () {

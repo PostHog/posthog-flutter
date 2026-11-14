@@ -334,26 +334,64 @@ internal class PosthogFlutterPluginTest {
         assertEquals(PostHogCompression.NONE, assertNotNull(plugin.lastBuiltConfig).compression)
     }
 
-    @Test
-    fun setup_flutterVersion_addedOnlyToInstallAndUpdateEvents() {
+    /** Runs setup with [setupArgs] and returns a lookup from event name to its properties after the native beforeSend hooks. */
+    private fun nativeBeforeSendAfterSetup(setupArgs: Map<String, Any>): (eventName: String) -> Map<String, Any>? {
         val plugin = PosthogFlutterPlugin()
         attach(plugin, Mockito.mock(BinaryMessenger::class.java))
-        plugin.onMethodCall(
-            MethodCall("setup", mapOf("projectToken" to "test-token", "flutterVersion" to "3.35.0")),
-            Mockito.mock(MethodChannel.Result::class.java),
-        )
+        plugin.onMethodCall(MethodCall("setup", setupArgs), Mockito.mock(MethodChannel.Result::class.java))
         val beforeSend = assertNotNull(plugin.lastBuiltConfig).beforeSendList
-
-        fun propertiesOf(name: String): Map<String, Any>? =
+        return { eventName ->
             beforeSend
-                .fold(PostHogEvent(name, "id", properties = mutableMapOf())) { event, hook ->
+                .fold(PostHogEvent(eventName, "id", properties = mutableMapOf())) { event, hook ->
                     assertNotNull(hook.run(event))
                 }.properties
+        }
+    }
+
+    @Test
+    fun setup_flutterVersion_addedOnlyToInstallAndUpdateEvents() {
+        val propertiesOf = nativeBeforeSendAfterSetup(mapOf("projectToken" to "test-token", "flutterVersion" to "3.35.0"))
 
         assertEquals("3.35.0", propertiesOf("Application Installed")?.get("\$flutter_version"))
         assertEquals("3.35.0", propertiesOf("Application Updated")?.get("\$flutter_version"))
         assertNull(propertiesOf("Application Opened")?.get("\$flutter_version"))
         assertNull(propertiesOf("custom")?.get("\$flutter_version"))
+    }
+
+    @Test
+    fun setup_disableGeoIp_forwardsTrueToNativeConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoIp" to true)),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+
+        assertTrue(assertNotNull(plugin.lastBuiltConfig).disableGeoIp)
+    }
+
+    @Test
+    fun setup_disableGeoIp_forwardsFalseToNativeConfig() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token", "disableGeoIp" to false)),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+
+        assertFalse(assertNotNull(plugin.lastBuiltConfig).disableGeoIp)
+    }
+
+    @Test
+    fun setup_disableGeoIp_defaultsToFalse() {
+        val plugin = PosthogFlutterPlugin()
+        attach(plugin, Mockito.mock(BinaryMessenger::class.java))
+        plugin.onMethodCall(
+            MethodCall("setup", mapOf("projectToken" to "test-token")),
+            Mockito.mock(MethodChannel.Result::class.java),
+        )
+
+        assertFalse(assertNotNull(plugin.lastBuiltConfig).disableGeoIp)
     }
 
     @Test

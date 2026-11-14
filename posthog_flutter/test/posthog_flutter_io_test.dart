@@ -226,6 +226,14 @@ isolate_dso_base: 7000000000
       expect(args['apiKey'], equals('test_project_token'));
     });
 
+    test('setup sends disableGeoIp to native', () async {
+      await posthogFlutterIO
+          .setup(PostHogConfig('test_project_token')..disableGeoIp = true);
+
+      final call = log.firstWhere((c) => c.method == 'setup');
+      expect((call.arguments as Map)['disableGeoIp'], isTrue);
+    });
+
     test(
       'setup sends the Flutter version for native lifecycle events',
       skip: const String.fromEnvironment('FLUTTER_VERSION').isEmpty

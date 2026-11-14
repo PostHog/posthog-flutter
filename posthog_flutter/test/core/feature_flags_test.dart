@@ -48,6 +48,18 @@ void main() {
       });
     }
 
+    for (final disableGeoIp in [false, true]) {
+      test('disableGeoIp $disableGeoIp sends geoip_disable $disableGeoIp',
+          () async {
+        final client = testClient(server,
+            config: testConfig()..disableGeoIp = disableGeoIp);
+
+        await client.reloadFeatureFlagsAsync();
+
+        expect(_flagsRequestBody(server)['geoip_disable'], disableGeoIp);
+      });
+    }
+
     test('group properties keep their JSON types in the /flags request',
         () async {
       final client = testClient(server);

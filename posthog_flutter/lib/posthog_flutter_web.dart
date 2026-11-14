@@ -136,6 +136,12 @@ class PosthogFlutterWeb extends PosthogFlutterPlatformInterface {
         'Configure bootstrap in your posthog.init({...}) call instead.',
       );
     }
+    if (config.disableGeoIp) {
+      printIfDebug(
+        'Warning: PostHogConfig.disableGeoIp is not applied on Flutter web. '
+        r'Set $geoip_disable: true on events in your posthog.init({...}) before_send instead.',
+      );
+    }
 
     WebCanvasMaskProvider(config).register();
 

@@ -870,6 +870,10 @@ class PosthogFlutterPlugin :
                     }
                 }
 
+                posthogConfig.getIfNotNull<Boolean>("disableGeoIp") {
+                    disableGeoIp = it
+                }
+
                 onFeatureFlags =
                     PostHogOnFeatureFlags {
                         Log.i("PostHogFlutter", "Android onFeatureFlags triggered. Notifying Dart.")
