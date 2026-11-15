@@ -1,3 +1,3 @@
 // This file is auto-updated by scripts/bump-version.sh
-const postHogFlutterVersion = '5.60.3';
+const postHogFlutterVersion = '5.61.0';
 const postHogFlutterSdkName = 'posthog-flutter';
