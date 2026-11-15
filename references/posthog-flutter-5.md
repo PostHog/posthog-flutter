@@ -1934,6 +1934,24 @@ Whether the SDK emits verbose debug logs.
 
 Defaults to `false`.
 
+#### `PostHogConfig.disableGeoIp`
+
+```dart
+bool disableGeoIp
+```
+
+Whether PostHog skips GeoIP enrichment, so the server doesn't infer the
+user's location from their IP address.
+
+When `true`, events carry `$geoip_disable: true` and feature flag
+requests send `geoip_disable: true`. The SDK adds the property after
+beforeSend runs, so a callback can't see or remove it.
+
+Defaults to `false`.
+
+**Flutter web:** not applied. posthog-js is initialized by your app, so
+set `$geoip_disable: true` on events in its `before_send` instead.
+
 #### `PostHogConfig.enableWindowsAndLinux`
 
 ```dart
