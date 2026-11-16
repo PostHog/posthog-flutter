@@ -170,6 +170,45 @@ class PostHogConfig {
   /// in your `posthog.init({...})` call instead.
   var preloadFeatureFlags = true;
 
+  /// Evaluation contexts sent with every `/flags` request, so only flags
+  /// tagged with at least one of these contexts are evaluated.
+  ///
+  /// Defaults to `null`, which sends no contexts and evaluates every flag.
+  /// Flags without evaluation contexts are always evaluated. Use this to keep
+  /// flags meant for other apps or environments out of this app's requests.
+  ///
+  /// **Flutter web:** not applied. posthog-js is initialized by your app, so
+  /// set `evaluation_contexts` in your `posthog.init({...})` call instead.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('<YOUR_PROJECT_TOKEN>')
+  ///   ..evaluationContexts = ['mobile-app', 'production'];
+  /// await Posthog().setup(config);
+  /// ```
+  List<String>? evaluationContexts;
+
+  /// Maximum number of retries for a `/flags` request after a network error
+  /// or a gateway error (HTTP 502 or 504).
+  ///
+  /// The SDK waits 300ms before the first retry and doubles the wait for each
+  /// later one. A refused connection is not retried.
+  ///
+  /// Defaults to `1`. Set to `0` to disable retries; negative values are
+  /// treated as `0`.
+  ///
+  /// **Flutter web:** not applied. posthog-js is initialized by your app, so
+  /// set `feature_flag_request_max_retries` in your `posthog.init({...})` call
+  /// instead.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final config = PostHogConfig('<YOUR_PROJECT_TOKEN>')
+  ///   ..featureFlagRequestMaxRetries = 3;
+  /// await Posthog().setup(config);
+  /// ```
+  var featureFlagRequestMaxRetries = 1;
+
   /// Whether the SDK captures application lifecycle events automatically.
   ///
   /// Captured events include app opened, backgrounded, installed, and updated
@@ -197,6 +236,19 @@ class PostHogConfig {
   /// Defaults to [PostHogPersonProfiles.identifiedOnly].
   var personProfiles = PostHogPersonProfiles.identifiedOnly;
 
+  /// Whether PostHog skips GeoIP enrichment, so the server doesn't infer the
+  /// user's location from their IP address.
+  ///
+  /// When `true`, events carry `$geoip_disable: true` and feature flag
+  /// requests send `geoip_disable: true`. The SDK adds the property after
+  /// [beforeSend] runs, so a callback can't see or remove it.
+  ///
+  /// Defaults to `false`.
+  ///
+  /// **Flutter web:** not applied. posthog-js is initialized by your app, so
+  /// set `$geoip_disable: true` on events in its `before_send` instead.
+  var disableGeoIp = false;
+
   /// Controls how request bodies are compressed before being sent to PostHog.
   ///
   /// Set this to [PostHogCompression.none] when something between the app and
@@ -208,6 +260,15 @@ class PostHogConfig {
   ///
   /// Defaults to [PostHogCompression.gzip].
   var compression = PostHogCompression.gzip;
+
+  /// Whether the SDK is enabled on Windows and Linux.
+  ///
+  /// Windows and Linux support is experimental. Defaults to `true`.
+  /// Set to `false` before [Posthog.setup] to disable the SDK on these
+  /// platforms. Other platforms are unaffected. Close the SDK before
+  /// changing this setting and calling setup again.
+  @experimental
+  bool enableWindowsAndLinux = true;
 
   /// Whether mobile session replay is enabled for Android and iOS.
   ///
@@ -235,6 +296,8 @@ class PostHogConfig {
   /// - For Flutter web, this setting will be ignored. Surveys on web use the
   ///   JavaScript Web SDK instead.
   ///   - See: https://posthog.com/docs/surveys/installation?tab=Web
+  /// - Surveys are not supported on Windows and Linux, where this setting is
+  ///   ignored.
   ///
   /// Defaults to true.
   var surveys = true;
@@ -254,9 +317,10 @@ class PostHogConfig {
   /// return caller-provided values before the first `/flags` response. Mirrors
   /// the [`bootstrap` option in `posthog-js`](https://posthog.com/docs/feature-flags/bootstrapping).
   ///
-  /// Forwarded to the native iOS/Android SDKs, which apply all precedence rules
-  /// (never overwrite persisted identity, overlay loaded flags over bootstrapped
-  /// ones, drop the bootstrap on `reset()`). Defaults to `null` (no bootstrap).
+  /// Forwarded to the native iOS/Android SDKs, and on Windows/Linux to the
+  /// pure-Dart implementation, which apply all precedence rules (never
+  /// overwrite persisted identity, overlay loaded flags over bootstrapped ones,
+  /// drop the bootstrap on `reset()`). Defaults to `null` (no bootstrap).
   ///
   /// **Flutter web:** not applied. The web SDK hooks onto an already-initialized
   /// posthog-js instance, so configure `bootstrap` in your `posthog.init({...})`
@@ -269,18 +333,21 @@ class PostHogConfig {
   /// callback to access the loaded flag values.
   OnFeatureFlagsCallback? onFeatureFlags;
 
-  /// Whether to automatically register this device's push token with PostHog.
+  /// Whether to automatically register this device's push token or Firebase
+  /// Installation ID (FID) with PostHog.
   ///
   /// On iOS the native SDK swizzles the app delegate's remote-notification
   /// registration callback; on Android it fetches the FCM token at startup when
-  /// `firebase-messaging` is on the classpath. Either way the host app is still
+  /// `firebase-messaging` is on the classpath, or the FID when the app's manifest
+  /// enables `firebase_messaging_installation_id_enabled`. The host app must
+  /// still register with Firebase in FID mode. Either way the host app is still
   /// responsible for requesting notification permission and calling
   /// `registerForRemoteNotifications()` (iOS) — this only observes the result.
   ///
   /// The startup fetch does not see later token refreshes; wire those to
   /// [Posthog.registerPushNotificationToken] yourself.
   ///
-  /// **Flutter web:** not supported. Defaults to `true`.
+  /// **Flutter web, Windows and Linux:** not supported. Defaults to `true`.
   bool capturePushNotificationSubscriptions = true;
 
   /// Whether to automatically capture `$push_notification_opened` when a user
@@ -293,7 +360,7 @@ class PostHogConfig {
   /// so push delivered outside FCM is not seen. Call
   /// [Posthog.capturePushNotificationOpened] for the opens this misses.
   ///
-  /// **Flutter web:** not supported. Defaults to `true`.
+  /// **Flutter web, Windows and Linux:** not supported. Defaults to `true`.
   ///
   /// On iOS this requires your app to set `UNUserNotificationCenter.current().delegate`.
   /// Without one, iOS reports the tap to nobody and no open can be captured.
@@ -324,7 +391,7 @@ class PostHogConfig {
   /// installed. Set `com.posthog.posthog.AUTO_INIT` to `false` and call
   /// [Posthog.setup].
   ///
-  /// **Flutter web:** not supported. Defaults to `null`.
+  /// **Flutter web, Windows and Linux:** not supported. Defaults to `null`.
   PushIdentityProvider? pushIdentityProvider;
 
   /// Callbacks to intercept and modify events before they are sent to PostHog.
@@ -400,6 +467,14 @@ class PostHogConfig {
   ///   called.
   /// - If any callback returns `null`, the event is dropped and subsequent
   ///   callbacks are not called.
+  /// - On every platform except Windows and Linux, PostHog calls made after a
+  ///   capture (including `reset()`, `identify()` and getters) wait until its
+  ///   callbacks finish, so the event keeps the user and consent it was
+  ///   captured under. A callback that runs longer than 10 seconds stops
+  ///   holding them back; its event is still sent when it finishes, with the
+  ///   user, super properties, groups and consent current by then. Calls made
+  ///   from inside a callback do not wait, but a callback that waits on a
+  ///   PostHog call made elsewhere stalls until that limit.
   List<BeforeSendCallback> beforeSend = [];
 
   // TODO: missing getAnonymousId, captureDeepLinks integrations
@@ -439,12 +514,15 @@ class PostHogConfig {
       'flushInterval': flushInterval.inSeconds,
       'sendFeatureFlagEvents': sendFeatureFlagEvent,
       'preloadFeatureFlags': preloadFeatureFlags,
+      if (evaluationContexts != null) 'evaluationContexts': evaluationContexts,
+      'featureFlagRequestMaxRetries': featureFlagRequestMaxRetries,
       'captureApplicationLifecycleEvents': captureApplicationLifecycleEvents,
       'rageClickConfig': rageClickConfig.toMap(),
       'debug': debug,
       'optOut': optOut,
       'surveys': surveys,
       'personProfiles': personProfiles.name,
+      'disableGeoIp': disableGeoIp,
       'compression': compression.name,
       'sessionReplay': sessionReplay,
       'dataMode': dataMode.name,
@@ -560,6 +638,9 @@ class PostHogBootstrapConfig {
 /// hooks onto an already-initialized posthog-js instance, so configure logs in
 /// your `posthog.init({...})` call instead. Only [beforeSend] runs on web (in
 /// Dart).
+///
+/// **Windows and Linux:** logs are not supported. Only [beforeSend] runs (in
+/// Dart); the records it keeps are then dropped.
 class PostHogLogsConfig {
   /// Creates a logs configuration with native defaults.
   PostHogLogsConfig();
@@ -891,20 +972,24 @@ class PostHogSessionReplayConfig {
 
   /// Multiplier for the width and height of Android replay screenshots.
   ///
-  /// Flutter screenshots scale from their logical-resolution baseline; native
-  /// screens recorded with [captureNativeScreens] scale from physical resolution.
-  /// Defaults to `1.0`. Values are clamped to `0.1`–`1.0`; NaN and infinity use
-  /// `1.0`. Scaled dimensions round up to at least one pixel without changing the
-  /// logical replay viewport. Masks round outward to cover output pixels; frames
-  /// with mask bounds that cannot be mapped safely are skipped.
+  /// Defaults to `null`: Flutter screenshots capture at one pixel per logical
+  /// pixel and native screens recorded with [captureNativeScreens] use the
+  /// Android SDK default of one pixel per dp. An explicit value multiplies the
+  /// logical size of Flutter screenshots and the physical size of native
+  /// screens, so `1.0` captures native screens at physical resolution. Values
+  /// are clamped to `0.1`–`1.0`; NaN and infinity reset to `null`. Scaled
+  /// dimensions round up to at least one pixel without changing the logical
+  /// replay viewport. Masks round outward to cover output pixels; frames with
+  /// mask bounds that cannot be mapped safely are skipped.
   /// Set before `Posthog().setup(config)`.
   @experimental
-  double get screenshotScale => _screenshotScale;
-  double _screenshotScale = 1.0;
+  double? get screenshotScale => _screenshotScale;
+  double? _screenshotScale;
 
   @experimental
-  set screenshotScale(double value) {
-    _screenshotScale = value.isFinite ? value.clamp(0.1, 1.0) : 1.0;
+  set screenshotScale(double? value) {
+    _screenshotScale =
+        value != null && value.isFinite ? value.clamp(0.1, 1.0) : null;
   }
 
   /// Compression quality for Android replay screenshots.
@@ -1022,7 +1107,7 @@ class PostHogSessionReplayConfig {
       'maskAllPlatformViews': maskAllPlatformViews,
       'captureNativeScreens': captureNativeScreens,
       'verifyScreenshotMaskAlignment': verifyScreenshotMaskAlignment,
-      'screenshotScale': screenshotScale,
+      if (screenshotScale != null) 'screenshotScale': screenshotScale,
       'screenshotCompressionQuality': screenshotCompressionQuality,
       'screenshotColorMode': screenshotColorMode.name,
       if (sampleRate != null) 'sampleRate': sampleRate,
@@ -1158,6 +1243,8 @@ class PostHogErrorTrackingConfig {
   /// the PostHog Gradle plugin to upload ProGuard/R8 mappings.
   /// See: https://posthog.com/docs/error-tracking/upload-mappings/android
   ///
+  /// **Windows and Linux:** not supported.
+  ///
   /// Default: false
   var captureNativeExceptions = false;
 
@@ -1180,15 +1267,18 @@ class PostHogErrorTrackingConfig {
   /// - Apple platforms: Not applicable (native crash capture is part of
   ///   [captureNativeExceptions])
   /// - Flutter web: Not supported
+  /// - Windows and Linux: Not supported
   ///
   /// Default: false
   var captureNativeCrashes = false;
 
   /// Enable automatic capture of isolate errors.
   ///
-  /// Controls whether errors from the current isolate are captured.
-  /// This includes errors from the main isolate and any isolates spawned
-  /// without explicit error handling.
+  /// Only captures errors from the isolate where `Posthog().setup()` runs,
+  /// normally the main isolate. Errors from spawned background isolates are
+  /// not captured automatically. To capture them, call
+  /// `isolate.addPostHogErrorListener()` from the main isolate before resuming
+  /// an isolate spawned paused.
   ///
   /// **Note:**
   /// - Flutter web: Not supported
@@ -1237,6 +1327,10 @@ class PostHogErrorTrackingConfig {
 /// **Flutter web:** the buffer lives in posthog-js. Steps are forwarded to it,
 /// but they only attach to exceptions captured by posthog-js itself, not to
 /// exceptions captured via `Posthog().captureException()` on web.
+///
+/// **Windows and Linux:** the buffer is kept in memory and attaches to every
+/// `$exception` captured by the app. There are no native crash reports to
+/// attach it to.
 class PostHogExceptionStepsConfig {
   /// Creates an exception-steps configuration with native defaults.
   PostHogExceptionStepsConfig();

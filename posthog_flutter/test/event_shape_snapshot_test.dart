@@ -261,13 +261,27 @@ void main() {
   });
 }
 
+// The Flutter version depends on the SDK running the tests, and Flutter < 3.32
+// doesn't report one, so it's checked here and left out of the snapshots.
+Object? _withoutFlutterVersion(Object? arguments) {
+  if (arguments is! Map || !arguments.containsKey('flutterVersion')) {
+    return arguments;
+  }
+  final withoutVersion = Map<String, Object?>.from(arguments);
+  expect(
+    withoutVersion.remove('flutterVersion'),
+    const String.fromEnvironment('FLUTTER_VERSION'),
+  );
+  return withoutVersion;
+}
+
 Future<void> _expectSnapshot(String name, List<MethodCall> calls) async {
   final snapshotFile = File('test/snapshots/$name');
   final actual = calls
       .map(
         (call) => <String, Object?>{
           'method': call.method,
-          'arguments': call.arguments,
+          'arguments': _withoutFlutterVersion(call.arguments),
         },
       )
       .toList();
@@ -280,7 +294,7 @@ Future<void> _expectSnapshot(String name, List<MethodCall> calls) async {
 
   expect(
     '$formatted\n',
-    await snapshotFile.readAsString(),
+    (await snapshotFile.readAsString()).replaceAll('\r\n', '\n'),
     reason: 'Update this explicit fixture only after reviewing the shape diff. '
         'Run with --dart-define=UPDATE_EVENT_SHAPE_SNAPSHOTS=true to accept it.',
   );

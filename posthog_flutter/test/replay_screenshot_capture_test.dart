@@ -19,16 +19,18 @@ void main() {
   final calls = <MethodCall>[];
   late PosthogFlutterPlatformInterface previousPlatform;
   var sessionId = 'session-a';
+  var secure = false;
 
   setUp(() {
     previousPlatform = PosthogFlutterPlatformInterface.instance;
     PosthogFlutterPlatformInterface.instance = PosthogFlutterIO();
     calls.clear();
     sessionId = 'session-a';
+    secure = false;
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       if (call.method == 'getSessionReplayState') {
-        return {'isActive': true, 'sessionId': sessionId};
+        return {'isActive': true, 'sessionId': sessionId, 'secure': secure};
       }
       return null;
     });
@@ -66,7 +68,7 @@ void main() {
         ),
       );
 
-  Future<PostHogConfig> mount(WidgetTester tester, double scale,
+  Future<PostHogConfig> mount(WidgetTester tester, double? scale,
       {Size size = const Size(101, 99), bool waitForSnapshot = true}) async {
     final config = PostHogConfig('test_project_token')
       ..sessionReplay = true
@@ -101,10 +103,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  for (final scale in [1.0, 0.5, 0.333, 0.1]) {
-    testWidgets('Android scale $scale preserves geometry and masks',
+  for (final configured in <double?>[null, 1.0, 0.5, 0.333, 0.1]) {
+    final scale = configured ?? 1.0;
+    testWidgets('Android scale $configured preserves geometry and masks',
         (tester) async {
-      final config = await mount(tester, scale);
+      final config = await mount(tester, configured);
       final full =
           calls.firstWhere((call) => call.method == 'sendFullSnapshot');
       final args = full.arguments as Map;
@@ -114,6 +117,7 @@ void main() {
         expect(image.height, (99 * scale).ceil());
         expect(args['width'], 101);
         expect(args['height'], 99);
+        expect(args['secureAtCapture'], isFalse);
         expect(args['x'], 0);
         expect(args['y'], 0);
         final meta = calls.firstWhere((call) => call.method == 'sendMetaEvent');
@@ -175,6 +179,17 @@ void main() {
     expect(args['width'], 411);
     expect(args['height'], 99);
     image.dispose();
+    await unmount(tester);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('a frame captured on a secure window is sent as secureAtCapture',
+      (tester) async {
+    secure = true;
+    await mount(tester, 1.0);
+    final args = calls
+        .firstWhere((call) => call.method == 'sendFullSnapshot')
+        .arguments as Map;
+    expect(args['secureAtCapture'], isTrue);
     await unmount(tester);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 

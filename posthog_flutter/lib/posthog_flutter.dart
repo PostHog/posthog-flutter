@@ -1,6 +1,7 @@
 /// Public Flutter API for the PostHog SDK.
 library posthog_flutter;
 
+export 'src/error_tracking/posthog_isolate_extension.dart';
 export 'src/feature_flag_result.dart';
 export 'src/logs/posthog_log_record.dart';
 export 'src/logs/posthog_log_severity.dart';

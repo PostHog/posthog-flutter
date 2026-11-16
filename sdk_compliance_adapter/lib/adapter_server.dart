@@ -186,7 +186,7 @@ class ComplianceAdapter {
         personProperties: _readNullableObjectMap(body['person_properties']),
         groups: _readNullableObjectMap(body['groups']),
         groupProperties: _readNestedObjectMap(body['group_properties']),
-        disableGeoip: body['disable_geoip'] == true,
+        disableGeoIp: body['disable_geoip'] == true,
       );
 
       await _sendJson(request, {'success': true, 'value': value});
@@ -491,7 +491,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
     Map<String, Object?>? personProperties,
     Map<String, Object?>? groups,
     Map<String, Map<String, Object?>>? groupProperties,
-    required bool disableGeoip,
+    required bool disableGeoIp,
   }) async {
     final payload = <String, Object?>{
       'api_key': _apiKey,
@@ -502,7 +502,7 @@ class _CompliancePlatform extends PosthogFlutterPlatformInterface {
       },
       'groups': groups ?? <String, Object?>{},
       'group_properties': groupProperties ?? <String, Map<String, Object?>>{},
-      'geoip_disable': disableGeoip,
+      'geoip_disable': disableGeoIp,
       'flag_keys_to_evaluate': [key],
     };
 

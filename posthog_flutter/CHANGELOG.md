@@ -1,5 +1,135 @@
 ## Next
 
+## 5.61.0
+
+### Minor Changes
+
+- bef8702: Add the `disableGeoIp` config so an app can opt out of server-side GeoIP enrichment. When enabled, events carry `$geoip_disable: true` and feature flag requests send `geoip_disable: true`, so the server doesn't infer the user's location from their IP address. Android requires posthog-android 3.77.0 or later. Flutter web doesn't apply it; set `$geoip_disable` in your posthog-js `before_send` instead.
+
+## 5.60.3
+
+### Patch Changes
+
+- b7c9e50: Fix failed feature flag values and payloads on Windows and Linux, preserve successful cached values on errored refreshes, and report failed reads as evaluation failures.
+
+## 5.60.2
+
+### Patch Changes
+
+- 7796ebf: Let web `beforeSend` redact `$current_url`, `$host`, and `$pathname`. Those properties are attached before the callback. A removed key is sent as null, because posthog-js fills an omitted one back in from `window.location`.
+
+## 5.60.1
+
+### Patch Changes
+
+- 3239e4e: Keep Android surveys working when `setup()` runs more than once in a process, for example after a Flutter hot restart. The plugin now reuses the survey delegate that the native SDK holds, and points it at the engine that is attached, so a survey that appears captures `survey shown`, `survey sent` and `survey dismissed` again, keeps the answer, and counts as seen. A recurring survey no longer comes back on every launch. Release the delegate's channel when its engine detaches, and discard the delegate when the SDK closes. Preserve unfinished answers across engine detach/reattach and Flutter hot restart without recording a dismissal.
+
+## 5.60.0
+
+### Minor Changes
+
+- 96e5209: Add `PostHogConfig.featureFlagRequestMaxRetries` to set how many times a failed `/flags` request is retried on iOS, Android, macOS, Windows, and Linux
+
+## 5.59.0
+
+### Minor Changes
+
+- 9214ace: **Breaking:** Change `PostHogSessionReplayConfig.screenshotScale` from `double` to `double?` with a `null` default, so native screens recorded with `captureNativeScreens` on Android pick up posthog-android's one-pixel-per-dp default instead of physical resolution. Flutter screens still capture at one pixel per logical pixel. Set `screenshotScale = 1.0` to keep native screens at physical resolution. Code that reads the value into a `double` needs a null check.
+
+## 5.58.4
+
+### Patch Changes
+
+- 2dd8d8d: Raise the Android SDK minimum to 3.75.0 to support Firebase Installation ID (FID) push registration when `firebase_messaging_installation_id_enabled` is enabled. With `firebase_messaging` 17+, forward `onRegistered` to the existing `registerPushNotificationToken` method; explicit Android registrations refresh the subscription even when the FID is unchanged. iOS continues to use APNs by default.
+
+## 5.58.3
+
+### Patch Changes
+
+- 5b85326: Fix session replay after `optIn()` continuing the session that was active while opted out, and raise the minimum PostHog iOS SDK to 3.92.3.
+
+## 5.58.2
+
+### Patch Changes
+
+- ce069ea: Keep events in call order on every platform except Windows and Linux while an async `beforeSend` runs. A `reset()`, `identify()`, `alias()`, `register()`, `group()`, `optIn()` or `optOut()` made after an un-awaited `capture()`, `screen()` or `captureException()` now applies after that event, so the event goes out with the user, super properties, groups and consent it was captured under, as in the native SDKs. While a `beforeSend` callback runs, later PostHog calls (getters included) wait for it; one that runs longer than 10 seconds stops holding them back, and its event is still sent when it finishes, with the user, super properties, groups and consent current by then.
+
+## 5.58.1
+
+### Patch Changes
+
+- 50c2c3e: Mask Android session replay frames while the app window has `FLAG_SECURE` set, instead of recording the secure screen.
+
+## 5.58.0
+
+### Minor Changes
+
+- cabe336: Resolve obfuscated Flutter mobile stack frames with uploaded debug symbols.
+- a136696: Add `isolate.addPostHogErrorListener()` and `isolate.removePostHogErrorListener()` to capture uncaught background isolate errors and clean up their listeners, and clarify that `captureIsolateErrors` only monitors the setup isolate.
+
+## 5.57.1
+
+### Patch Changes
+
+- dda207d: Upgrade the Android SDK to 3.72.9, which pulls in OkHttp 4.12.1 to block the compromised eMudhra intermediate certificates.
+
+## 5.57.0
+
+### Minor Changes
+
+- 0db911a: Add `getAllFeatureFlags()` to read every loaded feature flag result without capturing `$feature_flag_called`
+- 60bc22b: Add `captureFeatureView()` and `captureFeatureInteraction()` to capture `$feature_view` and `$feature_interaction` events for a feature flag
+- 48876f4: Add `PostHogConfig.evaluationContexts` to limit which feature flags are evaluated on iOS, Android, macOS, Windows, and Linux
+- cec2fc3: Add an optional `sendFeatureFlagEvent` parameter to `getFeatureFlag()` and `isFeatureEnabled()` to override `PostHogConfig.sendFeatureFlagEvent` per call
+
+## 5.56.2
+
+### Patch Changes
+
+- 94ca664: Omit numeric NaN and infinities from Windows/Linux event object properties and send them as null in arrays instead of strings. Preserve array positions and valid neighboring properties, and budget exception steps using their final wire form.
+
+## 5.56.1
+
+### Patch Changes
+
+- 7fa8179: Stop `PosthogObserver` from registering itself with `WidgetsBinding` and never unregistering, which leaked one observer per navigator, such as each nested auto_route router.
+
+## 5.56.0
+
+### Minor Changes
+
+- 27eada6: Apply the survey appearance `fontFamily` to the built-in survey UI. The font must be bundled with the app; a missing, blank, `inherit`, or unbundled family uses the default font.
+
+## 5.55.0
+
+### Minor Changes
+
+- 3b55de1: Add experimental Windows and Linux support, enabled by default and set up with the same `Posthog().setup(config)` as the other platforms. Existing apps will start tracking on Windows and Linux after upgrading. Set `config.enableWindowsAndLinux = false` before setup to disable the SDK on these platforms without affecting other platforms. Event and screen capture, exception capture (including autocapture of Flutter and Dart errors, and exception steps), identify, alias, groups, super properties, feature flags, bootstrap, opt-out and application lifecycle events work on both. App metadata comes from the executable's `ProductName` and `ProductVersion` on Windows and the bundled `version.json` on Linux. State is stored under `posthog/<project token>` in the application support directory returned by the official Windows/Linux `path_provider` implementations. If the directory is unavailable, state stays in memory and is lost when the SDK closes or the app exits. Events include `$timezone` when the SDK can determine a local IANA time zone; on Windows, this uses the system ICU data on a best-effort basis. Session replay, surveys, logs, push notifications and native crash capture are not supported on Windows and Linux.
+
+## 5.54.0
+
+### Minor Changes
+
+- 53370a9: Wait `surveyPopupDelaySeconds` before showing a survey. A missing, zero, or negative delay still shows it immediately.
+
+## 5.53.0
+
+### Minor Changes
+
+- 0703fbb: Send `$flutter_version` only on the `Application Installed` and `Application Updated` events on iOS, macOS and Android instead of on every event, and stop sending it on web
+
+## 5.52.0
+
+### Minor Changes
+
+- e8398cc: Add `$flutter_version` (for example `3.32.0`) to events captured through `capture`, `screen` and `captureException`, including the event `beforeSend` receives. Requires apps built with Flutter 3.32 or later; it's omitted on older Flutter versions and on events the native iOS/Android SDKs or posthog-js capture on their own, such as lifecycle events.
+
+## 5.51.1
+
+### Patch Changes
+
+- 6ec313e: Stop Flutter session replay when `optOut()` opts the user out, and start a new recording on `optIn()` if a recording was actually stopped.
+
 ## 5.51.0
 
 ### Minor Changes

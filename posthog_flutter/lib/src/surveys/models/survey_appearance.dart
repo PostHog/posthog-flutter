@@ -18,6 +18,18 @@ String surveyQuestionButtonLabel(String? buttonText, String fallback) {
   return 'Submit';
 }
 
+/// Survey [fontFamily] of null, blank, or `inherit` means the default font.
+///
+/// posthog-js saves `inherit` as its default, which is a CSS keyword and not
+/// a font family Flutter can resolve.
+String? surveyFontFamily(String? fontFamily) {
+  final family = fontFamily?.trim();
+  if (family == null || family.isEmpty || family.toLowerCase() == 'inherit') {
+    return null;
+  }
+  return family;
+}
+
 /// Appearance configuration for survey widgets
 @immutable
 class SurveyAppearance {
@@ -48,6 +60,7 @@ class SurveyAppearance {
     this.inputPlaceholderColor = const Color(0xFF757575),
     this.choiceButtonBorderColor = Colors.black,
     this.choiceButtonTextColor = Colors.black,
+    this.fontFamily,
   });
 
   final Color backgroundColor;
@@ -76,6 +89,10 @@ class SurveyAppearance {
   final Color inputPlaceholderColor;
   final Color choiceButtonBorderColor;
   final Color choiceButtonTextColor;
+
+  /// Font family for all survey text. Null uses the app's default font, as
+  /// does a family the app doesn't bundle.
+  final String? fontFamily;
 
   /// Creates a [SurveyAppearance] from a [PostHogDisplaySurveyAppearance]
   static SurveyAppearance fromPostHog(
@@ -140,6 +157,7 @@ class SurveyAppearance {
       inputPlaceholderColor: inputTextColor.withAlpha(153),
       choiceButtonBorderColor: primaryTextColor,
       choiceButtonTextColor: primaryTextColor,
+      fontFamily: surveyFontFamily(appearance?.fontFamily),
     );
   }
 

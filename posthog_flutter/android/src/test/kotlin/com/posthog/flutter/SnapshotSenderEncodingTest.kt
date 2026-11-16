@@ -129,4 +129,23 @@ class SnapshotSenderEncodingTest {
             decoded.recycle()
         }
     }
+
+    @Test
+    fun maskedFrameIsBlackAtTheSameDimensions() {
+        val frame = wireframe(SnapshotSender().buildFullSnapshot(png(), id = 1, x = 0, y = 0, quality = 100, masked = true))
+        val jpeg = Base64.decode(assertNotNull(frame.base64).substringAfter(','), Base64.DEFAULT)
+        val image = assertNotNull(BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size))
+        try {
+            assertEquals(51, image.width)
+            assertEquals(50, image.height)
+            for (y in 0 until image.height) {
+                for (x in 0 until image.width) {
+                    val pixel = image.getPixel(x, y)
+                    assertTrue(Color.red(pixel) < 8 && Color.green(pixel) < 8 && Color.blue(pixel) < 8, "pixel ($x, $y)")
+                }
+            }
+        } finally {
+            image.recycle()
+        }
+    }
 }

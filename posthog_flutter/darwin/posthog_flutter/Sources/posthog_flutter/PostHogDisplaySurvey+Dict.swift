@@ -93,6 +93,9 @@
                 if let placeholder = appearance.placeholder {
                     appearanceDict["placeholder"] = placeholder
                 }
+                if let surveyPopupDelaySeconds = appearance.surveyPopupDelaySeconds {
+                    appearanceDict["surveyPopupDelaySeconds"] = surveyPopupDelaySeconds
+                }
                 appearanceDict["displayThankYouMessage"] = appearance.displayThankYouMessage
                 if let thankYouMessageHeader = appearance.thankYouMessageHeader {
                     appearanceDict["thankYouMessageHeader"] = thankYouMessageHeader

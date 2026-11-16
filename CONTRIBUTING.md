@@ -2,6 +2,10 @@
 
 Thanks for your interest in improving the PostHog Flutter SDK.
 
+## Commit signing
+
+This repo requires all commits to be signed. To configure commit signing, see the [PostHog handbook](https://posthog.com/handbook/engineering/security#commit-signing). Set `commit.gpgsign` to `true` in your git config so that every commit is signed, not only the ones you sign by hand.
+
 ## CI-aligned local checks
 
 From the repository root, run the same checks CI uses:

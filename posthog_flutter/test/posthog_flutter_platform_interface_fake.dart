@@ -97,6 +97,8 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
   final Map<String, Object?> featureFlagValues = {};
   final Map<String, Object?> featureFlagPayloads = {};
 
+  final List<Map<String, Object?>> flagReadCalls = [];
+
   // Call tracking for getFeatureFlagResult
   final List<Map<String, dynamic>> getFeatureFlagResultCalls = [];
 
@@ -250,9 +252,46 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
     });
   }
 
+  final List<List<Object?>> featureEventCalls = [];
+
   @override
-  Future<Object?> getFeatureFlag({required String key}) async {
+  Future<void> captureFeatureView({
+    required String flag,
+    String? flagVariant,
+  }) async {
+    featureEventCalls.add(['captureFeatureView', flag, flagVariant]);
+  }
+
+  @override
+  Future<void> captureFeatureInteraction({
+    required String flag,
+    String? flagVariant,
+  }) async {
+    featureEventCalls.add(['captureFeatureInteraction', flag, flagVariant]);
+  }
+
+  @override
+  Future<Object?> getFeatureFlag({
+    required String key,
+    bool? sendFeatureFlagEvent,
+  }) async {
+    flagReadCalls.add({
+      'method': 'getFeatureFlag',
+      'key': key,
+      'sendFeatureFlagEvent': sendFeatureFlagEvent,
+    });
     return featureFlagValues[key];
+  }
+
+  @override
+  Future<bool> isFeatureEnabled(String key,
+      {bool? sendFeatureFlagEvent}) async {
+    flagReadCalls.add({
+      'method': 'isFeatureEnabled',
+      'key': key,
+      'sendFeatureFlagEvent': sendFeatureFlagEvent,
+    });
+    return featureFlagValues[key] == true;
   }
 
   @override
@@ -271,4 +310,10 @@ class PosthogFlutterPlatformFake extends PosthogFlutterPlatformInterface {
 
     return featureFlagResult;
   }
+
+  List<PostHogFeatureFlagResult>? allFeatureFlags;
+
+  @override
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() async =>
+      allFeatureFlags;
 }

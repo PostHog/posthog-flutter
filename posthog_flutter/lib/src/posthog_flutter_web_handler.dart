@@ -33,7 +33,7 @@ extension PostHogExtension on PostHog {
   external JSAny? get_distinct_id();
   external void reset();
   external void debug(JSAny debug);
-  external JSAny? isFeatureEnabled(JSAny key);
+  external JSAny? isFeatureEnabled(JSAny key, [JSAny? options]);
   external void group(JSAny type, JSAny key, JSAny properties);
   external void reloadFeatureFlags();
   external void setPersonProperties(
@@ -56,9 +56,11 @@ extension PostHogExtension on PostHog {
   external void opt_out_capturing();
   // ignore: non_constant_identifier_names
   external bool has_opted_out_capturing();
-  external JSAny? getFeatureFlag(JSAny key);
+  external JSAny? getFeatureFlag(JSAny key, [JSAny? options]);
   external JSAny? getFeatureFlagPayload(JSAny key);
   external JSAny? getFeatureFlagResult(JSAny key, [JSAny? options]);
+  // Added in posthog-js 1.395.0; the call site guards with try/catch.
+  external JSAny? getAllFeatureFlags();
   external void register(JSAny properties);
   external void unregister(JSAny key);
   // ignore: non_constant_identifier_names
@@ -116,6 +118,13 @@ Map<String, dynamic> safeMapConversion(dynamic mapData) {
   return {};
 }
 
+// An absent sendEvent leaves send_event unset so posthog-js applies its own
+// default.
+JSAny? _flagOptions(Map<dynamic, dynamic> args) {
+  final sendEvent = args['sendEvent'] as bool?;
+  return {if (sendEvent != null) 'send_event': sendEvent}.jsify();
+}
+
 bool _sdkInfoOverridden = false;
 
 void _maybeOverrideSDKInfo() {
@@ -160,6 +169,29 @@ void _addAppVersionProperties(Map<String, dynamic> properties) {
   appVersionProperties().forEach(
     (key, value) => properties.putIfAbsent(key, () => value),
   );
+}
+
+/// Page URL and app version attached to web events.
+///
+/// [PosthogFlutterWeb] applies this before `beforeSend`. The handler applies
+/// it only for callers that have not, so a callback can redact the values.
+void stampWebAutomaticProperties(Map<String, dynamic> properties) {
+  properties.addAll(_getLocationProperties());
+  _addAppVersionProperties(properties);
+}
+
+bool _automaticPropertiesApplied(Object? args) =>
+    args is Map && args['automaticPropertiesApplied'] == true;
+
+const _pageLocationKeys = [r'$current_url', r'$host', r'$pathname'];
+
+/// posthog-js copies `window.location` onto a property it did not receive.
+/// It leaves an explicit null in place, so a key `beforeSend` removed has to
+/// be sent as null or the page URL comes back.
+void _preserveRedactedPageLocation(Map<String, dynamic> properties) {
+  for (final key in _pageLocationKeys) {
+    properties.putIfAbsent(key, () => null);
+  }
 }
 
 Map<String, String> _getLocationProperties() {
@@ -232,8 +264,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'capture':
       final eventName = args['eventName'] as String;
       final properties = safeMapConversion(args['properties']);
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
+        stampWebAutomaticProperties(properties);
+      }
       final userProperties = safeMapConversion(args['userProperties']);
       final userPropertiesSetOnce = safeMapConversion(
         args['userPropertiesSetOnce'],
@@ -259,8 +294,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       final screenName = args['screenName'] as String;
       final properties = safeMapConversion(args['properties']);
       properties['\$screen_name'] = screenName;
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
+        stampWebAutomaticProperties(properties);
+      }
 
       posthog?.capture(stringToJSAny('\$screen'), mapToJSAny(properties), null);
       break;
@@ -309,9 +347,10 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'isFeatureEnabled':
       final key = args['key'] as String;
-      final isFeatureEnabled =
-          posthog?.isFeatureEnabled(stringToJSAny(key))?.dartify() as bool? ??
-              false;
+      final isFeatureEnabled = posthog
+              ?.isFeatureEnabled(stringToJSAny(key), _flagOptions(args))
+              ?.dartify() as bool? ??
+          false;
       return isFeatureEnabled;
     case 'group':
       final groupType = args['groupType'] as String;
@@ -365,7 +404,8 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
     case 'getFeatureFlag':
       final key = args['key'] as String;
 
-      final featureFlag = posthog?.getFeatureFlag(stringToJSAny(key));
+      final featureFlag =
+          posthog?.getFeatureFlag(stringToJSAny(key), _flagOptions(args));
       return featureFlag?.dartify();
     case 'getFeatureFlagPayload':
       final key = args['key'] as String;
@@ -381,6 +421,15 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
         {'send_event': sendEvent}.jsify(),
       );
       return result?.dartify();
+    case 'getAllFeatureFlags':
+      try {
+        return posthog?.getAllFeatureFlags()?.dartify();
+      } catch (error) {
+        printIfDebug(
+          '[PostHog] getAllFeatureFlags is not supported by the loaded posthog-js version: $error',
+        );
+        return null;
+      }
     case 'register':
       final key = args['key'] as String;
       final value = args['value'];
@@ -457,8 +506,11 @@ Future<dynamic> handleWebMethodCall(MethodCall call) async {
       break;
     case 'captureException':
       final properties = safeMapConversion(args['properties']);
-      properties.addAll(_getLocationProperties());
-      _addAppVersionProperties(properties);
+      if (_automaticPropertiesApplied(args)) {
+        _preserveRedactedPageLocation(properties);
+      } else {
+        stampWebAutomaticProperties(properties);
+      }
 
       // Route through posthog-js's captureException so it attaches required
       // metadata and any buffered $exception_steps. posthog-js spreads the

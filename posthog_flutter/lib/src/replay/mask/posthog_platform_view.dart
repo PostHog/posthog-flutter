@@ -40,9 +40,15 @@ enum PostHogPlatformViewPrivacy {
 /// This widget has no runtime state — it is a pure marker. The compositor reads
 /// [privacy] from the element tree during each capture frame.
 class PostHogPlatformView extends StatelessWidget {
+  /// The platform view subtree this policy applies to.
   final Widget child;
+
+  /// How the platform views in [child] are handled in session replay.
+  ///
+  /// Defaults to [PostHogPlatformViewPrivacy.mask].
   final PostHogPlatformViewPrivacy privacy;
 
+  /// Creates a session replay policy marker around [child].
   const PostHogPlatformView({
     super.key,
     required this.child,

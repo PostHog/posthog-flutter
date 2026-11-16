@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -41,6 +42,58 @@ void main() {
         );
       },
     );
+
+    test('Windows and Linux support is enabled by default', () {
+      expect(PostHogConfig('test_project_token').enableWindowsAndLinux, isTrue);
+    });
+
+    for (final platform in [TargetPlatform.windows, TargetPlatform.linux]) {
+      test('default config sets up on $platform', () async {
+        debugDefaultTargetPlatformOverride = platform;
+        try {
+          final config = PostHogConfig('test_project_token');
+          await Posthog().setup(config);
+          expect(fakePlatformInterface.receivedConfig, same(config));
+        } finally {
+          await Posthog().close();
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+    }
+
+    for (final platform in TargetPlatform.values) {
+      test('enableWindowsAndLinux only disables setup on $platform', () async {
+        debugDefaultTargetPlatformOverride = platform;
+        final originalHandler = FlutterError.onError;
+        void sentinelHandler(FlutterErrorDetails _) {}
+        FlutterError.onError = sentinelHandler;
+        try {
+          final config = PostHogConfig('test_project_token')
+            ..enableWindowsAndLinux = false
+            ..sessionReplay = true;
+          config.errorTrackingConfig.captureFlutterErrors = true;
+
+          await Posthog().setup(config);
+
+          if (!kIsWeb &&
+              (platform == TargetPlatform.windows ||
+                  platform == TargetPlatform.linux)) {
+            expect(fakePlatformInterface.receivedConfig, isNull);
+            expect(Posthog().config, isNull);
+            expect(FlutterError.onError, same(sentinelHandler));
+            expect(PostHogInternalEvents.sessionRecordingActive.value, isFalse);
+          } else {
+            expect(fakePlatformInterface.receivedConfig, same(config));
+            expect(Posthog().config, same(config));
+            expect(FlutterError.onError, isNot(same(sentinelHandler)));
+          }
+        } finally {
+          await Posthog().close();
+          FlutterError.onError = originalHandler;
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+    }
 
     test(
       'setup after close with different masking flags rebuilds the parser map',
@@ -169,6 +222,22 @@ void main() {
 
       expect(config.sendFeatureFlagEvent, isFalse);
       expect(config.toMap()['sendFeatureFlagEvents'], isFalse);
+    });
+
+    test('toMap forwards evaluationContexts only when set', () {
+      final config = PostHogConfig('test_project_token');
+      expect(config.toMap().containsKey('evaluationContexts'), isFalse);
+
+      config.evaluationContexts = ['mobile', 'prod'];
+      expect(config.toMap()['evaluationContexts'], ['mobile', 'prod']);
+    });
+
+    test('toMap forwards featureFlagRequestMaxRetries', () {
+      final config = PostHogConfig('test_project_token');
+      expect(config.toMap()['featureFlagRequestMaxRetries'], 1);
+
+      config.featureFlagRequestMaxRetries = 0;
+      expect(config.toMap()['featureFlagRequestMaxRetries'], 0);
     });
 
     test('trims whitespace-sensitive config values in config and toMap', () {
@@ -373,6 +442,49 @@ void main() {
       );
       expect(find.text('child'), findsOneWidget);
     });
+  });
+
+  test(
+      'captureFeatureView and captureFeatureInteraction forward to the platform',
+      () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+
+    await Posthog().captureFeatureView('a');
+    await Posthog().captureFeatureInteraction('b', flagVariant: 'control');
+
+    expect(fake.featureEventCalls, [
+      ['captureFeatureView', 'a', null],
+      ['captureFeatureInteraction', 'b', 'control'],
+    ]);
+  });
+
+  test('getFeatureFlag and isFeatureEnabled forward sendFeatureFlagEvent',
+      () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+
+    await Posthog().getFeatureFlag('a');
+    await Posthog().getFeatureFlag('b', sendFeatureFlagEvent: false);
+    await Posthog().isFeatureEnabled('c');
+    await Posthog().isFeatureEnabled('d', sendFeatureFlagEvent: true);
+
+    expect(fake.flagReadCalls, [
+      {'method': 'getFeatureFlag', 'key': 'a', 'sendFeatureFlagEvent': null},
+      {'method': 'getFeatureFlag', 'key': 'b', 'sendFeatureFlagEvent': false},
+      {'method': 'isFeatureEnabled', 'key': 'c', 'sendFeatureFlagEvent': null},
+      {'method': 'isFeatureEnabled', 'key': 'd', 'sendFeatureFlagEvent': true},
+    ]);
+  });
+
+  test('getAllFeatureFlags returns the platform results unchanged', () async {
+    final fake = PosthogFlutterPlatformFake();
+    PosthogFlutterPlatformInterface.instance = fake;
+    expect(await Posthog().getAllFeatureFlags(), isNull);
+
+    final flags = [PostHogFeatureFlagResult(key: 'a', enabled: true)];
+    fake.allFeatureFlags = flags;
+    expect(await Posthog().getAllFeatureFlags(), same(flags));
   });
 
   group('getFeatureFlagResult', () {

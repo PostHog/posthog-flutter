@@ -27,6 +27,11 @@ class Posthog {
 
   PostHogConfig? _config;
 
+  /// Set when [optOut] stops an in-progress Flutter replay. [optIn] consumes
+  /// it to re-arm Flutter capture for the recording native opt-in restarts,
+  /// and a replay the caller already stopped is left stopped.
+  bool _restartSessionReplayOnEnable = false;
+
   /// Returns the singleton PostHog client instance.
   factory Posthog() {
     return _instance;
@@ -70,7 +75,15 @@ class Posthog {
       return Future<void>.value();
     }
 
+    if (!config.enableWindowsAndLinux &&
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux)) {
+      return Future<void>.value();
+    }
+
     _config = config; // Store the config
+    _restartSessionReplayOnEnable = false;
 
     // The mask controller singleton may predate this setup() (or a previous
     // setup() built it with different masking flags); without a refresh the
@@ -275,6 +288,8 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when the record has been forwarded.
   ///
+  /// **Windows/Linux:** not supported.
+  ///
   /// **Example:**
   /// ```dart
   /// await Posthog().captureLog(
@@ -378,24 +393,44 @@ class Posthog {
 
   /// Opts the current user out of data collection.
   ///
+  /// Also stops session replay and uninstalls Flutter error autocapture.
+  ///
   /// Returns a [Future] that completes when the opt-out request has been queued.
-  Future<void> optOut() {
+  Future<void> optOut() async {
     // Uninstall Flutter-specific integrations when opting out
     _uninstallFlutterIntegrations();
+    // Skipped on web: posthog-js drops replay while opted out, and restarting
+    // it on optIn would override a replay disabled in posthog.init.
+    if (!kIsWeb && PostHogInternalEvents.sessionRecordingActive.value) {
+      _restartSessionReplayOnEnable = true;
+      PostHogInternalEvents.sessionRecordingActive.value = false;
+    }
 
-    return _posthog.disable();
+    // Native opt-out stops replay itself. A native stopSessionRecording() here
+    // would record that the app stopped replay, so native opt-in would not
+    // restart it.
+    await _posthog.disable();
   }
 
   /// Opts the current user back in to data collection.
   ///
+  /// Reinstalls Flutter error autocapture. If [optOut] stopped session replay,
+  /// this starts a new recording.
+  ///
   /// Returns a [Future] that completes when the opt-in request has been queued.
-  Future<void> optIn() {
+  Future<void> optIn() async {
     final config = _config;
     if (config != null) {
       _installFlutterIntegrations(config);
     }
 
-    return _posthog.enable();
+    await _posthog.enable();
+    final restartReplay = _restartSessionReplayOnEnable;
+    _restartSessionReplayOnEnable = false;
+    if (restartReplay) {
+      PostHogInternalEvents.requestReplaySessionReset();
+      PostHogInternalEvents.sessionRecordingActive.value = true;
+    }
   }
 
   /// Opts the current user out of data collection.
@@ -443,8 +478,23 @@ class Posthog {
   ///
   /// The [key] is the feature flag key.
   ///
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
+  /// this call, or `true` to capture it even when the config turns it off.
+  ///
   /// Returns `false` when the flag is disabled, missing, or not a boolean flag.
-  Future<bool> isFeatureEnabled(String key) => _posthog.isFeatureEnabled(key);
+  ///
+  /// **Example:**
+  /// ```dart
+  /// if (await Posthog().isFeatureEnabled('new-checkout',
+  ///     sendFeatureFlagEvent: false)) {
+  ///   // show the new checkout without recording a flag exposure
+  /// }
+  /// ```
+  Future<bool> isFeatureEnabled(String key, {bool? sendFeatureFlagEvent}) =>
+      _posthog.isFeatureEnabled(key,
+          sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Reloads feature flags for the current user.
   ///
@@ -598,16 +648,17 @@ class Posthog {
         groupProperties: groupProperties,
       );
 
-  /// Registers this device's push token so PostHog Workflows can target it.
+  /// Registers this device's push token or Firebase Installation ID (FID) so
+  /// PostHog Workflows can target it.
   ///
-  /// Both platforms register a token automatically at startup when
+  /// Both platforms register automatically at startup when
   /// [PostHogConfig.capturePushNotificationSubscriptions] is enabled, so the
-  /// main reason to call this is a token refresh, which that startup fetch
-  /// cannot see.
+  /// main reason to call this is a later Firebase registration or token refresh,
+  /// which that startup fetch cannot see.
   ///
-  /// [appId] identifies the app the token belongs to: the Firebase
-  /// `project_id` for an FCM token, the APNs bundle id for an APNs token. It is
-  /// what tells PostHog which provider to deliver through — the platform is
+  /// [appId] identifies the app the identifier belongs to: the Firebase
+  /// `project_id` for an FCM token or FID, the APNs bundle id for an APNs token.
+  /// It tells PostHog which provider to deliver through — the platform is
   /// only recorded alongside it. Leave it `null` and iOS falls back to the
   /// bundle id while Android falls back to the default `FirebaseApp`'s project
   /// id, so pass it explicitly if your app does not use Firebase or registers
@@ -616,17 +667,28 @@ class Posthog {
   ///
   /// **The default is APNs on iOS and FCM on Android**, matching what
   /// [PostHogConfig.capturePushNotificationSubscriptions] registers on its own.
-  /// `firebase_messaging`'s `onTokenRefresh` yields an FCM token on both
-  /// platforms, so forwarding it unguarded pairs an FCM token with the iOS
-  /// bundle id and delivery fails:
+  /// On Android, enabling `firebase_messaging_installation_id_enabled` in the
+  /// app's manifest switches automatic registration to FIDs. Pass the FID to
+  /// this method unchanged; no identifier type parameter is needed.
+  ///
+  /// With `firebase_messaging` 17+, enable that manifest flag and forward
+  /// `onRegistered` after [setup] completes, then register with Firebase:
   ///
   /// ```dart
   /// if (Platform.isAndroid) {
-  ///   FirebaseMessaging.instance.onTokenRefresh.listen(
-  ///     (token) => Posthog().registerPushNotificationToken(token),
+  ///   FirebaseMessaging.instance.onRegistered.listen(
+  ///     (fid) => Posthog().registerPushNotificationToken(fid),
   ///   );
+  ///   await FirebaseMessaging.instance.register();
   /// }
   /// ```
+  ///
+  /// On Android, explicit calls refresh the subscription even when the FID
+  /// hasn't changed; automatic startup registration still deduplicates it.
+  /// For older `firebase_messaging` versions, forward `onTokenRefresh` instead
+  /// and leave FID mode disabled. Neither Firebase callback should be forwarded
+  /// unguarded on iOS: pairing a Firebase identifier with the default APNs
+  /// bundle id causes delivery to fail.
   ///
   /// **Using FCM on both platforms** is supported — pass the Firebase
   /// `project_id` as [appId] on iOS too — but you must set
@@ -645,7 +707,7 @@ class Posthog {
   /// a token registered before they are initialized, and this method still
   /// completes without an error.
   ///
-  /// Not supported on Flutter web or macOS.
+  /// Not supported on Flutter web, macOS, Windows or Linux.
   Future<void> registerPushNotificationToken(
     String deviceToken, {
     String? appId,
@@ -660,7 +722,7 @@ class Posthog {
   /// moves a registered token to the new anonymous identity on its own, so this
   /// is only needed when you manage subscriptions yourself.
   ///
-  /// Not supported on Flutter web or macOS.
+  /// Not supported on Flutter web, macOS, Windows or Linux.
   Future<void> unregisterPushNotificationToken() =>
       _posthog.unregisterPushNotificationToken();
 
@@ -702,7 +764,7 @@ class Posthog {
   ///
   /// [subtitle] is iOS only and ignored on Android, which has no such field.
   ///
-  /// Not supported on Flutter web.
+  /// Not supported on Flutter web, Windows or Linux.
   Future<void> capturePushNotificationOpened({
     String? title,
     String? subtitle,
@@ -723,8 +785,23 @@ class Posthog {
   /// Returns `null` if the flag does not exist or cannot be loaded. For boolean
   /// flags, returns `true` or `false`. For multivariate flags, returns the
   /// variant key.
-  Future<Object?> getFeatureFlag(String key) =>
-      _posthog.getFeatureFlag(key: key);
+  ///
+  /// [sendFeatureFlagEvent] controls whether this call captures the
+  /// `$feature_flag_called` event. Defaults to `null`, which follows
+  /// [PostHogConfig.sendFeatureFlagEvent]. Pass `false` to skip the event for
+  /// this call, or `true` to capture it even when the config turns it off.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final variant = await Posthog().getFeatureFlag('button-color',
+  ///     sendFeatureFlagEvent: false);
+  /// if (variant == 'red') {
+  ///   // show the red button without recording a flag exposure
+  /// }
+  /// ```
+  Future<Object?> getFeatureFlag(String key, {bool? sendFeatureFlagEvent}) =>
+      _posthog.getFeatureFlag(
+          key: key, sendFeatureFlagEvent: sendFeatureFlagEvent);
 
   /// Returns the full feature flag result for [key], including value and
   /// payload.
@@ -750,6 +827,29 @@ class Posthog {
   }) =>
       _posthog.getFeatureFlagResult(key: key, sendEvent: sendEvent);
 
+  /// Returns the results of all currently loaded feature flags.
+  ///
+  /// Each [PostHogFeatureFlagResult] carries the flag's key, enabled state,
+  /// variant (for multivariate flags), and payload. This reads the flags from
+  /// the last load without a network request; call [reloadFeatureFlags] first
+  /// to refresh them. Unlike [getFeatureFlag], it never captures the
+  /// `$feature_flag_called` event.
+  ///
+  /// Returns `null` when no flags have been loaded yet or the SDK is disabled.
+  /// On web, posthog-js returns an empty list before flags load, and this
+  /// returns `null` when the loaded posthog-js predates `getAllFeatureFlags`
+  /// (1.395.0).
+  ///
+  /// **Example:**
+  /// ```dart
+  /// final flags = await Posthog().getAllFeatureFlags() ?? [];
+  /// for (final flag in flags) {
+  ///   print('${flag.key}: ${flag.variant ?? flag.enabled}');
+  /// }
+  /// ```
+  Future<List<PostHogFeatureFlagResult>?> getAllFeatureFlags() =>
+      _posthog.getAllFeatureFlags();
+
   /// Returns the payload for the feature flag [key].
   ///
   /// Returns `null` when the flag does not exist, has no payload, or the payload
@@ -759,6 +859,48 @@ class Posthog {
   )
   Future<Object?> getFeatureFlagPayload(String key) =>
       _posthog.getFeatureFlagPayload(key: key);
+
+  /// Captures a `$feature_view` event when the user sees the feature behind
+  /// the feature flag [flag].
+  ///
+  /// The event carries `feature_flag` and, for multivariate flags,
+  /// `feature_flag_variant`, and sets the person property
+  /// `$feature_view/<flag>` to the variant.
+  ///
+  /// [flagVariant] defaults to `null`, which uses the flag's current value
+  /// without capturing `$feature_flag_called`. When the flag has no value
+  /// (not loaded or unknown), Android falls back to `true`, while iOS, macOS,
+  /// web, Windows, and Linux skip the event.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// await Posthog().captureFeatureView('new-checkout');
+  /// await Posthog().captureFeatureView('button-color', flagVariant: 'red');
+  /// ```
+  Future<void> captureFeatureView(String flag, {String? flagVariant}) =>
+      _posthog.captureFeatureView(flag: flag, flagVariant: flagVariant);
+
+  /// Captures a `$feature_interaction` event when the user interacts with the
+  /// feature behind the feature flag [flag].
+  ///
+  /// The event carries `feature_flag` and, for multivariate flags,
+  /// `feature_flag_variant`, and sets the person property
+  /// `$feature_interaction/<flag>` to the variant.
+  ///
+  /// [flagVariant] defaults to `null`, which uses the flag's current value
+  /// without capturing `$feature_flag_called`. When the flag has no value
+  /// (not loaded or unknown), Android falls back to `true`, while iOS, macOS,
+  /// web, Windows, and Linux skip the event.
+  ///
+  /// **Example:**
+  /// ```dart
+  /// ElevatedButton(
+  ///   onPressed: () => Posthog().captureFeatureInteraction('new-checkout'),
+  ///   child: const Text('Checkout'),
+  /// );
+  /// ```
+  Future<void> captureFeatureInteraction(String flag, {String? flagVariant}) =>
+      _posthog.captureFeatureInteraction(flag: flag, flagVariant: flagVariant);
 
   /// Flushes queued events immediately where supported by the platform.
   ///
@@ -840,6 +982,8 @@ class Posthog {
   /// - Flutter web: forwarded to posthog-js. Steps attach to exceptions
   ///   captured by posthog-js, but not to exceptions captured via
   ///   [captureException] on web.
+  /// - Windows/Linux: the buffer is kept in memory by the Dart
+  ///   implementation, and no native crashes are captured on desktop.
   ///
   /// **Example:**
   /// ```dart
@@ -877,11 +1021,17 @@ class Posthog {
   ///
   /// Returns a [Future] that completes when platform resources have been closed.
   ///
+  /// **Windows/Linux:** first makes one attempt to send the queued events and
+  /// waits for it for up to two seconds. Events left unsent go out with the
+  /// next [setup], or are lost when the application support directory is
+  /// unavailable and state is kept in memory.
+  ///
   /// **Note:** After calling `close()`, surveys will not be rendered until the
   /// SDK is re-initialized and the next navigation event occurs.
   Future<void> close() {
     _config = null;
     _currentScreen = null;
+    _restartSessionReplayOnEnable = false;
     PostHogInternalEvents.sessionRecordingActive.value = false;
     // Forced rather than keyed on observing a new session id, because the
     // platforms disagree on whether close() rotates the session at all — the
@@ -913,6 +1063,8 @@ class Posthog {
   /// restarts the recording even when the platform keeps the current session id.
   ///
   /// Returns a [Future] that completes when the start request has been sent.
+  ///
+  /// **Windows/Linux:** not supported.
   Future<void> startSessionRecording({bool resumeCurrent = true}) async {
     if (!resumeCurrent) {
       // The new recording must send its own meta event rather than inherit the
@@ -928,6 +1080,8 @@ class Posthog {
   /// This method will have no effect if PostHog is not enabled.
   ///
   /// Returns a [Future] that completes when the stop request has been sent.
+  ///
+  /// **Windows/Linux:** not supported.
   Future<void> stopSessionRecording() async {
     await _posthog.stopSessionRecording();
     PostHogInternalEvents.sessionRecordingActive.value = false;
@@ -937,6 +1091,8 @@ class Posthog {
   ///
   /// Returns `false` when session replay is inactive or unsupported by the
   /// current platform.
+  ///
+  /// **Windows/Linux:** not supported.
   Future<bool> isSessionReplayActive() => _posthog.isSessionReplayActive();
 
   Posthog._internal();

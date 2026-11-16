@@ -5,8 +5,6 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
-import 'package:posthog_flutter/src/util/platform_io_stub.dart'
-    if (dart.library.io) 'package:posthog_flutter/src/util/platform_io_real.dart';
 
 import 'isolate_handler_io.dart'
     if (dart.library.js_interop) 'isolate_handler_web.dart';
@@ -182,9 +180,9 @@ class PostHogErrorTrackingAutoCaptureIntegration {
 
   /// Platform error handler for Dart runtime errors
   void _setupPlatformErrorHandler() {
-    // On web, PlatformDispatcher.onError is not implemented. Skip for now
+    // PlatformDispatcher.onError is not implemented on web.
     // See: https://github.com/flutter/flutter/issues/100277
-    if (!isSupportedPlatform()) {
+    if (kIsWeb) {
       return;
     }
 
@@ -219,9 +217,8 @@ class PostHogErrorTrackingAutoCaptureIntegration {
     }
 
     // https://docs.flutter.dev/perf/isolates#web-platforms-and-compute
-    // web has no isolates support, and isSupportedPlatform() returns true
-    // there (its web stub reports kIsWeb), so check kIsWeb explicitly
-    if (kIsWeb || !isSupportedPlatform()) {
+    // web has no isolates support
+    if (kIsWeb) {
       return;
     }
 

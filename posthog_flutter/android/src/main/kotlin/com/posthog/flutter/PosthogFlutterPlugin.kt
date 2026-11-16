@@ -19,10 +19,12 @@ import android.view.PixelCopy
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager.LayoutParams.FLAG_SECURE
 import androidx.annotation.RequiresApi
 import androidx.annotation.VisibleForTesting
 import com.posthog.PersonProfiles
 import com.posthog.PostHog
+import com.posthog.PostHogBeforeSend
 import com.posthog.PostHogBootstrapConfig
 import com.posthog.PostHogCompression
 import com.posthog.PostHogConfig
@@ -35,6 +37,7 @@ import com.posthog.android.replay.PostHogReplayIntegration
 import com.posthog.android.replay.PostHogScreenshotColorMode
 import com.posthog.internal.PostHogSessionManager
 import com.posthog.logs.PostHogLogSeverity
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -159,6 +162,16 @@ class PosthogFlutterPlugin :
 
     private var flutterSurveysDelegate: PostHogFlutterSurveysDelegate? = null
 
+    private val engineLifecycleListener =
+        object : FlutterEngine.EngineLifecycleListener {
+            override fun onPreEngineRestart() {
+                // Hot restart replaces Dart without detaching the native plugin.
+                flutterSurveysDelegate?.detachFromEngine()
+            }
+
+            override fun onEngineWillDestroy() {}
+        }
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         if (bitmapExportExecutor.isShutdown) {
             bitmapExportExecutor = Executors.newSingleThreadExecutor()
@@ -172,6 +185,9 @@ class PosthogFlutterPlugin :
         initPlugin()
 
         channel.setMethodCallHandler(this)
+        @Suppress("DEPRECATION")
+        val engine = flutterPluginBinding.flutterEngine
+        engine.addEngineLifecycleListener(engineLifecycleListener)
     }
 
     private fun initPlugin() {
@@ -258,6 +274,14 @@ class PosthogFlutterPlugin :
                 capture(call, result)
             }
 
+            "captureFeatureView" -> {
+                captureFeatureView(call, result)
+            }
+
+            "captureFeatureInteraction" -> {
+                captureFeatureInteraction(call, result)
+            }
+
             "screen" -> {
                 screen(call, result)
             }
@@ -328,6 +352,10 @@ class PosthogFlutterPlugin :
 
             "getFeatureFlagResult" -> {
                 getFeatureFlagResult(call, result)
+            }
+
+            "getAllFeatureFlags" -> {
+                getAllFeatureFlags(result)
             }
 
             "register" -> {
@@ -459,7 +487,15 @@ class PosthogFlutterPlugin :
         mapOf(
             "isActive" to isSessionReplayActive(),
             "sessionId" to PostHogSessionManager.peekSessionId()?.toString(),
+            "secure" to isWindowSecure(),
         )
+
+    private fun isWindowSecure(): Boolean = ((activity?.window?.attributes?.flags ?: 0) and FLAG_SECURE) != 0
+
+    // Dart's capture-time value plus a send-time re-check, so a frame stays masked
+    // if FLAG_SECURE clears (e.g. the secure screen is popped) before it's sent.
+    @VisibleForTesting
+    internal fun isFrameMasked(secureAtCapture: Boolean): Boolean = secureAtCapture || isWindowSecure()
 
     private fun startSessionRecording(
         call: MethodCall,
@@ -602,6 +638,12 @@ class PosthogFlutterPlugin :
                 posthogConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
                     preloadFeatureFlags = it
                 }
+                posthogConfig.getIfNotNull<List<String>>("evaluationContexts") {
+                    evaluationContexts = it
+                }
+                posthogConfig.getIfNotNull<Int>("featureFlagRequestMaxRetries") {
+                    featureFlagRequestMaxRetries = it
+                }
                 posthogConfig.getIfNotNull<Boolean>("optOut") {
                     optOut = it
                 }
@@ -670,7 +712,12 @@ class PosthogFlutterPlugin :
                 posthogConfig.getIfNotNull<Boolean>("surveys") {
                     surveys = it
                     if (surveys) {
-                        val delegate = PostHogFlutterSurveysDelegate(channel)
+                        // The native SDK ignores a repeated setup() and keeps the delegate from the
+                        // first one. A new instance here would render nothing yet still receive
+                        // every Dart survey action, so each action comes back as SurveyInvalidated.
+                        val delegate = flutterSurveysDelegate ?: PostHogFlutterSurveysDelegate(channel)
+                        // Dart's setup confirms its handler is ready before resuming a detached survey.
+                        delegate.attachToEngine(channel)
                         surveysConfig.surveysDelegate = delegate
                         flutterSurveysDelegate = delegate
                     }
@@ -807,6 +854,25 @@ class PosthogFlutterPlugin :
 
                 sdkName = "posthog-flutter"
                 sdkVersion = postHogVersion
+
+                // Native lifecycle events never pass through Dart, so the version Dart
+                // reports at setup is added here, once per app build.
+                posthogConfig.getIfNotNull<String>("flutterVersion") { flutterVersion ->
+                    if (flutterVersion.isNotEmpty()) {
+                        addBeforeSend(
+                            PostHogBeforeSend { event ->
+                                if (event.event == "Application Installed" || event.event == "Application Updated") {
+                                    event.properties?.put("\$flutter_version", flutterVersion)
+                                }
+                                event
+                            },
+                        )
+                    }
+                }
+
+                posthogConfig.getIfNotNull<Boolean>("disableGeoIp") {
+                    disableGeoIp = it
+                }
 
                 onFeatureFlags =
                     PostHogOnFeatureFlags {
@@ -952,7 +1018,11 @@ class PosthogFlutterPlugin :
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        @Suppress("DEPRECATION")
+        val engine = binding.flutterEngine
+        engine.removeEngineLifecycleListener(engineLifecycleListener)
         stopOcclusionDetector()
+        flutterSurveysDelegate?.detachFromEngine()
         channel.setMethodCallHandler(null)
         pushChannelCandidates.remove(channel)
         if (activeChannel === channel) {
@@ -1291,8 +1361,9 @@ class PosthogFlutterPlugin :
                 val timestampMs = replayTimeMillis()
                 val replayConfig = postHogConfig?.sessionReplayConfig
                 val quality = replayConfig?.screenshotCompressionQuality ?: DEFAULT_SCREENSHOT_COMPRESSION_QUALITY
+                val masked = isFrameMasked(call.argument<Boolean>("secureAtCapture") == true)
                 submitSnapshotWork(result) {
-                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality)
+                    snapshotSender.sendFullSnapshot(imageBytes, id, x, y, timestampMs, width, height, quality, masked)
                 }
             } else {
                 result.error("INVALID_ARGUMENT", "Image bytes are null", null)
@@ -1663,7 +1734,7 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val featureFlagKey: String = call.argument("key")!!
-            val flag = PostHog.getFeatureFlag(featureFlagKey)
+            val flag = PostHog.getFeatureFlag(featureFlagKey, sendFeatureFlagEvent = call.argument("sendEvent"))
             result.success(flag)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -1708,6 +1779,23 @@ class PosthogFlutterPlugin :
             } else {
                 result.success(null)
             }
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun getAllFeatureFlags(result: Result) {
+        try {
+            val flagResults =
+                PostHog.getAllFeatureFlags()?.map {
+                    mapOf(
+                        "key" to it.key,
+                        "enabled" to it.enabled,
+                        "variant" to it.variant,
+                        "payload" to it.payload,
+                    )
+                }
+            result.success(flagResults)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
         }
@@ -1818,6 +1906,32 @@ class PosthogFlutterPlugin :
         }
     }
 
+    private fun captureFeatureView(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val flag: String = call.argument("flag")!!
+            PostHog.captureFeatureView(flag, call.argument("flagVariant"))
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
+    private fun captureFeatureInteraction(
+        call: MethodCall,
+        result: Result,
+    ) {
+        try {
+            val flag: String = call.argument("flag")!!
+            PostHog.captureFeatureInteraction(flag, call.argument("flagVariant"))
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PosthogFlutterException", e.localizedMessage, null)
+        }
+    }
+
     private fun distinctId(result: Result) {
         try {
             val distinctId: String = PostHog.distinctId()
@@ -1882,7 +1996,7 @@ class PosthogFlutterPlugin :
     ) {
         try {
             val key: String = call.argument("key")!!
-            val isEnabled = PostHog.isFeatureEnabled(key)
+            val isEnabled = PostHog.isFeatureEnabled(key, sendFeatureFlagEvent = call.argument("sendEvent"))
             result.success(isEnabled)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)
@@ -2130,6 +2244,8 @@ class PosthogFlutterPlugin :
     private fun close(result: Result) {
         try {
             PostHog.close()
+            flutterSurveysDelegate?.detachFromEngine()
+            flutterSurveysDelegate = null
             result.success(null)
         } catch (e: Throwable) {
             result.error("PosthogFlutterException", e.localizedMessage, null)

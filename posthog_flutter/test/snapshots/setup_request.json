@@ -11,6 +11,7 @@
       "flushInterval": 15,
       "sendFeatureFlagEvents": false,
       "preloadFeatureFlags": false,
+      "featureFlagRequestMaxRetries": 1,
       "captureApplicationLifecycleEvents": false,
       "rageClickConfig": {
         "enabled": true,
@@ -22,6 +23,7 @@
       "optOut": false,
       "surveys": true,
       "personProfiles": "always",
+      "disableGeoIp": false,
       "compression": "gzip",
       "sessionReplay": true,
       "dataMode": "any",
@@ -33,7 +35,6 @@
         "maskAllPlatformViews": true,
         "captureNativeScreens": false,
         "verifyScreenshotMaskAlignment": false,
-        "screenshotScale": 1.0,
         "screenshotCompressionQuality": 30,
         "screenshotColorMode": "argb8888",
         "sampleRate": 0.25
