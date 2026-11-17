@@ -242,7 +242,7 @@ class ComplianceAdapter {
         personProperties: _readNullableObjectMap(body['person_properties']),
         groups: _readNullableObjectMap(body['groups']),
         groupProperties: _readNestedObjectMap(body['group_properties']),
-        disableGeoip: body['disable_geoip'] == true,
+        disableGeoIp: body['disable_geoip'] == true,
       );
 
       await _sendJson(request, {'success': true, 'value': value});
@@ -385,7 +385,7 @@ class _CaptureClient extends DesktopPostHog {
     required Map<String, Object?> personProperties,
     required Map<String, Object?> groups,
     required Map<String, Map<String, Object?>> groupProperties,
-    required bool disableGeoip,
+    required bool disableGeoIp,
   }) async {
     // A user's cached flags and reported flag calls must not serve the next.
     if (_flagsUser != null && _flagsUser != distinctId) {
@@ -405,7 +405,7 @@ class _CaptureClient extends DesktopPostHog {
     resetGroupPropertiesForFlags();
     setGroupPropertiesForFlags(groupProperties);
     _flagsRequestFields = {
-      'geoip_disable': disableGeoip,
+      'geoip_disable': disableGeoIp,
       'flag_keys_to_evaluate': [key],
     };
     await reloadFeatureFlagsAsync();
@@ -675,7 +675,7 @@ class _CompliancePlatform {
     Map<String, Object?>? personProperties,
     Map<String, Object?>? groups,
     Map<String, Map<String, Object?>>? groupProperties,
-    required bool disableGeoip,
+    required bool disableGeoIp,
   }) async {
     final client = _client;
     if (client == null) return false;
@@ -685,7 +685,7 @@ class _CompliancePlatform {
       personProperties: personProperties ?? const {},
       groups: groups ?? const {},
       groupProperties: groupProperties ?? const {},
-      disableGeoip: disableGeoip,
+      disableGeoIp: disableGeoIp,
     );
     return result?.variant ?? result?.enabled ?? false;
   }

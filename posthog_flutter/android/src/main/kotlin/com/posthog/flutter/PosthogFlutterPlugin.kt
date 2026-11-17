@@ -923,6 +923,10 @@ class PosthogFlutterPlugin :
                     }
                 }
                 nativeBeforeSendSnapshot().forEach { this.addBeforeSend(it) }
+
+                posthogConfig.getIfNotNull<Boolean>("disableGeoIp") {
+                    disableGeoIp = it
+                }
             }
 
         lastBuiltConfig = config

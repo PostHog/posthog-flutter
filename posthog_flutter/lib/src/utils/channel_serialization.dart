@@ -22,6 +22,7 @@ extension PostHogConfigSerialization on PostHogConfig {
       'optOut': optOut,
       'surveys': surveys,
       'personProfiles': personProfiles.name,
+      'disableGeoIp': disableGeoIp,
       'compression': compression.name,
       // Unset AI lane settings are omitted so the native defaults apply.
       if (captureAiCompression != null)
