@@ -379,7 +379,6 @@ internal class PosthogFlutterPluginTest {
         assertEquals(PostHogConfig.DEFAULT_CAPTURE_AI_MAX_EVENT_BYTES, config.captureAiMaxEventBytes)
     }
 
-
     /** Runs setup with [setupArgs] and returns a lookup from event name to its properties after the native beforeSend hooks. */
     private fun nativeBeforeSendAfterSetup(setupArgs: Map<String, Any>): (eventName: String) -> Map<String, Any>? {
         val plugin = PosthogFlutterPlugin()
