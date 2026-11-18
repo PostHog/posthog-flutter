@@ -24,11 +24,13 @@ allprojects {
     }
 }
 
-apply plugin: 'com.android.library'
+// Flutter 3.44+ scans this file's text for AGP/KGP `apply plugin:` lines and warns about, or on
+// 3.44-3.46 force-applies, KGP. This script already applies KGP only when it is needed.
+pluginManager.apply('com.android.library')
 
 def agpMajor = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')[0] as int
 if (agpMajor < 9) {
-    apply plugin: 'kotlin-android'
+    pluginManager.apply('kotlin-android')
 } else {
     // AGP 9 enables built-in Kotlin by default. Flutter templates can explicitly opt out
     // with android.builtInKotlin=false, in which case we still apply kotlin-android.
@@ -36,7 +38,7 @@ if (agpMajor < 9) {
         .map { it.toBoolean() }
         .getOrElse(true)
     if (!builtInKotlin) {
-        apply plugin: 'kotlin-android'
+        pluginManager.apply('kotlin-android')
     }
 }
 
