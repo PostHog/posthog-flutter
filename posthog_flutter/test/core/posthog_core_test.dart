@@ -108,24 +108,20 @@ void main() {
       expect(reloads, 0, reason: 'an event-level group is not a group change');
     });
 
-    test('attaches the session debug properties', () async {
+    test('attaches the queue size but no session debug properties', () {
       final storage = tempStorage();
-      final before = DateTime.now().millisecondsSinceEpoch;
       final client = testClient(server, storage: storage);
-      final after = DateTime.now().millisecondsSinceEpoch;
-      // Real wait: the session starts with the client, not its first event.
-      await Future<void>.delayed(const Duration(milliseconds: 10));
 
       client.capture('first');
       client.register({r'$sdk_debug_pending_queue_size': 'registered'});
       client.capture('second');
 
-      final first = queuedProps(storage, 0);
-      expect(first[r'$sdk_debug_session_start'],
-          allOf(greaterThanOrEqualTo(before), lessThanOrEqualTo(after)));
-      expect(first[r'$sdk_debug_current_session_duration'],
-          greaterThanOrEqualTo(10));
-      expect(first[r'$sdk_debug_pending_queue_size'], 0);
+      for (final index in [0, 1]) {
+        final props = queuedProps(storage, index);
+        expect(props, isNot(contains(r'$sdk_debug_session_start')));
+        expect(props, isNot(contains(r'$sdk_debug_current_session_duration')));
+      }
+      expect(queuedProps(storage, 0)[r'$sdk_debug_pending_queue_size'], 0);
       expect(queuedProps(storage, 1)[r'$sdk_debug_pending_queue_size'], 1,
           reason: 'SDK debug values win over a registered super property');
     });
@@ -278,7 +274,8 @@ void main() {
         final props = queuedPropsOf(storage, event);
         expect(props[r'$process_person_profile'], isTrue, reason: event);
         expect(props[r'$is_identified'], isTrue, reason: event);
-        expect(props, contains(r'$sdk_debug_session_start'), reason: event);
+        expect(props, contains(r'$sdk_debug_pending_queue_size'),
+            reason: event);
       }
     });
   });

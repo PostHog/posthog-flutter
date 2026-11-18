@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:meta/meta.dart';
 
@@ -165,18 +164,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
       r'$process_person_profile': _hasPersonProcessing(),
       r'$is_identified': _isIdentified(),
       if (_disableGeoIp) r'$geoip_disable': true,
-      ..._sessionDebugProperties(now),
-    };
-  }
-
-  /// The state of the session and the queue, attached to every event to
-  /// help debug the SDK.
-  Map<String, Object?> _sessionDebugProperties(int now) {
-    final startedAt = _session.startedAt;
-    return {
-      r'$sdk_debug_session_start': startedAt,
-      // The wall clock can move backwards.
-      r'$sdk_debug_current_session_duration': max(0, now - startedAt),
       r'$sdk_debug_pending_queue_size': storage.queue.length,
     };
   }
