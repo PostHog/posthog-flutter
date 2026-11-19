@@ -145,8 +145,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   Map<String, Object?> _enrichProperties(Map<String, Object?>? properties) {
     final now = DateTime.now().millisecondsSinceEpoch;
-    // Resolved first: it may start a new session, which the debug
-    // properties below then describe.
     final managedSessionId = _session.touch(now);
     final callerSessionId = properties?[r'$session_id'];
     final sessionId = callerSessionId is String && callerSessionId.isNotEmpty
