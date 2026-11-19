@@ -43,6 +43,13 @@ await Posthog().flush();
 await Posthog().close();
 ```
 
+## Offline behavior
+
+On Android and Apple platforms, the SDK keeps capturing events while the device is offline. Events are queued in device file storage and flushed when the app restarts with a network connection.
+
+- `maxQueueSize` sets the maximum number of queued events.
+- When the queue is full, the oldest event is evicted first.
+
 ## Reproducible Android builds and Shorebird
 
 `posthog_flutter` allows a range of versions of the native PostHog Android SDK, which depends on the PostHog core library. Gradle can pick a newer native version even when your `posthog_flutter` version stays the same, and `pubspec.lock` doesn't lock Gradle dependencies.

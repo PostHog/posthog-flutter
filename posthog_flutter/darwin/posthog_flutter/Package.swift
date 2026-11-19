@@ -7,7 +7,7 @@ let package = Package(
     name: "posthog_flutter",
     platforms: [
         .iOS("15.0"),
-        .macOS("11.0"),
+        .macOS("12.0"),
     ],
     products: [
         .library(name: "posthog-flutter", targets: ["posthog_flutter"]),
