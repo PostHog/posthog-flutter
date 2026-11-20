@@ -969,16 +969,17 @@ abstract class PostHogCoreStateless {
           timeout: lane.timeout);
       if (response.status != 307 && response.status != 308) return response;
       final location = response.location;
-      final target = location == null ? null : url.resolve(location);
+      final target = location == null ? null : Uri.tryParse(location);
+      final resolved = target == null ? null : url.resolveUri(target);
       if (redirects >= _maxCaptureRedirects ||
-          target == null ||
-          target.scheme != origin.scheme ||
-          target.host.toLowerCase() != origin.host.toLowerCase() ||
-          target.port != origin.port) {
+          resolved == null ||
+          resolved.scheme != origin.scheme ||
+          resolved.host.toLowerCase() != origin.host.toLowerCase() ||
+          resolved.port != origin.port) {
         logger.warn('Capture did not follow a ${response.status} redirect.');
         return response;
       }
-      url = target;
+      url = resolved;
     }
   }
 

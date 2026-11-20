@@ -755,6 +755,22 @@ void main() {
       expect(server.requests, hasLength(6));
       expect(getQueue(storage), isEmpty);
     });
+
+    test('does not follow a redirect with a malformed location', () async {
+      final server = await LocalPostHogServer.start();
+      final storage = tempStorage();
+      final client = testClient(server, storage: storage);
+      server.respond = (_) => PostHogResponse(HttpStatus.temporaryRedirect,
+          location: 'http://[::1');
+
+      client.capture('evt');
+      await expectLater(
+          client.flush(),
+          throwsA(isA<PostHogFetchHttpError>()
+              .having((e) => e.status, 'status', 307)));
+
+      expect(server.requests, hasLength(1));
+    });
   });
 
   test('sends events queued by posthog_flutter 5.x through capture v1',
