@@ -112,6 +112,14 @@ abstract class PostHogCoreStateless {
   @protected
   final FileStorage storage;
 
+  /// The queue's length once it has reached `flushAt`, else null: below it
+  /// the queue is ordinary batching, not a backlog worth reporting.
+  @protected
+  int? get backedUpQueueLength {
+    final length = storage.queue.length;
+    return length > 0 && length >= _flushAt ? length : null;
+  }
+
   final _httpClient = HttpClient();
 
   PostHogCoreStateless(
