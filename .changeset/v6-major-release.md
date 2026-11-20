@@ -16,7 +16,7 @@
 - **Breaking:** remove the `PostHogSessionReplayConfig.debouncerDelay` setter. Use `throttleDelay`
 - **Breaking:** remove `PostHogDataMode.cellular`. Use `PostHogDataMode.any`
 - **Breaking:** remove `toMap()` from the config classes and `PostHogFeatureFlagResult.fromMap()` from the public API
-- **Breaking:** send events to capture v1 (`/i/v1/analytics/events`) instead of `/batch/` on iOS, macOS, Android, Windows and Linux. Update your reverse proxy first. See the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#prepare-your-proxy) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#prepare-your-proxy) migration guides
+- **Breaking:** send events to capture v1 (`/i/v1/analytics/events`) instead of `/batch/` on iOS, macOS, Android, Windows and Linux. Update your reverse proxy first. See the [iOS](https://github.com/PostHog/posthog-ios/blob/4.0.0/MIGRATION.md#prepare-your-proxy) and [Android](https://github.com/PostHog/posthog-android/blob/android-v4.0.0/MIGRATION.md#prepare-your-proxy) migration guides
 - **Breaking:** drop the batch on a redirect on Windows and Linux, following only same-origin 307 and 308 redirects, and cap a `Retry-After` wait at 30 seconds
 - **Breaking:** write events to disk only when the returned future completes on Windows and Linux, so an unawaited call can be lost on a crash or `exit()`. Await the call or `Posthog().close()` before `exit()`
 - **Breaking:** apply SDK properties, then registered properties, then event properties on iOS, macOS, Android, Windows and Linux, so your value wins for that event, and run `beforeSend` after that merge

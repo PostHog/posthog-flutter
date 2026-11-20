@@ -149,7 +149,7 @@ Don't add these native SDKs to your app separately at a different major version.
 
 On Android, posthog-android 4.0.0 brings the `posthog` core 7.0.0. It isn't binary compatible with artifacts built against posthog-android 3.x.x.
 
-If your app also uses `posthog-server` older than 2.25.0, or another plugin or library built on posthog-android 3.x.x, it fails at runtime with errors such as `NoSuchMethodError`. Upgrade `posthog-server` to 2.25.0 or later. See [`posthog-server`](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#upgrade-posthog-server) in the Android guide.
+If your app also uses `posthog-server` older than 2.25.0, or another plugin or library built on posthog-android 3.x.x, it fails at runtime with errors such as `NoSuchMethodError`. Upgrade `posthog-server` to 2.25.0 or later. See [`posthog-server`](https://github.com/PostHog/posthog-android/blob/android-v4.0.0/MIGRATION.md#upgrade-posthog-server) in the Android guide.
 
 ### Prepare your proxy
 
@@ -185,7 +185,7 @@ On iOS, macOS, Android, Windows, and Linux, the SDK follows a 307 or 308 redirec
 
 Any other redirect drops the batch. In 5.x.x, iOS, macOS, and Android followed redirects to any host, and Windows and Linux followed none and kept the batch queued. If a proxy redirects capture requests to another host, point `host` at the final host.
 
-On iOS, macOS, and Android, capture v1 comes from the native SDKs. The capture v1 changes in the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#prepare-your-proxy) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#prepare-your-proxy) guides apply there too.
+On iOS, macOS, and Android, capture v1 comes from the native SDKs. The capture v1 changes in the [iOS](https://github.com/PostHog/posthog-ios/blob/4.0.0/MIGRATION.md#prepare-your-proxy) and [Android](https://github.com/PostHog/posthog-android/blob/android-v4.0.0/MIGRATION.md#prepare-your-proxy) guides apply there too.
 
 For the changes every capture v1 SDK shares, such as event options, limits, and per-event results, see [Upgrading to capture v1 SDKs](https://posthog.com/docs/api/capture-v1).
 
@@ -201,7 +201,7 @@ If you identify users with a long ID, such as a JWT or a long email address, sho
 
 On Windows and Linux, PostHog also drops an event whose name is over 200 UTF-8 bytes. Legacy capture had no limit on event name length.
 
-On iOS, macOS, and Android, the native SDKs send the events and apply the same limits (see the [iOS](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#shorten-distinct-ids) and [Android](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#shorten-long-ids) guides).
+On iOS, macOS, and Android, the native SDKs send the events and apply the same limits (see the [iOS](https://github.com/PostHog/posthog-ios/blob/4.0.0/MIGRATION.md#shorten-distinct-ids) and [Android](https://github.com/PostHog/posthog-android/blob/android-v4.0.0/MIGRATION.md#shorten-long-ids) guides).
 
 ### Rename empty variants
 
@@ -527,7 +527,7 @@ On iOS, macOS, and Android, `$feature_flag_called` for a missing flag now leaves
 
 Insights, cohorts, and actions that filter on `$feature_flag_response` being `null`, `""`, or `false` to find missing flags stop matching new events without any error. Use an `is not set` filter instead.
 
-See [Check flag events](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#check-flag-events) in the Android guide.
+See [Check flag events](https://github.com/PostHog/posthog-android/blob/android-v4.0.0/MIGRATION.md#check-flag-events) in the Android guide.
 
 ### Check flag events
 
@@ -551,7 +551,7 @@ On iOS and macOS, a `null` value inside a nested map is now left out of the even
 - **Empty maps.** A map left empty is sent as `{}`.
 - **Person and group properties.** `$set`, `$set_once`, and `$group_set` still send `null` values, so you can still clear a person or group property.
 
-See [Check null properties](https://github.com/PostHog/posthog-ios/blob/main/MIGRATION.md#check-null-properties) in the iOS guide.
+See [Check null properties](https://github.com/PostHog/posthog-ios/blob/4.0.0/MIGRATION.md#check-null-properties) in the iOS guide.
 
 On Android, a `null` element in a list is now sent as `null` at its position instead of being removed. In 5.x.x, the removal moved later elements to lower indexes. A map entry whose value is `null` is still left out.
 
