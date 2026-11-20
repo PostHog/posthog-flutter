@@ -781,6 +781,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
             : properties,
         userProperties,
         userPropertiesSetOnce,
+        normalize: false,
       ),
       options: callerOptions,
     );
@@ -795,7 +796,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
         properties: eventProperties,
         userProperties: set,
         userPropertiesSetOnce: setOnce,
-        options: preparedOptions == null ? null : {...preparedOptions},
+        options: preparedOptions == null
+            ? null
+            : copyForBeforeSend(preparedOptions) as Map<String, Object?>,
         uuid: prepared.uuid,
         distinctId: prepared.distinctId,
         timestamp: DateTime.parse(prepared.timestamp),
@@ -805,12 +808,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   }
 
   /// A deep copy of [map] without its null values, or null when it is not a
-  /// map. Registered properties share their nested maps and lists with
-  /// storage, so a callback editing them in place would change later events.
+  /// map.
   static Map<String, Object>? _nonNull(Object? map) => map is Map
-      ? Map<String, Object>.from(PropertyNormalizer.normalize({
-          for (final MapEntry(:key, :value) in map.entries) '$key': value,
-        }))
+      ? {
+          for (final MapEntry(:key, :value) in map.entries)
+            if (value != null) '$key': copyForBeforeSend(value)!,
+        }
       : null;
 
   /// Applies the beforeSend callbacks to an event in order. Running them here
@@ -876,8 +879,9 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   Map<String, Object?>? _mergeUserProps(
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
-    Map<String, Object>? userPropertiesSetOnce,
-  ) {
+    Map<String, Object>? userPropertiesSetOnce, {
+    bool normalize = true,
+  }) {
     // Inline $set/$set_once in properties are legacy but still honored, with
     // the explicit parameters winning per key.
     final extracted = CaptureUtils.extractUserProperties(
@@ -886,10 +890,12 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
 
-    final set = _normalize(extracted.userProperties);
-    final setOnce = _normalize(extracted.userPropertiesSetOnce);
+    Map<String, Object>? convert(Map<String, Object>? properties) =>
+        normalize ? _normalize(properties) : properties;
+    final set = convert(extracted.userProperties);
+    final setOnce = convert(extracted.userPropertiesSetOnce);
     final merged = <String, Object?>{
-      ...?_normalize(extracted.properties),
+      ...?convert(extracted.properties),
       if (set != null && set.isNotEmpty) r'$set': set,
       if (setOnce != null && setOnce.isNotEmpty) r'$set_once': setOnce,
     };

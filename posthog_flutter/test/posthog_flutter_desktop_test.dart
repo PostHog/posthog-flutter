@@ -1216,6 +1216,35 @@ void main() {
       expect(sentOptions, containsPair('disable_skew_correction', false));
     });
 
+    test('a callback editing a nested registered option changes only its event',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            if (event.event == 'first') {
+              final custom = event.options!['custom'] as Map<String, dynamic>;
+              (custom['tags'] as List).add('mutated');
+            }
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+      await platform.registerOptions({
+        'custom': {
+          'tags': ['a'],
+        },
+      });
+
+      await platform.capture(eventName: 'first');
+      await platform.capture(eventName: 'second');
+
+      final second = await server.waitForEvent('second');
+      expect((second['options'] as Map)['custom'], {
+        'tags': ['a'],
+      });
+    });
+
     test('properties the callbacks remove stay removed', () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());
@@ -1322,6 +1351,26 @@ void main() {
       final stacktrace =
           Map<String, Object?>.from(exception['stacktrace']! as Map);
       expect(stacktrace['frames'], isNotEmpty);
+    });
+
+    test(r'lets callbacks cast $exception_list to a list of maps', () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            final list = event.properties?[r'$exception_list']
+                as List<Map<String, dynamic>>?;
+            list?.first['value'] = 'scrubbed';
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.captureException(error: StateError('secret'));
+
+      final event = await server.waitForEvent(r'$exception');
+      final exceptionList = _propertiesOf(event)[r'$exception_list']! as List;
+      expect((exceptionList.first as Map)['value'], 'scrubbed');
     });
 
     test('does not admit an exception made while opted out', () async {
