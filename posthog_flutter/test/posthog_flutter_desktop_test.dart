@@ -228,24 +228,23 @@ void main() {
       expect(_propertiesOf(event)[r'$set'], {'plan': 'pro', 'team': 'core'});
     });
 
-    test(r'a beforeSend that removes a legacy $set keeps it off the event',
-        () async {
+    test(r'hands a legacy $set to beforeSend as userProperties', () async {
       final server = await LocalPostHogServer.start();
       final config = configFor(server)
         ..beforeSend = [
-          (event) => event..properties?.remove(r'$set'),
+          (event) => event..userProperties?.remove('email'),
         ];
       final platform = await setUpPlatform(config);
 
       await platform.capture(
         eventName: 'redacted',
         properties: {
-          r'$set': {'email': 'a@b.c'},
+          r'$set': {'email': 'a@b.c', 'plan': 'pro'},
         },
       );
 
       final event = await server.waitForEvent('redacted');
-      expect(_propertiesOf(event), isNot(contains(r'$set')));
+      expect(_propertiesOf(event)[r'$set'], {'plan': 'pro'});
     });
 
     test(r'sends $app_language', () async {

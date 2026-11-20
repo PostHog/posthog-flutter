@@ -754,11 +754,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   /// The SDK's properties come first, then the registered ones, then the
   /// event's own. Returns null when the client is closed or opted out.
   ///
-  /// [userProperties] and [userPropertiesSetOnce] are handed to the
+  /// Legacy `$set` and `$set_once` maps in [properties] are merged with
+  /// [userProperties] and [userPropertiesSetOnce] and handed to the
   /// callbacks as [PostHogEvent.userProperties] and
-  /// [PostHogEvent.userPropertiesSetOnce]. Legacy `$set` and `$set_once`
-  /// maps in [properties] stay in [PostHogEvent.properties], so a callback
-  /// that removes them there still keeps them off the event.
+  /// [PostHogEvent.userPropertiesSetOnce], as on iOS and Android.
   /// The event's time, uuid and distinct id are taken now, before the
   /// callbacks run. An `$exception` event gets the exception steps recorded
   /// up to now, unless it sets its own.
@@ -787,24 +786,15 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
     );
     if (prepared == null) return null;
     final eventProperties = _nonNull(prepared.properties)!;
-    for (final (key, explicit) in [
-      (r'$set', userProperties),
-      (r'$set_once', userPropertiesSetOnce),
-    ]) {
-      final legacy = _nonNull(properties?[key]);
-      if (legacy != null) {
-        eventProperties[key] = legacy;
-      } else if (explicit != null) {
-        eventProperties.remove(key);
-      }
-    }
+    final set = _nonNull(eventProperties.remove(r'$set'));
+    final setOnce = _nonNull(eventProperties.remove(r'$set_once'));
     final preparedOptions = prepared.options;
     return (
       event: PostHogEvent(
         event: eventName,
         properties: eventProperties,
-        userProperties: _nonNull(userProperties),
-        userPropertiesSetOnce: _nonNull(userPropertiesSetOnce),
+        userProperties: set,
+        userPropertiesSetOnce: setOnce,
         options: preparedOptions == null ? null : {...preparedOptions},
         uuid: prepared.uuid,
         distinctId: prepared.distinctId,
