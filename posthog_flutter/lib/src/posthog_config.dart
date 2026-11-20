@@ -10,9 +10,11 @@ import 'replay/mask/posthog_text_mask.dart';
 
 /// Callback to intercept and modify events before they are sent to PostHog.
 ///
-/// The [event] argument contains the event name and user-provided properties
-/// that are about to be captured. Return a possibly modified event to send it,
-/// or return `null` to drop it.
+/// The [event] argument is the event about to be captured. On iOS, macOS,
+/// Android, Windows and Linux it is the built event, with the system and
+/// registered properties and the options the SDK adds; on web it has only
+/// the event's own properties. See [PostHogConfig.beforeSend]. Return a
+/// possibly modified event to send it, or return `null` to drop it.
 ///
 /// Callbacks are synchronous, as in the native SDKs, so the event is sent
 /// with the user and properties it was captured under.
