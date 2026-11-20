@@ -1,5 +1,17 @@
 ## Next
 
+## 5.61.2
+
+### Patch Changes
+
+- 34144cb: Only attach `$sdk_debug_pending_queue_size` to Windows and Linux events once the event queue reaches `flushAt`, so healthy queues no longer add it to every event
+
+## 5.61.1
+
+### Patch Changes
+
+- ddaf3ab: Fix the false "plugins that apply Kotlin Gradle Plugin (KGP)" warning that Flutter 3.44+ printed for `posthog_flutter` on every AGP 9 build, even though the plugin applies KGP only when built-in Kotlin is off.
+
 ## 5.61.0
 
 ### Minor Changes

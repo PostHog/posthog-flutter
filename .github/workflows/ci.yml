@@ -115,6 +115,16 @@ jobs:
         if: needs.detect-markdown-only.outputs.markdown_only != 'true'
         run: make checkFormatKotlin
 
+      # Flutter 3.44+ scans the plugin's build.gradle text for `apply plugin:` / `plugins {}` lines
+      # and warns about, or force-applies, KGP on AGP 9 (#731). Keep those forms out of the file.
+      - name: Check build.gradle avoids Flutter's plugin-apply scan
+        if: needs.detect-markdown-only.outputs.markdown_only != 'true'
+        run: |
+          if grep -nE '^[[:space:]]*(apply[[:space:]]+plugin|plugins[[:space:]]*\{)' posthog_flutter/android/build.gradle; then
+            echo "::error file=posthog_flutter/android/build.gradle::Use pluginManager.apply(...) instead of 'apply plugin:' or a plugins {} block (see #731)."
+            exit 1
+          fi
+
   swift-format:
     needs: detect-markdown-only
     name: Swift format

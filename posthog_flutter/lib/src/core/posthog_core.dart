@@ -289,7 +289,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       r'$sdk_debug_session_start': startedAt,
       // The wall clock can move backwards.
       r'$sdk_debug_current_session_duration': max(0, now - startedAt),
-      r'$sdk_debug_pending_queue_size': storage.queue.length,
+      // Null is left out when the event is queued.
+      r'$sdk_debug_pending_queue_size': backedUpQueueLength,
     };
   }
 

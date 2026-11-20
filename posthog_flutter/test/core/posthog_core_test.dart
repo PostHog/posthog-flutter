@@ -118,16 +118,33 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
       client.capture('first');
-      client.register({r'$sdk_debug_pending_queue_size': 'registered'});
-      client.capture('second');
 
       final first = queuedProps(storage, 0);
       expect(first[r'$sdk_debug_session_start'],
           allOf(greaterThanOrEqualTo(before), lessThanOrEqualTo(after)));
       expect(first[r'$sdk_debug_current_session_duration'],
           greaterThanOrEqualTo(10));
-      expect(first[r'$sdk_debug_pending_queue_size'], 0);
-      expect(queuedProps(storage, 1)[r'$sdk_debug_pending_queue_size'],
+    });
+
+    test('attaches the pending queue size only once the queue reaches flushAt',
+        () {
+      final storage = tempStorage();
+      final client = testClient(server,
+          config: testConfig(flushAt: 2, flushInterval: Duration.zero),
+          storage: storage);
+
+      client.capture('first');
+      client.capture('second');
+      client.capture('third');
+      client.register({r'$sdk_debug_pending_queue_size': 'registered'});
+      client.capture('fourth');
+
+      for (final index in [0, 1]) {
+        expect(queuedProps(storage, index),
+            isNot(contains(r'$sdk_debug_pending_queue_size')));
+      }
+      expect(queuedProps(storage, 2)[r'$sdk_debug_pending_queue_size'], 2);
+      expect(queuedProps(storage, 3)[r'$sdk_debug_pending_queue_size'],
           'registered',
           reason: 'a registered super property wins over SDK values');
     });
