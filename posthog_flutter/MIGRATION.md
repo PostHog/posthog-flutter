@@ -18,10 +18,10 @@ Read the checklist first, then the sections that apply to you.
 
 - [ ] You build with a Flutter SDK older than 3.41.0, on any platform → [Update Flutter and Xcode](#update-flutter-and-xcode)
 - [ ] You build for iOS or macOS with an Xcode older than 26 → [Update Flutter and Xcode](#update-flutter-and-xcode)
-- [ ] Your iOS deployment target is below 15.0 or your macOS deployment target is below 11.0, in your Xcode projects or in a `Podfile` you keep → [Raise deployment targets](#raise-deployment-targets)
+- [ ] Your iOS deployment target is below 15.0 or your macOS deployment target is below 12.0, in your Xcode projects or in a `Podfile` you keep → [Raise deployment targets](#raise-deployment-targets)
 - [ ] You build for iOS or macOS with Swift Package Manager off → [Use Swift Package Manager](#use-swift-package-manager)
 - [ ] You embed Flutter in an iOS app as an add-to-app module → use Flutter 3.50.0 or later, see [Use Swift Package Manager](#use-swift-package-manager)
-- [ ] You use `posthog-server` older than 2.25.0 in your Android app → [Check native SDKs](#check-native-sdks)
+- [ ] You use `posthog-server` older than 2.26.0 in your Android app → [Check native SDKs](#check-native-sdks)
 - [ ] You send events through a reverse proxy that doesn't serve `/i/v1/analytics/events` and `/i/v1/ai/events` → [Prepare your proxy](#prepare-your-proxy)
 - [ ] You send events through a reverse proxy set up from PostHog's proxy guides before 29 October 2026, which strips `Authorization` → [Prepare your proxy](#prepare-your-proxy)
 - [ ] You send events through a proxy that redirects capture requests, other than with a 307 or 308 to the same origin as `host` → [Prepare your proxy](#prepare-your-proxy)
@@ -86,7 +86,7 @@ posthog_flutter 6.x.x needs Xcode 26 or later. 5.x.x didn't set an Xcode minimum
 | Target | 5.x.x | 6.x.x |
 | --- | --- | --- |
 | iOS deployment target | 13.0 | 15.0 |
-| macOS deployment target | 10.15 | 11.0 |
+| macOS deployment target | 10.15 | 12.0 |
 | Android `minSdkVersion` declared by the plugin | 21 | 23 |
 
 On iOS and macOS, raise your app's deployment targets. A lower target fails the build.
@@ -100,7 +100,7 @@ If you keep a `Podfile` for other plugins, raise its platform too:
 platform :ios, '15.0'
 
 # macos/Podfile
-platform :osx, '11.0'
+platform :osx, '12.0'
 ```
 
 On Android, you have nothing to change.
@@ -145,7 +145,7 @@ Don't add these native SDKs to your app separately at a different major version.
 
 On Android, posthog-android 4.0.0 brings the `posthog` core 7.0.0. It isn't binary compatible with artifacts built against posthog-android 3.x.x.
 
-If your app also uses `posthog-server` older than 2.25.0, or another plugin or library built on posthog-android 3.x.x, it fails at runtime with errors such as `NoSuchMethodError`. Upgrade `posthog-server` to 2.25.0 or later. See [`posthog-server`](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#upgrade-posthog-server) in the Android guide.
+If your app also uses `posthog-server` older than 2.26.0, or another plugin or library built on posthog-android 3.x.x, it fails at runtime with errors such as `NoSuchMethodError`. Upgrade `posthog-server` to 2.26.0 or later. See [`posthog-server`](https://github.com/PostHog/posthog-android/blob/main/MIGRATION.md#upgrade-posthog-server) in the Android guide.
 
 ### Prepare your proxy
 

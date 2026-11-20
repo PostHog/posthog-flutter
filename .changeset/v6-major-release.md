@@ -2,7 +2,7 @@
 "posthog_flutter": major
 ---
 
-- **Breaking:** bump the minimum iOS deployment target from 13.0 to 15.0 and macOS from 10.15 to 11.0. See the [migration guide](https://github.com/PostHog/posthog-flutter/blob/main/posthog_flutter/MIGRATION.md)
+- **Breaking:** bump the minimum iOS deployment target from 13.0 to 15.0 and macOS from 10.15 to 12.0. See the [migration guide](https://github.com/PostHog/posthog-flutter/blob/main/posthog_flutter/MIGRATION.md)
 - **Breaking:** require the Flutter SDK 3.41 or later on every platform, including Android-only apps
 - **Breaking:** remove CocoaPods support on iOS and macOS. Install through Swift Package Manager, which needs the Flutter SDK 3.41 or later, or 3.50 or later for add-to-app modules
 - **Breaking:** adopt `posthog-ios` 4.x.x, which requires Xcode 26

@@ -310,10 +310,10 @@ class PostHogConfig {
   /// - After calling `Posthog().close()`, surveys will not be rendered until the
   ///   SDK is re-initialized and the next navigation event occurs.
   /// - You must install `PosthogObserver` in your app for surveys to display.
-  ///   - See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
+  ///   - See: https://posthog.com/docs/surveys/installation/flutter
   /// - For Flutter web, this setting will be ignored. Surveys on web use the
   ///   JavaScript Web SDK instead.
-  ///   - See: https://posthog.com/docs/surveys/installation?tab=Web
+  ///   - See: https://posthog.com/docs/surveys/installation/web
   /// - Surveys are not supported on Windows and Linux, where this setting is
   ///   ignored.
   ///
