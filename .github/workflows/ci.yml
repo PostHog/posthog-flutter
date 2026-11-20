@@ -364,7 +364,8 @@ jobs:
 
       - name: Boot iOS test simulator
         if: ${{ needs.detect-markdown-only.outputs.markdown_only != 'true' && matrix.target == 'ios' }}
-        timeout-minutes: 5
+        # A new simulator's first boot on the macos-26 image spends about 4 minutes in data migration.
+        timeout-minutes: 10
         run: |
           simulator_id=$(xcrun simctl create "PostHog Plugin Tests" "iPhone 17 Pro")
           echo "POSTHOG_TEST_SIMULATOR=$simulator_id" >> "$GITHUB_ENV"
