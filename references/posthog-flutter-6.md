@@ -185,6 +185,44 @@ await Posthog().flush();
 await Posthog().close();
 ```
 
+### Reproducible Android builds and Shorebird
+
+`posthog_flutter` allows a range of versions of the native PostHog Android SDK, which depends on the PostHog core library. Gradle can pick a newer native version even when your `posthog_flutter` version stays the same, and `pubspec.lock` doesn't lock Gradle dependencies.
+
+[Shorebird](https://docs.shorebird.dev/code-push/troubleshooting/) patches can't update native Android code. Pin both native libraries before you create a release, so the release and its patches use the same versions.
+
+From your app's `android` directory, list the versions your release build selects:
+
+```bash
+./gradlew :app:dependencyInsight --dependency com.posthog --configuration releaseRuntimeClasspath
+```
+
+With product flavors, use your release variant's configuration, such as `productionReleaseRuntimeClasspath`. Note the versions of `com.posthog:posthog-android` and `com.posthog:posthog`. Their version numbers differ.
+
+Add those versions as strict constraints in `android/app/build.gradle.kts`:
+
+```kotlin
+dependencies {
+    constraints {
+        implementation("com.posthog:posthog-android") {
+            version { strictly("<android-sdk-version>") }
+        }
+        implementation("com.posthog:posthog") {
+            version { strictly("<core-version>") }
+        }
+    }
+}
+```
+
+In a Groovy `build.gradle`, write `version { strictly "<version>" }` inside each constraint. Gradle can still upgrade a plain version declaration, and a [strict constraint](https://docs.gradle.org/current/userguide/dependency_versions.html#sec:rich-version-constraints) stops that.
+
+Run the dependency report again, build your app, and check that events arrive in PostHog. Commit the constraints and `pubspec.lock`.
+
+- For an existing Shorebird release, use the native versions recorded for that release, not the versions a new build resolves.
+- The pins cover PostHog only. To pin other plugins and build tools, use [Gradle dependency locking](https://docs.gradle.org/current/userguide/dependency_locking.html).
+- Pins also block automatic native bug fixes. When you upgrade PostHog, choose compatible native versions together and test event capture before a new app store release.
+- Don't upgrade native dependencies in a Dart-only patch, and don't force a version below the minimum that `posthog_flutter` requires.
+
 ## Setup
 
 ### `Posthog.setup`
@@ -272,6 +310,12 @@ alias and group are dropped because posthog-js sends those events
 without event properties.
 
 Returns a Future that completes when the event has been queued.
+
+On Android and Apple platforms, events captured offline are queued in
+device file storage and sent when the device is online. Queued events
+survive app restarts and are sent after restart when the device is online.
+PostHogConfig.maxQueueSize limits the queue. When full, it drops the
+oldest event first.
 
 **Example**
 
@@ -851,6 +895,38 @@ The property remains active until unregister is called with the same
 
 Returns a Future that completes when the property has been registered.
 
+### `Posthog.registerOptions`
+
+```dart
+Future<void> registerOptions(Map<String, Object?> options)
+```
+
+Registers capture options sent with all following events, such as
+`cookieless_mode` or `disable_skew_correction`. See capture for the
+known keys.
+
+An event's own `options` win over registered ones key by key. On iOS,
+macOS, Android, Windows and Linux, PostHogConfig.beforeSend callbacks
+see and can change the result. New values overwrite registered ones for
+the same keys. They persist across
+app restarts until unregisterOptions removes them or reset clears
+them. A `null` value is ignored.
+
+Use this instead of registering a legacy option property such as
+`$cookieless_mode`.
+
+On web, posthog-js has no options: known keys are registered as their
+legacy properties, with the limits described on capture, and other
+keys are dropped. posthog-js adds them to every event it sends, including
+the ones it captures itself, after PostHogConfig.beforeSend runs, so
+the callbacks don't see them, as for properties added with register.
+
+```dart
+await Posthog().registerOptions({'cookieless_mode': true});
+```
+
+Returns a Future that completes when the options have been registered.
+
 ## Reload feature flags
 
 ### `Posthog.reloadFeatureFlags`
@@ -1136,6 +1212,21 @@ Unregisters a previously registered super property.
 The `key` identifies the property to stop sending with future events.
 
 Returns a Future that completes when the property has been removed.
+
+### `Posthog.unregisterOptions`
+
+```dart
+Future<void> unregisterOptions(String key)
+```
+
+Removes an option registered with registerOptions. Events captured
+afterwards no longer get it, unless they pass it in their own `options`.
+
+```dart
+await Posthog().unregisterOptions('cookieless_mode');
+```
+
+Returns a Future that completes when the option has been removed.
 
 ## SDK utils
 

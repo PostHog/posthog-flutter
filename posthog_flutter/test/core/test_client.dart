@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/core/file_storage.dart';
+import 'package:posthog_flutter/src/core/logger.dart';
+import 'package:posthog_flutter/src/core/queue_worker.dart';
 import 'package:posthog_flutter/src/posthog_config.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 
@@ -44,13 +47,16 @@ FileStorage tempStorage() => FileStorage(tempDirectory().path);
 
 /// A client of [api] with [config], closed at the end of the test. It keeps
 /// its state in [storage], a new temporary directory by default, and
-/// attaches [context] and [timezone] to its events.
+/// attaches [context] and [timezone] to its events. Its backoff has no
+/// jitter unless [jitterUnit] says otherwise, so retries come 1, 2, 4, 8, 16
+/// and then 30 seconds apart.
 DesktopPostHog testClient(
   PostHogApiFake api, {
   PostHogConfig? config,
   FileStorage? storage,
   Map<String, Object?> context = const {},
   String? timezone,
+  double jitterUnit = 0.5,
 }) {
   final client = api.connect(
     () => DesktopPostHog(
@@ -60,6 +66,7 @@ DesktopPostHog testClient(
       timezone: timezone,
     ),
   );
+  client.jitterUnit = () => jitterUnit;
   addTearDown(client.close);
   return client;
 }
@@ -81,9 +88,22 @@ Future<int> flagsRequestsFor(
   return api.flagsRequests.length - before - 1;
 }
 
+/// The value of [future], which an inline [QueueWorker] completes right
+/// away.
+T now<T>(Future<T> future) {
+  late T value;
+  var done = false;
+  future.then((result) {
+    value = result;
+    done = true;
+  });
+  if (!done) throw StateError('The future did not complete synchronously.');
+  return value;
+}
+
 /// The queued event messages, oldest first.
 List<Map<String, Object?>> getQueue(FileStorage storage) => [
-      for (final queued in storage.queue.peek(storage.queue.length))
+      for (final queued in now(storage.queue.peek(storage.queue.length)))
         queued.event,
     ];
 
@@ -96,6 +116,12 @@ Map<String, Object?> queuedProps(FileStorage storage, int index) {
   return queuedMessage(storage, index)['properties'] as Map<String, Object?>;
 }
 
+/// The capture v1 options of the queued event message at [index], empty
+/// when it has none.
+Map<String, Object?> queuedOptions(FileStorage storage, int index) =>
+    Map<String, Object?>.from(
+        (queuedMessage(storage, index)['options'] ?? const {}) as Map);
+
 /// The names of the queued events, oldest first.
 List<Object?> queuedEvents(FileStorage storage) =>
     [for (final message in getQueue(storage)) message['event']];
@@ -105,6 +131,64 @@ Map<String, Object?> queuedPropsOf(FileStorage storage, String event) {
   final message =
       getQueue(storage).singleWhere((message) => message['event'] == event);
   return message['properties'] as Map<String, Object?>;
+}
+
+/// Runs jobs like [QueueWorker.inline], except that each kind of job waits
+/// for its gate while that is set: writes for [writeGate], reads for
+/// [readGate], deletes for [deleteGate], request bodies for [encodeGate].
+class GatedWorker implements QueueWorker {
+  @override
+  CoreLogger? logger;
+
+  final _inline = QueueWorker.inline();
+  Completer<void>? writeGate;
+  Completer<void>? deleteGate;
+  Completer<void>? readGate;
+  Completer<void>? encodeGate;
+  var writes = 0;
+  var deletes = 0;
+
+  @override
+  Future<QueueWriteResult> write(
+    String? path,
+    Map<String, Object?> event, {
+    int? maxBytes,
+  }) {
+    writes++;
+    final gate = writeGate;
+    return gate == null
+        ? _inline.write(path, event, maxBytes: maxBytes)
+        : gate.future
+            .then((_) => _inline.write(path, event, maxBytes: maxBytes));
+  }
+
+  @override
+  Future<List<String>> delete(List<String> paths) {
+    deletes++;
+    // Like the real worker, a delete never overtakes an earlier write or read.
+    final gates =
+        [writeGate, readGate, deleteGate].nonNulls.map((gate) => gate.future);
+    return gates.isEmpty
+        ? _inline.delete(paths)
+        : Future.wait(gates).then((_) => _inline.delete(paths));
+  }
+
+  @override
+  Future<List<QueueReadResult>> read(List<String> paths) =>
+      _after(readGate, () => _inline.read(paths));
+
+  @override
+  Future<EncodedBody> encodeBody(Object? body, {required bool gzip}) =>
+      _after(encodeGate, () => _inline.encodeBody(body, gzip: gzip));
+
+  static Future<T> _after<T>(Completer<void>? gate, Future<T> Function() job) =>
+      gate == null ? job() : gate.future.then((_) => job());
+
+  @override
+  bool get runsInBackground => false;
+
+  @override
+  void kill() {}
 }
 
 /// Skip reason for tests that simulate IO failures with POSIX permissions.

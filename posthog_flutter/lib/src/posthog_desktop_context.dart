@@ -41,14 +41,15 @@ String extractOsVersion(String banner) {
   return RegExp(r'\d+(\.\d+)+').firstMatch(banner)?[0] ?? banner;
 }
 
-/// The language code of [locale] ("en"), reported as `$locale`.
+/// The language tag of [locale] ("en-US"), reported as `$locale`.
 ///
 /// Null when the platform reported no locale ("und") or only the POSIX
 /// default Linux falls back to ("C"), which names no language.
-String? languageCodeOf(Locale locale) {
-  final language = locale.languageCode;
+String? localeTagOf(Locale locale) {
   const noLanguage = {'', 'und', 'C', 'POSIX'};
-  return noLanguage.contains(language) ? null : language;
+  return noLanguage.contains(locale.languageCode)
+      ? null
+      : locale.toLanguageTag();
 }
 
 /// Screen size in logical pixels.
