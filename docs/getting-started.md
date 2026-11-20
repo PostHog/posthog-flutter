@@ -1,6 +1,8 @@
 # Getting started
 
-The Flutter SDK runs in iOS, Android, macOS, and web apps.
+The Flutter SDK runs in iOS, Android, macOS, Windows, Linux, and web apps.
+
+It requires Flutter 3.41 or later, iOS 15 or macOS 12 with Xcode 26 and Swift Package Manager, and Android `minSdkVersion` 23. iOS add-to-app modules need Flutter 3.50 or later.
 
 To send your first event, add `posthog_flutter`, then call `setup` once before `runApp` with your project token and host from your [project settings](https://app.posthog.com/project/settings).
 
