@@ -162,7 +162,9 @@ abstract class PostHogCore extends PostHogCoreStateless {
       r'$process_person_profile': _hasPersonProcessing(),
       r'$is_identified': _isIdentified(),
       if (_disableGeoIp) r'$geoip_disable': true,
-      r'$sdk_debug_pending_queue_size': storage.queue.length,
+      // Null is left out when the event is queued, so a registered or caller
+      // value can't make a healthy queue look backed up.
+      r'$sdk_debug_pending_queue_size': backedUpQueueLength,
     };
   }
 

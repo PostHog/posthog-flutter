@@ -1,5 +1,11 @@
 ## Next
 
+## 5.61.2
+
+### Patch Changes
+
+- 34144cb: Only attach `$sdk_debug_pending_queue_size` to Windows and Linux events once the event queue reaches `flushAt`, so healthy queues no longer add it to every event
+
 ## 5.61.1
 
 ### Patch Changes
