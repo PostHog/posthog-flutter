@@ -236,11 +236,10 @@ void main() {
       client.optOut();
     });
 
-    test('identify, alias and group leave the identity untouched', () async {
+    test('alias and group leave the identity untouched', () async {
       final anonymousId = client.getDistinctId();
 
       final reloads = await flagsRequestsFor(client, server, () {
-        client.identify('user-123', userProperties: {'plan': 'pro'});
         client.alias('user-alias');
         client.group('company', 'acme', groupProperties: {'seats': 50});
       });
@@ -256,6 +255,45 @@ void main() {
         expect(storage.getProperty<Object>(key), isNull, reason: key.key);
       }
       expect(reloads, 0);
+    });
+
+    test('identify updates the identity and reloads flags, without an event',
+        () async {
+      final anonymousId = client.getDistinctId();
+
+      final reloads = await flagsRequestsFor(client, server,
+          () => client.identify('user-123', userProperties: {'plan': 'pro'}));
+
+      expect(client.getDistinctId(), 'user-123');
+      expect(storage.getProperty<String>(PostHogPersistedProperty.anonymousId),
+          anonymousId);
+      expect(storage.getProperty<String>(PostHogPersistedProperty.personMode),
+          'identified');
+      expect(
+          storage.getProperty<Map<String, Object?>>(
+              PostHogPersistedProperty.personProperties),
+          {'plan': 'pro'},
+          reason: 'the new user must be evaluated with their own properties');
+      expect(reloads, 1);
+      expect(getQueue(storage), isEmpty,
+          reason: 'opting out stops the event, not the identity');
+    });
+
+    test('identify is not remembered as sent', () {
+      client.identify('user-123', userProperties: {'plan': 'pro'});
+      client.optIn();
+      client.identify('user-123', userProperties: {'plan': 'pro'});
+
+      expect(queuedEvents(storage), [r'$set'],
+          reason: 'the dropped identify must not count as a duplicate');
+    });
+
+    test('identify of the anonymous user is not remembered as sent', () {
+      client.identify(client.getDistinctId(), userProperties: {'plan': 'pro'});
+      client.optIn();
+      client.identify(client.getDistinctId(), userProperties: {'plan': 'pro'});
+
+      expect(queuedEvents(storage), [r'$set']);
     });
 
     test('capture leaves the person state untouched', () {
