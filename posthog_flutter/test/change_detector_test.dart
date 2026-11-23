@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/replay/change_detector.dart';
 
@@ -169,4 +170,135 @@ void main() {
       await tester.pump();
     });
   });
+
+  group('ChangeDetector app lifecycle', () {
+    const interval = Duration(seconds: 1);
+
+    void setLifecycle(WidgetTester tester, AppLifecycleState state) {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      for (final step in _pathTo(state)) {
+        tester.binding.handleAppLifecycleStateChanged(step);
+      }
+    }
+
+    for (final away in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      testWidgets('schedules nothing while $away', (tester) async {
+        var changes = 0;
+        final detector = ChangeDetector(() => changes++, interval: interval)
+          ..hasCapturedPlatformViews = true;
+
+        detector.start();
+        await tester.pump();
+        expect(changes, 1);
+
+        setLifecycle(tester, away);
+        for (var i = 0; i < 3; i++) {
+          await tester.binding.delayed(interval);
+          expect(tester.binding.hasScheduledFrame, isFalse);
+          await tester.pump();
+        }
+        expect(changes, 1);
+
+        detector.stop();
+        await tester.pump();
+      });
+    }
+
+    testWidgets('samples once on return to resumed', (tester) async {
+      var changes = 0;
+      final detector = ChangeDetector(() => changes++, interval: interval);
+
+      detector.start();
+      await tester.pump();
+      expect(changes, 1);
+
+      setLifecycle(tester, AppLifecycleState.paused);
+      await tester.binding.delayed(interval);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pump();
+      expect(changes, 2);
+
+      await tester.pump();
+      expect(changes, 2);
+
+      detector.stop();
+      await tester.pump();
+    });
+
+    testWidgets('a backgrounded tick does not spend the forced-tick budget', (
+      tester,
+    ) async {
+      var changes = 0;
+      final detector = ChangeDetector(() => changes++, interval: interval);
+
+      detector.start();
+      await tester.pump();
+
+      detector.forceNextTicks(1);
+      setLifecycle(tester, AppLifecycleState.inactive);
+      for (var i = 0; i < 3; i++) {
+        await tester.binding.delayed(interval);
+      }
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      final afterResume = changes;
+
+      await tester.binding.delayed(interval);
+      expect(
+        tester.binding.hasScheduledFrame,
+        isTrue,
+        reason: 'the budget survived the backgrounded ticks',
+      );
+      await tester.pump();
+      expect(changes, afterResume + 1);
+
+      await tester.binding.delayed(interval);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
+      detector.stop();
+      await tester.pump();
+    });
+
+    testWidgets('stop() removes the lifecycle observer', (tester) async {
+      final detector = ChangeDetector(() {}, interval: interval);
+
+      detector.start();
+      await tester.pump();
+      detector.stop();
+
+      setLifecycle(tester, AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+    });
+  });
 }
+
+List<AppLifecycleState> _pathTo(AppLifecycleState target) => switch (target) {
+      AppLifecycleState.inactive => [AppLifecycleState.inactive],
+      AppLifecycleState.hidden => [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+        ],
+      AppLifecycleState.paused => [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ],
+      AppLifecycleState.resumed => [AppLifecycleState.resumed],
+      AppLifecycleState.detached => [AppLifecycleState.detached],
+    };

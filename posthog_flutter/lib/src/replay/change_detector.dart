@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../util/app_lifecycle.dart';
+
 /// A class that detects changes in the UI and executes a callback when changes occur.
 ///
 /// The `ChangeDetector` monitors the Flutter widget tree by scheduling
 /// a callback after a frame is rendered. To avoid unnecessary overhead,
 /// it only listens for frame callbacks while actively polling at a fixed interval.
+/// It pauses while the app is not in the foreground.
 ///
 /// **Usage:**
 /// ```dart
@@ -20,7 +23,7 @@ import 'package:flutter/widgets.dart';
 ///
 /// **Note:** Since the `onChange` callback is called periodically, ensure that
 /// the operations performed are efficient to avoid impacting app performance.
-class ChangeDetector {
+class ChangeDetector with WidgetsBindingObserver {
   final VoidCallback onChange;
   final Duration interval;
 
@@ -51,6 +54,7 @@ class ChangeDetector {
       return;
     }
     _isRunning = true;
+    WidgetsBinding.instance.addObserver(this);
     // A pending budget means a session boundary armed it, and forcing a frame
     // now would record the screen the host has not replaced yet. Leave that
     // first frame to the budget's own ticks. Any other start() — app launch, a
@@ -62,6 +66,9 @@ class ChangeDetector {
       requestImmediateSample();
     }
     _timer = Timer.periodic(interval, (_) {
+      if (!isAppInForeground) {
+        return;
+      }
       final forceFrame = _forcedTicksLeft > 0;
       if (forceFrame) {
         _forcedTicksLeft--;
@@ -75,6 +82,7 @@ class ChangeDetector {
   /// This prevents the [onChange] callback from being called.
   void stop() {
     _isRunning = false;
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _timer = null;
   }
@@ -105,9 +113,18 @@ class ChangeDetector {
     _scheduleFrameCallback(forceFrame: true);
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isRunning) {
+      requestImmediateSample();
+    }
+  }
+
   /// Schedules a single post-frame callback to invoke [onChange].
   void _scheduleFrameCallback({bool forceFrame = false}) {
-    if (!_isRunning) {
+    // The window surface may already be gone while not resumed, and rasterizing
+    // then crashes the engine.
+    if (!_isRunning || !isAppInForeground) {
       return;
     }
 
@@ -115,7 +132,7 @@ class ChangeDetector {
       WidgetsBinding.instance.scheduleFrame();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_isRunning) {
+      if (_isRunning && isAppInForeground) {
         onChange();
       }
     });

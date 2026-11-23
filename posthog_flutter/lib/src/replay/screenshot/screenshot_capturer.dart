@@ -16,6 +16,7 @@ import 'package:posthog_flutter/src/replay/native_communicator.dart';
 import 'package:posthog_flutter/src/replay/screenshot/snapshot_manager.dart';
 import 'package:posthog_flutter/src/replay/size_extension.dart';
 import 'package:posthog_flutter/src/replay/session_replay_config_extension.dart';
+import 'package:posthog_flutter/src/util/app_lifecycle.dart';
 import 'package:posthog_flutter/src/util/logging.dart';
 
 class ImageInfo {
@@ -581,7 +582,7 @@ class ScreenshotCapturer {
 
   Future<ImageInfo?> _buildOcclusionPlaceholder() async {
     final target = _resolveCaptureTarget();
-    if (target == null) {
+    if (target == null || !isAppInForeground) {
       return null;
     }
     // Read before the awaits below, so a rotation or a forced reset mid-build
@@ -645,12 +646,17 @@ class ScreenshotCapturer {
     );
   }
 
+  bool get _shouldAbortCapture => _cancelled || !isAppInForeground;
+
   /// Captures one Flutter frame, or null when there is nothing to send. Never
   /// throws.
   Future<ImageInfo?> captureScreenshot() async {
     // Cleared again in _resolveCaptureTarget, but that runs after the round trip
     // below — whose post-await check would veto this capture on a prior flag.
     _cancelled = false;
+    if (!isAppInForeground) {
+      return null;
+    }
     final state = await _nativeCommunicator.getSessionReplayState();
     if (_cancelled) {
       return null;
@@ -705,6 +711,11 @@ class ScreenshotCapturer {
       Future(() async {
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
+
+        if (_shouldAbortCapture) {
+          completer.complete(null);
+          return;
+        }
 
         // Walk the tree for mask rects here, with no await before toImage(),
         // so the rects and the pixels come from the same frame. A walk done
@@ -870,6 +881,13 @@ class ScreenshotCapturer {
 
         final currentPicture = picture;
         if (currentPicture == null) {
+          completer.complete(null);
+          return;
+        }
+
+        if (_shouldAbortCapture) {
+          currentPicture.dispose();
+          picture = null;
           completer.complete(null);
           return;
         }

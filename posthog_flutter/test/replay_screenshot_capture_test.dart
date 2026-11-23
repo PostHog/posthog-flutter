@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/widgets.dart' hide ImageInfo;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
@@ -292,4 +292,82 @@ void main() {
     expect(meta, lessThan(full));
     await unmount(tester);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  group('app lifecycle', () {
+    void goInactive(WidgetTester tester) {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    }
+
+    testWidgets('captureScreenshot returns null while inactive',
+        (tester) async {
+      final config = await mount(tester, 1.0);
+      final capturer = ScreenshotCapturer(config);
+
+      ImageInfo? resumed;
+      var done = false;
+      capturer.captureScreenshot().then((value) {
+        resumed = value;
+        done = true;
+      });
+      await settleUntil(tester, () => done);
+      expect(resumed, isNotNull, reason: 'positive control');
+
+      goInactive(tester);
+      calls.clear();
+      expect(await capturer.captureScreenshot(), isNull);
+      expect(
+        calls.map((c) => c.method),
+        isNot(contains('getSessionReplayState')),
+        reason: 'bails out before the native round trip',
+      );
+
+      await unmount(tester);
+    });
+
+    testWidgets('a capture dropped when the app goes inactive mid-flight', (
+      tester,
+    ) async {
+      final config = await mount(tester, 1.0);
+      final capturer = ScreenshotCapturer(config);
+
+      ImageInfo? result;
+      var done = false;
+      final capture = capturer.captureScreenshot().then((value) {
+        result = value;
+        done = true;
+      });
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      expect(done, isFalse);
+
+      goInactive(tester);
+      await settleUntil(tester, () => done);
+      await capture;
+
+      expect(result, isNull);
+      await unmount(tester);
+    });
+
+    testWidgets('widget sends no snapshot while inactive, one after resume', (
+      tester,
+    ) async {
+      goInactive(tester);
+      await mount(tester, 1.0, waitForSnapshot: false);
+      await settleCapture(tester);
+      expect(calls.map((c) => c.method), isNot(contains('sendFullSnapshot')));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settleUntil(
+        tester,
+        () => calls.any((call) => call.method == 'sendFullSnapshot'),
+      );
+      expect(calls.where((c) => c.method == 'sendFullSnapshot'), hasLength(1));
+
+      await unmount(tester);
+    });
+  });
 }
