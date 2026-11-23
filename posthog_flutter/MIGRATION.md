@@ -460,7 +460,7 @@ On Windows and Linux, `beforeSend` sees the options the SDK adds, including `pro
 - **Options.** The `PostHogEvent` the callbacks return replaces the event's options. A callback that returns a new `PostHogEvent`, or replaces `event.options`, without the options it got drops them. That includes `process_person_profile: false`, which turns person processing on for that event. Copy `event.options` to the event you return.
 - **Person processing.** It's decided before the callbacks run. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 - **New fields.** `PostHogEvent` has `uuid`, `distinctId`, and `timestamp`, set on every platform except web. A callback can change the distinct ID and timestamp, and the event keeps its uuid.
-- **Collection types.** Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Map<String, dynamic>>`. Any other list is `List<dynamic>`, even a `List<String>` you passed to `capture`, so cast its items instead of the list.
+- **Collection types.** Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Map<String, dynamic>>`. Any other list is `List<dynamic>`, even a `List<String>` you passed to `capture`, so cast its items instead of the list. Values arrive as they're sent: a `Set` is a list, and a `DateTime` or other object is its `toString()`.
 
 These rules apply on iOS, macOS, and Android:
 

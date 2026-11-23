@@ -781,7 +781,6 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
             : properties,
         userProperties,
         userPropertiesSetOnce,
-        normalize: false,
       ),
       options: callerOptions,
     );
@@ -880,9 +879,8 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   Map<String, Object?>? _mergeUserProps(
     Map<String, Object>? properties,
     Map<String, Object>? userProperties,
-    Map<String, Object>? userPropertiesSetOnce, {
-    bool normalize = true,
-  }) {
+    Map<String, Object>? userPropertiesSetOnce,
+  ) {
     // Inline $set/$set_once in properties are legacy but still honored, with
     // the explicit parameters winning per key.
     final extracted = CaptureUtils.extractUserProperties(
@@ -891,12 +889,10 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
       userPropertiesSetOnce: userPropertiesSetOnce,
     );
 
-    Map<String, Object>? convert(Map<String, Object>? properties) =>
-        normalize ? _normalize(properties) : properties;
-    final set = convert(extracted.userProperties);
-    final setOnce = convert(extracted.userPropertiesSetOnce);
+    final set = _normalize(extracted.userProperties);
+    final setOnce = _normalize(extracted.userPropertiesSetOnce);
     final merged = <String, Object?>{
-      ...?convert(extracted.properties),
+      ...?_normalize(extracted.properties),
       if (set != null && set.isNotEmpty) r'$set': set,
       if (setOnce != null && setOnce.isNotEmpty) r'$set_once': setOnce,
     };

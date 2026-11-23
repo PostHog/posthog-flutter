@@ -1251,6 +1251,31 @@ void main() {
       });
     });
 
+    test('callbacks see the same value types as on iOS and Android', () async {
+      final server = await LocalPostHogServer.start();
+      final tags = {'a'};
+      final seen = <String, Object?>{};
+      final config = configFor(server)
+        ..beforeSend = [
+          (event) {
+            seen['at'] = event.properties?['at'];
+            seen['tags'] = event.properties?['tags'];
+            return event;
+          },
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'typed',
+        properties: {'at': DateTime.utc(2026, 1, 2), 'tags': tags},
+      );
+      await server.waitForEvent('typed');
+
+      expect(seen['at'], isA<String>());
+      expect(seen['tags'], isA<List<dynamic>>());
+      expect(identical(seen['tags'], tags), isFalse);
+    });
+
     test(r'keeps $geoip_disable when a callback replaces the properties',
         () async {
       final server = await LocalPostHogServer.start();
