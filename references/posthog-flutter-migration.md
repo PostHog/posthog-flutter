@@ -142,8 +142,8 @@ Add-to-app modules (`flutter create -t module`) on iOS need Flutter 3.50.0 or la
 
 | Native SDK | 5.x.x | 6.x.x |
 | --- | --- | --- |
-| `posthog-ios` | `>= 3.92.3, < 4.0.0` | `>= 4.0.0, < 5.0.0` |
-| `posthog-android` | `[3.75.0, 4.0.0)` | `[4.0.0, 5.0.0)` |
+| `posthog-ios` | `>= 3.92.3, < 4.0.0` | `>= 4.0.3, < 5.0.0` |
+| `posthog-android` | `[3.75.0, 4.0.0)` | `[4.0.2, 5.0.0)` |
 
 Don't add these native SDKs to your app separately at a different major version.
 
