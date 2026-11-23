@@ -557,7 +557,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
         method,
         _captureArguments(
           eventName: eventName,
-          properties: properties,
+          properties: _withGeoIpDisable(properties),
           userProperties: userProperties,
           userPropertiesSetOnce: userPropertiesSetOnce,
           options: options,
@@ -568,6 +568,14 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       return null;
     }
   }
+
+  /// [properties] with `$geoip_disable: true` when [PostHogConfig.disableGeoIp]
+  /// is set. posthog-ios adds it before the event's own properties, so a
+  /// caller's `false` would otherwise win there.
+  Map<String, Object>? _withGeoIpDisable(Map<String, Object>? properties) =>
+      _config?.disableGeoIp == true
+          ? {...?properties, r'$geoip_disable': true}
+          : properties;
 
   /// The `capture`, `captureAi` and `buildEvent` arguments, with `$set` and
   /// `$set_once` moved out of [properties] and the values normalized.
@@ -630,8 +638,9 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
 
     try {
       // The native SDK adds the screen name back as `$screen_name`.
-      final screenProperties = <String, Object>{...?properties}
-        ..remove(PostHogPropertyName.screenName);
+      final screenProperties = <String, Object>{
+        ...?_withGeoIpDisable(properties)
+      }..remove(PostHogPropertyName.screenName);
       final cleanedOptions = cleanEventOptions(options);
 
       await _invoke('screen', {
@@ -1132,7 +1141,7 @@ class PosthogFlutterIO extends PosthogFlutterPlatformInterface {
       // Add timestamp from Flutter side (will be used and removed from native plugins)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final normalizedData = PropertyNormalizer.normalize(
-        exceptionProps.cast<String, Object>(),
+        _withGeoIpDisable(exceptionProps.cast<String, Object>())!,
       );
       final cleanedOptions = cleanEventOptions(options);
 

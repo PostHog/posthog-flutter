@@ -210,9 +210,10 @@ class PostHogConfig {
   /// user's location from their IP address.
   ///
   /// When `true`, events carry `$geoip_disable: true` and feature flag
-  /// requests send `geoip_disable: true`. [beforeSend] callbacks see the
-  /// property, and the SDK sets it again after they run, so they can't remove
-  /// or change it.
+  /// requests send `geoip_disable: true`. Event properties and [beforeSend]
+  /// callbacks can't remove or change it: the SDK sets it again after them.
+  /// Native hooks added with `PosthogFlutterPlugin.addBeforeSend` run later
+  /// and can.
   ///
   /// Defaults to `false`.
   ///
