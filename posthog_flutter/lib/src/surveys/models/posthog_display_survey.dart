@@ -130,6 +130,7 @@ class PostHogDisplaySurvey {
         introScreenDescription: a['introScreenDescription'] as String?,
         introScreenDescriptionContentType: introScreenDescriptionContentType,
         introScreenButtonText: a['introScreenButtonText'] as String?,
+        position: a['position'] as String?,
       );
     }
 
