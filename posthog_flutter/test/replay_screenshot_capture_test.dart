@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -102,6 +103,60 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     await tester.pump(const Duration(milliseconds: 1));
   }
+
+  testWidgets('capture skips inactive apps and resumes in the foreground',
+      (tester) async {
+    final config = await mount(tester, 1.0);
+    final capturer = ScreenshotCapturer(config);
+    final previousStateRequests =
+        calls.where((call) => call.method == 'getSessionReplayState').length;
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    try {
+      var completed = false;
+      final skipped = capturer.captureScreenshot().whenComplete(() {
+        completed = true;
+      });
+      await settleUntil(tester, () => completed);
+      expect(completed, isTrue);
+      expect(await skipped, isNull);
+      expect(calls.where((call) => call.method == 'getSessionReplayState'),
+          hasLength(previousStateRequests));
+    } finally {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    }
+
+    var completed = false;
+    final capture = capturer.captureScreenshot().whenComplete(() {
+      completed = true;
+    });
+    await settleUntil(tester, () => completed);
+    expect(completed, isTrue);
+    expect(await capture, isNotNull);
+    await unmount(tester);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('capture drops the frame when the app becomes inactive',
+      (tester) async {
+    final config = await mount(tester, 1.0);
+    final capturer = ScreenshotCapturer(config);
+    var completed = false;
+    final capture = capturer.captureScreenshot().whenComplete(() {
+      completed = true;
+    });
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    });
+
+    try {
+      await settleUntil(tester, () => completed);
+      expect(completed, isTrue);
+      expect(await capture, isNull);
+    } finally {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    }
+    await unmount(tester);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   for (final configured in <double?>[null, 1.0, 0.5, 0.333, 0.1]) {
     final scale = configured ?? 1.0;

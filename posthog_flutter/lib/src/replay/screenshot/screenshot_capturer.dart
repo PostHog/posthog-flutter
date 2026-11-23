@@ -645,14 +645,24 @@ class ScreenshotCapturer {
     );
   }
 
+  bool get _canCaptureInCurrentLifecycle {
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    return lifecycleState == null ||
+        lifecycleState == ui.AppLifecycleState.resumed;
+  }
+
   /// Captures one Flutter frame, or null when there is nothing to send. Never
   /// throws.
   Future<ImageInfo?> captureScreenshot() async {
+    if (!_canCaptureInCurrentLifecycle) {
+      return null;
+    }
+
     // Cleared again in _resolveCaptureTarget, but that runs after the round trip
     // below — whose post-await check would veto this capture on a prior flag.
     _cancelled = false;
     final state = await _nativeCommunicator.getSessionReplayState();
-    if (_cancelled) {
+    if (_cancelled || !_canCaptureInCurrentLifecycle) {
       return null;
     }
     if (!state.isActive) {
@@ -705,6 +715,10 @@ class ScreenshotCapturer {
       Future(() async {
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
+        if (_cancelled || !_canCaptureInCurrentLifecycle) {
+          completer.complete(null);
+          return;
+        }
 
         // Walk the tree for mask rects here, with no await before toImage(),
         // so the rects and the pixels come from the same frame. A walk done
