@@ -38,12 +38,20 @@ class ChangeDetector with WidgetsBindingObserver {
   /// to be discarded.
   bool suppressForcedFrames = false;
 
+  /// Called instead of [requestImmediateSample] when the app returns to the
+  /// foreground, so the owner can defer the sample past a capture in flight.
+  final VoidCallback? onResumed;
+
   bool get isRunning => _isRunning;
 
   /// Creates a [ChangeDetector] with the given [onChange] callback.
   ///
   /// [interval] controls how often to check for changes.
-  ChangeDetector(this.onChange, {this.interval = const Duration(seconds: 1)});
+  ChangeDetector(
+    this.onChange, {
+    this.interval = const Duration(seconds: 1),
+    this.onResumed,
+  });
 
   /// Starts the change detection process.
   ///
@@ -116,7 +124,7 @@ class ChangeDetector with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _isRunning) {
-      requestImmediateSample();
+      (onResumed ?? requestImmediateSample)();
     }
   }
 

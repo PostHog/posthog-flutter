@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -20,6 +21,7 @@ void main() {
   late PosthogFlutterPlatformInterface previousPlatform;
   var sessionId = 'session-a';
   var secure = false;
+  Completer<void>? holdSend;
 
   setUp(() {
     previousPlatform = PosthogFlutterPlatformInterface.instance;
@@ -27,8 +29,12 @@ void main() {
     calls.clear();
     sessionId = 'session-a';
     secure = false;
+    holdSend = null;
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
+      if (call.method == 'sendFullSnapshot') {
+        await holdSend?.future;
+      }
       if (call.method == 'getSessionReplayState') {
         return {'isActive': true, 'sessionId': sessionId, 'secure': secure};
       }
@@ -43,7 +49,8 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  Widget captureTree(Size size) => Align(
+  Widget captureTree(Size size, {Color background = const Color(0xFF00FF00)}) =>
+      Align(
         alignment: Alignment.topLeft,
         child: SizedBox.fromSize(
           size: size,
@@ -51,9 +58,9 @@ void main() {
             child: Stack(
               textDirection: TextDirection.ltr,
               fit: StackFit.expand,
-              children: const [
-                ColoredBox(color: Color(0xFF00FF00)),
-                Positioned(
+              children: [
+                ColoredBox(color: background),
+                const Positioned(
                   left: 11,
                   top: 9,
                   width: 23,
@@ -366,6 +373,39 @@ void main() {
         () => calls.any((call) => call.method == 'sendFullSnapshot'),
       );
       expect(calls.where((c) => c.method == 'sendFullSnapshot'), hasLength(1));
+
+      await unmount(tester);
+    });
+    testWidgets('a resume during an in-flight send still samples afterwards', (
+      tester,
+    ) async {
+      await mount(tester, 1.0);
+      int sends() => calls.where((c) => c.method == 'sendFullSnapshot').length;
+      expect(sends(), 1);
+
+      holdSend = Completer<void>();
+      // An unforced tick only arms a post-frame callback, so the repaint has to
+      // come after it.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(
+        captureTree(const Size(101, 99), background: const Color(0xFFFF0000)),
+      );
+      await settleUntil(tester, () => sends() == 2);
+      expect(sends(), 2, reason: 'the second send is now held in flight');
+
+      goInactive(tester);
+      await tester.pumpWidget(
+        captureTree(const Size(101, 99), background: const Color(0xFF0000FF)),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settleCapture(tester);
+      expect(sends(), 2);
+
+      holdSend!.complete();
+      await settleUntil(tester, () => sends() == 3);
+      expect(sends(), 3,
+          reason: 'the resume sample is deferred past the held send, not '
+              'dropped, so the screen changed while away still records');
 
       await unmount(tester);
     });
