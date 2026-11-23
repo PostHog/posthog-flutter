@@ -1245,6 +1245,29 @@ void main() {
       });
     });
 
+    test(r'keeps $geoip_disable when a callback replaces the properties',
+        () async {
+      final server = await LocalPostHogServer.start();
+      final config = configFor(server)
+        ..disableGeoIp = true
+        ..beforeSend = [
+          (event) => PostHogEvent(
+                event: event.event,
+                properties: {'allowed': 'yes'},
+                options: event.options,
+              ),
+        ];
+      final platform = await setUpPlatform(config);
+
+      await platform.capture(
+        eventName: 'replaced',
+        properties: {r'$geoip_disable': false},
+      );
+
+      final event = await server.waitForEvent('replaced');
+      expect(_propertiesOf(event), containsPair(r'$geoip_disable', true));
+    });
+
     test('properties the callbacks remove stay removed', () async {
       final server = await LocalPostHogServer.start();
       server.respond = _answerFlags(_variantFlagResponse());

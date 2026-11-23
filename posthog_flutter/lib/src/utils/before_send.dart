@@ -6,11 +6,13 @@ import '../util/logging.dart';
 /// Runs [callbacks] in order against [event].
 ///
 /// A null return drops the event and skips the rest of the list. A throw drops
-/// the event too.
+/// the event too. With [disableGeoIp], the event keeps `$geoip_disable: true`
+/// whatever the callbacks return.
 PostHogEvent? applyBeforeSend(
   List<PostHogEvent? Function(PostHogEvent)> callbacks,
-  PostHogEvent event,
-) {
+  PostHogEvent event, {
+  bool disableGeoIp = false,
+}) {
   for (final callback in callbacks) {
     try {
       final result = callback(event);
@@ -22,6 +24,9 @@ PostHogEvent? applyBeforeSend(
       );
       return null;
     }
+  }
+  if (disableGeoIp) {
+    event.properties = {...?event.properties, r'$geoip_disable': true};
   }
   return event;
 }

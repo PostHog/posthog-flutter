@@ -730,6 +730,25 @@ isolate_dso_base: 7000000000
       expect(argsOf('sendBuiltEvent')['options'], sent);
     });
 
+    test(r'keeps $geoip_disable when a callback replaces the properties',
+        () async {
+      await posthogFlutterIO.setup(PostHogConfig(
+        'test_project_token',
+        beforeSend: [
+          (event) => PostHogEvent(
+                event: event.event,
+                properties: {'allowed': 'yes'},
+                options: event.options,
+              ),
+        ],
+      )..disableGeoIp = true);
+
+      await posthogFlutterIO.capture(eventName: 'replaced');
+
+      expect(argsOf('sendBuiltEvent')['properties'],
+          {'allowed': 'yes', r'$geoip_disable': true});
+    });
+
     test('captureAi dropped by beforeSend returns null', () async {
       await posthogFlutterIO.setup(PostHogConfig(
         'test_project_token',

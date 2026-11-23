@@ -825,6 +825,7 @@ class PosthogFlutterDesktop extends PosthogFlutterPlatformInterface {
   PostHogEvent? _runBeforeSend(PostHogEvent event) => applyBeforeSend(
         _config?.beforeSend ?? const <BeforeSendCallback>[],
         event,
+        disableGeoIp: _config?.disableGeoIp ?? false,
       );
 
   /// Queues [event] as the beforeSend callbacks left it, on the AI queue

@@ -210,8 +210,9 @@ class PostHogConfig {
   /// user's location from their IP address.
   ///
   /// When `true`, events carry `$geoip_disable: true` and feature flag
-  /// requests send `geoip_disable: true`. The SDK adds the property after
-  /// [beforeSend] runs, so a callback can't see or remove it.
+  /// requests send `geoip_disable: true`. [beforeSend] callbacks see the
+  /// property, and the SDK sets it again after they run, so they can't remove
+  /// or change it.
   ///
   /// Defaults to `false`.
   ///
