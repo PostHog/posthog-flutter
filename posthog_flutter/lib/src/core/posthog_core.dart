@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:meta/meta.dart';
 
@@ -146,8 +145,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
 
   Map<String, Object?> _enrichProperties(Map<String, Object?>? properties) {
     final now = DateTime.now().millisecondsSinceEpoch;
-    // Resolved first: it may start a new session, which the debug
-    // properties below then describe.
     final managedSessionId = _session.touch(now);
     final callerSessionId = properties?[r'$session_id'];
     final sessionId = callerSessionId is String && callerSessionId.isNotEmpty
@@ -165,18 +162,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
       r'$process_person_profile': _hasPersonProcessing(),
       r'$is_identified': _isIdentified(),
       if (_disableGeoIp) r'$geoip_disable': true,
-      ..._sessionDebugProperties(now),
-    };
-  }
-
-  /// The state of the session and the queue, attached to every event to
-  /// help debug the SDK.
-  Map<String, Object?> _sessionDebugProperties(int now) {
-    final startedAt = _session.startedAt;
-    return {
-      r'$sdk_debug_session_start': startedAt,
-      // The wall clock can move backwards.
-      r'$sdk_debug_current_session_duration': max(0, now - startedAt),
       // Null is left out when the event is queued, so a registered or caller
       // value can't make a healthy queue look backed up.
       r'$sdk_debug_pending_queue_size': backedUpQueueLength,

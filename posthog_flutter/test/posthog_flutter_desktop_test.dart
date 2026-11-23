@@ -284,7 +284,8 @@ void main() {
       expect(flags, isNot(contains('timezone')));
     });
 
-    test(r'reports $recording_status disabled on every event', () async {
+    test(r'reports $recording_status disabled and no session debug keys',
+        () async {
       final server = await LocalPostHogServer.start();
       final platform = await setUpPlatform(configFor(server));
 
@@ -298,6 +299,11 @@ void main() {
       expect(_propertiesOf(identify)[r'$recording_status'], 'disabled');
       final captured = await server.waitForEvent('replay event');
       expect(_propertiesOf(captured)[r'$recording_status'], 'disabled');
+      for (final event in [identify, captured]) {
+        final props = _propertiesOf(event);
+        expect(props, isNot(contains(r'$sdk_debug_session_start')));
+        expect(props, isNot(contains(r'$sdk_debug_current_session_duration')));
+      }
     });
   });
 
