@@ -1472,29 +1472,38 @@ class PosthogFlutterPlugin :
                         locationInWindow[0] + cropRight,
                         locationInWindow[1] + cropBottom,
                     )
-                PixelCopy.request(
-                    activity.window,
-                    srcRect,
-                    bitmap,
-                    { copyResult ->
-                        if (copyResult != PixelCopy.SUCCESS) {
-                            bitmap.recycle()
-                            captureNativeScreenshotFallback(
-                                contentView,
-                                cropLeft,
-                                cropTop,
-                                cropRight,
-                                cropBottom,
-                                logicalWidth,
-                                logicalHeight,
-                                onResult,
-                            )
-                            return@request
-                        }
-                        exportBitmapAsync(bitmap, onResult)
-                    },
-                    mainHandler,
-                )
+                // PixelCopy throws, instead of reporting a failed copy, when the window or
+                // SurfaceView has no valid surface, e.g. once the app has gone to the
+                // background mid-capture. Every view after the first is captured from the
+                // previous one's callback, where nothing else catches it and the app crashes.
+                try {
+                    PixelCopy.request(
+                        activity.window,
+                        srcRect,
+                        bitmap,
+                        { copyResult ->
+                            if (copyResult != PixelCopy.SUCCESS) {
+                                bitmap.recycle()
+                                captureNativeScreenshotFallback(
+                                    contentView,
+                                    cropLeft,
+                                    cropTop,
+                                    cropRight,
+                                    cropBottom,
+                                    logicalWidth,
+                                    logicalHeight,
+                                    onResult,
+                                )
+                                return@request
+                            }
+                            exportBitmapAsync(bitmap, onResult)
+                        },
+                        mainHandler,
+                    )
+                } catch (e: Throwable) {
+                    bitmap.recycle()
+                    onResult(null)
+                }
                 return
             }
 
@@ -1511,44 +1520,50 @@ class PosthogFlutterPlugin :
             val fsvSrcBottom = (locationInWindow[1] + cropBottom - fsvLocation[1]).coerceIn(fsvSrcTop + 1, flutterSv.height)
             val fsvSrcRect = Rect(fsvSrcLeft, fsvSrcTop, fsvSrcRight, fsvSrcBottom)
 
-            PixelCopy.request(
-                flutterSv,
-                fsvSrcRect,
-                bitmap,
-                { copyResult ->
-                    if (copyResult != PixelCopy.SUCCESS) {
-                        bitmap.recycle()
-                        captureNativeScreenshotFallback(
-                            contentView,
-                            cropLeft,
-                            cropTop,
-                            cropRight,
-                            cropBottom,
-                            logicalWidth,
-                            logicalHeight,
-                            onResult,
-                        )
-                        return@request
-                    }
-
-                    if (platformViewSvs.isEmpty()) {
-                        exportBitmapAsync(bitmap, onResult)
-                    } else {
-                        compositeSurfaceViewsOnto(
-                            svList = platformViewSvs,
-                            destBitmap = bitmap,
-                            contentViewLocation = locationInWindow,
-                            cropLeft = cropLeft,
-                            cropTop = cropTop,
-                            density = density,
-                            index = 0,
-                        ) {
-                            exportBitmapAsync(bitmap, onResult)
+            // See the PixelCopy.request above for why this is guarded.
+            try {
+                PixelCopy.request(
+                    flutterSv,
+                    fsvSrcRect,
+                    bitmap,
+                    { copyResult ->
+                        if (copyResult != PixelCopy.SUCCESS) {
+                            bitmap.recycle()
+                            captureNativeScreenshotFallback(
+                                contentView,
+                                cropLeft,
+                                cropTop,
+                                cropRight,
+                                cropBottom,
+                                logicalWidth,
+                                logicalHeight,
+                                onResult,
+                            )
+                            return@request
                         }
-                    }
-                },
-                mainHandler,
-            )
+
+                        if (platformViewSvs.isEmpty()) {
+                            exportBitmapAsync(bitmap, onResult)
+                        } else {
+                            compositeSurfaceViewsOnto(
+                                svList = platformViewSvs,
+                                destBitmap = bitmap,
+                                contentViewLocation = locationInWindow,
+                                cropLeft = cropLeft,
+                                cropTop = cropTop,
+                                density = density,
+                                index = 0,
+                            ) {
+                                exportBitmapAsync(bitmap, onResult)
+                            }
+                        }
+                    },
+                    mainHandler,
+                )
+            } catch (e: Throwable) {
+                bitmap.recycle()
+                onResult(null)
+            }
             return
         }
 
