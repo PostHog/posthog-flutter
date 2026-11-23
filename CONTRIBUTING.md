@@ -20,7 +20,7 @@ make checkFormatSwift
 (cd posthog_flutter && flutter test)
 (cd posthog_flutter && flutter test --platform chrome test/posthog_flutter_web_handler_test.dart test/posthog_flutter_web_setup_test.dart test/posthog_widget_web_test.dart test/posthog_widget_test.dart test/web_before_send_test.dart test/web_canvas_mask_provider_test.dart)
 (cd posthog_flutter && flutter test --platform chrome --wasm test/posthog_isolate_error_handler_web_test.dart)
-(cd sdk_compliance_adapter && flutter test test/feature_flag_has_experiment_test.dart test/flags_retry_test.dart test/minimal_flag_called_events_test.dart test/timestamp_test.dart)
+(cd sdk_compliance_adapter && flutter test test/feature_flag_has_experiment_test.dart test/flags_retry_test.dart test/minimal_flag_called_events_test.dart test/recording_proxy_test.dart test/timestamp_test.dart)
 ```
 
 The adapter's `test/adapter_server_test.dart` is the long-running compliance server,
@@ -43,37 +43,25 @@ flutter build apk
 flutter build web
 ```
 
-If you want to exercise Swift Package Manager locally as well, run:
-
-```bash
-flutter config --enable-swift-package-manager
-flutter pub get
-cd example
-flutter build ios --simulator --no-codesign
-flutter build macos
-```
+The iOS and macOS builds need Swift Package Manager. If it's off, run `flutter config --enable-swift-package-manager` first.
 
 ## Testing with local native SDKs
 
-The native SDK version floors in `posthog_flutter/darwin/posthog_flutter.podspec`,
-`posthog_flutter/darwin/posthog_flutter/Package.swift`, and
-`posthog_flutter/android/build.gradle` track the next expected native release. To
-develop against an unreleased native branch, point the example app at your local
-checkout with a gitignored override file — the committed build stays release-clean,
-and a source override ignores the version floor.
+The native SDK version floors in `posthog_flutter/darwin/posthog_flutter/Package.swift`
+and `posthog_flutter/android/build.gradle` track the next expected native release. To
+develop against an unreleased native branch, point the plugin at your local checkout.
+A source override ignores the version floor.
 
 ### iOS
 
-- Create `example/ios/Podfile.local` (gitignored) pointing at your checkout:
+- In `posthog_flutter/darwin/posthog_flutter/Package.swift`, replace the `posthog-ios`
+  package with your checkout. Don't commit this change.
 
-```ruby
-pod 'PostHog', :path => File.expand_path('~/posthog-ios')
+```swift
+.package(name: "posthog-ios", path: "/absolute/path/to/posthog-ios"),
 ```
 
-- Run `cd example/ios && pod install`, then `flutter run`.
-
-The example `Podfile` evaluates `Podfile.local` when present, so no committed file
-changes.
+- Turn Swift Package Manager on, then `flutter run`.
 
 ### Android
 

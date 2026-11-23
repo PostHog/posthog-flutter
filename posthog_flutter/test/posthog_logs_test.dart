@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
+import 'package:posthog_flutter/src/utils/channel_serialization.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -141,6 +142,39 @@ void main() {
     });
 
     group('beforeSend hook', () {
+      test('runs before captureLog returns its first await', () async {
+        var ran = false;
+        final config = PostHogConfig('test_token');
+        config.logsConfig.beforeSend = [
+          (record) {
+            ran = true;
+            return record;
+          },
+        ];
+        await setupWith(config);
+
+        final sent = Posthog().captureLog(body: 'hello');
+        expect(ran, isTrue);
+        expect(fake.capturedLogs, hasLength(1));
+        await sent;
+      });
+
+      test('a hook that logs does not run forever when it stops itself',
+          () async {
+        final config = PostHogConfig('test_token');
+        config.logsConfig.beforeSend = [
+          (record) {
+            if (record.body == 'outer') Posthog().captureLog(body: 'inner');
+            return record;
+          },
+        ];
+        await setupWith(config);
+
+        await Posthog().captureLog(body: 'outer');
+
+        expect(fake.capturedLogs.map((l) => l.body), ['inner', 'outer']);
+      });
+
       test('hook returning null drops the record', () async {
         final config = PostHogConfig('test_token');
         config.logsConfig.beforeSend = [(record) => null];
@@ -216,22 +250,6 @@ void main() {
         await Posthog().captureLog(body: 'x');
 
         expect(fake.capturedLogs.single.body, 'x-1-2');
-      });
-
-      test('async hook is awaited', () async {
-        final config = PostHogConfig('test_token');
-        config.logsConfig.beforeSend = [
-          (record) async {
-            await Future<void>.delayed(Duration.zero);
-            record.body = 'async';
-            return record;
-          },
-        ];
-        await setupWith(config);
-
-        await Posthog().captureLog(body: 'x');
-
-        expect(fake.capturedLogs.single.body, 'async');
       });
     });
 

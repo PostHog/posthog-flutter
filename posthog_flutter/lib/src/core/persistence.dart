@@ -4,6 +4,7 @@ enum PostHogPersistedProperty {
   distinctId('distinct_id'),
   deviceId('device_id'),
   props('props'),
+  registeredOptions('registered_options'),
   enablePersonProcessing('enable_person_processing'),
   personMode('person_mode'),
   featureFlagDetails('feature_flag_details'),
