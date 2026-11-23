@@ -25,6 +25,7 @@
 - Ignore a registered `$process_person_profile` or `process_person_profile` option on `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once` on Windows and Linux, as the native SDKs do, so a registered `false` doesn't stop identifying users
 - **Breaking:** make `beforeSend` and `logsConfig.beforeSend` callbacks synchronous. Load what they need ahead of time instead of using `await`
 - **Breaking:** pass `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android, with its system and registered properties, and make their changes final
+- **Breaking:** move a `$set` or `$set_once` map passed in `properties` to `PostHogEvent.userProperties` and `userPropertiesSetOnce` before `beforeSend` runs on Windows and Linux, as on iOS, macOS and Android. Read them there instead of from `event.properties`
 - **Breaking:** decide person processing before `beforeSend` runs on iOS, macOS, Android, Windows and Linux. A callback that removes `$set` no longer prevents a person profile, and a callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option
 - **Breaking:** remove `PostHogConfig.onFeatureFlags`. Call `Posthog().onFeatureFlags((loaded) { ... })` before `setup()` instead, which also covers the first load and returns a `PostHogFeatureFlagsSubscription` you can `unsubscribe()`
 - **Breaking:** return the reloaded flags from `reloadFeatureFlags()` as a `Future<PostHogFeatureFlagsLoaded>`

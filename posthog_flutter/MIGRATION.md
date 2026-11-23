@@ -470,6 +470,7 @@ These rules apply on iOS, macOS, and Android:
 
 These rules apply on Windows and Linux:
 
+- **Legacy `$set` and `$set_once`.** A `$set` or `$set_once` map passed in `properties` reaches callbacks in `event.userProperties` and `event.userPropertiesSetOnce`, not in `event.properties`, as on iOS, macOS, and Android.
 - **Legacy option properties.** A legacy option property that a callback adds doesn't replace an option that is already set.
 - **Events callbacks don't see.** `beforeSend` doesn't see `$identify`, `$create_alias`, `$groupidentify`, or `$feature_flag_called`.
 - **Exception steps.** `$exception_steps` is added to `$exception` events before `beforeSend` runs, so a callback can read or remove it. Steps recorded while a callback runs, and an event a callback renames to `$exception`, don't get them.
