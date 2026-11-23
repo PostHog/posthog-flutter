@@ -464,16 +464,17 @@ On Windows and Linux, `beforeSend` sees the options the SDK adds, including `pro
 - **Options.** The `PostHogEvent` the callbacks return replaces the event's options. A callback that returns a new `PostHogEvent`, or replaces `event.options`, without the options it got drops them. That includes `process_person_profile: false`, which turns person processing on for that event. Copy `event.options` to the event you return.
 - **Person processing.** It's decided before the callbacks run. A callback that adds `$set` to an anonymous event must also set the `process_person_profile: true` option.
 - **New fields.** `PostHogEvent` has `uuid`, `distinctId`, and `timestamp`, set on every platform except web. A callback can change the distinct ID and timestamp, and the event keeps its uuid.
+- **Collection types.** Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Map<String, dynamic>>`. Any other list is `List<dynamic>`, even a `List<String>` you passed to `capture`, so cast its items instead of the list. Values arrive as they're sent: a `Set` is a list, and a `DateTime` or other object is its `toString()`.
 
 These rules apply on iOS, macOS, and Android:
 
 - **Removed `$set`.** In 5.x.x, a callback that removed `$set` prevented a person profile. Now the event is still person-processed, and so are later events. Return `null` to drop an event that must not create a profile.
-- **Collection types.** Nested maps are `Map<String, dynamic>`, and a non-empty list of maps is `List<Map<String, dynamic>>`. Any other list is `List<dynamic>`, even a `List<String>` you passed to `capture`, so cast its items instead of the list.
 - **Empty distinct IDs.** A Dart callback that sets the distinct ID to an empty or whitespace-only string keeps the SDK's distinct ID for that event.
 - **Native events.** Events the native SDK captures itself don't go through Dart callbacks. Use `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin to filter or edit those, such as crashes, app lifecycle, and `$feature_flag_called` events. A native hook that sets the distinct ID to an empty or whitespace-only string drops the event.
 
 These rules apply on Windows and Linux:
 
+- **Legacy `$set` and `$set_once`.** A `$set` or `$set_once` map passed in `properties` reaches callbacks in `event.userProperties` and `event.userPropertiesSetOnce`, not in `event.properties`, as on iOS, macOS, and Android.
 - **Legacy option properties.** A legacy option property that a callback adds doesn't replace an option that is already set.
 - **Events callbacks don't see.** `beforeSend` doesn't see `$identify`, `$create_alias`, `$groupidentify`, or `$feature_flag_called`.
 - **Exception steps.** `$exception_steps` is added to `$exception` events before `beforeSend` runs, so a callback can read or remove it. Steps recorded while a callback runs, and an event a callback renames to `$exception`, don't get them.

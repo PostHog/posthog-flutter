@@ -1,5 +1,5 @@
 ---
-title: "PostHog Flutter SDK 6.x (experimental)"
+title: "PostHog Flutter SDK 6.x"
 sidebar: Docs
 showTitle: true
 contentMaxWidthClass: max-w-full
@@ -142,7 +142,9 @@ tableOfContents:
 ## Getting started
 
 
-The Flutter SDK runs in iOS, Android, macOS, and web apps.
+The Flutter SDK runs in iOS, Android, macOS, Windows, Linux, and web apps.
+
+It requires Flutter 3.41 or later, iOS 15 or macOS 12 with Xcode 26 and Swift Package Manager, and Android `minSdkVersion` 23. iOS add-to-app modules need Flutter 3.50 or later.
 
 To send your first event, add `posthog_flutter`, then call `setup` once before `runApp` with your project token and host from your [project settings](https://app.posthog.com/project/settings).
 
@@ -184,6 +186,13 @@ Flush queued events and shut the SDK down before the app exits:
 await Posthog().flush();
 await Posthog().close();
 ```
+
+### Offline behavior
+
+On Android and Apple platforms, the SDK keeps capturing events while the device is offline. Events are queued in device file storage and flushed when the app restarts with a network connection.
+
+- `maxQueueSize` sets the maximum number of queued events.
+- When the queue is full, the oldest event is evicted first.
 
 ### Reproducible Android builds and Shorebird
 
@@ -1812,9 +1821,11 @@ BeforeSendCallback = PostHogEvent? Function(PostHogEvent event)
 
 Callback to intercept and modify events before they are sent to PostHog.
 
-The `event` argument contains the event name and user-provided properties
-that are about to be captured. Return a possibly modified event to send it,
-or return `null` to drop it.
+The `event` argument is the event about to be captured. On iOS, macOS,
+Android, Windows and Linux it is the built event, with the system and
+registered properties and the options the SDK adds; on web it has only
+the event's own properties. See PostHogConfig.beforeSend. Return a
+possibly modified event to send it, or return `null` to drop it.
 
 Callbacks are synchronous, as in the native SDKs, so the event is sent
 with the user and properties it was captured under.
@@ -2228,6 +2239,26 @@ Whether the SDK emits verbose debug logs.
 
 Defaults to `false`.
 
+#### `PostHogConfig.disableGeoIp`
+
+```dart
+bool disableGeoIp
+```
+
+Whether PostHog skips GeoIP enrichment, so the server doesn't infer the
+user's location from their IP address.
+
+When `true`, events carry `$geoip_disable: true` and feature flag
+requests send `geoip_disable: true`. Event properties and beforeSend
+callbacks can't remove or change it: the SDK sets it again after them.
+Native hooks added with `PosthogFlutterPlugin.addBeforeSend` run later
+and can.
+
+Defaults to `false`.
+
+**Flutter web:** not applied. posthog-js is initialized by your app, so
+set `$geoip_disable: true` on events in its `before_send` instead.
+
 #### `PostHogConfig.enableWindowsAndLinux`
 
 ```dart
@@ -2497,10 +2528,10 @@ Enable Surveys
 - After calling `Posthog().close()`, surveys will not be rendered until the
   SDK is re-initialized and the next navigation event occurs.
 - You must install `PosthogObserver` in your app for surveys to display.
-  - See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
+  - See: https://posthog.com/docs/surveys/installation/flutter
 - For Flutter web, this setting will be ignored. Surveys on web use the
   JavaScript Web SDK instead.
-  - See: https://posthog.com/docs/surveys/installation?tab=Web
+  - See: https://posthog.com/docs/surveys/installation/web
 - Surveys are not supported on Windows and Linux, where this setting is
   ignored.
 
