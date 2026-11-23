@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:meta/meta.dart';
@@ -187,8 +186,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
     String? event,
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
-    // Resolved first: it may start a new session, which the debug
-    // properties below then describe.
     final managedSessionId = _session.touch(now);
     final timezone = getTimezone();
     final enriched = {
@@ -198,7 +195,8 @@ abstract class PostHogCore extends PostHogCoreStateless {
       r'$session_id': managedSessionId,
       r'$is_identified': _isIdentified(),
       if (_disableGeoIp) r'$geoip_disable': true,
-      ..._sessionDebugProperties(now),
+      // Null is left out when the event is queued.
+      r'$sdk_debug_pending_queue_size': backedUpQueueLength,
       ..._sessionProps,
       ..._registeredProperties(event),
       ...?properties,
@@ -279,19 +277,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
       return options;
     }
     return {...?options, 'process_person_profile': false};
-  }
-
-  /// The state of the session and the queue, attached to every event to
-  /// help debug the SDK.
-  Map<String, Object?> _sessionDebugProperties(int now) {
-    final startedAt = _session.startedAt;
-    return {
-      r'$sdk_debug_session_start': startedAt,
-      // The wall clock can move backwards.
-      r'$sdk_debug_current_session_duration': max(0, now - startedAt),
-      // Null is left out when the event is queued.
-      r'$sdk_debug_pending_queue_size': backedUpQueueLength,
-    };
   }
 
   /// Adds [properties] to every later event until [reset], without
