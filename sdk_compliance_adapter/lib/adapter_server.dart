@@ -517,7 +517,8 @@ class _RecordingProxy {
       });
       headersSent = true;
       // Not addStream: a failing body would take the response down with it.
-      await for (final chunk in result) {
+      // A body that stalls is abandoned, closing its upstream connection.
+      await for (final chunk in result.timeout(_upstreamTimeout)) {
         response.add(chunk);
       }
     } catch (error) {
