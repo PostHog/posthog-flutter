@@ -153,8 +153,10 @@ Use `capture` for your own events, and call `flush` and `close` before the app e
 Install the package:
 
 ```bash
-flutter pub add posthog_flutter
+flutter pub add posthog_flutter:^6.0.0
 ```
+
+This adds `posthog_flutter: ^6.0.0` to the `dependencies` in your `pubspec.yaml`.
 
 Initialize the SDK once, before `runApp`, with your project token and host:
 
@@ -269,6 +271,20 @@ await Posthog().setup(config);
 For Android and iOS, if you are performing a manual setup,
 ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
 configuration.
+
+On Android, add this to the `<application>` element of
+`android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<meta-data android:name="com.posthog.posthog.AUTO_INIT" android:value="false" />
+```
+
+On iOS, add this to the top-level `<dict>` of `ios/Runner/Info.plist`:
+
+```xml
+<key>com.posthog.posthog.AUTO_INIT</key>
+<false/>
+```
 
 ## Capture
 

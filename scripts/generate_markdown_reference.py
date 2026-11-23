@@ -79,8 +79,13 @@ def markdown(node) -> str:
     for text in node.find_all(string=True):  # braces in prose only; code keeps them
         if not text.find_parent(["code", "pre"]):
             text.replace_with(str(text).translate(MDX))
-    md = markdownify(str(node), strip=["a"], heading_style="ATX", bullets="-", code_language="dart")
+    md = markdownify(str(node), strip=["a"], heading_style="ATX", bullets="-", code_language="dart", code_language_callback=fence)
     return md.strip().replace("<br>", "<br />")
+
+
+def fence(pre) -> str | None:
+    """The language of a fenced doc comment block, from dartdoc's `language-xml` class. Dart otherwise."""
+    return next((c.removeprefix("language-") for c in pre.get("class", []) if c.startswith("language-")), None)
 
 
 def capabilities(checkout: str) -> dict[str, str]:

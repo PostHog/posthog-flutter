@@ -11,8 +11,10 @@ Use `capture` for your own events, and call `flush` and `close` before the app e
 Install the package:
 
 ```bash
-flutter pub add posthog_flutter
+flutter pub add posthog_flutter:^6.0.0
 ```
+
+This adds `posthog_flutter: ^6.0.0` to the `dependencies` in your `pubspec.yaml`.
 
 Initialize the SDK once, before `runApp`, with your project token and host:
 
