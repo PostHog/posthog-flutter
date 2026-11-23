@@ -16,8 +16,8 @@ import 'package:posthog_flutter/src/core/posthog_core.dart';
 import 'package:posthog_flutter/src/posthog_desktop_app_info.dart';
 import 'package:posthog_flutter/src/posthog_desktop_client.dart';
 import 'package:posthog_flutter/src/posthog_flutter_desktop.dart';
+import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
 import 'package:posthog_flutter/src/posthog_flutter_version.dart';
-import 'package:posthog_flutter/src/utils/project_token.dart';
 
 const _adapterVersion = '1.0.0';
 const _defaultFlushAt = 100;
@@ -144,15 +144,11 @@ class ComplianceAdapter {
       }
 
       await platform.resetAdapterState();
-      if (isUsableProjectToken(config.projectToken)) {
-        await platform.configure(
-          config,
-          host: host,
-          superProperties: _readNullableObjectMap(body['super_properties']),
-        );
-      } else {
-        platform.disable();
-      }
+      await platform.configure(
+        config,
+        host: host,
+        superProperties: _readNullableObjectMap(body['super_properties']),
+      );
 
       await _sendJson(request, {'success': true});
       return;
@@ -584,9 +580,6 @@ class _CompliancePlatform {
 
   bool get isInitialized => _initialized;
 
-  /// Initialized as an app whose setup was skipped: every call is a no-op.
-  void disable() => _initialized = true;
-
   Future<void> configure(
     PostHogConfig config, {
     required String host,
@@ -603,11 +596,15 @@ class _CompliancePlatform {
       createClient: (config, storage, _) =>
           created = _CaptureClient(config, storage),
     );
-    await plugin.setup(config);
+    PosthogFlutterPlatformInterface.instance = plugin;
+    await Posthog().setup(config);
     final client = created;
     if (client == null) {
+      // Setup declined the config, as for a personal API key: every call is
+      // then a no-op, like in an app.
       await proxy.close();
-      throw StateError('The plugin did not start a client');
+      _initialized = true;
+      return;
     }
     final clientState = state;
     client.onCaptured = () => clientState.totalEventsCaptured++;
@@ -691,7 +688,7 @@ class _CompliancePlatform {
   }
 
   Future<void> resetAdapterState() async {
-    unawaited(_plugin?.close());
+    if (_plugin != null) unawaited(Posthog().close());
     _plugin = null;
     _client = null;
     await _proxy?.close();
