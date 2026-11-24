@@ -125,7 +125,7 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
     final headerFooterHeight = 350; //estimated
     final availableHeight =
         (screenHeight - headerFooterHeight - keyboardHeight - bottomPadding)
-            .clamp(0.0, double.infinity);
+            .clamp(120.0, double.infinity);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/src/posthog_observer.dart';
 import 'package:posthog_flutter/src/surveys/models/posthog_display_survey.dart';
 import 'package:posthog_flutter/src/surveys/survey_service.dart';
+import 'package:posthog_flutter/src/surveys/widgets/choice_question.dart';
 import 'package:posthog_flutter/src/surveys/widgets/survey_bottom_sheet.dart';
 
 const linkQuestion = {
@@ -77,6 +78,30 @@ void main() {
     expect(tester.getRect(find.byType(IconButton)).top - card.top, 8);
   });
 
+  for (final entry in {
+    'top_left': Alignment.topLeft,
+    'top_center': Alignment.topCenter,
+    'top_right': Alignment.topRight,
+    'middle_left': Alignment.centerLeft,
+    'middle_center': Alignment.center,
+    'middle_right': Alignment.centerRight,
+    'left': Alignment.bottomLeft,
+    'right': Alignment.bottomRight,
+  }.entries) {
+    testWidgets('aligns a ${entry.key} card', (tester) async {
+      await showSurvey(tester, position: entry.key);
+      final align = tester.widget<Align>(
+        find
+            .ancestor(
+              of: find.byType(SurveyBottomSheet),
+              matching: find.byType(Align),
+            )
+            .first,
+      );
+      expect(align.alignment, entry.value);
+    });
+  }
+
   for (final position in [null, 'center', 'unknown']) {
     testWidgets('keeps the bottom sheet for $position', (tester) async {
       await showSurvey(tester, position: position);
@@ -108,6 +133,38 @@ void main() {
     await showSurvey(tester, position: 'right');
     expect(find.byType(SurveyBottomSheet), findsOneWidget);
   });
+
+  testWidgets('keeps a card open on a scrim tap until hideSurvey', (
+    tester,
+  ) async {
+    await showSurvey(tester, position: 'right');
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(SurveyBottomSheet), findsOneWidget);
+
+    SurveyService().hideSurvey();
+    await tester.pumpAndSettle();
+    expect(find.byType(SurveyBottomSheet), findsNothing);
+  });
+
+  for (final (screen, keyboard) in [
+    (const Size(844, 390), 0.0),
+    (const Size(375, 667), 270.0),
+  ]) {
+    testWidgets('keeps choices visible in a $screen card', (tester) async {
+      openKeyboard(tester, screen, keyboard);
+      await showSurvey(tester, position: 'right', question: choiceQuestion);
+      final choices = tester.getSize(
+        find
+            .descendant(
+              of: find.byType(ChoiceQuestionWidget),
+              matching: find.byType(SingleChildScrollView),
+            )
+            .first,
+      );
+      expect(choices.height, greaterThan(0));
+    });
+  }
 
   for (final question in [choiceQuestion, openQuestion]) {
     testWidgets('keeps ${question['type']} Submit above the keyboard', (
