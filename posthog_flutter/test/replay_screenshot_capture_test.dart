@@ -21,6 +21,7 @@ void main() {
   late PosthogFlutterPlatformInterface previousPlatform;
   var sessionId = 'session-a';
   var secure = false;
+  void Function()? onStateRequest;
 
   setUp(() {
     previousPlatform = PosthogFlutterPlatformInterface.instance;
@@ -28,9 +29,11 @@ void main() {
     calls.clear();
     sessionId = 'session-a';
     secure = false;
+    onStateRequest = null;
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       if (call.method == 'getSessionReplayState') {
+        onStateRequest?.call();
         return {'isActive': true, 'sessionId': sessionId, 'secure': secure};
       }
       return null;
@@ -159,6 +162,28 @@ void main() {
       await unmount(tester);
     }, variant: TargetPlatformVariant.only(TargetPlatform.android));
   }
+
+  testWidgets(
+      'capture drops the frame when the app is paused during the native state request',
+      (tester) async {
+    final config = await mount(tester, 1.0);
+    final capturer = ScreenshotCapturer(config);
+    var stateRequested = false;
+    onStateRequest = () {
+      stateRequested = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    };
+
+    try {
+      expect(await capturer.captureScreenshot(), isNull);
+      // Got past the entry guard; only the post-await guard can drop it.
+      expect(stateRequested, isTrue);
+    } finally {
+      onStateRequest = null;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    }
+    await unmount(tester);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('capture drops the frame when the app becomes inactive',
       (tester) async {
