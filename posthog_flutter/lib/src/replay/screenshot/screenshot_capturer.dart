@@ -257,6 +257,11 @@ class ScreenshotCapturer {
     ui.Image img, {
     ui.ImageByteFormat format = ui.ImageByteFormat.png,
   }) async {
+    // Re-checked right before the raster-thread work: the app may have left
+    // the foreground since the capture started.
+    if (!_canCaptureInCurrentLifecycle) {
+      return null;
+    }
     try {
       final ByteData? byteData = await img.toByteData(format: format);
       if (byteData == null || byteData.lengthInBytes == 0) {
@@ -863,6 +868,12 @@ class ScreenshotCapturer {
           final specs = pvRects.captured
               .map((v) => _viewSpec(v.data, globalPosition))
               .toList();
+          if (!_canCaptureInCurrentLifecycle) {
+            currentRecorder.endRecording().dispose();
+            recorder = null;
+            completer.complete(null);
+            return;
+          }
           final bytesList =
               await _nativeCommunicator.captureNativeScreenshots(specs);
           if (_cancelled) {
@@ -889,6 +900,10 @@ class ScreenshotCapturer {
         }
 
         try {
+          if (!_canCaptureInCurrentLifecycle) {
+            completer.complete(null);
+            return;
+          }
           finalImage = await currentPicture.toImage(imageWidth, imageHeight);
 
           final currentFinalImage = finalImage;

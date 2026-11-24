@@ -136,6 +136,30 @@ void main() {
     await unmount(tester);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
+  for (final state in [
+    AppLifecycleState.paused,
+    AppLifecycleState.hidden,
+    AppLifecycleState.detached,
+  ]) {
+    testWidgets('capture is skipped while the app is $state', (tester) async {
+      final config = await mount(tester, 1.0);
+      final capturer = ScreenshotCapturer(config);
+      final previousStateRequests =
+          calls.where((call) => call.method == 'getSessionReplayState').length;
+
+      tester.binding.handleAppLifecycleStateChanged(state);
+      try {
+        expect(await capturer.captureScreenshot(), isNull);
+        expect(calls.where((call) => call.method == 'getSessionReplayState'),
+            hasLength(previousStateRequests));
+      } finally {
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      }
+      await unmount(tester);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }
+
   testWidgets('capture drops the frame when the app becomes inactive',
       (tester) async {
     final config = await mount(tester, 1.0);
@@ -145,6 +169,9 @@ void main() {
       completed = true;
     });
     SchedulerBinding.instance.addPostFrameCallback((_) {
+      // The capture got past the entry guard and the native state request,
+      // so only the post-frame guard can drop it.
+      expect(completed, isFalse);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     });
 

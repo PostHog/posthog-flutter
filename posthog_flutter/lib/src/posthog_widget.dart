@@ -30,7 +30,8 @@ class PostHogWidget extends StatefulWidget {
 
 /// State for [PostHogWidget].
 @internal
-class PostHogWidgetState extends State<PostHogWidget> {
+class PostHogWidgetState extends State<PostHogWidget>
+    with WidgetsBindingObserver {
   ChangeDetector? _changeDetector;
   ScreenshotCapturer? _screenshotCapturer;
   NativeCommunicator? _nativeCommunicator;
@@ -38,12 +39,19 @@ class PostHogWidgetState extends State<PostHogWidget> {
   bool _isCapturing = false;
   bool _disposed = false;
 
+  /// Set when sampling was held back (or stopped) because the app is not
+  /// resumed; cleared when the detector is restarted on resume.
+  bool _pausedByLifecycle = false;
+
   bool _sampleRequestedDuringCapture = false;
 
   /// Whether a substitute source (bridge or placeholder) owns the current
   /// episode. Not the same as "occluded": with the bridge off, occlusion is
   /// ignored and Flutter capture keeps running.
   bool _suppressFlutterCapture = false;
+
+  @visibleForTesting
+  bool get debugChangeDetectorRunning => _changeDetector?.isRunning ?? false;
 
   @visibleForTesting
   bool get debugFlutterCaptureSuppressed => _suppressFlutterCapture;
@@ -56,6 +64,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     final config = Posthog().config;
     if (config == null) {
@@ -72,7 +81,11 @@ class PostHogWidgetState extends State<PostHogWidget> {
 
     if (_capturesSnapshots && config.sessionReplay) {
       _initComponents(config);
-      _changeDetector?.start();
+      if (_inForeground) {
+        _changeDetector?.start();
+      } else {
+        _pausedByLifecycle = true;
+      }
     }
 
     PostHogInternalEvents.sessionRecordingActive.addListener(
@@ -217,6 +230,35 @@ class PostHogWidgetState extends State<PostHogWidget> {
     )..suppressForcedFrames = _suppressFlutterCapture;
   }
 
+  /// Whether the app is in a lifecycle state where capturing is allowed.
+  /// Uninitialized (null) counts as foreground.
+  bool get _inForeground {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
+
+  /// Pauses sampling while the app is not resumed, so the detector does not
+  /// spend forced ticks on captures that are skipped, and restarts it on
+  /// resume (which forces a first frame for static screens).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_disposed) {
+      return;
+    }
+    if (state == AppLifecycleState.resumed) {
+      if (_pausedByLifecycle) {
+        _pausedByLifecycle = false;
+        _changeDetector?.start();
+      }
+    } else {
+      if (_changeDetector?.isRunning ?? false) {
+        _pausedByLifecycle = true;
+      }
+      _changeDetector?.stop();
+      _screenshotCapturer?.cancel();
+    }
+  }
+
   void _onSessionRecordingChanged() {
     if (PostHogInternalEvents.sessionRecordingActive.value) {
       _startRecording();
@@ -239,10 +281,15 @@ class PostHogWidgetState extends State<PostHogWidget> {
       _initComponents(config);
     }
 
+    if (!_inForeground) {
+      _pausedByLifecycle = true;
+      return;
+    }
     _changeDetector?.start();
   }
 
   void _stopRecording() {
+    _pausedByLifecycle = false;
     _changeDetector?.stop();
     _screenshotCapturer?.cancel();
   }
@@ -364,6 +411,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
   @override
   void dispose() {
     _disposed = true;
+    WidgetsBinding.instance.removeObserver(this);
 
     PostHogInternalEvents.sessionRecordingActive.removeListener(
       _onSessionRecordingChanged,

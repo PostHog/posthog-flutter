@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_platform_interface.dart';
+import 'package:posthog_flutter/src/posthog_internal_events.dart';
+import 'package:posthog_flutter/src/posthog_widget.dart';
 
 import 'posthog_flutter_platform_interface_fake.dart';
 
@@ -80,4 +82,65 @@ void main() {
       expect(messages, isEmpty);
     });
   }
+
+  group('app lifecycle', () {
+    Future<PostHogWidgetState> mountReplay(WidgetTester tester) async {
+      await Posthog()
+          .setup(PostHogConfig('test_project_token')..sessionReplay = true);
+      await tester.pumpWidget(const PostHogWidget(child: SizedBox()));
+      await tester.pump(const Duration(milliseconds: 1));
+      return tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
+    }
+
+    Future<void> unmount(WidgetTester tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+    }
+
+    for (final background in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.detached,
+    ]) {
+      testWidgets('change detector stops on $background and restarts on resume',
+          (tester) async {
+        final state = await mountReplay(tester);
+        expect(state.debugChangeDetectorRunning, isTrue);
+
+        tester.binding.handleAppLifecycleStateChanged(background);
+        expect(state.debugChangeDetectorRunning, isFalse);
+
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        expect(state.debugChangeDetectorRunning, isTrue);
+        await unmount(tester);
+      }, skip: kIsWeb);
+    }
+
+    testWidgets('mounting while backgrounded starts only on resume',
+        (tester) async {
+      // inactive still renders frames, so the widget can mount.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      final state = await mountReplay(tester);
+      expect(state.debugChangeDetectorRunning, isFalse);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(state.debugChangeDetectorRunning, isTrue);
+      await unmount(tester);
+    }, skip: kIsWeb);
+
+    testWidgets('resume does not restart a detector stopped by the recording',
+        (tester) async {
+      final state = await mountReplay(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      PostHogInternalEvents.sessionRecordingActive.value = false;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(state.debugChangeDetectorRunning, isFalse);
+      PostHogInternalEvents.sessionRecordingActive.value = true;
+      expect(state.debugChangeDetectorRunning, isTrue);
+      await unmount(tester);
+    }, skip: kIsWeb);
+  });
 }
