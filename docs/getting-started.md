@@ -11,8 +11,17 @@ Use `capture` for your own events, and call `flush` and `close` before the app e
 Install the package:
 
 ```bash
-flutter pub add posthog_flutter
+flutter pub add "posthog_flutter:^6.0.0"
 ```
+
+This adds `posthog_flutter: ^6.0.0` to the `dependencies` in your `pubspec.yaml`. The caret constraint resolves to the newest 6.x release and never to 7.0 or later:
+
+```yaml
+dependencies:
+  posthog_flutter: ^6.0.0
+```
+
+On Windows, `cmd` can drop the `^`. If the line reads `posthog_flutter: 6.0.0`, add the `^` back and run `flutter pub get`.
 
 Initialize the SDK once, before `runApp`, with your project token and host:
 

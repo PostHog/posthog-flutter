@@ -73,6 +73,20 @@ class Posthog {
   /// For Android and iOS, if you are performing a manual setup,
   /// ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
   /// configuration.
+  ///
+  /// On Android, add this to the `<application>` element of
+  /// `android/app/src/main/AndroidManifest.xml`:
+  ///
+  /// ```xml
+  /// <meta-data android:name="com.posthog.posthog.AUTO_INIT" android:value="false" />
+  /// ```
+  ///
+  /// On iOS, add this to the top-level `<dict>` of `ios/Runner/Info.plist`:
+  ///
+  /// ```xml
+  /// <key>com.posthog.posthog.AUTO_INIT</key>
+  /// <false/>
+  /// ```
   Future<void> setup(PostHogConfig config) async {
     if (!isUsableProjectToken(config.projectToken)) {
       return Future<void>.value();
