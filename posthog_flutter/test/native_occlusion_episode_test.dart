@@ -661,6 +661,23 @@ void main() {
     });
   });
 
+  group('placeholder lifecycle', () {
+    testWidgets('builds the placeholder while the app is paused',
+        (tester) async {
+      final config = replayConfig(captureNativeScreens: true);
+      await setupPosthog(config);
+      await pumpReplayWidget(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+
+      final capturer = ScreenshotCapturer(config);
+      final imageInfo = await tester.runAsync(
+        () => capturer.buildOcclusionPlaceholder(),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(imageInfo, isNotNull);
+    });
+  });
+
   group('confirmDelivered', () {
     testWidgets('commits the status captured with the frame', (tester) async {
       final config = replayConfig(captureNativeScreens: true);

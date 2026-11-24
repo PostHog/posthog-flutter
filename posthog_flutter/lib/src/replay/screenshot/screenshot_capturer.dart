@@ -257,11 +257,6 @@ class ScreenshotCapturer {
     ui.Image img, {
     ui.ImageByteFormat format = ui.ImageByteFormat.png,
   }) async {
-    // Re-checked right before the raster-thread work: the app may have left
-    // the foreground since the capture started.
-    if (!_canCaptureInCurrentLifecycle) {
-      return null;
-    }
     try {
       final ByteData? byteData = await img.toByteData(format: format);
       if (byteData == null || byteData.lengthInBytes == 0) {
@@ -770,10 +765,14 @@ class ScreenshotCapturer {
         }
         final canvas = Canvas(currentRecorder);
 
-        Uint8List? imageBytes = await _getImageBytes(
-          currentImage,
-          format: ui.ImageByteFormat.rawRgba,
-        );
+        // Re-checked right before the raster-thread work: the app may have
+        // left the foreground since the capture started.
+        Uint8List? imageBytes = _canCaptureInCurrentLifecycle
+            ? await _getImageBytes(
+                currentImage,
+                format: ui.ImageByteFormat.rawRgba,
+              )
+            : null;
         if (_cancelled) {
           currentRecorder.endRecording().dispose();
           recorder = null;
@@ -924,7 +923,9 @@ class ScreenshotCapturer {
           try {
             _pendingImageBytesHash = preMaskHash;
 
-            final pngBytes = await _getImageBytes(currentFinalImage);
+            final pngBytes = _canCaptureInCurrentLifecycle
+                ? await _getImageBytes(currentFinalImage)
+                : null;
             if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
               completer.complete(null);
               return;
