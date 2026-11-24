@@ -48,7 +48,8 @@ class _OpenTextQuestionState extends State<OpenTextQuestion> {
 
         // Reserve space for header and button (approximate)
         final reservedSpace = 150.0;
-        final textFieldMaxHeight = (availableHeight - reservedSpace) * 0.7;
+        final textFieldMaxHeight = ((availableHeight - reservedSpace) * 0.7)
+            .clamp(80.0, double.infinity);
 
         return Column(
           mainAxisSize: MainAxisSize.min,

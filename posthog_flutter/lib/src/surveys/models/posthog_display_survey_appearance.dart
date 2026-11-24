@@ -61,8 +61,5 @@ class PostHogDisplaySurveyAppearance {
   final String? introScreenDescription;
   final PostHogDisplaySurveyTextContentType? introScreenDescriptionContentType;
   final String? introScreenButtonText;
-
-  /// Screen position sent by PostHog in `appearance.position`, such as
-  /// `top_left` or `center`.
   final String? position;
 }

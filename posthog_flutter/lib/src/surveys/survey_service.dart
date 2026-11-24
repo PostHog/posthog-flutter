@@ -23,32 +23,16 @@ Duration surveyPopupDelay(double? seconds) {
   return Duration(milliseconds: (seconds * 1000).round());
 }
 
-/// Card alignment for [position] (`appearance.position`).
-///
-/// Returns null for bottom center, a missing value, or an unknown value, which
-/// all keep the bottom sheet like iOS does.
-Alignment? surveyCardAlignment(String? position) {
-  switch (position) {
-    case 'top_left':
-      return Alignment.topLeft;
-    case 'top_center':
-      return Alignment.topCenter;
-    case 'top_right':
-      return Alignment.topRight;
-    case 'middle_left':
-      return Alignment.centerLeft;
-    case 'middle_center':
-      return Alignment.center;
-    case 'middle_right':
-      return Alignment.centerRight;
-    case 'left':
-      return Alignment.bottomLeft;
-    case 'right':
-      return Alignment.bottomRight;
-    default:
-      return null;
-  }
-}
+const surveyCardAlignments = {
+  'top_left': Alignment.topLeft,
+  'top_center': Alignment.topCenter,
+  'top_right': Alignment.topRight,
+  'middle_left': Alignment.centerLeft,
+  'middle_center': Alignment.center,
+  'middle_right': Alignment.centerRight,
+  'left': Alignment.bottomLeft,
+  'right': Alignment.bottomRight,
+};
 
 /// A service that manages displaying surveys
 ///
@@ -165,7 +149,7 @@ class SurveyService {
     final programmaticDismissal = Completer<void>();
     _programmaticDismissal = programmaticDismissal;
     try {
-      final cardAlignment = surveyCardAlignment(survey.appearance?.position);
+      final cardAlignment = surveyCardAlignments[survey.appearance?.position];
       Widget builder(BuildContext context) {
         final route = ModalRoute.of(context);
         if (_programmaticDismissal == programmaticDismissal &&
@@ -238,7 +222,6 @@ class SurveyService {
     );
   }
 
-  /// Shows the survey as a card at [alignment].
   Widget _buildSurveyCard(
     BuildContext context,
     Alignment alignment,
@@ -248,19 +231,20 @@ class SurveyService {
       child: Padding(
         padding: const EdgeInsets.all(16) +
             EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-        child: Align(
-          alignment: alignment,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              // The padding above already lifts the card over the keyboard.
-              // Builder reads MediaQuery inside SafeArea, so the sheet's own
-              // SafeArea adds nothing.
-              child: Builder(
-                builder: (context) => MediaQuery.removeViewInsets(
-                  context: context,
-                  removeBottom: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              size: constraints.biggest,
+              padding: EdgeInsets.zero,
+              viewPadding: EdgeInsets.zero,
+              viewInsets: EdgeInsets.zero,
+            ),
+            child: Align(
+              alignment: alignment,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
                   child: Material(
                     type: MaterialType.transparency,
                     child: survey,
