@@ -359,6 +359,39 @@ void main() {
       await unmount(tester);
     });
 
+    testWidgets(
+        'a capture dropped when the app goes inactive during the state request',
+        (tester) async {
+      final config = await mount(tester, 1.0);
+      final capturer = ScreenshotCapturer(config);
+
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'getSessionReplayState') {
+          tester.binding
+              .handleAppLifecycleStateChanged(AppLifecycleState.paused);
+          return {'isActive': true, 'sessionId': sessionId, 'secure': secure};
+        }
+        return null;
+      });
+      addTearDown(() => tester.binding
+          .handleAppLifecycleStateChanged(AppLifecycleState.resumed));
+
+      ImageInfo? result;
+      var done = false;
+      capturer.captureScreenshot().then((value) {
+        result = value;
+        done = true;
+      });
+      // No pump: a capture that got past the state request would wait on
+      // endOfFrame and never complete here.
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+
+      expect(done, isTrue);
+      expect(result, isNull);
+      await unmount(tester);
+    });
+
     testWidgets('widget sends no snapshot while inactive, one after resume', (
       tester,
     ) async {

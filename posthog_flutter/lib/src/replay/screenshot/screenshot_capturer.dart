@@ -658,7 +658,7 @@ class ScreenshotCapturer {
       return null;
     }
     final state = await _nativeCommunicator.getSessionReplayState();
-    if (_cancelled) {
+    if (_shouldAbortCapture) {
       return null;
     }
     if (!state.isActive) {
@@ -860,15 +860,25 @@ class ScreenshotCapturer {
           final specs = pvRects.captured
               .map((v) => _viewSpec(v.data, globalPosition))
               .toList();
+          if (_shouldAbortCapture) {
+            currentRecorder.endRecording().dispose();
+            recorder = null;
+            completer.complete(null);
+            return;
+          }
           final bytesList =
               await _nativeCommunicator.captureNativeScreenshots(specs);
-          if (_cancelled) {
+          if (_shouldAbortCapture) {
             currentRecorder.endRecording().dispose();
             recorder = null;
             completer.complete(null);
             return;
           }
           for (var i = 0; i < pvRects.captured.length; i++) {
+            // A break leaves a partial picture; the abort check before toImage drops it.
+            if (_shouldAbortCapture) {
+              break;
+            }
             final spec = specs[i];
             final bytes = i < bytesList.length ? bytesList[i] : null;
             await _compositeRevealedView(canvas, pvRects.captured[i], bytes,
