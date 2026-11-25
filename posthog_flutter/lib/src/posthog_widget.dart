@@ -214,6 +214,7 @@ class PostHogWidgetState extends State<PostHogWidget> {
     _changeDetector = ChangeDetector(
       _onChangeDetected,
       interval: config.sessionReplayConfig.throttleDelay,
+      onResumed: _ensureSampleLands,
     )..suppressForcedFrames = _suppressFlutterCapture;
   }
 

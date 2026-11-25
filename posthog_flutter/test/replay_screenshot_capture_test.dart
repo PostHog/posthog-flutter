@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/widgets.dart' hide ImageInfo;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:posthog_flutter/src/posthog_flutter_io.dart';
@@ -20,6 +21,7 @@ void main() {
   late PosthogFlutterPlatformInterface previousPlatform;
   var sessionId = 'session-a';
   var secure = false;
+  Completer<void>? holdSend;
 
   setUp(() {
     previousPlatform = PosthogFlutterPlatformInterface.instance;
@@ -27,8 +29,12 @@ void main() {
     calls.clear();
     sessionId = 'session-a';
     secure = false;
+    holdSend = null;
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
+      if (call.method == 'sendFullSnapshot') {
+        await holdSend?.future;
+      }
       if (call.method == 'getSessionReplayState') {
         return {'isActive': true, 'sessionId': sessionId, 'secure': secure};
       }
@@ -43,7 +49,8 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  Widget captureTree(Size size) => Align(
+  Widget captureTree(Size size, {Color background = const Color(0xFF00FF00)}) =>
+      Align(
         alignment: Alignment.topLeft,
         child: SizedBox.fromSize(
           size: size,
@@ -51,9 +58,9 @@ void main() {
             child: Stack(
               textDirection: TextDirection.ltr,
               fit: StackFit.expand,
-              children: const [
-                ColoredBox(color: Color(0xFF00FF00)),
-                Positioned(
+              children: [
+                ColoredBox(color: background),
+                const Positioned(
                   left: 11,
                   top: 9,
                   width: 23,
@@ -292,4 +299,148 @@ void main() {
     expect(meta, lessThan(full));
     await unmount(tester);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  group('app lifecycle', () {
+    void goInactive(WidgetTester tester) {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    }
+
+    testWidgets('captureScreenshot returns null while inactive',
+        (tester) async {
+      final config = await mount(tester, 1.0);
+      final capturer = ScreenshotCapturer(config);
+
+      ImageInfo? resumed;
+      var done = false;
+      capturer.captureScreenshot().then((value) {
+        resumed = value;
+        done = true;
+      });
+      await settleUntil(tester, () => done);
+      expect(resumed, isNotNull, reason: 'positive control');
+
+      goInactive(tester);
+      calls.clear();
+      expect(await capturer.captureScreenshot(), isNull);
+      expect(
+        calls.map((c) => c.method),
+        isNot(contains('getSessionReplayState')),
+        reason: 'bails out before the native round trip',
+      );
+
+      await unmount(tester);
+    });
+
+    testWidgets('a capture dropped when the app goes inactive mid-flight', (
+      tester,
+    ) async {
+      final config = await mount(tester, 1.0);
+      final capturer = ScreenshotCapturer(config);
+
+      ImageInfo? result;
+      var done = false;
+      final capture = capturer.captureScreenshot().then((value) {
+        result = value;
+        done = true;
+      });
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      expect(done, isFalse);
+
+      goInactive(tester);
+      await settleUntil(tester, () => done);
+      await capture;
+
+      expect(result, isNull);
+      await unmount(tester);
+    });
+
+    testWidgets(
+        'a capture dropped when the app goes inactive during the state request',
+        (tester) async {
+      final config = await mount(tester, 1.0);
+      final capturer = ScreenshotCapturer(config);
+
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'getSessionReplayState') {
+          tester.binding
+              .handleAppLifecycleStateChanged(AppLifecycleState.paused);
+          return {'isActive': true, 'sessionId': sessionId, 'secure': secure};
+        }
+        return null;
+      });
+      addTearDown(() => tester.binding
+          .handleAppLifecycleStateChanged(AppLifecycleState.resumed));
+
+      ImageInfo? result;
+      var done = false;
+      capturer.captureScreenshot().then((value) {
+        result = value;
+        done = true;
+      });
+      // No pump: a capture that got past the state request would wait on
+      // endOfFrame and never complete here.
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+
+      expect(done, isTrue);
+      expect(result, isNull);
+      await unmount(tester);
+    });
+
+    testWidgets('widget sends no snapshot while inactive, one after resume', (
+      tester,
+    ) async {
+      goInactive(tester);
+      await mount(tester, 1.0, waitForSnapshot: false);
+      await settleCapture(tester);
+      expect(calls.map((c) => c.method), isNot(contains('sendFullSnapshot')));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settleUntil(
+        tester,
+        () => calls.any((call) => call.method == 'sendFullSnapshot'),
+      );
+      expect(calls.where((c) => c.method == 'sendFullSnapshot'), hasLength(1));
+
+      await unmount(tester);
+    });
+    testWidgets('a resume during an in-flight send still samples afterwards', (
+      tester,
+    ) async {
+      await mount(tester, 1.0);
+      int sends() => calls.where((c) => c.method == 'sendFullSnapshot').length;
+      expect(sends(), 1);
+
+      holdSend = Completer<void>();
+      // An unforced tick only arms a post-frame callback, so the repaint has to
+      // come after it.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpWidget(
+        captureTree(const Size(101, 99), background: const Color(0xFFFF0000)),
+      );
+      await settleUntil(tester, () => sends() == 2);
+      expect(sends(), 2, reason: 'the second send is now held in flight');
+
+      goInactive(tester);
+      await tester.pumpWidget(
+        captureTree(const Size(101, 99), background: const Color(0xFF0000FF)),
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settleCapture(tester);
+      expect(sends(), 2);
+
+      holdSend!.complete();
+      await settleUntil(tester, () => sends() == 3);
+      expect(sends(), 3,
+          reason: 'the resume sample is deferred past the held send, not '
+              'dropped, so the screen changed while away still records');
+
+      await unmount(tester);
+    });
+  });
 }
