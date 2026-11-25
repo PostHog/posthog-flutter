@@ -662,6 +662,77 @@ void main() {
   });
 
   group('placeholder lifecycle', () {
+    testWidgets(
+        'placeholder survives a subsequent non-resumed lifecycle event while building',
+        (tester) async {
+      await setupPosthog(replayConfig(captureNativeScreens: true));
+      await pumpReplayWidget(tester);
+      recordedCalls.clear();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      try {
+        pushOcclusion(occluded: true, episode: 1, bridgeFailed: true);
+        // Arrives while buildOcclusionPlaceholder() is awaiting picture.toImage().
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+
+        await settleCapture(tester);
+
+        final methods = recordedCalls.map((c) => c.method).toList();
+        expect(methods, contains('sendMetaEvent'));
+        expect(methods, contains('sendFullSnapshot'));
+      } finally {
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await unmountAndFlush(tester);
+      }
+    });
+
+    testWidgets(
+        'brief inactive -> resumed during an in-flight capture still records a static screen',
+        (tester) async {
+      final firstStateRead = Completer<Map<String, Object?>>();
+      var stateReads = 0;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        recordedCalls.add(call);
+        if (call.method == 'getSessionReplayState') {
+          stateReads++;
+          if (stateReads == 1) {
+            return firstStateRead.future;
+          }
+          return {'isActive': true, 'sessionId': 'session-a'};
+        }
+        return null;
+      });
+      await setupPosthog(replayConfig(captureNativeScreens: false));
+      await pumpReplayWidget(tester);
+      const replayState = {'isActive': true, 'sessionId': 'session-a'};
+      try {
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(stateReads, 1);
+
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        // Spend start()'s first callback while the old capture is still busy.
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(stateReads, 1);
+        firstStateRead.complete(replayState);
+
+        await settleUntil(tester, () => sent('sendFullSnapshot'));
+        expect(stateReads, 2);
+        expect(sent('sendMetaEvent'), isTrue);
+        expect(sent('sendFullSnapshot'), isTrue);
+      } finally {
+        if (!firstStateRead.isCompleted) {
+          firstStateRead.complete(replayState);
+        }
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await unmountAndFlush(tester);
+      }
+    });
+
     testWidgets('builds the placeholder while the app is paused',
         (tester) async {
       final config = replayConfig(captureNativeScreens: true);
@@ -669,12 +740,17 @@ void main() {
       await pumpReplayWidget(tester);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
 
-      final capturer = ScreenshotCapturer(config);
-      final imageInfo = await tester.runAsync(
-        () => capturer.buildOcclusionPlaceholder(),
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      expect(imageInfo, isNotNull);
+      try {
+        final capturer = ScreenshotCapturer(config);
+        final imageInfo = await tester.runAsync(
+          () => capturer.buildOcclusionPlaceholder(),
+        );
+        expect(imageInfo, isNotNull);
+      } finally {
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await unmountAndFlush(tester);
+      }
     });
   });
 
@@ -923,6 +999,28 @@ void main() {
       );
 
       await unmountAndFlush(tester);
+    });
+
+    testWidgets('reset while inactive records a static screen after resume',
+        (tester) async {
+      await deliverFirstFrame(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      try {
+        await Posthog().reset();
+        await tester.pump(const Duration(seconds: 1));
+        expect(sent('sendFullSnapshot'), isFalse);
+
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await tester.pump(const Duration(seconds: 1));
+        await settleUntil(tester, () => sent('sendFullSnapshot'));
+        expect(sent('sendMetaEvent'), isTrue);
+        expect(sent('sendFullSnapshot'), isTrue);
+      } finally {
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await unmountAndFlush(tester);
+      }
     });
 
     testWidgets('a repeated tick in the same session does not re-send meta',
@@ -1284,6 +1382,49 @@ void main() {
         [800, 600]
       ]);
     }
+
+    testWidgets(
+        'drops a Flutter screenshot that backgrounds during native capture',
+        (tester) async {
+      final config = replayConfig(captureNativeScreens: false);
+      config.sessionReplayConfig.maskAllPlatformViews = false;
+      await setupPosthog(config);
+      await tester.pumpWidget(
+        screen(const Color(0xFF00FF00), platformView: true),
+      );
+      await settleCapture(tester);
+
+      var nativeCaptureRequested = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'getSessionReplayState') {
+          return {'isActive': true, 'sessionId': sessionId};
+        }
+        if (call.method == 'captureNativeScreenshots') {
+          nativeCaptureRequested = true;
+          tester.binding
+              .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        }
+        return null;
+      });
+
+      var completed = false;
+      final capture =
+          ScreenshotCapturer(config).captureScreenshot().whenComplete(
+        () {
+          completed = true;
+        },
+      );
+      try {
+        await settleUntil(tester, () => completed);
+        expect(nativeCaptureRequested, isTrue);
+        expect(completed, isTrue);
+        expect(await capture, isNull);
+      } finally {
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await unmountAndFlush(tester);
+      }
+    });
 
     testWidgets('re-sends meta only when the size changes', (tester) async {
       await deliverFirstFrame(tester);

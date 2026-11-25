@@ -99,7 +99,8 @@ class ScreenshotCapturer {
   final _nativeCommunicator = NativeCommunicator();
   final _snapshotManager = SnapshotManager();
 
-  bool _cancelled = false;
+  int _cancellationGeneration = 0;
+  int _screenshotGeneration = 0;
 
   bool hasCapturedPlatformViews = false;
 
@@ -141,7 +142,14 @@ class ScreenshotCapturer {
   PostHogConfig get effectiveConfig => Posthog().config ?? _config;
 
   void cancel() {
-    _cancelled = true;
+    _cancellationGeneration++;
+    cancelScreenshotCapture();
+  }
+
+  /// Invalidates Flutter screenshots while allowing native occlusion
+  /// placeholders to finish even when the host activity is paused.
+  void cancelScreenshotCapture() {
+    _screenshotGeneration++;
   }
 
   /// Drops all per-session snapshot state when [currentSessionId] differs from
@@ -525,16 +533,13 @@ class ScreenshotCapturer {
   }
 
   /// Shared prologue of [captureScreenshot]/[buildOcclusionPlaceholder]: resolves
-  /// the container render object and per-view status, and resets [_cancelled] so a
-  /// prior stop's cancel() can't veto a fresh capture. Null when not ready.
+  /// the container render object and per-view status. Null when not ready.
   ({
     RenderRepaintBoundary renderObject,
     ViewTreeSnapshotStatus statusView,
     bool shouldSendMetaEvent,
     Offset globalPosition,
   })? _resolveCaptureTarget() {
-    _cancelled = false;
-
     final context = PostHogMaskController.instance.containerKey.currentContext;
     final renderObject = context?.findRenderObject() as RenderRepaintBoundary?;
     if (renderObject == null ||
@@ -580,6 +585,7 @@ class ScreenshotCapturer {
   }
 
   Future<ImageInfo?> _buildOcclusionPlaceholder() async {
+    final cancellationGeneration = _cancellationGeneration;
     final target = _resolveCaptureTarget();
     if (target == null) {
       return null;
@@ -615,7 +621,8 @@ class ScreenshotCapturer {
       picture.dispose();
     }
 
-    if (_cancelled || !placeholderImage.isValidSize) {
+    if (cancellationGeneration != _cancellationGeneration ||
+        !placeholderImage.isValidSize) {
       placeholderImage.dispose();
       return null;
     }
@@ -627,7 +634,9 @@ class ScreenshotCapturer {
       placeholderImage.dispose();
     }
 
-    if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
+    if (cancellationGeneration != _cancellationGeneration ||
+        pngBytes == null ||
+        pngBytes.isEmpty) {
       return null;
     }
 
@@ -651,6 +660,10 @@ class ScreenshotCapturer {
         lifecycleState == ui.AppLifecycleState.resumed;
   }
 
+  bool _shouldAbortCapture(int screenshotGeneration) =>
+      screenshotGeneration != _screenshotGeneration ||
+      !_canCaptureInCurrentLifecycle;
+
   /// Captures one Flutter frame, or null when there is nothing to send. Never
   /// throws.
   Future<ImageInfo?> captureScreenshot() async {
@@ -658,11 +671,9 @@ class ScreenshotCapturer {
       return null;
     }
 
-    // Cleared again in _resolveCaptureTarget, but that runs after the round trip
-    // below — whose post-await check would veto this capture on a prior flag.
-    _cancelled = false;
+    final screenshotGeneration = _screenshotGeneration;
     final state = await _nativeCommunicator.getSessionReplayState();
-    if (_cancelled || !_canCaptureInCurrentLifecycle) {
+    if (_shouldAbortCapture(screenshotGeneration)) {
       return null;
     }
     if (!state.isActive) {
@@ -678,12 +689,15 @@ class ScreenshotCapturer {
     if (previousSessionId != null && state.sessionId != previousSessionId) {
       onSessionRotated?.call();
     }
-    return _captureScreenshot(
-        state.sessionId, _sessionGeneration, state.secure);
+    return _captureScreenshot(state.sessionId, _sessionGeneration, state.secure,
+        screenshotGeneration);
   }
 
-  Future<ImageInfo?> _captureScreenshot(
-      String? sessionId, int generation, bool secureAtCapture) {
+  Future<ImageInfo?> _captureScreenshot(String? sessionId, int generation,
+      bool secureAtCapture, int screenshotGeneration) {
+    if (_shouldAbortCapture(screenshotGeneration)) {
+      return Future.value(null);
+    }
     final target = _resolveCaptureTarget();
     if (target == null) {
       return Future.value(null);
@@ -715,7 +729,7 @@ class ScreenshotCapturer {
       Future(() async {
         // wait the UI to settle
         await SchedulerBinding.instance.endOfFrame;
-        if (_cancelled || !_canCaptureInCurrentLifecycle) {
+        if (_shouldAbortCapture(screenshotGeneration)) {
           completer.complete(null);
           return;
         }
@@ -740,7 +754,7 @@ class ScreenshotCapturer {
         image = await renderObject.toImage(pixelRatio: pixelRatio);
 
         final currentImage = image;
-        if (_cancelled) {
+        if (_shouldAbortCapture(screenshotGeneration)) {
           currentImage?.dispose();
           image = null;
           completer.complete(null);
@@ -765,15 +779,11 @@ class ScreenshotCapturer {
         }
         final canvas = Canvas(currentRecorder);
 
-        // Re-checked right before the raster-thread work: the app may have
-        // left the foreground since the capture started.
-        Uint8List? imageBytes = _canCaptureInCurrentLifecycle
-            ? await _getImageBytes(
-                currentImage,
-                format: ui.ImageByteFormat.rawRgba,
-              )
-            : null;
-        if (_cancelled) {
+        Uint8List? imageBytes = await _getImageBytes(
+          currentImage,
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        if (_shouldAbortCapture(screenshotGeneration)) {
           currentRecorder.endRecording().dispose();
           recorder = null;
           currentImage.dispose();
@@ -841,13 +851,6 @@ class ScreenshotCapturer {
           image = null;
         }
 
-        if (_cancelled) {
-          currentRecorder.endRecording().dispose();
-          recorder = null;
-          completer.complete(null);
-          return;
-        }
-
         if (maskElements.isNotEmpty) {
           _imageMaskPainter.drawMaskedImage(
             canvas,
@@ -867,7 +870,7 @@ class ScreenshotCapturer {
           final specs = pvRects.captured
               .map((v) => _viewSpec(v.data, globalPosition))
               .toList();
-          if (!_canCaptureInCurrentLifecycle) {
+          if (_shouldAbortCapture(screenshotGeneration)) {
             currentRecorder.endRecording().dispose();
             recorder = null;
             completer.complete(null);
@@ -875,13 +878,10 @@ class ScreenshotCapturer {
           }
           final bytesList =
               await _nativeCommunicator.captureNativeScreenshots(specs);
-          if (_cancelled) {
-            currentRecorder.endRecording().dispose();
-            recorder = null;
-            completer.complete(null);
-            return;
-          }
           for (var i = 0; i < pvRects.captured.length; i++) {
+            if (_shouldAbortCapture(screenshotGeneration)) {
+              break;
+            }
             final spec = specs[i];
             final bytes = i < bytesList.length ? bytesList[i] : null;
             await _compositeRevealedView(canvas, pvRects.captured[i], bytes,
@@ -899,14 +899,14 @@ class ScreenshotCapturer {
         }
 
         try {
-          if (!_canCaptureInCurrentLifecycle) {
+          if (_shouldAbortCapture(screenshotGeneration)) {
             completer.complete(null);
             return;
           }
           finalImage = await currentPicture.toImage(imageWidth, imageHeight);
 
           final currentFinalImage = finalImage;
-          if (_cancelled) {
+          if (_shouldAbortCapture(screenshotGeneration)) {
             currentFinalImage?.dispose();
             finalImage = null;
             completer.complete(null);
@@ -923,10 +923,10 @@ class ScreenshotCapturer {
           try {
             _pendingImageBytesHash = preMaskHash;
 
-            final pngBytes = _canCaptureInCurrentLifecycle
-                ? await _getImageBytes(currentFinalImage)
-                : null;
-            if (_cancelled || pngBytes == null || pngBytes.isEmpty) {
+            final pngBytes = await _getImageBytes(currentFinalImage);
+            if (_shouldAbortCapture(screenshotGeneration) ||
+                pngBytes == null ||
+                pngBytes.isEmpty) {
               completer.complete(null);
               return;
             }

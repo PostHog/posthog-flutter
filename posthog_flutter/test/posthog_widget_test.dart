@@ -92,6 +92,11 @@ void main() {
       return tester.state<PostHogWidgetState>(find.byType(PostHogWidget));
     }
 
+    tearDown(() {
+      TestWidgetsFlutterBinding.instance
+          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    });
+
     Future<void> unmount(WidgetTester tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpWidget(const SizedBox());
@@ -124,6 +129,19 @@ void main() {
       // inactive still renders frames, so the widget can mount.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       final state = await mountReplay(tester);
+      expect(state.debugChangeDetectorRunning, isFalse);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(state.debugChangeDetectorRunning, isTrue);
+      await unmount(tester);
+    }, skip: kIsWeb);
+
+    testWidgets('recording enabled while paused starts sampling on resume',
+        (tester) async {
+      final state = await mountReplay(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      PostHogInternalEvents.sessionRecordingActive.value = false;
+      PostHogInternalEvents.sessionRecordingActive.value = true;
       expect(state.debugChangeDetectorRunning, isFalse);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);

@@ -249,13 +249,16 @@ class PostHogWidgetState extends State<PostHogWidget>
       if (_pausedByLifecycle) {
         _pausedByLifecycle = false;
         _changeDetector?.start();
+        if (_isCapturing) {
+          _sampleRequestedDuringCapture = true;
+        }
       }
     } else {
       if (_changeDetector?.isRunning ?? false) {
         _pausedByLifecycle = true;
       }
       _changeDetector?.stop();
-      _screenshotCapturer?.cancel();
+      _screenshotCapturer?.cancelScreenshotCapture();
     }
   }
 

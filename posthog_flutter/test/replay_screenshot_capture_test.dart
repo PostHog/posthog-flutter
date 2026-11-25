@@ -107,6 +107,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
+  final mobilePlatforms =
+      TargetPlatformVariant({TargetPlatform.android, TargetPlatform.iOS});
+
   testWidgets('capture skips inactive apps and resumes in the foreground',
       (tester) async {
     final config = await mount(tester, 1.0);
@@ -137,7 +140,7 @@ void main() {
     expect(completed, isTrue);
     expect(await capture, isNotNull);
     await unmount(tester);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }, variant: mobilePlatforms);
 
   for (final state in [
     AppLifecycleState.paused,
@@ -160,7 +163,7 @@ void main() {
             .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       }
       await unmount(tester);
-    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+    }, variant: mobilePlatforms);
   }
 
   testWidgets(
@@ -183,12 +186,14 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     }
     await unmount(tester);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }, variant: mobilePlatforms);
 
   testWidgets('capture drops the frame when the app becomes inactive',
       (tester) async {
     final config = await mount(tester, 1.0);
     final capturer = ScreenshotCapturer(config);
+    final previousStateRequests =
+        calls.where((call) => call.method == 'getSessionReplayState').length;
     var completed = false;
     final capture = capturer.captureScreenshot().whenComplete(() {
       completed = true;
@@ -204,11 +209,13 @@ void main() {
       await settleUntil(tester, () => completed);
       expect(completed, isTrue);
       expect(await capture, isNull);
+      expect(calls.where((call) => call.method == 'getSessionReplayState'),
+          hasLength(previousStateRequests + 1));
     } finally {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     }
     await unmount(tester);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+  }, variant: mobilePlatforms);
 
   for (final configured in <double?>[null, 1.0, 0.5, 0.333, 0.1]) {
     final scale = configured ?? 1.0;
