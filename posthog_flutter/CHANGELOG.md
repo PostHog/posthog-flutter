@@ -1,5 +1,11 @@
 ## Next
 
+## 6.0.2
+
+### Patch Changes
+
+- cb84087: Fix session replay capturing screenshots while the app is not in the foreground, which could crash Impeller on Android when the app moves to the background.
+
 ## 6.0.1
 
 ### Patch Changes
