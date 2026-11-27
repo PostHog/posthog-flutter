@@ -1,5 +1,5 @@
 ---
-title: "PostHog Flutter SDK 6.x (experimental)"
+title: "PostHog Flutter SDK 6.x"
 sidebar: Docs
 showTitle: true
 contentMaxWidthClass: max-w-full
@@ -142,7 +142,9 @@ tableOfContents:
 ## Getting started
 
 
-The Flutter SDK runs in iOS, Android, macOS, and web apps.
+The Flutter SDK runs in iOS, Android, macOS, Windows, Linux, and web apps.
+
+It requires Flutter 3.41 or later, iOS 15 or macOS 12 with Xcode 26 and Swift Package Manager, and Android `minSdkVersion` 23. iOS add-to-app modules need Flutter 3.50 or later.
 
 To send your first event, add `posthog_flutter`, then call `setup` once before `runApp` with your project token and host from your [project settings](https://app.posthog.com/project/settings).
 
@@ -151,8 +153,17 @@ Use `capture` for your own events, and call `flush` and `close` before the app e
 Install the package:
 
 ```bash
-flutter pub add posthog_flutter
+flutter pub add "posthog_flutter:^6.0.0"
 ```
+
+This adds `posthog_flutter: ^6.0.0` to the `dependencies` in your `pubspec.yaml`. The caret constraint resolves to the newest 6.x release and never to 7.0 or later:
+
+```yaml
+dependencies:
+  posthog_flutter: ^6.0.0
+```
+
+On Windows, `cmd` can drop the `^`. If the line reads `posthog_flutter: 6.0.0`, add the `^` back and run `flutter pub get`.
 
 Initialize the SDK once, before `runApp`, with your project token and host:
 
@@ -184,6 +195,51 @@ Flush queued events and shut the SDK down before the app exits:
 await Posthog().flush();
 await Posthog().close();
 ```
+
+### Offline behavior
+
+On Android and Apple platforms, the SDK keeps capturing events while the device is offline. Events are queued in device file storage and flushed when the app restarts with a network connection.
+
+- `maxQueueSize` sets the maximum number of queued events.
+- When the queue is full, the oldest event is evicted first.
+
+### Reproducible Android builds and Shorebird
+
+`posthog_flutter` allows a range of versions of the native PostHog Android SDK, which depends on the PostHog core library. Gradle can pick a newer native version even when your `posthog_flutter` version stays the same, and `pubspec.lock` doesn't lock Gradle dependencies.
+
+[Shorebird](https://docs.shorebird.dev/code-push/troubleshooting/) patches can't update native Android code. Pin both native libraries before you create a release, so the release and its patches use the same versions.
+
+From your app's `android` directory, list the versions your release build selects:
+
+```bash
+./gradlew :app:dependencyInsight --dependency com.posthog --configuration releaseRuntimeClasspath
+```
+
+With product flavors, use your release variant's configuration, such as `productionReleaseRuntimeClasspath`. Note the versions of `com.posthog:posthog-android` and `com.posthog:posthog`. Their version numbers differ.
+
+Add those versions as strict constraints in `android/app/build.gradle.kts`:
+
+```kotlin
+dependencies {
+    constraints {
+        implementation("com.posthog:posthog-android") {
+            version { strictly("<android-sdk-version>") }
+        }
+        implementation("com.posthog:posthog") {
+            version { strictly("<core-version>") }
+        }
+    }
+}
+```
+
+In a Groovy `build.gradle`, write `version { strictly "<version>" }` inside each constraint. Gradle can still upgrade a plain version declaration, and a [strict constraint](https://docs.gradle.org/current/userguide/dependency_versions.html#sec:rich-version-constraints) stops that.
+
+Run the dependency report again, build your app, and check that events arrive in PostHog. Commit the constraints and `pubspec.lock`.
+
+- For an existing Shorebird release, use the native versions recorded for that release, not the versions a new build resolves.
+- The pins cover PostHog only. To pin other plugins and build tools, use [Gradle dependency locking](https://docs.gradle.org/current/userguide/dependency_locking.html).
+- Pins also block automatic native bug fixes. When you upgrade PostHog, choose compatible native versions together and test event capture before a new app store release.
+- Don't upgrade native dependencies in a Dart-only patch, and don't force a version below the minimum that `posthog_flutter` requires.
 
 ## Setup
 
@@ -222,6 +278,20 @@ await Posthog().setup(config);
 For Android and iOS, if you are performing a manual setup,
 ensure `com.posthog.posthog.AUTO_INIT: false` is set in your native
 configuration.
+
+On Android, add this to the `<application>` element of
+`android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<meta-data android:name="com.posthog.posthog.AUTO_INIT" android:value="false" />
+```
+
+On iOS, add this to the top-level `<dict>` of `ios/Runner/Info.plist`:
+
+```xml
+<key>com.posthog.posthog.AUTO_INIT</key>
+<false/>
+```
 
 ## Capture
 
@@ -272,6 +342,12 @@ alias and group are dropped because posthog-js sends those events
 without event properties.
 
 Returns a Future that completes when the event has been queued.
+
+On Android and Apple platforms, events captured offline are queued in
+device file storage and sent when the device is online. Queued events
+survive app restarts and are sent after restart when the device is online.
+PostHogConfig.maxQueueSize limits the queue. When full, it drops the
+oldest event first.
 
 **Example**
 
@@ -851,6 +927,38 @@ The property remains active until unregister is called with the same
 
 Returns a Future that completes when the property has been registered.
 
+### `Posthog.registerOptions`
+
+```dart
+Future<void> registerOptions(Map<String, Object?> options)
+```
+
+Registers capture options sent with all following events, such as
+`cookieless_mode` or `disable_skew_correction`. See capture for the
+known keys.
+
+An event's own `options` win over registered ones key by key. On iOS,
+macOS, Android, Windows and Linux, PostHogConfig.beforeSend callbacks
+see and can change the result. New values overwrite registered ones for
+the same keys. They persist across
+app restarts until unregisterOptions removes them or reset clears
+them. A `null` value is ignored.
+
+Use this instead of registering a legacy option property such as
+`$cookieless_mode`.
+
+On web, posthog-js has no options: known keys are registered as their
+legacy properties, with the limits described on capture, and other
+keys are dropped. posthog-js adds them to every event it sends, including
+the ones it captures itself, after PostHogConfig.beforeSend runs, so
+the callbacks don't see them, as for properties added with register.
+
+```dart
+await Posthog().registerOptions({'cookieless_mode': true});
+```
+
+Returns a Future that completes when the options have been registered.
+
 ## Reload feature flags
 
 ### `Posthog.reloadFeatureFlags`
@@ -1136,6 +1244,21 @@ Unregisters a previously registered super property.
 The `key` identifies the property to stop sending with future events.
 
 Returns a Future that completes when the property has been removed.
+
+### `Posthog.unregisterOptions`
+
+```dart
+Future<void> unregisterOptions(String key)
+```
+
+Removes an option registered with registerOptions. Events captured
+afterwards no longer get it, unless they pass it in their own `options`.
+
+```dart
+await Posthog().unregisterOptions('cookieless_mode');
+```
+
+Returns a Future that completes when the option has been removed.
 
 ## SDK utils
 
@@ -1721,9 +1844,11 @@ BeforeSendCallback = PostHogEvent? Function(PostHogEvent event)
 
 Callback to intercept and modify events before they are sent to PostHog.
 
-The `event` argument contains the event name and user-provided properties
-that are about to be captured. Return a possibly modified event to send it,
-or return `null` to drop it.
+The `event` argument is the event about to be captured. On iOS, macOS,
+Android, Windows and Linux it is the built event, with the system and
+registered properties and the options the SDK adds; on web it has only
+the event's own properties. See PostHogConfig.beforeSend. Return a
+possibly modified event to send it, or return `null` to drop it.
 
 Callbacks are synchronous, as in the native SDKs, so the event is sent
 with the user and properties it was captured under.
@@ -2137,6 +2262,26 @@ Whether the SDK emits verbose debug logs.
 
 Defaults to `false`.
 
+#### `PostHogConfig.disableGeoIp`
+
+```dart
+bool disableGeoIp
+```
+
+Whether PostHog skips GeoIP enrichment, so the server doesn't infer the
+user's location from their IP address.
+
+When `true`, events carry `$geoip_disable: true` and feature flag
+requests send `geoip_disable: true`. Event properties and beforeSend
+callbacks can't remove or change it: the SDK sets it again after them.
+Native hooks added with `PosthogFlutterPlugin.addBeforeSend` run later
+and can.
+
+Defaults to `false`.
+
+**Flutter web:** not applied. posthog-js is initialized by your app, so
+set `$geoip_disable: true` on events in its `before_send` instead.
+
 #### `PostHogConfig.enableWindowsAndLinux`
 
 ```dart
@@ -2406,10 +2551,10 @@ Enable Surveys
 - After calling `Posthog().close()`, surveys will not be rendered until the
   SDK is re-initialized and the next navigation event occurs.
 - You must install `PosthogObserver` in your app for surveys to display.
-  - See: https://posthog.com/docs/surveys/installation?tab=Flutter#step-two-install-posthogobserver
+  - See: https://posthog.com/docs/surveys/installation/flutter
 - For Flutter web, this setting will be ignored. Surveys on web use the
   JavaScript Web SDK instead.
-  - See: https://posthog.com/docs/surveys/installation?tab=Web
+  - See: https://posthog.com/docs/surveys/installation/web
 - Surveys are not supported on Windows and Linux, where this setting is
   ignored.
 

@@ -79,8 +79,13 @@ def markdown(node) -> str:
     for text in node.find_all(string=True):  # braces in prose only; code keeps them
         if not text.find_parent(["code", "pre"]):
             text.replace_with(str(text).translate(MDX))
-    md = markdownify(str(node), strip=["a"], heading_style="ATX", bullets="-", code_language="dart")
+    md = markdownify(str(node), strip=["a"], heading_style="ATX", bullets="-", code_language="dart", code_language_callback=fence)
     return md.strip().replace("<br>", "<br />")
+
+
+def fence(pre) -> str | None:
+    """The language of a fenced doc comment block, from dartdoc's `language-xml` class. Dart otherwise."""
+    return next((c.removeprefix("language-") for c in pre.get("class", []) if c.startswith("language-")), None)
 
 
 def capabilities(checkout: str) -> dict[str, str]:
@@ -169,6 +174,15 @@ def nest(markdown: str) -> str:
     return "\n".join(out)
 
 
+def migration_page(guides: list[str]) -> list[str]:
+    """The migration page. One guide's H1 becomes the page title, so the page shows one title."""
+    title = "PostHog Flutter SDK migration guides"
+    if len(guides) == 1 and guides[0].startswith("# "):
+        heading, _, rest = guides[0].partition("\n")
+        title, guides = heading[2:].strip(), [rest.strip()]
+    return [f"---\ntitle: {json.dumps(title)}\nsidebar: Docs\nshowTitle: true\n---", *guides]
+
+
 def write(name: str, sections: list[str]) -> None:
     (ROOT / "references" / name).write_text("\n\n".join(sections) + "\n")
     print(f"wrote references/{name}")
@@ -195,8 +209,7 @@ def main() -> None:
         write("posthog-flutter-reference.md", [front_matter("PostHog Flutter SDK", body), *body])
     # The migration guide lives next to the package, as posthog_flutter/MIGRATION.md.
     if guides := [g for g in [PKG / "MIGRATION.md"] if g.exists()]:
-        head = "---\ntitle: PostHog Flutter SDK migration guides\nsidebar: Docs\nshowTitle: true\n---"
-        write("posthog-flutter-migration.md", [head, *(g.read_text().strip() for g in guides)])
+        write("posthog-flutter-migration.md", migration_page([g.read_text().strip() for g in guides]))
 
 
 if __name__ == "__main__":

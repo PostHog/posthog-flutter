@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-platform :ios, '14.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -32,11 +32,6 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-
-  # Local development against an unreleased PostHog iOS SDK. Inert unless a
-  # gitignored Podfile.local exists; see CONTRIBUTING.md.
-  podfile_local = File.expand_path('Podfile.local', __dir__)
-  instance_eval(File.read(podfile_local), podfile_local) if File.exist?(podfile_local)
 
   target 'RunnerTests' do
     inherit! :search_paths

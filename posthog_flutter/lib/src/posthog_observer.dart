@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 
 import 'posthog.dart';
 import 'surveys/survey_service.dart';
+import 'util/app_lifecycle.dart';
 
 /// Extracts a PostHog screen name from Flutter [RouteSettings].
 ///
@@ -52,11 +53,7 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
   /// Whether the app is currently in the foreground (resumed state).
   /// Screen events are suppressed when the app is not in the foreground
   /// to avoid ghost screen views caused by background widget rebuilds.
-  bool get _isAppInForeground {
-    // If we haven't received a lifecycle state yet, assume foreground
-    final state = WidgetsBinding.instance.lifecycleState;
-    return state == null || state == AppLifecycleState.resumed;
-  }
+  bool get _isAppInForeground => isAppInForeground;
 
   /// The current navigation context, which can be used for showing modals
   /// This is updated whenever routes change (push, pop, replace)
@@ -105,6 +102,9 @@ class PosthogObserver extends RouteObserver<ModalRoute<dynamic>>
     if (context != null) {
       _currentContext = context;
       SurveyService().onContextAvailable();
+      Posthog().reportResolvedAppLanguage(
+        Localizations.maybeLocaleOf(context)?.toLanguageTag(),
+      );
     }
   }
 

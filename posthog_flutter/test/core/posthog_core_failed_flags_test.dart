@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import '../posthog_api_fake.dart';
@@ -56,21 +58,26 @@ void main() {
         () async {
       final storage = tempStorage();
       final client = testClient(server, storage: storage);
-      server.respond = (_) => PostHogResponse.json({
-            'flags': {
-              'failed-false': _flag('failed-false', false, failed: true),
-              'failed-variant':
-                  _flag('failed-variant', 'placeholder', failed: true),
-              'healthy-false': _flag('healthy-false', false, failed: false),
-              'healthy-variant': _flag('healthy-variant', 'blue'),
-            },
-            // Flat mirrors must not reintroduce failed values or payloads.
-            'featureFlags': {'failed-false': true, 'failed-variant': 'mirror'},
-            'featureFlagPayloads': {'failed-variant': '"mirror"'},
-            if (globalError != null) 'errorsWhileComputingFlags': globalError,
-            'requestId': 'request',
-            'evaluatedAt': 123,
-          });
+      server.respond = (request) => !request.isFlags
+          ? const PostHogResponse(HttpStatus.ok)
+          : PostHogResponse.json({
+              'flags': {
+                'failed-false': _flag('failed-false', false, failed: true),
+                'failed-variant':
+                    _flag('failed-variant', 'placeholder', failed: true),
+                'healthy-false': _flag('healthy-false', false, failed: false),
+                'healthy-variant': _flag('healthy-variant', 'blue'),
+              },
+              // Flat mirrors must not reintroduce failed values or payloads.
+              'featureFlags': {
+                'failed-false': true,
+                'failed-variant': 'mirror'
+              },
+              'featureFlagPayloads': {'failed-variant': '"mirror"'},
+              if (globalError != null) 'errorsWhileComputingFlags': globalError,
+              'requestId': 'request',
+              'evaluatedAt': 123,
+            });
 
       await client.reloadFeatureFlagsAsync();
 

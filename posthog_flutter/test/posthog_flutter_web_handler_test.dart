@@ -80,6 +80,152 @@ void main() {
     });
   });
 
+  group('handleWebMethodCall reloadFeatureFlags', () {
+    late JSFunction? listener;
+    late int reloads;
+    late int unsubscribes;
+
+    /// Installs a fake posthog-js whose reload answers with [answer], if any.
+    void installFake({
+      Map<String, Object?> config = const {},
+      ({Map<String, Object> variants, bool errorsLoading})? answer,
+      Duration answerAfter = Duration.zero,
+      String? asyncStatus,
+    }) {
+      listener = null;
+      reloads = 0;
+      unsubscribes = 0;
+      var current = {'cached': true}.jsify()!;
+      final featureFlags = JSObject()
+        ..setProperty('getFlagVariants'.toJS, (() => current).toJS);
+      if (asyncStatus != null) {
+        featureFlags.setProperty(
+          'reloadFeatureFlagsAsync'.toJS,
+          (() => Future(() {
+                current = {'fresh': 'v2'}.jsify()!;
+                return {'status': asyncStatus}.jsify();
+              }).toJS).toJS,
+        );
+      }
+      final fake = JSObject()
+        ..setProperty('featureFlags'.toJS, featureFlags)
+        ..setProperty('config'.toJS, config.jsify())
+        ..setProperty(
+          'onFeatureFlags'.toJS,
+          ((JSFunction callback) {
+            listener = callback;
+            callback.callAsFunction(null, <String>[].jsify(), current);
+            return (() => unsubscribes++).toJS;
+          }).toJS,
+        )
+        ..setProperty(
+          'reloadFeatureFlags'.toJS,
+          (() {
+            reloads++;
+            if (answer == null) return;
+            Future.delayed(
+                answerAfter,
+                () => listener?.callAsFunction(
+                      null,
+                      answer.variants.keys.toList().jsify(),
+                      answer.variants.jsify(),
+                      {'errorsLoading': answer.errorsLoading}.jsify(),
+                    ));
+          }).toJS,
+        );
+      globalContext.setProperty('posthog'.toJS, fake);
+    }
+
+    test('completes with the flags the reload delivers, not the replayed ones',
+        () async {
+      installFake(answer: (variants: {'fresh': 'v2'}, errorsLoading: true));
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': true,
+      });
+      expect(unsubscribes, 1);
+    });
+
+    test('awaits reloadFeatureFlagsAsync when posthog-js has it', () async {
+      installFake(asyncStatus: 'loaded');
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': false,
+      });
+      expect(reloads, 0);
+    });
+
+    test('reports an error when reloadFeatureFlagsAsync skips the request',
+        () async {
+      installFake(asyncStatus: 'skipped');
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result['errorsLoading'], isTrue);
+    });
+
+    test('completes right away with an error when flags are disabled',
+        () async {
+      installFake(config: {'advanced_disable_feature_flags': true});
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'cached': true},
+        'errorsLoading': true,
+      });
+      expect(reloads, 0);
+    });
+
+    test('waits for a reload that posthog-js retries after a timeout',
+        () async {
+      // Past twice the request timeout, but within one retry after 500 ms.
+      installFake(
+        config: {'feature_flag_request_timeout_ms': 20},
+        answer: (variants: {'fresh': 'v2'}, errorsLoading: false),
+        answerAfter: const Duration(milliseconds: 300),
+      );
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'fresh': 'v2'},
+        'errorsLoading': false,
+      });
+    });
+
+    test('completes with an error when posthog-js never calls back', () async {
+      installFake(config: {'feature_flag_request_timeout_ms': 5});
+
+      final result =
+          await handleWebMethodCall(const MethodCall('reloadFeatureFlags'))
+              as Map<String, Object?>;
+
+      expect(result, {
+        'variants': {'cached': true},
+        'errorsLoading': true,
+      });
+      expect(reloads, 1);
+      expect(unsubscribes, 1);
+    });
+  });
+
   group('handleWebMethodCall addExceptionStep', () {
     String? capturedMessage;
     JSAny? capturedProperties;
@@ -162,6 +308,51 @@ void main() {
         'count': 3,
         'at': '2026-01-02 00:00:00.000Z',
       });
+    });
+  });
+
+  group('PosthogFlutterWeb registerOptions', () {
+    late List<Object?> registered;
+    late List<String> unregistered;
+
+    setUp(() {
+      registered = [];
+      unregistered = [];
+      final fake = JSObject();
+      fake.setProperty(
+        'register'.toJS,
+        ((JSAny properties) {
+          registered.add(properties.dartify());
+        }).toJS,
+      );
+      fake.setProperty(
+        'unregister'.toJS,
+        ((JSString key) {
+          unregistered.add(key.toDart);
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    });
+
+    test('registers known options as their legacy properties', () async {
+      await PosthogFlutterWeb().registerOptions({
+        'cookieless_mode': true,
+        'disable_skew_correction': true,
+        'unknown_option': 1,
+        'unset': null,
+      });
+
+      expect(registered, [
+        {r'$cookieless_mode': true},
+        {r'$ignore_sent_at': true},
+      ]);
+    });
+
+    test('unregisters the legacy property of a known option only', () async {
+      await PosthogFlutterWeb().unregisterOptions('disable_skew_correction');
+      await PosthogFlutterWeb().unregisterOptions('unknown_option');
+
+      expect(unregistered, [r'$ignore_sent_at']);
     });
   });
 
@@ -272,6 +463,47 @@ void main() {
         });
       });
     }
+  });
+
+  group('PosthogFlutterWeb isFeatureEnabled defaultValue', () {
+    late Object? receivedOptions;
+
+    void installFlagValue(JSAny? value) {
+      final fake = JSObject();
+      fake.setProperty(
+        'isFeatureEnabled'.toJS,
+        ((JSString key, JSAny? options) {
+          receivedOptions = options.dartify();
+          return value;
+        }).toJS,
+      );
+      globalContext.setProperty('posthog'.toJS, fake);
+    }
+
+    for (final (name, value, defaultValue, expected)
+        in <(String, JSAny?, bool, bool)>[
+      ('missing flag returns default true', null, true, true),
+      ('missing flag returns default false', null, false, false),
+      ('false flag beats default true', false.toJS, true, false),
+      ('variant beats default false', true.toJS, false, true),
+    ]) {
+      test(name, () async {
+        installFlagValue(value);
+
+        expect(
+            await PosthogFlutterWeb()
+                .isFeatureEnabled('flag', defaultValue: defaultValue),
+            expected);
+      });
+    }
+
+    test('does not pass the default to posthog-js', () async {
+      installFlagValue(null);
+
+      await PosthogFlutterWeb().isFeatureEnabled('flag', defaultValue: true);
+
+      expect(receivedOptions, <String, Object?>{});
+    });
   });
 
   group('PosthogFlutterWeb getAllFeatureFlags', () {

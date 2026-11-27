@@ -190,11 +190,13 @@ class _CapturePlatform extends PosthogFlutterPlatformFake {
     required Object error,
     StackTrace? stackTrace,
     Map<String, Object>? properties,
+    Map<String, Object?>? options,
   }) async {
     await super.captureException(
       error: error,
       stackTrace: stackTrace,
       properties: properties,
+      options: options,
     );
     captures.add(capturedExceptions.last);
   }

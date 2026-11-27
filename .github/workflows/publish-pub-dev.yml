@@ -75,7 +75,7 @@ jobs:
       # setup-dart registers a pub.dev OIDC token that breaks public dependency downloads.
       # Authenticate only after dependency resolution and package validation have succeeded.
       - name: Setup Dart
-        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+        uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1.8.2
 
       - name: Publish to pub.dev
         working-directory: ./posthog_flutter
