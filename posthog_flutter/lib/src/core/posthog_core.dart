@@ -137,6 +137,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
   }
 
   @override
+  @override
   Map<String, Object?> getCommonEventProperties() {
     final featureFlags = _getFeatureFlags() ?? const {};
     final activeFeatureFlags = [
@@ -154,6 +155,7 @@ abstract class PostHogCore extends PostHogCoreStateless {
     };
   }
 
+  @override
   @override
   bool isMinimalFlagCalledEventsEnabled() =>
       _getStoredFlagDetails()?.minimalFlagCalledEvents == true;
@@ -367,13 +369,6 @@ abstract class PostHogCore extends PostHogCoreStateless {
       logger.warn('bootstrap.distinctId differs from the identified user '
           'stored on this device, which is kept. Call reset() before '
           'creating the client to switch users.');
-    } else if (optedOut) {
-      // identify() ignores calls while opted out, but opting out only stops
-      // events: the identity is still reconciled for a later opt-in.
-      if (_personProfiles != PostHogPersonProfiles.never) {
-        setPersistedProperty(PostHogPersistedProperty.distinctId, distinctId);
-        setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
-      }
     } else {
       identify(distinctId);
     }
@@ -391,10 +386,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
   /// - A different id while already identified is ignored: call [reset]
   ///   first to switch users.
   ///
-  /// An empty [distinctId] is ignored, as are all calls while opted out or
-  /// when `personProfiles` is `never`.
-  ///
-  /// The optional [options] are sent with the event this call sends.
+  /// An empty [distinctId] is ignored, as are all calls when
+  /// `personProfiles` is `never`. While opted out the identity, the person
+  /// properties for flags and the flags themselves are still updated; only
+  /// the event is left out.
   void identify(
     String distinctId, {
     Map<String, Object?>? userProperties,
@@ -407,8 +402,15 @@ abstract class PostHogCore extends PostHogCoreStateless {
             'This call will be ignored.');
         return;
       }
-      if (_ignoredWhileOptedOut('posthog.identify')) return;
       if (!_requirePersonProcessing('posthog.identify')) return;
+
+      // Opting out stops events, not identity: the distinct id, the person
+      // properties for flags and the flags themselves still follow the user.
+      final isOptedOut = optedOut;
+      if (isOptedOut) {
+        logger.info('posthog.identify was called while opted out. The '
+            'identity is updated, but no event is captured.');
+      }
 
       final previousDistinctId = getDistinctId();
       final isIdentified = _isIdentified();
@@ -431,46 +433,59 @@ abstract class PostHogCore extends PostHogCoreStateless {
         _setPersonPropertiesForFlagsIfNeeded(
             userProperties, userPropertiesSetOnce);
 
-        final identifyProperties = _enrichProperties({
-          'distinct_id': distinctId,
-          r'$anon_distinct_id': previousDistinctId,
-          ...maybeAdd(r'$set', userProperties),
-          ...maybeAdd(r'$set_once', userPropertiesSetOnce),
-        }, event: r'$identify');
-        final identifyOptions =
-            _withRegisteredOptions(options, event: r'$identify');
-        identifyStateless(
-          distinctId,
-          properties: identifyProperties,
-          options: identifyOptions,
-        );
-        if (userProperties != null || userPropertiesSetOnce != null) {
-          _recordSentPersonProperties(
-            _processPersonProfile(identifyProperties, identifyOptions),
-            _personPropertiesHash(
-                distinctId, userProperties, userPropertiesSetOnce),
+        if (!isOptedOut) {
+          final identifyProperties = _enrichProperties({
+            'distinct_id': distinctId,
+            r'$anon_distinct_id': previousDistinctId,
+            ...maybeAdd(r'$set', userProperties),
+            ...maybeAdd(r'$set_once', userPropertiesSetOnce),
+          }, event: r'$identify');
+          final identifyOptions =
+              _withRegisteredOptions(options, event: r'$identify');
+          identifyStateless(
+            distinctId,
+            properties: identifyProperties,
+            options: identifyOptions,
           );
+          // Only an event that was captured can make the next one a duplicate.
+          if (userProperties != null || userPropertiesSetOnce != null) {
+            _recordSentPersonProperties(
+              _processPersonProfile(identifyProperties, identifyOptions),
+              _personPropertiesHash(
+                  distinctId, userProperties, userPropertiesSetOnce),
+            );
+          }
         }
         _reloadFeatureFlags();
       } else if (!isIdentified) {
         // There is no anonymous history to link: the id already is the
         // anonymous one, so the transition is recorded with a $set.
         setPersistedProperty(PostHogPersistedProperty.personMode, 'identified');
-        capture(r'$set',
-            properties: {
-              r'$set': userProperties ?? {},
-              r'$set_once': userPropertiesSetOnce ?? {},
-            },
-            options: options);
+        if (isOptedOut) {
+          _setPersonPropertiesForFlagsIfNeeded(
+              userProperties, userPropertiesSetOnce);
+        } else {
+          capture(r'$set',
+              properties: {
+                r'$set': userProperties ?? {},
+                r'$set_once': userPropertiesSetOnce ?? {},
+              },
+              options: options);
+        }
         if (hasUserProperties) _reloadFeatureFlags();
       } else if (hasUserProperties) {
         // Person property changes are processed asynchronously by PostHog,
         // so reloading flags right away would not see them.
-        setPersonProperties(
-          userPropertiesToSet: userProperties,
-          userPropertiesToSetOnce: userPropertiesSetOnce,
-          options: options,
-        );
+        if (isOptedOut) {
+          _setPersonPropertiesForFlagsIfNeeded(
+              userProperties, userPropertiesSetOnce);
+        } else {
+          setPersonProperties(
+            userPropertiesToSet: userProperties,
+            userPropertiesToSetOnce: userPropertiesSetOnce,
+            options: options,
+          );
+        }
       } else {
         logger.info('identify was called with the current distinct id of an '
             'identified user and no properties. This call will be ignored.');
@@ -1281,8 +1296,10 @@ abstract class PostHogCore extends PostHogCoreStateless {
     setPersistedProperty(PostHogPersistedProperty.enablePersonProcessing, true);
   }
 
-  /// Event-producing calls do nothing while opted out: identity, groups and
-  /// person properties must not change without the event that reports them.
+  /// Event-producing calls do nothing while opted out: groups and person
+  /// properties must not change without the event that reports them.
+  /// [identify] is the exception the spec carves out, and handles opt-out
+  /// itself.
   bool _ignoredWhileOptedOut(String functionName) {
     if (!optedOut) return false;
     logger.info(
