@@ -118,6 +118,9 @@
                 if let introScreenButtonText = appearance.introScreenButtonText {
                     appearanceDict["introScreenButtonText"] = introScreenButtonText
                 }
+                if let position = appearance.position {
+                    appearanceDict["position"] = position
+                }
                 dict["appearance"] = appearanceDict
             }
 

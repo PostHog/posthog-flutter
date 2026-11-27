@@ -124,7 +124,8 @@ class _ChoiceQuestionWidgetState extends State<ChoiceQuestionWidget> {
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final headerFooterHeight = 350; //estimated
     final availableHeight =
-        screenHeight - headerFooterHeight - keyboardHeight - bottomPadding;
+        (screenHeight - headerFooterHeight - keyboardHeight - bottomPadding)
+            .clamp(120.0, double.infinity);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

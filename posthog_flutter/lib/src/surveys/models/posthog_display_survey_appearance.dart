@@ -29,6 +29,7 @@ class PostHogDisplaySurveyAppearance {
     this.introScreenDescription,
     this.introScreenDescriptionContentType,
     this.introScreenButtonText,
+    this.position,
   });
 
   final String? fontFamily;
@@ -60,4 +61,5 @@ class PostHogDisplaySurveyAppearance {
   final String? introScreenDescription;
   final PostHogDisplaySurveyTextContentType? introScreenDescriptionContentType;
   final String? introScreenButtonText;
+  final String? position;
 }

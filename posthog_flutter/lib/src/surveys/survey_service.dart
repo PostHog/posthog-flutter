@@ -23,6 +23,17 @@ Duration surveyPopupDelay(double? seconds) {
   return Duration(milliseconds: (seconds * 1000).round());
 }
 
+const surveyCardAlignments = {
+  'top_left': Alignment.topLeft,
+  'top_center': Alignment.topCenter,
+  'top_right': Alignment.topRight,
+  'middle_left': Alignment.centerLeft,
+  'middle_center': Alignment.center,
+  'middle_right': Alignment.centerRight,
+  'left': Alignment.bottomLeft,
+  'right': Alignment.bottomRight,
+};
+
 /// A service that manages displaying surveys
 ///
 /// This service uses the PosthogObserver to access the current navigation context
@@ -138,35 +149,47 @@ class SurveyService {
     final programmaticDismissal = Completer<void>();
     _programmaticDismissal = programmaticDismissal;
     try {
-      final modalDismissal = showModalBottomSheet<void>(
-        context: context,
-        useRootNavigator: true,
-        isScrollControlled: true,
-        isDismissible: false,
-        builder: (context) {
-          final route = ModalRoute.of(context);
-          if (_programmaticDismissal == programmaticDismissal &&
-              !_isDismissingSurvey) {
-            _currentSurveyRoute = route;
-            if (_dismissSurveyWhenReady && route != null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (_currentSurveyRoute == route &&
-                    _programmaticDismissal == programmaticDismissal) {
-                  _dismissSurveyRoute(route, programmaticDismissal);
-                }
-              });
-            }
+      final cardAlignment = surveyCardAlignments[survey.appearance?.position];
+      Widget builder(BuildContext context) {
+        final route = ModalRoute.of(context);
+        if (_programmaticDismissal == programmaticDismissal &&
+            !_isDismissingSurvey) {
+          _currentSurveyRoute = route;
+          if (_dismissSurveyWhenReady && route != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_currentSurveyRoute == route &&
+                  _programmaticDismissal == programmaticDismissal) {
+                _dismissSurveyRoute(route, programmaticDismissal);
+              }
+            });
           }
-          return _buildSurveyWidget(survey, onShown, onResponse, (survey) {
-            if (_programmaticDismissal != programmaticDismissal) {
-              return;
-            }
-            _isDismissingSurvey = true;
-            _currentSurveyRoute = null;
-            onClosed(survey);
-          });
-        },
-      );
+        }
+        return _buildSurveyWidget(survey, onShown, onResponse, (survey) {
+          if (_programmaticDismissal != programmaticDismissal) {
+            return;
+          }
+          _isDismissingSurvey = true;
+          _currentSurveyRoute = null;
+          onClosed(survey);
+        });
+      }
+
+      final modalDismissal = cardAlignment == null
+          ? showModalBottomSheet<void>(
+              context: context,
+              useRootNavigator: true,
+              isScrollControlled: true,
+              isDismissible: false,
+              builder: builder,
+            )
+          : showGeneralDialog<void>(
+              context: context,
+              useRootNavigator: true,
+              barrierDismissible: false,
+              barrierColor: Colors.black54,
+              pageBuilder: (context, _, __) =>
+                  _buildSurveyCard(context, cardAlignment, builder(context)),
+            );
       // removeRoute did not complete a route's future before Flutter 3.32.
       await Future.any([modalDismissal, programmaticDismissal.future]);
     } catch (e) {
@@ -196,6 +219,42 @@ class SurveyService {
       onResponse: onResponse,
       onClosed: onClosed,
       appearance: SurveyAppearance.fromPostHog(survey.appearance),
+    );
+  }
+
+  Widget _buildSurveyCard(
+    BuildContext context,
+    Alignment alignment,
+    Widget survey,
+  ) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16) +
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: LayoutBuilder(
+          builder: (context, constraints) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              size: constraints.biggest,
+              padding: EdgeInsets.zero,
+              viewPadding: EdgeInsets.zero,
+              viewInsets: EdgeInsets.zero,
+            ),
+            child: Align(
+              alignment: alignment,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: survey,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
